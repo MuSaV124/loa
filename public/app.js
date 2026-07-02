@@ -1,5 +1,6 @@
 const form = document.querySelector('#searchForm');
 const input = document.querySelector('#characterName');
+const searchButton = document.querySelector('#searchButton');
 const statusBox = document.querySelector('#status');
 const characterCard = document.querySelector('#characterCard');
 const summaryCard = document.querySelector('#summaryCard');
@@ -22,6 +23,11 @@ function hideCards() {
   characterCard.classList.add('hidden');
   summaryCard.classList.add('hidden');
   extractCard.classList.add('hidden');
+}
+
+function setLoading(isLoading) {
+  searchButton.disabled = isLoading;
+  searchButton.textContent = isLoading ? '검색...' : '검색';
 }
 
 async function readJsonResponse(response) {
@@ -50,12 +56,12 @@ function renderSummary(data) {
   summaryCard.innerHTML = `
     <h2>검색 결과 확인</h2>
     <div class="grid">
-<div class="metric"><b>직업</b>${escapeHtml(s.characterClass || '-')}</div>
-      <div class="metric"><b>서버</b>${escapeHtml(s.serverName || '-')}</div>
+      <div class="metric"><b>직업</b>${escapeHtml(s.characterClass || '-')}</div>
       <div class="metric"><b>아이템 레벨</b>${escapeHtml(s.itemLevel || '-')}</div>
+      <div class="metric"><b>서버</b>${escapeHtml(s.serverName || '-')}</div>
       <div class="metric"><b>치명</b>${escapeHtml(stats.crit || 0)}</div>
-      <div class="metric"><b>특화</b>${escapeHtml(stats.specialization || 0)}</div>
       <div class="metric"><b>신속</b>${escapeHtml(stats.swiftness || 0)}</div>
+      <div class="metric"><b>특화</b>${escapeHtml(stats.specialization || 0)}</div>
       <div class="metric"><b>진화</b>${escapeHtml(ark.evolution || 0)}</div>
       <div class="metric"><b>깨달음</b>${escapeHtml(ark.enlightenment || 0)}</div>
       <div class="metric"><b>도약</b>${escapeHtml(ark.leap || 0)}</div>
@@ -65,19 +71,27 @@ function renderSummary(data) {
   summaryCard.classList.remove('hidden');
 }
 
-function renderExtractPlaceholder() {
+function formatPercent(effect) {
+  const value = Number(effect?.value || 0);
+  if (!Number.isFinite(value) || value === 0) return '-';
+  const text = Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.00$/, '').replace(/0$/, '');
+  return `${text}%`;
+}
+
+function renderExtractResult(data) {
+  const e = data.extractedEffects || {};
   extractCard.innerHTML = `
     <h2>자동 추출 결과</h2>
     <div class="grid">
-      <div class="metric"><b>진화형 피해</b>-</div>
-      <div class="metric"><b>적에게 주는 피해</b>-</div>
-      <div class="metric"><b>추가 피해</b>-</div>
-      <div class="metric"><b>치명타 적중률</b>-</div>
-      <div class="metric"><b>치명타 피해</b>-</div>
-      <div class="metric"><b>공격속도</b>-</div>
-      <div class="metric"><b>이동속도</b>-</div>
+      <div class="metric"><b>진화형 피해</b>${escapeHtml(formatPercent(e.evolutionDamage))}</div>
+      <div class="metric"><b>적에게 주는 피해</b>${escapeHtml(formatPercent(e.damageToEnemy))}</div>
+      <div class="metric"><b>추가 피해</b>${escapeHtml(formatPercent(e.additionalDamage))}</div>
+      <div class="metric"><b>치명타 적중률</b>${escapeHtml(formatPercent(e.critRate))}</div>
+      <div class="metric"><b>치명타 피해</b>${escapeHtml(formatPercent(e.critDamage))}</div>
+      <div class="metric"><b>공격속도</b>${escapeHtml(formatPercent(e.attackSpeed))}</div>
+      <div class="metric"><b>이동속도</b>${escapeHtml(formatPercent(e.moveSpeed))}</div>
     </div>
-    <p class="note">다음 버전부터 진화/깨달음/도약 노드에서 자동 추출됩니다.</p>
+    <p class="note">v1.0.7: 진화/깨달음/도약 노드 문구에서 주요 효과 수치를 추출합니다. 스킬 트라이포드는 다음 단계에서 분리 적용합니다.</p>
   `;
   extractCard.classList.remove('hidden');
 }
@@ -88,6 +102,7 @@ form.addEventListener('submit', async (event) => {
   if (!name) return showStatus('캐릭터명을 입력해줘.', true);
 
   hideCards();
+  setLoading(true);
   showStatus('캐릭터 정보를 불러오는 중...');
 
   try {
@@ -98,8 +113,10 @@ form.addEventListener('submit', async (event) => {
     hideStatus();
     renderCharacter(data);
     renderSummary(data);
-    renderExtractPlaceholder();
+    renderExtractResult(data);
   } catch (error) {
     showStatus(error.message, true);
+  } finally {
+    setLoading(false);
   }
 });

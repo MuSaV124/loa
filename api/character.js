@@ -1,5 +1,5 @@
 const LOSTARK_BASE_URL = 'https://developer-lostark.game.onstove.com';
-const VERSION = '1.0.5';
+const VERSION = '1.0.7';
 
 function json(res, status, body) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -80,6 +80,106 @@ function getArkPoint(arkpassive, name) {
   return parseNumber(found?.Value || found?.Point || found?.Amount);
 }
 
+function decodeHtmlEntities(text) {
+  return String(text || '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'");
+}
+
+function cleanText(text) {
+  return decodeHtmlEntities(text)
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function collectStrings(value, out = []) {
+  if (value === null || value === undefined) return out;
+  if (typeof value === 'string') {
+    const cleaned = cleanText(value);
+    if (cleaned) out.push(cleaned);
+    return out;
+  }
+  if (typeof value !== 'object') return out;
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectStrings(item, out));
+    return out;
+  }
+  Object.values(value).forEach((item) => collectStrings(item, out));
+  return out;
+}
+
+function extractPercentNearKeyword(text, keywords) {
+  const results = [];
+  const escaped = keywords.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const keywordGroup = `(?:${escaped.join('|')})`;
+  const percent = `([+-]?\\d+(?:\\.\\d+)?)\\s*%`;
+  const patterns = [
+    new RegExp(`${keywordGroup}[^%]{0,45}${percent}`, 'g'),
+    new RegExp(`${percent}[^.。]*${keywordGroup}`, 'g')
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const numberText = match[1];
+      const value = Number(numberText);
+      if (Number.isFinite(value)) {
+        results.push({ value, source: text.slice(Math.max(0, match.index - 40), match.index + match[0].length + 40) });
+      }
+    }
+  }
+  return results;
+}
+
+function sumUniqueMatches(matches) {
+  const seen = new Set();
+  let total = 0;
+  const sources = [];
+  for (const match of matches) {
+    const key = `${match.value}|${match.source.replace(/\s+/g, ' ').slice(0, 160)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    total += match.value;
+    if (sources.length < 5) sources.push(match.source.replace(/\s+/g, ' ').trim());
+  }
+  return {
+    value: Math.round(total * 100) / 100,
+    count: seen.size,
+    sources
+  };
+}
+
+function extractArkEffects(arkpassive) {
+  const texts = collectStrings(arkpassive);
+  const uniqueTexts = [...new Set(texts)];
+
+  const definitions = {
+    evolutionDamage: ['진화형 피해', '진화형 피해량'],
+    damageToEnemy: ['적에게 주는 피해', '주는 피해량', '주는 피해'],
+    additionalDamage: ['추가 피해', '추가 피해량'],
+    critRate: ['치명타 적중률', '치명타 적중', '치명타 확률'],
+    critDamage: ['치명타 피해량', '치명타 피해'],
+    attackSpeed: ['공격속도', '공격 속도'],
+    moveSpeed: ['이동속도', '이동 속도']
+  };
+
+  const extracted = {};
+  for (const [key, keywords] of Object.entries(definitions)) {
+    const matches = uniqueTexts.flatMap((text) => extractPercentNearKeyword(text, keywords));
+    extracted[key] = sumUniqueMatches(matches);
+  }
+
+  return extracted;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return json(res, 405, { version: VERSION, error: 'GET 요청만 지원합니다.' });
@@ -145,6 +245,7 @@ export default async function handler(req, res) {
         leap: getArkPoint(arkpassive, '도약')
       }
     },
+    extractedEffects: extractArkEffects(arkpassive),
     apiErrors: {
       profile: null,
       arkpassive: arkpassiveResult.ok ? null : arkpassiveResult.error
