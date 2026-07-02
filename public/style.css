@@ -93,3 +93,39 @@ pre {
   .search { flex-direction: column; }
   .profile { align-items: flex-start; }
 }
+.hint {
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: #9ca3af;
+}
+h3 {
+  margin: 22px 0 12px;
+}
+.effects-grid {
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+}
+.effect-metric {
+  border-color: #1d4ed8;
+}
+.effect-metric b {
+  color: #bfdbfe;
+}
+.effect-details {
+  margin-top: 14px;
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 14px;
+  padding: 12px;
+}
+.effect-details summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: #bfdbfe;
+}
+.effect-details table {
+  font-size: 14px;
+}
+.effect-details td:last-child {
+  color: #d1d5db;
+  min-width: 260px;
+}
