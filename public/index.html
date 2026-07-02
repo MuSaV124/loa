@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v4.2.0 · 가독성 UI 개선</span>
+        <span class="badge">v4.3.0 · 예둔 효율 추가</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -70,16 +70,13 @@
       </div>
     </section>
 
-    <section id="dbPanel" class="panel subtle">
-      <h2>DB 상태</h2>
-      <div class="grid">
-        <div class="cell"><b>진화 DB</b><span id="evolutionDbStatus">대기</span></div>
-        <div class="cell"><b>계산 방식</b><span>API+추가효과 기반 치적 × 진피 × 추피 × 적주피 × 공증</span></div>
-      </div>
+    <section id="keenPanel" class="panel">
+      <div class="sectionHead"><div><h2>예리한 둔기 효율</h2><p class="hint">현재 치적/치피 기준으로 전설·유물 예둔 효율을 계산합니다.</p></div></div>
+      <div id="keenEfficiency" class="keenGrid"></div>
     </section>
   </main>
 
-  <div class="version">Version 4.2.0</div>
+  <div class="version">Version 4.3.0</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

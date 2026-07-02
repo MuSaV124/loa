@@ -478,3 +478,20 @@ select {
   .topline { display: block; }
   .badge { margin: 0 0 12px; }
 }
+
+/* v4.3.0 DB panel replaced with Keen Blunt efficiency */
+#keenPanel { grid-column: 1; }
+.keenGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.keenNote { grid-column: 1 / -1; color: var(--muted); font-size: 13px; padding: 10px 12px; border: 1px solid var(--softLine); border-radius: 12px; background: #0b1220; }
+.keenCard { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--softLine); border-radius: 14px; background: #0b1220; }
+.keenCard b { display: block; font-size: 15px; color: #f8fafc; }
+.keenCard span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.keenCard strong { font-size: 24px; letter-spacing: -.03em; color: #f8fafc; white-space: nowrap; }
+.keenCard em { font-style: normal; font-weight: 950; border-radius: 999px; padding: 5px 9px; background: rgba(148,163,184,.14); color: #cbd5e1; white-space: nowrap; }
+.keenCard.recommend { border-color: rgba(49,208,125,.35); background: rgba(34,197,94,.075); }
+.keenCard.recommend strong { color: #86efac; }
+.keenCard.recommend em { background: rgba(49,208,125,.18); color: #86efac; }
+.sourceTitle { align-items: center; }
+.sourceTitle button { white-space: nowrap; min-width: 68px; line-height: 1.1; }
+@media (max-width: 1160px) { #keenPanel { grid-column: 1; } }
+@media (max-width: 760px) { .keenGrid { grid-template-columns: 1fr; } .keenCard { grid-template-columns: 1fr; } .keenCard strong { font-size: 22px; } }

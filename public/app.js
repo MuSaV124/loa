@@ -1,4 +1,4 @@
-const VERSION = '4.2.0';
+const VERSION = '4.3.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
@@ -450,10 +450,38 @@ function buildSourceSummary(current) {
 function renderCombatStats(current = statsWithSelection(getBaseStats(), state.selected)) {
   buildSourceSummary(current);
 }
+
+function keenEfficiency(current, bonusCritDamage) {
+  const critRate = Math.max(0, Math.min(100, Number(current?.result?.effectiveCritRate ?? current?.result?.critRate ?? 0))) / 100;
+  const critDamage = Number(current?.result?.critDamage || 200);
+  const before = (1 - critRate) + critRate * (critDamage / 100);
+  const after = ((1 - critRate) + critRate * ((critDamage + bonusCritDamage) / 100)) * 0.98;
+  if (!before || !Number.isFinite(before) || !Number.isFinite(after)) return 0;
+  return ((after / before) - 1) * 100;
+}
+function renderKeenEfficiency(current) {
+  const el = $('keenEfficiency');
+  if (!el) return;
+  const rows = [
+    { name: '전설 예둔', bonus: 44 },
+    { name: '유물 예둔', bonus: 52 }
+  ].map(row => {
+    const eff = keenEfficiency(current, row.bonus);
+    const recommend = eff >= 16;
+    return `<div class="keenCard ${recommend ? 'recommend' : 'normal'}">
+      <div><b>${row.name}</b><span>치명타 피해 +${row.bonus}% / 평균 페널티 0.98 적용</span></div>
+      <strong>${eff.toFixed(2)}%</strong>
+      <em>${recommend ? '추천' : '비추천'}</em>
+    </div>`;
+  }).join('');
+  const crit = Math.max(0, Math.min(100, Number(current?.result?.effectiveCritRate ?? current?.result?.critRate ?? 0)));
+  el.innerHTML = `<div class="keenNote">계산 기준: 실제 치적 ${crit.toFixed(2)}% / 치피 ${Number(current?.result?.critDamage || 0).toFixed(2)}%</div>${rows}`;
+}
 function calculateAndRender() {
   const baseStats = getBaseStats();
   const current = statsWithSelection(baseStats, state.selected);
   renderCombatStats(current);
+  renderKeenEfficiency(current);
   const baseValue = current.result.value || 1;
   const candidates = [];
   for (const name of allOptions(5)) {
@@ -481,7 +509,6 @@ async function loadDb() {
   state.index = buildIndex(state.evolution);
   state.selected = defaultSelection();
   state.apiSelected = JSON.parse(JSON.stringify(state.selected));
-  $('evolutionDbStatus').textContent = `${state.index.size}개 노드 / 진화 전용`;
   renderEvolutionTiers();
   calculateAndRender();
 }
