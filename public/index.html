@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>LOSTARK 노드 추천 계산기</title>
+  <title>LOSTARK 진화 노드 추천 계산기</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -11,10 +11,10 @@
     <section class="panel hero">
       <div class="topline">
         <div>
-          <h1>LOSTARK 노드 추천 계산기</h1>
-          <p>v1.3.0: 현재 선택 노드 효과를 먼저 제거한 뒤, 후보 노드를 다시 적용해서 추천합니다.</p>
+          <h1>LOSTARK 진화 노드 추천 계산기</h1>
+          <p>검색된 현재 진화 노드를 확인하고, 5티어 노드를 바꿨을 때 치적/치피/진피/추피/적주피가 어떻게 바뀌는지 비교합니다.</p>
         </div>
-        <span class="badge">수라 브레이커 기준</span>
+        <span class="badge">v1.4.0 · 진화 전용</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="무사브" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -25,32 +25,43 @@
 
     <section id="characterCard" class="panel character hidden"></section>
 
-    <section id="resultPanel" class="panel hidden">
-      <h2>기준 스탯</h2>
-      <p class="hint">API에서 불러온 값이 부족하면 직접 입력하세요. 현재 선택된 노드 효과가 포함된 최종값을 입력하면 됩니다.</p>
-      <div id="statGrid" class="grid"></div>
+    <section id="summaryPanel" class="panel hidden">
+      <h2>캐릭터 정보 / 현재 계산 수치</h2>
+      <p class="hint">아래 값은 현재 선택한 진화 노드를 반영한 표시값입니다. API에서 못 가져오는 값은 직접 입력하면 됩니다.</p>
+      <div id="basicStatGrid" class="grid"></div>
+      <div id="combatStatGrid" class="grid statHighlight"></div>
+    </section>
+
+    <section id="inputPanel" class="panel">
+      <h2>기준값 입력</h2>
+      <p class="hint">현재 장비/각인/악세/초월 등 진화 노드를 제외한 기준값을 넣으면 가장 정확합니다. 모르면 현재 최종값을 넣고 아래 노드를 현재와 동일하게 맞춘 뒤 비교하세요.</p>
       <div class="manualGrid">
-        <label>최종 치명타 확률(%)<input id="critRate" type="number" step="0.01" value="120" /></label>
-        <label>최종 치명타 피해(%)<input id="critDamage" type="number" step="0.01" value="200" /></label>
-        <label>현재 진화형 피해(%)<input id="evolutionDamage" type="number" step="0.01" value="0" /></label>
-        <label>기타 최종 피해 증가(%)<input id="finalDamage" type="number" step="0.01" value="0" /></label>
+        <label>기준 치명타 확률(%)<input id="baseCritRate" type="number" step="0.01" value="100" /></label>
+        <label>기준 치명타 피해(%)<input id="baseCritDamage" type="number" step="0.01" value="200" /></label>
+        <label>기준 진화형 피해(%)<input id="baseEvolutionDamage" type="number" step="0.01" value="0" /></label>
+        <label>기준 추가 피해, 추피(%)<input id="baseAdditionalDamage" type="number" step="0.01" value="0" /></label>
+        <label>기준 적에게 주는 피해, 적주피(%)<input id="baseEnemyDamage" type="number" step="0.01" value="0" /></label>
         <label>주력기 치명 보정(%)<input id="skillCritBonus" type="number" step="0.01" value="0" /></label>
-        <label>계산 대상<input id="targetSkill" value="전체 딜" /></label>
       </div>
-      <button id="recalcButton" class="wideButton" type="button">추천 다시 계산</button>
     </section>
 
-    <section id="tierPanel" class="panel hidden">
-      <h2>티어별 현재 선택</h2>
-      <p class="hint">자동 분류가 틀리면 드롭다운에서 직접 바꾸면 됩니다. 뭉툭한 가시/입식 타격가는 진화 5티어로 고정했습니다.</p>
-      <div id="tierGroups" class="tierGroups"></div>
+    <section id="foundPanel" class="panel hidden">
+      <h2>검색된 현재 아크패시브 노드</h2>
+      <p class="hint">DB에 있는 진화 노드는 자동 선택됩니다. DB에 없는 노드는 참고용으로 표시됩니다.</p>
+      <div id="foundEffects" class="effectList"></div>
     </section>
 
-    <section id="recommendPanel" class="panel hidden">
-      <h2>추천 결과</h2>
+    <section id="evolutionPanel" class="panel">
+      <h2>현재 진화 노드 선택</h2>
+      <p class="hint">1~4티어는 현재 검색/표시용입니다. 추천 계산은 실제 비교 대상인 5티어 노드를 중심으로 합니다.</p>
+      <div id="evolutionTiers" class="tierGroups"></div>
+    </section>
+
+    <section id="recommendPanel" class="panel">
+      <h2>5티어 추천 결과</h2>
       <div class="resultLayout">
         <div>
-          <h3>현재 기준</h3>
+          <h3>현재 선택 기준</h3>
           <div id="currentScore" class="scoreBox"></div>
           <div id="baseInfo" class="baseInfo"></div>
         </div>
@@ -61,17 +72,16 @@
       </div>
     </section>
 
-    <section id="dbPanel" class="panel">
+    <section id="dbPanel" class="panel subtle">
       <h2>DB 상태</h2>
       <div class="grid">
         <div class="cell"><b>진화 DB</b><span id="evolutionDbStatus">대기</span></div>
-        <div class="cell"><b>깨달음 DB</b><span id="enlightenmentDbStatus">대기</span></div>
-        <div class="cell"><b>도약 DB</b><span id="leapDbStatus">대기</span></div>
+        <div class="cell"><b>계산 방식</b><span>치명 기대값 × 진피 × 추피 × 적주피</span></div>
       </div>
     </section>
   </main>
 
-  <div class="version">Version 1.3.0</div>
+  <div class="version">Version 1.4.0</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

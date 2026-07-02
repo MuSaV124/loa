@@ -1,8 +1,8 @@
 {
   "meta": {
-    "version": "1.3.0",
+    "version": "1.4.0",
     "source": "Lost Ark Ark Passive Evolution common nodes",
-    "note": "진화는 전 직업 공통. 계산기는 effect 필드를 기준으로 현재 선택 효과를 제거한 뒤 후보를 다시 적용합니다. 수치가 변경되면 이 JSON만 수정하면 됩니다."
+    "note": "진화 전용 계산기. 1~4티어는 검색/표시용이며, 현재 제공 계산식은 5티어 추천 비교 중심입니다."
   },
   "group": "진화",
   "tiers": {
@@ -27,8 +27,18 @@
       "costPerLevel": 15,
       "description": "진화형 피해 증가 + 치명타 확률 80% 제한 + 초과 치적을 진화형 피해로 전환",
       "levels": {
-        "1": { "evolutionDamage": 7.5, "critCap": 80, "overCritToEvolutionDamageRate": 1.2, "overCritEvolutionDamageCap": 50 },
-        "2": { "evolutionDamage": 15, "critCap": 80, "overCritToEvolutionDamageRate": 1.4, "overCritEvolutionDamageCap": 70 }
+        "1": {
+          "evolutionDamage": 7.5,
+          "critCap": 80,
+          "overCritToEvolutionDamageRate": 1.2,
+          "overCritEvolutionDamageCap": 50
+        },
+        "2": {
+          "evolutionDamage": 15,
+          "critCap": 80,
+          "overCritToEvolutionDamageRate": 1.4,
+          "overCritEvolutionDamageCap": 70
+        }
       }
     },
     {
@@ -38,8 +48,12 @@
       "costPerLevel": 15,
       "description": "진화형 피해 기본 증가 + 입식 타격 6중첩 기준 추가 증가",
       "levels": {
-        "1": { "evolutionDamage": 10.5 },
-        "2": { "evolutionDamage": 21 }
+        "1": {
+          "evolutionDamage": 10.5
+        },
+        "2": {
+          "evolutionDamage": 21
+        }
       }
     },
     {
@@ -49,8 +63,12 @@
       "costPerLevel": 15,
       "description": "정면 승부 기준 진화형 피해 증가",
       "levels": {
-        "1": { "evolutionDamage": 9 },
-        "2": { "evolutionDamage": 18 }
+        "1": {
+          "evolutionDamage": 9
+        },
+        "2": {
+          "evolutionDamage": 18
+        }
       }
     },
     {
@@ -60,8 +78,12 @@
       "costPerLevel": 15,
       "description": "공이속 조건을 만족한다고 가정한 최대 진화형 피해",
       "levels": {
-        "1": { "evolutionDamage": 12 },
-        "2": { "evolutionDamage": 24 }
+        "1": {
+          "evolutionDamage": 12
+        },
+        "2": {
+          "evolutionDamage": 24
+        }
       }
     },
     {
@@ -71,8 +93,12 @@
       "costPerLevel": 15,
       "description": "마나 소모 조건을 만족한다고 가정한 최대 진화형 피해",
       "levels": {
-        "1": { "evolutionDamage": 12 },
-        "2": { "evolutionDamage": 24 }
+        "1": {
+          "evolutionDamage": 12
+        },
+        "2": {
+          "evolutionDamage": 24
+        }
       }
     },
     {
@@ -82,8 +108,12 @@
       "costPerLevel": 15,
       "description": "낙인력 증가 노드. 딜 계산에서는 직접 피해 증가 없음으로 처리",
       "levels": {
-        "1": { "evolutionDamage": 0 },
-        "2": { "evolutionDamage": 0 }
+        "1": {
+          "evolutionDamage": 0
+        },
+        "2": {
+          "evolutionDamage": 0
+        }
       }
     }
   ]
