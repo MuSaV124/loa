@@ -758,10 +758,12 @@
       "icon": "🌩️",
       "levels": {
         "1": {
-          "critDamage": 8
+          "critRate": 10,
+          "critDamage": 16
         },
         "2": {
-          "critDamage": 16
+          "critRate": 20,
+          "critDamage": 32
         }
       },
       "iconImage": "/images/evolution/일격.webp"

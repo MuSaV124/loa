@@ -1,4 +1,4 @@
-const VERSION = '3.1.0';
+const VERSION = '3.2.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
@@ -80,16 +80,6 @@ function renderCharacter(profile) {
   el.classList.remove('hidden');
 }
 function renderSummary(profile, arkPassive) {
-  const points = Array.isArray(arkPassive?.Points) ? arkPassive.Points : [];
-  const point = (name) => points.find(p => p.Name === name)?.Value ?? '-';
-  $('basicStatGrid').innerHTML = [
-    item('직업', profile?.CharacterClassName), item('아이템 레벨', profile?.ItemAvgLevel), item('서버', profile?.ServerName),
-    item('치명', getStat(profile, '치명')), item('신속', getStat(profile, '신속')), item('특화', getStat(profile, '특화')),
-    item('진화 포인트', point('진화')), item('악세 치적', `${fmt(state.accessory.critRate)}%`), item('악세 치피', `${fmt(state.accessory.critDamage)}%`),
-    item('악세 추피', `${fmt(state.accessory.additionalDamage)}%`), item('악세 적주피', `${fmt(state.accessory.enemyDamage)}%`),
-    item('팔찌 치적', `${fmt(state.bracelet.critRate)}%`), item('팔찌 치피', `${fmt(state.bracelet.critDamage)}%`),
-    item('팔찌 추피', `${fmt(state.bracelet.additionalDamage)}%`), item('팔찌 적주피', `${fmt(state.bracelet.enemyDamage)}%`)
-  ].join('');
   $('summaryPanel').classList.remove('hidden');
   renderCombatStats();
 }
@@ -304,16 +294,6 @@ function buildSourceSummary(current) {
 }
 
 function renderCombatStats(current = statsWithSelection(getBaseStats(), state.selected)) {
-  const convertedText = current.result.convertedEvolutionDamage > 0
-    ? `${fmt(current.result.evo)}% (뭉가 전환 +${fmt(current.result.convertedEvolutionDamage)}%)`
-    : `${fmt(current.result.evo)}%`;
-  $('combatStatGrid').innerHTML = [
-    item('치명 스탯', `${Math.round(current.stats.critStat || 0)}`), item('스탯 치적', `${fmt(current.stats.statCritRate || 0)}%`),
-    item('치명타 확률', `${fmt(current.result.critRate)}%`), item('치명타 피해', `${fmt(current.result.critDamage)}%`),
-    item('진피', convertedText), item('추피', `${fmt(current.result.additionalDamage)}%`),
-    item('적주피', `${fmt(current.result.enemyDamage)}%`), item('아드 공증', `${fmt(current.result.attackPower)}%`),
-    item('공이속', `${fmt(current.result.moveAttackSpeed)}%`), item('기대값 점수', current.result.value.toFixed(4))
-  ].join('');
   buildSourceSummary(current);
 }
 function calculateAndRender() {

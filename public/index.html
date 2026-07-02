@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>치명 스탯 × 0.03579 공식으로 기준 치적을 계산하고, 우측 소스 요약으로 수치 출처를 확인합니다.</p>
         </div>
-        <span class="badge">v3.1.0 · 소스 요약</span>
+        <span class="badge">v3.2.0 · 소스 요약</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="무사브" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -25,11 +25,7 @@
 
     <section id="characterCard" class="panel character hidden"></section>
 
-    <section id="summaryPanel" class="panel hidden">
-      <h2>캐릭터 정보 / 현재 계산 수치</h2>
-      <p class="hint">아래 값은 현재 선택한 진화 노드와 API 악세/팔찌, 아드 입력값을 반영한 표시값입니다.</p>
-      <div id="basicStatGrid" class="grid"></div>
-      <div id="combatStatGrid" class="grid statHighlight"></div>
+    <section id="summaryPanel" class="panel hidden sourceOnlyPanel">
       <div id="sourceSummary" class="sourceSummary"></div>
     </section>
 
@@ -86,7 +82,7 @@
     </section>
   </main>
 
-  <div class="version">Version 3.1.0</div>
+  <div class="version">Version 3.2.0</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>
