@@ -1,9 +1,10 @@
-const VERSION = '4.4.1';
+const VERSION = '4.4.2';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
 
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
+function escapeRegExp(v) { return String(v || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 function stripHtml(v) { return String(v ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&#40;/g, '(').replace(/&#41;/g, ')').replace(/&#37;/g, '%').replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim(); }
 function collectTextDeep(value, bucket = []) {
   if (value == null) return bucket;
@@ -131,8 +132,32 @@ function hasAnyEffect(effects) {
   return ['critRate','critDamage','evolutionDamage','enemyDamage','additionalDamage'].some(k => Math.abs(Number(effects?.[k] || 0)) > 0);
 }
 function isKnownEvolutionEffect(effect) {
+  const name = normalizeNodeName(effect?.name || '');
   const joined = normalizeNodeName(`${effect?.name || ''} ${effect?.description || ''} ${effect?.tooltip || ''}`);
-  return (state.evolution?.nodes || []).some(node => effect?.name === node.name || joined.includes(node.name));
+
+  // ArkPassive.Effects가 '진화/깨달음/도약' 같은 카테고리 단위로 내려오는 경우가 있습니다.
+  // 특히 깨달음 설명에는 '치명타'라는 단어가 들어가는데, 기존 로직은 1티어 노드 '치명'과
+  // 부분 문자열로 매칭되어 깨달음을 진화 노드로 오인했습니다.
+  if (name.includes('깨달음')) return false;
+  if (name.includes('도약')) return false;
+  if (name.includes('진화')) return true;
+
+  return (state.evolution?.nodes || []).some(node => {
+    if (name === node.name) return true;
+    const nodeName = String(node.name || '');
+    // 치명/신속/특화처럼 일반 단어와 겹치는 1티어 스탯명은 부분 매칭하지 않습니다.
+    if (['치명','특화','신속','제압','인내','숙련'].includes(nodeName)) return false;
+    const escaped = escapeRegExp(nodeName);
+    return new RegExp(`(?:\\[진화\\]|진화|^|\\s)${escaped}(?:\\s*Lv\\.?|\\s*레벨|\\s*\\(|\\s|$)`, 'i').test(joined);
+  });
+}
+function levelNearName(text, nodeName, fallback = 1) {
+  const source = String(text || '');
+  const escaped = escapeRegExp(nodeName);
+  const near = source.match(new RegExp(`${escaped}.{0,80}(?:Lv\\.?|레벨)\\s*(\\d+)`, 'i'))
+    || source.match(new RegExp(`${escaped}.{0,80}([1-5])\\s*단계`, 'i'));
+  if (near) return Number(near[1]);
+  return fallback;
 }
 function extractEnlightenmentEffects(effects) {
   const result = { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
@@ -146,23 +171,23 @@ function extractEnlightenmentEffects(effects) {
 
     // 기상술사 질풍노도/기민함처럼 문장 안에 고정 수치가 아니라
     // 공속/이속 증가량을 참조하는 깨달음 효과는 별도 계산합니다.
-    const level = Math.max(1, Number(effect?.level || parseLevelFromText(joined, 1) || 1));
+    const baseLevel = Math.max(1, Number(effect?.level || parseLevelFromText(joined, 1) || 1));
     if (normalized.includes('질풍노도')) {
       parsed.attackSpeed = (parsed.attackSpeed || 0) + 12;
       parsed.moveSpeed = (parsed.moveSpeed || 0) + 12;
     }
     if (normalized.includes('기민함')) {
-      const lv = Math.min(3, level);
+      const lv = Math.min(3, levelNearName(joined, '기민함', baseLevel));
       const critDamageRate = [0, 0.4, 0.8, 1.2][lv] || 0;
       const critRateRate = [0, 0.1, 0.2, 0.3][lv] || 0;
       parsed.windfuryAgility = { level: lv, critDamageRate, critRateRate };
     }
     if (normalized.includes('자연의 흐름')) {
-      const lv = Math.min(5, level);
+      const lv = Math.min(5, levelNearName(joined, '자연의 흐름', baseLevel));
       parsed.enemyDamage += lv * 1.2;
     }
     if (normalized.includes('바람의 길')) {
-      const lv = Math.min(5, level);
+      const lv = Math.min(5, levelNearName(joined, '바람의 길', baseLevel));
       parsed.enemyDamage += lv * 1.2; // 최대 2중첩 기준: 0.6/1.2/1.8/2.4/3.0 × 2
     }
 
