@@ -71,27 +71,61 @@ function renderSummary(data) {
   summaryCard.classList.remove('hidden');
 }
 
-function formatPercent(effect) {
-  const value = Number(effect?.value || 0);
-  if (!Number.isFinite(value) || value === 0) return '-';
-  const text = Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.00$/, '').replace(/0$/, '');
-  return `${text}%`;
+function nodeLabel(node) {
+  const level = node.level ? ` Lv.${node.level}` : '';
+  return `${node.name || '-'}${level}`;
+}
+
+function renderNodeGroup(title, nodes) {
+  const list = Array.isArray(nodes) ? nodes : [];
+  if (!list.length) {
+    return `
+      <div class="nodeGroup">
+        <h3>${escapeHtml(title)}</h3>
+        <p class="empty">추출된 노드 없음</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="nodeGroup">
+      <h3>${escapeHtml(title)}</h3>
+      <ul class="nodeList">
+        ${list.map((node) => `
+          <li>
+            <strong>${escapeHtml(nodeLabel(node))}</strong>
+            ${node.description ? `<span>${escapeHtml(node.description)}</span>` : ''}
+          </li>
+        `).join('')}
+      </ul>
+    </div>
+  `;
 }
 
 function renderExtractResult(data) {
-  const e = data.extractedEffects || {};
+  const nodes = data.selectedNodes || {};
+  const unknown = Array.isArray(nodes.unknown) ? nodes.unknown : [];
   extractCard.innerHTML = `
-    <h2>자동 추출 결과</h2>
-    <div class="grid">
-      <div class="metric"><b>진화형 피해</b>${escapeHtml(formatPercent(e.evolutionDamage))}</div>
-      <div class="metric"><b>적에게 주는 피해</b>${escapeHtml(formatPercent(e.damageToEnemy))}</div>
-      <div class="metric"><b>추가 피해</b>${escapeHtml(formatPercent(e.additionalDamage))}</div>
-      <div class="metric"><b>치명타 적중률</b>${escapeHtml(formatPercent(e.critRate))}</div>
-      <div class="metric"><b>치명타 피해</b>${escapeHtml(formatPercent(e.critDamage))}</div>
-      <div class="metric"><b>공격속도</b>${escapeHtml(formatPercent(e.attackSpeed))}</div>
-      <div class="metric"><b>이동속도</b>${escapeHtml(formatPercent(e.moveSpeed))}</div>
+    <h2>선택 노드 확인</h2>
+    <div class="nodeGrid">
+      ${renderNodeGroup('진화', nodes.evolution)}
+      ${renderNodeGroup('깨달음', nodes.enlightenment)}
+      ${renderNodeGroup('도약', nodes.leap)}
     </div>
-    <p class="note">v1.0.8: 진화/깨달음/도약 노드 문구에서 주요 효과 수치를 추출합니다. 스킬 트라이포드는 다음 단계에서 분리 적용합니다.</p>
+    ${unknown.length ? `
+      <div class="nodeGroup unknownGroup">
+        <h3>분류 필요</h3>
+        <ul class="nodeList">
+          ${unknown.map((node) => `
+            <li>
+              <strong>${escapeHtml(nodeLabel(node))}</strong>
+              ${node.description ? `<span>${escapeHtml(node.description)}</span>` : ''}
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    ` : ''}
+    <p class="note">v1.0.9: 계산 전 단계입니다. 현재 선택된 진화/깨달음/도약 노드명과 레벨을 먼저 확인합니다.</p>
   `;
   extractCard.classList.remove('hidden');
 }

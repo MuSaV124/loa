@@ -1,5 +1,5 @@
 const LOSTARK_BASE_URL = 'https://developer-lostark.game.onstove.com';
-const VERSION = '1.0.8';
+const VERSION = '1.0.9';
 
 function json(res, status, body) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -327,6 +327,127 @@ function extractArkEffects(arkpassive) {
 }
 
 
+function tryParseJson(text) {
+  if (typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  if (!trimmed || !/^[\[{]/.test(trimmed)) return null;
+  try { return JSON.parse(trimmed); } catch { return null; }
+}
+
+function valueToPlainText(value) {
+  const parsed = tryParseJson(value);
+  if (parsed) return collectStrings(parsed, []).join(' ');
+  return cleanText(value);
+}
+
+function readNodeLevel(obj) {
+  if (!obj || typeof obj !== 'object') return null;
+  const direct = parseNumber(obj.Level ?? obj.level ?? obj.NodeLevel ?? obj.nodeLevel ?? obj.TierLevel ?? obj.tierLevel);
+  if (direct > 0) return direct;
+
+  const text = [obj.Name, obj.name, obj.Description, obj.description, obj.Tooltip, obj.tooltip]
+    .filter(Boolean)
+    .map((item) => valueToPlainText(item))
+    .join(' ');
+
+  const patterns = [
+    /(?:Lv\.?|레벨)\s*(\d+)/i,
+    /(\d+)\s*(?:레벨|Lv\.?)/i
+  ];
+  for (const pattern of patterns) {
+    const found = text.match(pattern);
+    if (found) {
+      const n = Number(found[1]);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+  }
+  return null;
+}
+
+function getNodeGroup(obj, path = []) {
+  const joinedPath = path.join(' ').toLowerCase();
+  const text = [obj?.Type, obj?.type, obj?.Category, obj?.category, obj?.Description, obj?.description, obj?.Tooltip, obj?.tooltip]
+    .filter(Boolean)
+    .map((item) => valueToPlainText(item))
+    .join(' ');
+  const combined = `${joinedPath} ${text}`;
+
+  if (/진화|evolution/.test(combined)) return 'evolution';
+  if (/깨달음|enlightenment/.test(combined)) return 'enlightenment';
+  if (/도약|leap/.test(combined)) return 'leap';
+  return 'unknown';
+}
+
+function isProbablyPassiveNode(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+  const name = readNodeName(obj, '');
+  if (!name || ['진화', '깨달음', '도약'].includes(name)) return false;
+
+  const hasNodeText = ['Description', 'description', 'Tooltip', 'tooltip'].some((key) => typeof obj[key] === 'string' && obj[key].trim());
+  if (!hasNodeText) return false;
+
+  const fullText = [name, obj.Description, obj.description, obj.Tooltip, obj.tooltip]
+    .filter(Boolean)
+    .map((item) => valueToPlainText(item))
+    .join(' ');
+
+  if (/잠금|비활성|미선택|선택하지 않음|장착하지 않음/.test(fullText)) return false;
+  if (!/(진화|깨달음|도약|Lv\.?|레벨|티어|효과)/i.test(fullText)) return false;
+  return true;
+}
+
+function collectPassiveNodeCandidates(value, path = [], out = []) {
+  if (value === null || value === undefined) return out;
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => collectPassiveNodeCandidates(item, path.concat(String(index)), out));
+    return out;
+  }
+  if (typeof value !== 'object') return out;
+
+  if (isProbablyPassiveNode(value)) {
+    const name = readNodeName(value);
+    const level = readNodeLevel(value);
+    const group = getNodeGroup(value, path);
+    const description = valueToPlainText(value.Description || value.description || '');
+    const tooltipText = valueToPlainText(value.Tooltip || value.tooltip || '');
+    out.push({
+      group,
+      name,
+      level,
+      description: description.slice(0, 180),
+      sample: (description || tooltipText).slice(0, 240),
+      path: path.join('.')
+    });
+  }
+
+  for (const [key, child] of Object.entries(value)) {
+    collectPassiveNodeCandidates(child, path.concat(key), out);
+  }
+  return out;
+}
+
+function extractSelectedNodes(arkpassive) {
+  const empty = { evolution: [], enlightenment: [], leap: [], unknown: [] };
+  if (!arkpassive) return empty;
+
+  const candidates = collectPassiveNodeCandidates(arkpassive);
+  const seen = new Set();
+
+  for (const node of candidates) {
+    const key = `${node.group}|${node.name}|${node.level || ''}|${node.description}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    empty[node.group || 'unknown'].push(node);
+  }
+
+  for (const group of Object.keys(empty)) {
+    empty[group] = empty[group]
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ko'))
+      .slice(0, 30);
+  }
+  return empty;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return json(res, 405, { version: VERSION, error: 'GET 요청만 지원합니다.' });
@@ -392,6 +513,7 @@ export default async function handler(req, res) {
         leap: getArkPoint(arkpassive, '도약')
       }
     },
+    selectedNodes: extractSelectedNodes(arkpassive),
     extractedEffects: extractArkEffects(arkpassive),
     apiErrors: {
       profile: null,
