@@ -1,5 +1,5 @@
 const LOSTARK_BASE_URL = 'https://developer-lostark.game.onstove.com';
-const VERSION = '1.0.7';
+const VERSION = '1.0.8';
 
 function json(res, status, body) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -157,28 +157,175 @@ function sumUniqueMatches(matches) {
   };
 }
 
-function extractArkEffects(arkpassive) {
-  const texts = collectStrings(arkpassive);
-  const uniqueTexts = [...new Set(texts)];
 
-  const definitions = {
-    evolutionDamage: ['진화형 피해', '진화형 피해량'],
-    damageToEnemy: ['적에게 주는 피해', '주는 피해량', '주는 피해'],
-    additionalDamage: ['추가 피해', '추가 피해량'],
-    critRate: ['치명타 적중률', '치명타 적중', '치명타 확률'],
-    critDamage: ['치명타 피해량', '치명타 피해'],
-    attackSpeed: ['공격속도', '공격 속도'],
-    moveSpeed: ['이동속도', '이동 속도']
-  };
+function sentenceSplit(text) {
+  return cleanText(text)
+    .split(/(?<=[.!?。])\s+|[\r\n]+|(?=\s*[•\-※])/g)
+    .map((item) => item.replace(/^\s*[•\-※]\s*/, '').trim())
+    .filter(Boolean);
+}
 
-  const extracted = {};
-  for (const [key, keywords] of Object.entries(definitions)) {
-    const matches = uniqueTexts.flatMap((text) => extractPercentNearKeyword(text, keywords));
-    extracted[key] = sumUniqueMatches(matches);
+function normalizeSentence(text) {
+  return cleanText(text)
+    .replace(/\d+(?:\.\d+)?\s*%/g, (m) => m.replace(/\s+/g, ''))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function readNodeName(obj, fallback = '출처 미확인') {
+  if (!obj || typeof obj !== 'object') return fallback;
+  return cleanText(obj.Name || obj.name || obj.Title || obj.title || obj.Type || obj.type || fallback) || fallback;
+}
+
+function hasEffectTextObject(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+  const name = readNodeName(obj, '');
+  const fields = ['Description', 'description', 'Tooltip', 'tooltip', 'Effect', 'effect', 'Value', 'value'];
+  const hasText = fields.some((key) => typeof obj[key] === 'string' && obj[key].trim());
+  return Boolean(name && hasText);
+}
+
+function collectEffectNodes(value, path = [], out = []) {
+  if (value === null || value === undefined) return out;
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => collectEffectNodes(item, path.concat(String(index)), out));
+    return out;
+  }
+  if (typeof value !== 'object') return out;
+
+  if (hasEffectTextObject(value)) {
+    const name = readNodeName(value);
+    const level = parseNumber(value.Level || value.level || value.Grade || value.grade || value.Point || value.point);
+    const rawStrings = [];
+    ['Description', 'description', 'Tooltip', 'tooltip', 'Effect', 'effect', 'Value', 'value'].forEach((key) => {
+      if (typeof value[key] === 'string') rawStrings.push(value[key]);
+    });
+    out.push({
+      name,
+      level,
+      path: path.join('.'),
+      text: cleanText(rawStrings.join(' '))
+    });
   }
 
-  return extracted;
+  for (const [key, child] of Object.entries(value)) {
+    collectEffectNodes(child, path.concat(key), out);
+  }
+  return out;
 }
+
+function classifySentence(sentence, node) {
+  const text = cleanText(sentence);
+  const lowerRiskWords = ['증가한다', '증가합니다', '증가', '획득', '적용'];
+  const conditionalWords = ['최대', '중첩', '마다', '시마다', '동안', '이하', '이상', '적중 시', '공격 적중', '사용 시', '발동', '유지', '조건', '파티', '아군', '보스 등급'];
+  const suspectWords = ['Lv.1', 'Lv.2', 'Lv.3', '레벨별', '다음 레벨', '미리보기', '잠금', '비활성', '선택 가능', 'Rank'];
+
+  const hasConditional = conditionalWords.some((word) => text.includes(word));
+  const hasSuspect = suspectWords.some((word) => text.includes(word));
+  const hasActiveCue = lowerRiskWords.some((word) => text.includes(word));
+
+  if (hasSuspect) return 'suspect';
+  if (hasConditional) return 'conditional';
+  if (hasActiveCue || node.level > 0) return 'confirmed';
+  return 'suspect';
+}
+
+function extractMatchesFromSentence(sentence, keywords) {
+  const results = [];
+  const escaped = keywords.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const keywordGroup = `(?:${escaped.join('|')})`;
+  const percent = `([+-]?\d+(?:\.\d+)?)\s*%`;
+  const patterns = [
+    new RegExp(`${keywordGroup}[^%]{0,60}${percent}`, 'g'),
+    new RegExp(`${percent}[^.。%]{0,60}${keywordGroup}`, 'g')
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(sentence)) !== null) {
+      const value = Number(match[1]);
+      if (Number.isFinite(value)) results.push(value);
+    }
+  }
+  return results;
+}
+
+function createEmptyEffect() {
+  return {
+    value: 0,
+    confirmed: [],
+    conditional: [],
+    suspect: []
+  };
+}
+
+function pushEffect(bucket, item) {
+  const key = `${item.node}|${item.sentence}|${item.value}|${item.type}`;
+  const exists = bucket.some((row) => `${row.node}|${row.sentence}|${row.value}|${row.type}` === key);
+  if (!exists) bucket.push(item);
+}
+
+function finalizeEffect(effect) {
+  const total = effect.confirmed.reduce((sum, item) => sum + item.value, 0);
+  effect.value = Math.round(total * 100) / 100;
+  effect.confirmed = effect.confirmed.slice(0, 12);
+  effect.conditional = effect.conditional.slice(0, 12);
+  effect.suspect = effect.suspect.slice(0, 12);
+  return effect;
+}
+
+function extractArkEffects(arkpassive) {
+  const definitions = {
+    evolutionDamage: { label: '진화형 피해', keywords: ['진화형 피해', '진화형 피해량'] },
+    damageToEnemy: { label: '적에게 주는 피해', keywords: ['적에게 주는 피해', '주는 피해량', '주는 피해'] },
+    additionalDamage: { label: '추가 피해', keywords: ['추가 피해', '추가 피해량'] },
+    critRate: { label: '치명타 적중률', keywords: ['치명타 적중률', '치명타 적중', '치명타 확률'] },
+    critDamage: { label: '치명타 피해', keywords: ['치명타 피해량', '치명타 피해'] },
+    attackSpeed: { label: '공격속도', keywords: ['공격속도', '공격 속도'] },
+    moveSpeed: { label: '이동속도', keywords: ['이동속도', '이동 속도'] }
+  };
+
+  const nodes = collectEffectNodes(arkpassive)
+    .filter((node) => node.text && !/비활성|잠금|선택하지 않음|미선택/.test(node.text));
+
+  const extracted = Object.fromEntries(Object.keys(definitions).map((key) => [key, createEmptyEffect()]));
+  const seenSentences = new Set();
+
+  for (const node of nodes) {
+    const sentences = sentenceSplit(node.text);
+    for (const sentence of sentences) {
+      const normalized = normalizeSentence(sentence);
+      if (!normalized || seenSentences.has(`${node.name}|${normalized}`)) continue;
+      seenSentences.add(`${node.name}|${normalized}`);
+
+      for (const [key, definition] of Object.entries(definitions)) {
+        const values = extractMatchesFromSentence(sentence, definition.keywords);
+        for (const value of values) {
+          const type = classifySentence(sentence, node);
+          const item = {
+            node: node.name,
+            level: node.level || null,
+            value,
+            type,
+            sentence: normalized.slice(0, 220)
+          };
+          pushEffect(extracted[key][type], item);
+        }
+      }
+    }
+  }
+
+  for (const key of Object.keys(extracted)) finalizeEffect(extracted[key]);
+
+  return {
+    version: 'source-aware-1',
+    note: '확정 효과만 합산하고, 조건부/의심 문구는 계산에서 제외했습니다.',
+    nodeCount: nodes.length,
+    effects: extracted,
+    legacy: Object.fromEntries(Object.entries(extracted).map(([key, value]) => [key, { value: value.value }]))
+  };
+}
+
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {

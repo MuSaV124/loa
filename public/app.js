@@ -91,7 +91,7 @@ function renderExtractResult(data) {
       <div class="metric"><b>공격속도</b>${escapeHtml(formatPercent(e.attackSpeed))}</div>
       <div class="metric"><b>이동속도</b>${escapeHtml(formatPercent(e.moveSpeed))}</div>
     </div>
-    <p class="note">v1.0.7: 진화/깨달음/도약 노드 문구에서 주요 효과 수치를 추출합니다. 스킬 트라이포드는 다음 단계에서 분리 적용합니다.</p>
+    <p class="note">v1.0.8: 진화/깨달음/도약 노드 문구에서 주요 효과 수치를 추출합니다. 스킬 트라이포드는 다음 단계에서 분리 적용합니다.</p>
   `;
   extractCard.classList.remove('hidden');
 }
