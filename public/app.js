@@ -1,4 +1,4 @@
-const VERSION = '3.6.0';
+const VERSION = '4.0.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
@@ -248,34 +248,55 @@ function getBaseStats() {
   const swiftStat = num($('baseSwiftStat').value) + selectedSwiftStat;
   const statCritRate = critRateFromStat(critStat);
   const swiftSpeedBonus = speedFromSwift(swiftStat);
+  const extraCritRate = num($('extraCritRate').value);
+  const extraCritDamage = num($('extraCritDamage').value);
+  const extraEvolutionDamage = num($('extraEvolutionDamage').value);
+  const extraAdditionalDamage = num($('extraAdditionalDamage').value);
+  const extraEnemyDamage = num($('extraEnemyDamage').value);
+  const extraAttackSpeed = num($('extraAttackSpeed').value);
+  const extraMoveSpeed = num($('extraMoveSpeed').value);
+  const critSynergy = $('critSynergyEnabled').checked ? 10 : 0;
+  const baseSpeed = 114;
   return {
     critStat,
     swiftStat,
     statCritRate,
-    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num($('braceletCritRateManual').value) + num(state.enlightenment.critRate),
-    critDamage: num($('baseCritDamage').value, 200) + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num($('braceletCritDamageManual').value) + num(state.enlightenment.critDamage),
-    evolutionDamage: num($('baseEvolutionDamage').value) + num(state.enlightenment.evolutionDamage),
-    additionalDamage: num($('baseAdditionalDamage').value) + num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num($('braceletAdditionalDamageManual').value) + num(state.enlightenment.additionalDamage),
-    enemyDamage: num($('baseEnemyDamage').value) + num(state.accessory.enemyDamage) + num(state.bracelet.enemyDamage) + num($('braceletEnemyDamageManual').value) + num(state.enlightenment.enemyDamage),
-    skillCritBonus: num($('skillCritBonus').value),
+    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + extraCritRate + critSynergy,
+    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + extraCritDamage,
+    evolutionDamage: num(state.enlightenment.evolutionDamage) + extraEvolutionDamage,
+    additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + extraAdditionalDamage,
+    enemyDamage: num(state.accessory.enemyDamage) + num(state.bracelet.enemyDamage) + num(state.enlightenment.enemyDamage) + extraEnemyDamage,
+    skillCritBonus: 0,
+    critSynergy,
     adrenalineCritRate: $('adrenalineEnabled').checked ? num($('adrenalineCritRate').value) : 0,
     attackPower: $('adrenalineEnabled').checked ? num($('adrenalineAttackPower').value) : 0,
     swiftSpeedBonus,
-    baseMoveAttackSpeed: 114,
-    moveAttackSpeed: 114 + swiftSpeedBonus
+    baseMoveAttackSpeed: baseSpeed,
+    moveAttackSpeed: baseSpeed + swiftSpeedBonus + Math.min(extraAttackSpeed, extraMoveSpeed),
+    attackSpeed: baseSpeed + swiftSpeedBonus + extraAttackSpeed,
+    moveSpeed: baseSpeed + swiftSpeedBonus + extraMoveSpeed,
+    extraCritRate,
+    extraCritDamage,
+    extraEvolutionDamage,
+    extraAdditionalDamage,
+    extraEnemyDamage,
+    extraAttackSpeed,
+    extraMoveSpeed
   };
 }
 function applyEffect(stats, effect) {
   const out = { ...stats };
   if (effect.critStat) { out.critStat = (out.critStat || 0) + effect.critStat; out.statCritRate = critRateFromStat(out.critStat); out.critRate += critRateFromStat(effect.critStat); }
-  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.moveAttackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus; }
+  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.attackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.extraAttackSpeed || 0); out.moveSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.extraMoveSpeed || 0); out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
   if (effect.critRate) out.critRate += effect.critRate;
   if (effect.critDamage) out.critDamage += effect.critDamage;
   if (effect.critHitDamage) out.critHitDamage = (out.critHitDamage || 0) + effect.critHitDamage;
   if (effect.evolutionDamage) out.evolutionDamage += effect.evolutionDamage;
   if (effect.sonicBreak) {
-    const speedIncrease = Math.max(0, (out.moveAttackSpeed || 100) - 100);
-    const overCap = Math.max(0, (out.moveAttackSpeed || 100) - 140);
+    const attackIncrease = Math.max(0, (out.attackSpeed || out.moveAttackSpeed || 100) - 100);
+    const moveIncrease = Math.max(0, (out.moveSpeed || out.moveAttackSpeed || 100) - 100);
+    const speedIncrease = Math.min(attackIncrease, moveIncrease);
+    const overCap = Math.min(Math.max(0, (out.attackSpeed || out.moveAttackSpeed || 100) - 140), Math.max(0, (out.moveSpeed || out.moveAttackSpeed || 100) - 140));
     let sonicDamage = speedIncrease * Number(effect.sonicBreak.rate || 0);
     if (overCap > 0) sonicDamage += Number(effect.sonicBreak.overCapBonus || 0) + overCap * Number(effect.sonicBreak.overCapRate || 0);
     sonicDamage = Math.min(sonicDamage, Number(effect.sonicBreak.maxEvolutionDamage ?? Infinity));
@@ -286,7 +307,7 @@ function applyEffect(stats, effect) {
   if (effect.enemyDamage) out.enemyDamage += effect.enemyDamage;
   if (effect.finalDamage) out.enemyDamage += effect.finalDamage;
   if (effect.attackPower) out.attackPower = (out.attackPower || 0) + effect.attackPower;
-  if (effect.speedBonus) out.moveAttackSpeed = (out.moveAttackSpeed || 0) + effect.speedBonus;
+  if (effect.speedBonus) { out.attackSpeed = (out.attackSpeed || out.moveAttackSpeed || 0) + effect.speedBonus; out.moveSpeed = (out.moveSpeed || out.moveAttackSpeed || 0) + effect.speedBonus; out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
   if (effect.critCap != null) out.critCap = effect.critCap;
   if (effect.overCritToEvolutionDamageRate) out.overCritToEvolutionDamageRate = effect.overCritToEvolutionDamageRate;
   if (effect.overCritEvolutionDamageCap != null) out.overCritEvolutionDamageCap = effect.overCritEvolutionDamageCap;
@@ -312,7 +333,7 @@ function score(stats) {
   const addMultiplier = 1 + stats.additionalDamage / 100;
   const enemyMultiplier = 1 + stats.enemyDamage / 100;
   const attackMultiplier = 1 + (stats.attackPower || 0) / 100;
-  return { value: critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: stats.critHitDamage || 0, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: stats.enemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0 };
+  return { value: critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: stats.critHitDamage || 0, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: stats.enemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
 }
 function statsWithSelection(baseStats, selection) {
   let s = { ...baseStats };
@@ -351,8 +372,10 @@ function buildSourceSummary(current) {
     if (eff.critHitDamage) critDamageEvolution.push(sourceLine(label + ' 치명타 적중 피해', eff.critHitDamage));
     if (eff.evolutionDamage) evoEvolution.push(sourceLine(label, eff.evolutionDamage));
     if (eff.sonicBreak) {
-      const speedIncrease = Math.max(0, (current.stats.moveAttackSpeed || 100) - 100);
-      const overCap = Math.max(0, (current.stats.moveAttackSpeed || 100) - 140);
+      const attackIncrease = Math.max(0, (current.stats.attackSpeed || current.stats.moveAttackSpeed || 100) - 100);
+      const moveIncrease = Math.max(0, (current.stats.moveSpeed || current.stats.moveAttackSpeed || 100) - 100);
+      const speedIncrease = Math.min(attackIncrease, moveIncrease);
+      const overCap = Math.min(Math.max(0, (current.stats.attackSpeed || current.stats.moveAttackSpeed || 100) - 140), Math.max(0, (current.stats.moveSpeed || current.stats.moveAttackSpeed || 100) - 140));
       let sonicDamage = speedIncrease * Number(eff.sonicBreak.rate || 0);
       if (overCap > 0) sonicDamage += Number(eff.sonicBreak.overCapBonus || 0) + overCap * Number(eff.sonicBreak.overCapRate || 0);
       sonicDamage = Math.min(sonicDamage, Number(eff.sonicBreak.maxEvolutionDamage ?? Infinity));
@@ -364,42 +387,47 @@ function buildSourceSummary(current) {
   if (current.result.convertedEvolutionDamage > 0) evoEvolution.push(sourceLine('[진화] 뭉가 전환', current.result.convertedEvolutionDamage, `80% 초과분 · 최대 75%`));
   const critLines = [sourceLine('치명 스탯', current.stats.statCritRate || 0, `치명 ${Math.round(current.stats.critStat || 0)}${getStatNodeLine('치명') ? ' · ' + getStatNodeLine('치명') : ''}`)];
   if (base.adrenalineCritRate) critLines.push(sourceLine('아드레날린', base.adrenalineCritRate));
+  if (base.critSynergy) critLines.push(sourceLine('치적 시너지', base.critSynergy));
   if (state.accessory.critRate) critLines.push(sourceLine('악세', state.accessory.critRate));
   if (state.bracelet.critRate) critLines.push(sourceLine('팔찌', state.bracelet.critRate));
   if (state.enlightenment.critRate) critLines.push(sourceLine('깨달음', state.enlightenment.critRate));
-  if (num($('braceletCritRateManual').value)) critLines.push(sourceLine('팔찌 추가 보정', num($('braceletCritRateManual').value)));
-  if (base.skillCritBonus) critLines.push(sourceLine('주력기 보정', base.skillCritBonus));
+  if (base.extraCritRate) critLines.push(sourceLine('추가 입력', base.extraCritRate));
   critLines.push(...critEvolution);
 
-  const critDamageLines = [sourceLine('기준 치명타 피해', num($('baseCritDamage').value, 200))];
+  const critDamageLines = [sourceLine('기본 치명타 피해', 200)];
   if (state.accessory.critDamage) critDamageLines.push(sourceLine('악세', state.accessory.critDamage));
   if (state.bracelet.critDamage) critDamageLines.push(sourceLine('팔찌', state.bracelet.critDamage));
   if (state.enlightenment.critDamage) critDamageLines.push(sourceLine('깨달음', state.enlightenment.critDamage));
-  if (num($('braceletCritDamageManual').value)) critDamageLines.push(sourceLine('팔찌 추가 보정', num($('braceletCritDamageManual').value)));
+  if (base.extraCritDamage) critDamageLines.push(sourceLine('추가 입력', base.extraCritDamage));
   critDamageLines.push(...critDamageEvolution);
 
   const evoLines = [];
-  if (num($('baseEvolutionDamage').value)) evoLines.push(sourceLine('기준 진피', num($('baseEvolutionDamage').value)));
   if (state.enlightenment.evolutionDamage) evoLines.push(sourceLine('깨달음', state.enlightenment.evolutionDamage));
+  if (base.extraEvolutionDamage) evoLines.push(sourceLine('추가 입력', base.extraEvolutionDamage));
   evoLines.push(...evoEvolution);
 
   const addLines = [];
-  if (num($('baseAdditionalDamage').value)) addLines.push(sourceLine('기준 추피', num($('baseAdditionalDamage').value)));
   if (state.accessory.additionalDamage) addLines.push(sourceLine('악세', state.accessory.additionalDamage));
   if (state.bracelet.additionalDamage) addLines.push(sourceLine('팔찌', state.bracelet.additionalDamage));
   if (state.enlightenment.additionalDamage) addLines.push(sourceLine('깨달음', state.enlightenment.additionalDamage));
-  if (num($('braceletAdditionalDamageManual').value)) addLines.push(sourceLine('팔찌 추가 보정', num($('braceletAdditionalDamageManual').value)));
+  if (base.extraAdditionalDamage) addLines.push(sourceLine('추가 입력', base.extraAdditionalDamage));
   addLines.push(...addEvolution);
 
-  const speedLines = [sourceLine('기본 + 만찬 + 서폿 진화', 114, '100% + 5% + 9%')];
-  if (current.stats.swiftSpeedBonus) speedLines.push(sourceLine('신속 스탯', current.stats.swiftSpeedBonus, `신속 ${Math.round(current.stats.swiftStat || 0)}${getStatNodeLine('신속') ? ' · ' + getStatNodeLine('신속') : ''}`));
+  const attackSpeedLines = [sourceLine('기본 + 만찬 + 서폿 진화', 114, '100% + 5% + 9%')];
+  const moveSpeedLines = [sourceLine('기본 + 만찬 + 서폿 진화', 114, '100% + 5% + 9%')];
+  if (current.stats.swiftSpeedBonus) {
+    const swiftDetail = `신속 ${Math.round(current.stats.swiftStat || 0)}${getStatNodeLine('신속') ? ' · ' + getStatNodeLine('신속') : ''}`;
+    attackSpeedLines.push(sourceLine('신속 스탯', current.stats.swiftSpeedBonus, swiftDetail));
+    moveSpeedLines.push(sourceLine('신속 스탯', current.stats.swiftSpeedBonus, swiftDetail));
+  }
+  if (base.extraAttackSpeed) attackSpeedLines.push(sourceLine('추가 입력', base.extraAttackSpeed));
+  if (base.extraMoveSpeed) moveSpeedLines.push(sourceLine('추가 입력', base.extraMoveSpeed));
 
   const enemyLines = [];
-  if (num($('baseEnemyDamage').value)) enemyLines.push(sourceLine('기준 적주피', num($('baseEnemyDamage').value)));
   if (state.accessory.enemyDamage) enemyLines.push(sourceLine('악세', state.accessory.enemyDamage));
   if (state.bracelet.enemyDamage) enemyLines.push(sourceLine('팔찌', state.bracelet.enemyDamage));
   if (state.enlightenment.enemyDamage) enemyLines.push(sourceLine('깨달음', state.enlightenment.enemyDamage));
-  if (num($('braceletEnemyDamageManual').value)) enemyLines.push(sourceLine('팔찌 추가 보정', num($('braceletEnemyDamageManual').value)));
+  if (base.extraEnemyDamage) enemyLines.push(sourceLine('추가 입력', base.extraEnemyDamage));
   enemyLines.push(...enemyEvolution);
 
   $('sourceSummary').innerHTML = `
@@ -409,7 +437,8 @@ function buildSourceSummary(current) {
     ${sourceGroup('진피', 'orange', evoLines, current.result.evo)}
     ${sourceGroup('추피', 'green', addLines, current.result.additionalDamage)}
     ${sourceGroup('적주피', 'pink', enemyLines, current.result.enemyDamage)}
-    ${sourceGroup('공이속', 'cyan', speedLines, current.result.moveAttackSpeed)}
+    ${sourceGroup('공격 속도', 'cyan', attackSpeedLines, current.result.attackSpeed)}
+    ${sourceGroup('이동 속도', 'cyan', moveSpeedLines, current.result.moveSpeed)}
     <div class="sourceFoot">뭉가 전환 진피는 <b>최대 75%</b>까지 적용됩니다.</div>
   `;
   const reset = $('resetViewButton');
@@ -437,7 +466,7 @@ function calculateAndRender() {
   }
   candidates.sort((a, b) => b.calc.result.value - a.calc.result.value);
   $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>현재 선택 노드 반영 기준</span>`;
-  $('baseInfo').innerHTML = `치명 ${Math.round(current.stats.critStat || 0)} / 스탯치적 ${fmt(current.stats.statCritRate || 0)}%, 최종치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%, 공증 ${fmt(current.result.attackPower)}%, 공이속 ${fmt(current.result.moveAttackSpeed)}%`;
+  $('baseInfo').innerHTML = `치명 ${Math.round(current.stats.critStat || 0)} / 스탯치적 ${fmt(current.stats.statCritRate || 0)}%, 최종치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%, 공증 ${fmt(current.result.attackPower)}%, 공속 ${fmt(current.result.attackSpeed)}%, 이속 ${fmt(current.result.moveSpeed)}%`;
   $('recommendList').innerHTML = candidates.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
     const currentMark = state.selected[c.name]?.level > 0 ? '<em>현재</em>' : '';
@@ -473,8 +502,6 @@ async function searchCharacter(name) {
     if (!data.profile?.CharacterName) throw new Error('캐릭터 프로필을 가져오지 못했습니다.');
     state.accessory = data.accessoryEffects || { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
     state.bracelet = data.braceletEffects || { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
-    // 팔찌는 API 자동 합산값(state.bracelet)으로 계산에 반영합니다.
-    // 아래 수동 입력칸은 API에서 못 읽은 팔찌 옵션을 추가 보정할 때만 사용합니다.
     renderCharacter(data.profile);
     state.foundEffects = readEffects(data.arkPassive);
     state.enlightenment = extractEnlightenmentEffects(state.foundEffects);
@@ -495,7 +522,8 @@ $('searchForm').addEventListener('submit', (event) => {
   if (!name) return setMessage('캐릭터명을 입력하세요.');
   searchCharacter(name);
 });
-['baseCritStat','baseSwiftStat','baseCritDamage','baseEvolutionDamage','baseAdditionalDamage','baseEnemyDamage','skillCritBonus','adrenalineCritRate','adrenalineAttackPower','braceletCritRateManual','braceletCritDamageManual','braceletAdditionalDamageManual','braceletEnemyDamageManual'].forEach(id => $(id).addEventListener('input', calculateAndRender));
+['extraCritRate','extraCritDamage','extraEvolutionDamage','extraAdditionalDamage','extraEnemyDamage','extraAttackSpeed','extraMoveSpeed','adrenalineCritRate','adrenalineAttackPower'].forEach(id => $(id).addEventListener('input', calculateAndRender));
 $('adrenalineEnabled').addEventListener('change', calculateAndRender);
+$('critSynergyEnabled').addEventListener('change', calculateAndRender);
 
 await loadDb();
