@@ -203,3 +203,97 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+.analysisGrid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.analysisBox, .bigDetails {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.analysisBox h3 {
+  margin: 0 0 10px;
+  color: #93c5fd;
+  font-size: 14px;
+}
+
+.tableLike { display: grid; gap: 8px; }
+.row {
+  display: grid;
+  grid-template-columns: 90px 70px 1fr;
+  gap: 8px;
+  align-items: start;
+  font-size: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  padding-top: 8px;
+}
+.row:first-child { border-top: 0; padding-top: 0; }
+.row b { color: #bfdbfe; }
+.row span { color: #f8fafc; font-weight: 700; }
+.row code { color: #94a3b8; white-space: pre-wrap; word-break: break-all; }
+
+.bigDetails { margin-top: 14px; }
+.bigDetails > summary {
+  cursor: pointer;
+  color: #e5e7eb;
+  font-weight: 800;
+}
+
+.analysisList { display: grid; gap: 10px; margin-top: 12px; }
+.analysisItem {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.analysisItem summary {
+  cursor: pointer;
+  color: #bfdbfe;
+  font-weight: 700;
+  font-size: 13px;
+}
+.analysisBody p {
+  margin: 8px 0 0;
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.analysisBody b { color: #93c5fd; margin-right: 6px; }
+
+.pathTable { display: grid; gap: 8px; margin-top: 12px; }
+.pathRow {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 110px 2fr;
+  gap: 10px;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  padding-top: 8px;
+  font-size: 12px;
+}
+.pathRow:first-child { border-top: 0; }
+.pathRow code { color: #bfdbfe; word-break: break-all; }
+.pathRow span { color: #fbbf24; }
+.pathRow p { margin: 0; color: #94a3b8; word-break: break-all; }
+
+.rawPreview {
+  max-height: 420px;
+  overflow: auto;
+  background: #020617;
+  color: #d1d5db;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 860px) {
+  .analysisGrid, .pathRow { grid-template-columns: 1fr; }
+}

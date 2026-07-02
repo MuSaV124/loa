@@ -71,61 +71,77 @@ function renderSummary(data) {
   summaryCard.classList.remove('hidden');
 }
 
-function nodeLabel(node) {
-  const level = node.level ? ` Lv.${node.level}` : '';
-  return `${node.name || '-'}${level}`;
+function renderPoints(points) {
+  const list = Array.isArray(points) ? points : [];
+  if (!list.length) return '<p class="empty">Points 데이터 없음</p>';
+  return `<div class="tableLike">${list.map((item) => `
+    <div class="row"><b>${escapeHtml(item.Name || item.Type || '-')}</b><span>${escapeHtml(item.Value ?? item.Point ?? item.Amount ?? '-')}</span><code>${escapeHtml(JSON.stringify(item))}</code></div>
+  `).join('')}</div>`;
 }
 
-function renderNodeGroup(title, nodes) {
-  const list = Array.isArray(nodes) ? nodes : [];
-  if (!list.length) {
-    return `
-      <div class="nodeGroup">
-        <h3>${escapeHtml(title)}</h3>
-        <p class="empty">추출된 노드 없음</p>
+function renderLikelyObjects(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) return '<p class="empty">노드 후보로 보이는 객체 없음</p>';
+  return `<div class="analysisList">${list.slice(0, 60).map((row) => `
+    <details class="analysisItem">
+      <summary>${escapeHtml(row.path)} ${row.name ? `· ${escapeHtml(row.name)}` : ''}</summary>
+      <div class="analysisBody">
+        <p><b>Keys</b> ${escapeHtml((row.keys || []).join(', '))}</p>
+        <p><b>Name</b> ${escapeHtml(row.name || '-')}</p>
+        <p><b>Level</b> ${escapeHtml(row.level ?? '-')}</p>
+        <p><b>Sample</b> ${escapeHtml(row.sample || '-')}</p>
       </div>
-    `;
-  }
+    </details>
+  `).join('')}</div>`;
+}
 
-  return `
-    <div class="nodeGroup">
-      <h3>${escapeHtml(title)}</h3>
-      <ul class="nodeList">
-        ${list.map((node) => `
-          <li>
-            <strong>${escapeHtml(nodeLabel(node))}</strong>
-            ${node.description ? `<span>${escapeHtml(node.description)}</span>` : ''}
-          </li>
-        `).join('')}
-      </ul>
-    </div>
-  `;
+function renderFieldPaths(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) return '<p class="empty">필드 경로 없음</p>';
+  return `<div class="pathTable">
+    ${list.slice(0, 120).map((row) => `
+      <div class="pathRow">
+        <code>${escapeHtml(row.path)}</code>
+        <span>${escapeHtml(row.type)}</span>
+        <p>${escapeHtml(row.sample || '')}</p>
+      </div>
+    `).join('')}
+  </div>`;
 }
 
 function renderExtractResult(data) {
-  const nodes = data.selectedNodes || {};
-  const unknown = Array.isArray(nodes.unknown) ? nodes.unknown : [];
+  const analysis = data.analysis || {};
   extractCard.innerHTML = `
-    <h2>선택 노드 확인</h2>
-    <div class="nodeGrid">
-      ${renderNodeGroup('진화', nodes.evolution)}
-      ${renderNodeGroup('깨달음', nodes.enlightenment)}
-      ${renderNodeGroup('도약', nodes.leap)}
-    </div>
-    ${unknown.length ? `
-      <div class="nodeGroup unknownGroup">
-        <h3>분류 필요</h3>
-        <ul class="nodeList">
-          ${unknown.map((node) => `
-            <li>
-              <strong>${escapeHtml(nodeLabel(node))}</strong>
-              ${node.description ? `<span>${escapeHtml(node.description)}</span>` : ''}
-            </li>
-          `).join('')}
-        </ul>
+    <h2>Open API 분석기</h2>
+    <p class="note">${escapeHtml(analysis.message || 'ArkPassive 구조를 확인합니다.')}</p>
+
+    <div class="analysisGrid">
+      <div class="analysisBox">
+        <h3>Root Keys</h3>
+        <p>${escapeHtml((analysis.rootKeys || []).join(', ') || '-')}</p>
       </div>
-    ` : ''}
-    <p class="note">v1.0.9: 계산 전 단계입니다. 현재 선택된 진화/깨달음/도약 노드명과 레벨을 먼저 확인합니다.</p>
+      <div class="analysisBox">
+        <h3>ArkPassive Points</h3>
+        ${renderPoints(analysis.points)}
+      </div>
+    </div>
+
+    <details class="bigDetails" open>
+      <summary>노드 후보 객체</summary>
+      ${renderLikelyObjects(analysis.likelyNodeObjects)}
+    </details>
+
+    <details class="bigDetails">
+      <summary>필드 경로 전체 보기</summary>
+      ${renderFieldPaths(analysis.fieldPaths)}
+    </details>
+
+    <details class="bigDetails">
+      <summary>ArkPassive 원본 미리보기</summary>
+      <pre class="rawPreview">${escapeHtml(analysis.rawPreview || '원본 없음')}</pre>
+    </details>
+
+    <p class="note">v1.1.0: 이 화면에서 실제 노드명/레벨이 어느 필드에 있는지 확인한 뒤 다음 버전에서 파서를 확정합니다.</p>
   `;
   extractCard.classList.remove('hidden');
 }
