@@ -1,4 +1,4 @@
-const VERSION = '4.4.5';
+const VERSION = '4.4.6';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -601,7 +601,9 @@ function calculateAndRender() {
   renderKeenEfficiency(current);
   const baseValue = current.result.value || 1;
   const candidates = [];
+  const excludeManaForge = Boolean($('excludeManaForge')?.checked);
   for (const name of allOptions(5)) {
+    if (excludeManaForge && name === '마나 용광로') continue;
     const node = getNode(name);
     if (!node) continue;
     const level = node.maxLevel || 2;
@@ -671,5 +673,6 @@ $('searchForm').addEventListener('submit', (event) => {
 ['extraCritRate','extraCritDamage','extraEvolutionDamage','extraAdditionalDamage','extraEnemyDamage','extraAttackSpeed','extraMoveSpeed','adrenalineCritRate','adrenalineAttackPower'].forEach(id => $(id).addEventListener('input', calculateAndRender));
 $('adrenalineEnabled').addEventListener('change', calculateAndRender);
 $('critSynergyEnabled').addEventListener('change', calculateAndRender);
+$('excludeManaForge')?.addEventListener('change', calculateAndRender);
 
 await loadDb();

@@ -495,3 +495,21 @@ select {
 .sourceTitle button { white-space: nowrap; min-width: 68px; line-height: 1.1; }
 @media (max-width: 1160px) { #keenPanel { grid-column: 1; } }
 @media (max-width: 760px) { .keenGrid { grid-template-columns: 1fr; } .keenCard { grid-template-columns: 1fr; } .keenCard strong { font-size: 22px; } }
+
+/* v4.4.6 recommend option */
+.recommendHead { align-items: center; }
+.miniCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border: 1px solid rgba(245, 182, 66, .32);
+  border-radius: 999px;
+  background: rgba(245, 182, 66, .10);
+  color: #ffe2a3;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.miniCheck input { width: 18px; height: 18px; margin: 0; accent-color: var(--amber); }
+@media (max-width: 560px) { .recommendHead { align-items: flex-start; } .miniCheck { width: 100%; justify-content: space-between; border-radius: 10px; } }

@@ -1,5 +1,10 @@
-# Lost Ark Node Recommend Calculator v4.4.5
+# Lost Ark Node Recommend Calculator v4.4.6
 
 - 깨달음 효과 중복 적용 방지
 - 블래스터 등 동일 Tooltip이 반복되는 경우 치적/치피/진피/추피/적주피가 2배로 계산되던 문제 수정
 - 기상술사 기민함 상한 계산 유지
+
+
+## v4.4.6
+- 5티어 추천에서 마나용광로 제외 체크박스 추가
+- 화면/API 버전 표시 4.4.6 갱신
