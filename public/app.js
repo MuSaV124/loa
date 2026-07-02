@@ -1,4 +1,4 @@
-const VERSION = '3.2.0';
+const VERSION = '3.2.1';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
@@ -333,10 +333,15 @@ async function loadDb() {
 async function searchCharacter(name) {
   const button = $('searchButton');
   button.disabled = true; button.textContent = '검색...'; setMessage('');
+  // 이전 검색 결과가 남아 보이지 않도록 검색 시작 시 화면을 먼저 비웁니다.
+  $('characterCard').classList.add('hidden');
+  $('characterCard').innerHTML = '';
+  $('summaryPanel').classList.add('hidden');
   try {
-    const res = await fetch(`/api/character?name=${encodeURIComponent(name)}`);
+    const res = await fetch(`/api/character?name=${encodeURIComponent(name)}&_=${Date.now()}`, { cache: 'no-store' });
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || data.message || '검색 실패');
+    if (!data.profile?.CharacterName) throw new Error('캐릭터 프로필을 가져오지 못했습니다.');
     state.accessory = data.accessoryEffects || { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
     state.bracelet = data.braceletEffects || { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
     // 팔찌는 API 자동 합산값(state.bracelet)으로 계산에 반영합니다.

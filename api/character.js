@@ -1,4 +1,7 @@
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   try {
     const name = String(req.query.name || '').trim();
 
@@ -30,7 +33,7 @@ export default async function handler(req, res) {
     const accessoryEffects = extractAccessoryEffects(equipment);
     const braceletEffects = extractBraceletEffects(equipment);
 
-    return res.status(200).json({ ok: true, apiVersion: '3.0.0', profile, arkPassive, equipment, accessoryEffects, braceletEffects, raw: data });
+    return res.status(200).json({ ok: true, apiVersion: '3.2.1', profile, arkPassive, equipment, accessoryEffects, braceletEffects, raw: data });
   } catch (error) {
     const message = error.name === 'AbortError' ? 'Open API 응답 시간이 길어서 중단했습니다.' : error.message;
     return res.status(500).json({ error: '서버 함수 오류', message });
