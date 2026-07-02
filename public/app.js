@@ -1,4 +1,4 @@
-const VERSION = '4.4.4';
+const VERSION = '4.4.5';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -89,9 +89,10 @@ function normalizeMatchToken(text) {
   return String(text || '').replace(/\s+/g, ' ').trim();
 }
 function addMatchesTo(out, key, text, regexList) {
-  // Open API Tooltip은 같은 설명이 여러 필드/중첩 JSON에 반복되는 경우가 있어
-  // match.index 기준으로 더하면 블래스터처럼 40%가 80%로 중복 적용될 수 있습니다.
-  // 같은 항목 안에서는 같은 문장/수치 조합을 1회만 반영합니다.
+  // 깨달음 Tooltip은 같은 문장이 raw JSON, Element_*, Description 쪽에 반복되어 들어오는 경우가 있습니다.
+  // 그래서 한 효과 안에서 같은 계열 수치는 합산하지 않고 가장 큰 유효값 1개만 사용합니다.
+  // 예: 블래스터 깨달음 치피 40%가 중복 파싱되어 80%가 되는 문제 방지.
+  let best = 0;
   const seen = new Set();
   for (const re of regexList) {
     re.lastIndex = 0;
@@ -102,9 +103,10 @@ function addMatchesTo(out, key, text, regexList) {
       const token = `${key}:${value}:${normalizeMatchToken(match[0])}`;
       if (seen.has(token)) continue;
       seen.add(token);
-      out[key] += value;
+      best = Math.max(best, value);
     }
   }
+  if (best > 0) out[key] += best;
 }
 function parsePercentEffectText(text) {
   const out = { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0 };
