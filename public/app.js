@@ -1,7 +1,7 @@
-const VERSION = '2.4.0';
+const VERSION = '3.0.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
-const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
+const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
 
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
 function stripHtml(v) { return String(v ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(); }
@@ -12,29 +12,25 @@ function item(label, value) { return `<div class="cell"><b>${label}</b><span>${e
 function setMessage(text) { const el = $('message'); if (!text) { el.classList.add('hidden'); el.textContent = ''; return; } el.classList.remove('hidden'); el.textContent = text; }
 function getStat(profile, type) { return (profile?.Stats || []).find(s => s.Type === type)?.Value ?? '-'; }
 
-function parseProfileCombat(profile) {
-  const out = { critRate: null };
-  const stats = Array.isArray(profile?.Stats) ? profile.Stats : [];
-  const crit = stats.find(s => s.Type === '치명');
-  const text = stripHtml(crit?.Tooltip || '');
-  const match = text.match(/치명타\s*(?:적중률|확률)[^0-9+]*([+]?\d+(?:\.\d+)?)%/);
-  if (match) out.critRate = Number(match[1]);
-  return out;
+function parseProfileStats(profile) {
+  const stat = (type) => num((profile?.Stats || []).find(s => s.Type === type)?.Value, 0);
+  return { crit: stat('치명'), swift: stat('신속'), spec: stat('특화') };
 }
-function currentCritNodeBonus(selection = state.selected) {
-  const level = Number(selection?.['치명']?.level || 0);
-  return Number(getLevelEffect('치명', level)?.critRate || 0);
+function tier1StatBonus(name, selection = state.selected) {
+  const level = Number(selection?.[name]?.level || 0);
+  return level * 20;
 }
 function applyProfileDefaults(profile, selection = state.selected) {
-  const parsed = parseProfileCombat(profile);
-  if (Number.isFinite(parsed.critRate)) {
-    // API 프로필의 치명타 확률에는 현재 1티어 '치명' 노드로 오른 치명 스탯이 이미 반영되어 있을 수 있습니다.
-    // 계산기에서도 선택 노드를 다시 적용하므로, 기준값에서는 현재 선택된 치명 노드 추정치를 한 번 빼서 중복 합산을 막습니다.
-    const adjusted = Math.max(0, parsed.critRate - currentCritNodeBonus(selection));
-    $('baseCritRate').value = adjusted.toFixed(2);
-  }
+  state.profileStats = parseProfileStats(profile);
+  // Open API의 치명/신속 수치는 현재 진화 1티어 선택분이 이미 들어간 값입니다.
+  // v3부터는 진화 1티어를 먼저 제외한 뒤, 사용자가 선택한 레벨을 다시 더해 계산합니다.
+  const baseCritStat = Math.max(0, state.profileStats.crit - tier1StatBonus('치명', selection));
+  const baseSwiftStat = Math.max(0, state.profileStats.swift - tier1StatBonus('신속', selection));
+  $('baseCritStat').value = Math.round(baseCritStat);
+  $('baseSwiftStat').value = Math.round(baseSwiftStat);
 }
-
+function critRateFromStat(critStat) { return Number(critStat || 0) * 0.03579; }
+function speedFromSwift(swiftStat) { return Number(swiftStat || 0) * 0.01717; }
 function buildIndex(db) {
   const map = new Map();
   for (const [tier, names] of Object.entries(db?.tiers || {})) for (const name of names || []) map.set(name, Number(tier));
@@ -43,12 +39,10 @@ function buildIndex(db) {
 }
 function getNode(name) { return (state.evolution?.nodes || []).find(n => n.name === name); }
 function getLevelEffect(name, level) {
+  if (name === '치명') return { critStat: level * 20 };
+  if (name === '신속') return { swiftStat: level * 20 };
   const node = getNode(name);
-  const raw = node?.levels?.[String(level)] || {};
-  if (Object.keys(raw).length) return raw;
-  // 1티어 특성 노드는 레벨 비례 추정값. 실제값과 다르면 JSON에서 조정하면 됨.
-  if (name === '치명') return { critRate: level * 0.716 };
-  return {};
+  return node?.levels?.[String(level)] || {};
 }
 function allOptions(tier) { return [...new Set([...(state.evolution?.tiers?.[String(tier)] || []), ...(state.evolution?.nodes || []).filter(n => Number(n.tier) === Number(tier)).map(n => n.name)])]; }
 function defaultSelection() {
@@ -164,8 +158,17 @@ function onNodeCardClick(event) {
 
 
 function getBaseStats() {
+  const selectedCritStat = tier1StatBonus('치명');
+  const selectedSwiftStat = tier1StatBonus('신속');
+  const critStat = num($('baseCritStat').value) + selectedCritStat;
+  const swiftStat = num($('baseSwiftStat').value) + selectedSwiftStat;
+  const statCritRate = critRateFromStat(critStat);
+  const swiftSpeedBonus = $('includeSwiftSpeed').checked ? speedFromSwift(swiftStat) : 0;
   return {
-    critRate: num($('baseCritRate').value) + num(state.accessory.critRate) + num(state.bracelet.critRate) + num($('braceletCritRateManual').value),
+    critStat,
+    swiftStat,
+    statCritRate,
+    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num($('braceletCritRateManual').value),
     critDamage: num($('baseCritDamage').value, 200) + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num($('braceletCritDamageManual').value),
     evolutionDamage: num($('baseEvolutionDamage').value),
     additionalDamage: num($('baseAdditionalDamage').value) + num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num($('braceletAdditionalDamageManual').value),
@@ -173,11 +176,13 @@ function getBaseStats() {
     skillCritBonus: num($('skillCritBonus').value),
     adrenalineCritRate: $('adrenalineEnabled').checked ? num($('adrenalineCritRate').value) : 0,
     attackPower: $('adrenalineEnabled').checked ? num($('adrenalineAttackPower').value) : 0,
-    moveAttackSpeed: num($('baseMoveAttackSpeed').value, 114)
+    moveAttackSpeed: num($('baseMoveAttackSpeed').value, 114) + swiftSpeedBonus
   };
 }
 function applyEffect(stats, effect) {
   const out = { ...stats };
+  if (effect.critStat) { out.critStat = (out.critStat || 0) + effect.critStat; out.statCritRate = critRateFromStat(out.critStat); out.critRate += critRateFromStat(effect.critStat); }
+  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; }
   if (effect.critRate) out.critRate += effect.critRate;
   if (effect.critDamage) out.critDamage += effect.critDamage;
   if (effect.evolutionDamage) out.evolutionDamage += effect.evolutionDamage;
@@ -215,7 +220,10 @@ function score(stats) {
 }
 function statsWithSelection(baseStats, selection) {
   let s = { ...baseStats };
-  for (const row of selectedEntries(selection)) s = applyEffect(s, getLevelEffect(row.name, row.level));
+  for (const row of selectedEntries(selection)) {
+    if (row.name === '치명' || row.name === '신속') continue;
+    s = applyEffect(s, getLevelEffect(row.name, row.level));
+  }
   return { stats: s, result: score(s) };
 }
 function renderCombatStats(current = statsWithSelection(getBaseStats(), state.selected)) {
@@ -223,6 +231,7 @@ function renderCombatStats(current = statsWithSelection(getBaseStats(), state.se
     ? `${fmt(current.result.evo)}% (뭉가 전환 +${fmt(current.result.convertedEvolutionDamage)}%)`
     : `${fmt(current.result.evo)}%`;
   $('combatStatGrid').innerHTML = [
+    item('치명 스탯', `${Math.round(current.stats.critStat || 0)}`), item('스탯 치적', `${fmt(current.stats.statCritRate || 0)}%`),
     item('치명타 확률', `${fmt(current.result.critRate)}%`), item('치명타 피해', `${fmt(current.result.critDamage)}%`),
     item('진피', convertedText), item('추피', `${fmt(current.result.additionalDamage)}%`),
     item('적주피', `${fmt(current.result.enemyDamage)}%`), item('아드 공증', `${fmt(current.result.attackPower)}%`),
@@ -247,7 +256,7 @@ function calculateAndRender() {
   }
   candidates.sort((a, b) => b.calc.result.value - a.calc.result.value);
   $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>현재 선택 노드 반영 기준</span>`;
-  $('baseInfo').innerHTML = `치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%, 공증 ${fmt(current.result.attackPower)}%, 공이속 ${fmt(current.result.moveAttackSpeed)}%`;
+  $('baseInfo').innerHTML = `치명 ${Math.round(current.stats.critStat || 0)} / 스탯치적 ${fmt(current.stats.statCritRate || 0)}%, 최종치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%, 공증 ${fmt(current.result.attackPower)}%, 공이속 ${fmt(current.result.moveAttackSpeed)}%`;
   $('recommendList').innerHTML = candidates.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
     const currentMark = state.selected[c.name]?.level > 0 ? '<em>현재</em>' : '';
@@ -291,7 +300,8 @@ $('searchForm').addEventListener('submit', (event) => {
   if (!name) return setMessage('캐릭터명을 입력하세요.');
   searchCharacter(name);
 });
-['baseCritRate','baseCritDamage','baseEvolutionDamage','baseAdditionalDamage','baseEnemyDamage','skillCritBonus','adrenalineCritRate','adrenalineAttackPower','braceletCritRateManual','braceletCritDamageManual','braceletAdditionalDamageManual','braceletEnemyDamageManual','baseMoveAttackSpeed'].forEach(id => $(id).addEventListener('input', calculateAndRender));
+['baseCritStat','baseSwiftStat','baseCritDamage','baseEvolutionDamage','baseAdditionalDamage','baseEnemyDamage','skillCritBonus','adrenalineCritRate','adrenalineAttackPower','braceletCritRateManual','braceletCritDamageManual','braceletAdditionalDamageManual','braceletEnemyDamageManual','baseMoveAttackSpeed'].forEach(id => $(id).addEventListener('input', calculateAndRender));
 $('adrenalineEnabled').addEventListener('change', calculateAndRender);
+$('includeSwiftSpeed').addEventListener('change', calculateAndRender);
 
 await loadDb();

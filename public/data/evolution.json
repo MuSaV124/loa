@@ -1,8 +1,8 @@
 {
   "meta": {
-    "version": "2.0.0",
+    "version": "3.0.0",
     "source": "Lost Ark Ark Passive Evolution nodes",
-    "note": "진화 노드 전용. v2.0.0부터 아드 치적/공증 입력과 공이속 기준값을 지원합니다."
+    "note": "진화 노드 전용. v3.0.0부터 아드 치적/공증 입력과 공이속 기준값을 지원합니다."
   },
   "group": "진화",
   "tiers": {
