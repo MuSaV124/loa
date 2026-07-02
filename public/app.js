@@ -336,8 +336,14 @@ function getBaseStats() {
   for (const item of state.enlightenment.items || []) {
     const wf = item?.effects?.windfuryAgility;
     if (!wf) continue;
-    dynamicEnlightenmentCritDamage += Math.max(0, attackSpeed - 100) * Number(wf.critDamageRate || 0);
-    dynamicEnlightenmentCritRate += Math.max(0, moveSpeed - 100) * Number(wf.critRateRate || 0);
+    // 기상술사 '기민함'은 기본 공속/이속 증가량을 기준으로 계산합니다.
+    // 로아의 공속/이속 상한은 각각 140%라서 증가량은 최대 40%까지만 반영됩니다.
+    // Lv1: 치피 40% / 치적 10%, Lv2: 80% / 20%, Lv3: 120% / 30%
+    // 최대값: Lv1 치피 16%·치적 4%, Lv2 치피 32%·치적 8%, Lv3 치피 48%·치적 12%
+    const cappedAttackIncrease = Math.max(0, Math.min(attackSpeed, 140) - 100);
+    const cappedMoveIncrease = Math.max(0, Math.min(moveSpeed, 140) - 100);
+    dynamicEnlightenmentCritDamage += cappedAttackIncrease * Number(wf.critDamageRate || 0);
+    dynamicEnlightenmentCritRate += cappedMoveIncrease * Number(wf.critRateRate || 0);
   }
   dynamicEnlightenmentCritRate = Math.round(dynamicEnlightenmentCritRate * 100) / 100;
   dynamicEnlightenmentCritDamage = Math.round(dynamicEnlightenmentCritDamage * 100) / 100;
