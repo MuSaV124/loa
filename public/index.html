@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>로스트아크 4티어/5티어 추천 계산기</title>
+  <title>LOSTARK 노드 추천 계산기</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <main class="wrap">
     <section class="hero">
-      <h1>로스트아크 4티어/5티어 추천 계산기</h1>
-      <p>v1.0.5: 캐릭터 검색/API 연결 정상화 테스트 버전입니다.</p>
+      <h1>LOSTARK 노드 추천 계산기</h1>
+      <p>v1.0.6: 검색 결과 화면을 정리하고 자동 추출 영역을 준비했습니다.</p>
       <form id="searchForm" class="search">
         <input id="characterName" type="text" placeholder="캐릭터명 입력" autocomplete="off" />
         <button type="submit">검색</button>
@@ -30,10 +30,10 @@
     </section>
 
     <section id="summaryCard" class="card hidden"></section>
-    <section id="rawCard" class="card hidden"></section>
+    <section id="extractCard" class="card hidden"></section>
   </main>
 
-  <footer class="version">Version 1.0.5</footer>
+  <footer class="version">Version 1.0.6</footer>
   <script src="/app.js"></script>
 </body>
 </html>

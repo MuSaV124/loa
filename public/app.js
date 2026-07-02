@@ -3,7 +3,7 @@ const input = document.querySelector('#characterName');
 const statusBox = document.querySelector('#status');
 const characterCard = document.querySelector('#characterCard');
 const summaryCard = document.querySelector('#summaryCard');
-const rawCard = document.querySelector('#rawCard');
+const extractCard = document.querySelector('#extractCard');
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (ch) => ({
@@ -21,7 +21,7 @@ function hideStatus() { statusBox.classList.add('hidden'); }
 function hideCards() {
   characterCard.classList.add('hidden');
   summaryCard.classList.add('hidden');
-  rawCard.classList.add('hidden');
+  extractCard.classList.add('hidden');
 }
 
 async function readJsonResponse(response) {
@@ -50,8 +50,7 @@ function renderSummary(data) {
   summaryCard.innerHTML = `
     <h2>검색 결과 확인</h2>
     <div class="grid">
-      <div class="metric"><b>API 버전</b>${escapeHtml(data.version)}</div>
-      <div class="metric"><b>직업</b>${escapeHtml(s.characterClass || '-')}</div>
+<div class="metric"><b>직업</b>${escapeHtml(s.characterClass || '-')}</div>
       <div class="metric"><b>서버</b>${escapeHtml(s.serverName || '-')}</div>
       <div class="metric"><b>아이템 레벨</b>${escapeHtml(s.itemLevel || '-')}</div>
       <div class="metric"><b>치명</b>${escapeHtml(stats.crit || 0)}</div>
@@ -66,9 +65,21 @@ function renderSummary(data) {
   summaryCard.classList.remove('hidden');
 }
 
-function renderRaw(data) {
-  rawCard.innerHTML = `<h2>API 원본 확인용</h2><pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
-  rawCard.classList.remove('hidden');
+function renderExtractPlaceholder() {
+  extractCard.innerHTML = `
+    <h2>자동 추출 결과</h2>
+    <div class="grid">
+      <div class="metric"><b>진화형 피해</b>-</div>
+      <div class="metric"><b>적에게 주는 피해</b>-</div>
+      <div class="metric"><b>추가 피해</b>-</div>
+      <div class="metric"><b>치명타 적중률</b>-</div>
+      <div class="metric"><b>치명타 피해</b>-</div>
+      <div class="metric"><b>공격속도</b>-</div>
+      <div class="metric"><b>이동속도</b>-</div>
+    </div>
+    <p class="note">다음 버전부터 진화/깨달음/도약 노드에서 자동 추출됩니다.</p>
+  `;
+  extractCard.classList.remove('hidden');
 }
 
 form.addEventListener('submit', async (event) => {
@@ -87,7 +98,7 @@ form.addEventListener('submit', async (event) => {
     hideStatus();
     renderCharacter(data);
     renderSummary(data);
-    renderRaw(data);
+    renderExtractPlaceholder();
   } catch (error) {
     showStatus(error.message, true);
   }
