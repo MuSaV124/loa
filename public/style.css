@@ -513,3 +513,80 @@ select {
 }
 .miniCheck input { width: 18px; height: 18px; margin: 0; accent-color: var(--amber); }
 @media (max-width: 560px) { .recommendHead { align-items: flex-start; } .miniCheck { width: 100%; justify-content: space-between; border-radius: 10px; } }
+
+/* v4.5.0 4/5 tier combination recommendation table */
+.comboTableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--softLine);
+  border-radius: 14px;
+  background: #0b1220;
+}
+.comboTable {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.comboTable th,
+.comboTable td {
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--softLine);
+  text-align: left;
+  vertical-align: middle;
+}
+.comboTable th {
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 900;
+  background: rgba(148, 163, 184, .08);
+  white-space: nowrap;
+}
+.comboTable tbody tr:last-child td { border-bottom: 0; }
+.comboTable tbody tr.best {
+  background: rgba(34, 197, 94, .10);
+  box-shadow: inset 3px 0 0 rgba(34, 197, 94, .85);
+}
+.comboTable td:first-child b {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, .12);
+  color: #e5e7eb;
+}
+.comboTable tr.best td:first-child b {
+  background: rgba(34, 197, 94, .18);
+  color: #bbf7d0;
+}
+.comboTable strong { color: #f8fafc; }
+.comboTable .up { color: #86efac; font-weight: 950; }
+.comboTable .down { color: #fca5a5; font-weight: 950; }
+.nodePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid rgba(116, 161, 255, .45);
+  border-radius: 999px;
+  background: rgba(116, 161, 255, .12);
+  color: #dbeafe;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.comboTable em {
+  display: inline-block;
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 11px;
+  color: #111827;
+  background: var(--amber);
+  padding: 3px 6px;
+  border-radius: 999px;
+  font-weight: 950;
+  vertical-align: middle;
+}
+@media (max-width: 760px) {
+  .comboTable { font-size: 13px; }
+  .comboTable th, .comboTable td { padding: 11px 10px; }
+}

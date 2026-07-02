@@ -1,4 +1,4 @@
-const VERSION = '4.4.6';
+const VERSION = '4.5.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -594,6 +594,19 @@ function renderKeenEfficiency(current) {
   const crit = Math.max(0, Math.min(100, Number(current?.result?.effectiveCritRate ?? current?.result?.critRate ?? 0)));
   el.innerHTML = `<div class="keenNote">계산 기준: 실제 치적 ${crit.toFixed(2)}% / 치피 ${Number(current?.result?.critDamage || 0).toFixed(2)}%</div>${rows}`;
 }
+function currentTierNames(tier) {
+  return selectedEntries().filter(row => Number(row.tier) === Number(tier)).map(row => row.name);
+}
+function candidateMemo(fourName, fiveName, calc) {
+  const current4 = currentTierNames(4).join(' + ') || '-';
+  const current5 = currentTierNames(5).join(' + ') || '-';
+  const bits = [];
+  if (fourName === current4 && fiveName === current5) bits.push('현재 조합');
+  else bits.push(`${fourName} / ${fiveName}`);
+  if (calc?.result?.convertedEvolutionDamage > 0) bits.push(`뭉가 전환 ${fmt(calc.result.convertedEvolutionDamage)}%`);
+  if (calc?.result?.sonicBreakEvolutionDamage > 0) bits.push(`음속 ${fmt(calc.result.sonicBreakEvolutionDamage)}%`);
+  return bits.join(' / ');
+}
 function calculateAndRender() {
   const baseStats = getBaseStats();
   const current = statsWithSelection(baseStats, state.selected);
@@ -602,25 +615,45 @@ function calculateAndRender() {
   const baseValue = current.result.value || 1;
   const candidates = [];
   const excludeManaForge = Boolean($('excludeManaForge')?.checked);
-  for (const name of allOptions(5)) {
-    if (excludeManaForge && name === '마나 용광로') continue;
-    const node = getNode(name);
-    if (!node) continue;
-    const level = node.maxLevel || 2;
-    const next = cloneSelection();
-    for (const opt of allOptions(5)) delete next[opt];
-    next[name] = { level, source: 'candidate' };
-    const calc = statsWithSelection(baseStats, next);
-    candidates.push({ name, level, calc, diff: ((calc.result.value / baseValue) - 1) * 100 });
+  const tier4Options = allOptions(4).filter(name => getNode(name));
+  const tier5Options = allOptions(5).filter(name => getNode(name) && !(excludeManaForge && name === '마나 용광로'));
+
+  for (const fourName of tier4Options) {
+    const fourNode = getNode(fourName);
+    const fourLevel = fourNode?.maxLevel || 1;
+    for (const fiveName of tier5Options) {
+      const fiveNode = getNode(fiveName);
+      const fiveLevel = fiveNode?.maxLevel || 2;
+      const next = cloneSelection();
+      for (const opt of allOptions(4)) delete next[opt];
+      for (const opt of allOptions(5)) delete next[opt];
+      next[fourName] = { level: fourLevel, source: 'candidate' };
+      next[fiveName] = { level: fiveLevel, source: 'candidate' };
+      const calc = statsWithSelection(baseStats, next);
+      candidates.push({ fourName, fourLevel, fiveName, fiveLevel, calc, diff: ((calc.result.value / baseValue) - 1) * 100 });
+    }
   }
   candidates.sort((a, b) => b.calc.result.value - a.calc.result.value);
-  $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>현재 선택 노드 반영 기준</span>`;
+  const top = candidates.slice(0, 5);
+  $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>현재 1~5티어 선택 기준</span>`;
   $('baseInfo').innerHTML = `치명 ${Math.round(current.stats.critStat || 0)} / 스탯치적 ${fmt(current.stats.statCritRate || 0)}%, 최종치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%, 공증 ${fmt(current.result.attackPower)}%, 공속 ${fmt(current.result.attackSpeed)}%, 이속 ${fmt(current.result.moveSpeed)}%`;
-  $('recommendList').innerHTML = candidates.map((c, i) => {
-    const cls = c.diff >= 0 ? 'up' : 'down';
-    const currentMark = state.selected[c.name]?.level > 0 ? '<em>현재</em>' : '';
-    return `<div class="recommend ${cls}"><div><b>${i + 1}. ${escapeHtml(c.name)} Lv.${c.level}</b>${currentMark}<small>점수 ${c.calc.result.value.toFixed(4)}</small></div><strong>${pct(c.diff)}</strong></div>`;
-  }).join('');
+  $('recommendList').innerHTML = `<div class="comboTableWrap"><table class="comboTable">
+    <thead><tr><th>순위</th><th>4티어</th><th>5티어</th><th>기대값</th><th>차이</th><th>치적</th><th>진피</th><th>참고</th></tr></thead>
+    <tbody>${top.map((c, i) => {
+      const cls = c.diff >= 0 ? 'up' : 'down';
+      const currentCombo = (state.selected[c.fourName]?.level > 0 && state.selected[c.fiveName]?.level > 0) ? '<em>현재</em>' : '';
+      return `<tr class="${i === 0 ? 'best' : ''}">
+        <td><b>${i + 1}</b></td>
+        <td><strong>${escapeHtml(c.fourName)}</strong></td>
+        <td><span class="nodePill">${escapeHtml(c.fiveName)} Lv.${c.fiveLevel}</span>${currentCombo}</td>
+        <td>${c.calc.result.value.toFixed(4)}</td>
+        <td class="${cls}">${pct(c.diff)}</td>
+        <td>${fmt(c.calc.result.critRate)}%</td>
+        <td>${fmt(c.calc.result.evo)}%</td>
+        <td>${escapeHtml(candidateMemo(c.fourName, c.fiveName, c.calc))}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
 }
 
 async function loadDb() {
