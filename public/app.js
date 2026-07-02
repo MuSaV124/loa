@@ -1,7 +1,7 @@
-const VERSION = '2.0.0';
+const VERSION = '2.1.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
-const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
+const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
 
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
 function stripHtml(v) { return String(v ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(); }
@@ -82,7 +82,8 @@ function renderSummary(profile, arkPassive) {
     item('직업', profile?.CharacterClassName), item('아이템 레벨', profile?.ItemAvgLevel), item('서버', profile?.ServerName),
     item('치명', getStat(profile, '치명')), item('신속', getStat(profile, '신속')), item('특화', getStat(profile, '특화')),
     item('진화 포인트', point('진화')), item('악세 치적', `${fmt(state.accessory.critRate)}%`), item('악세 치피', `${fmt(state.accessory.critDamage)}%`),
-    item('악세 추피', `${fmt(state.accessory.additionalDamage)}%`), item('악세 적주피', `${fmt(state.accessory.enemyDamage)}%`)
+    item('악세 추피', `${fmt(state.accessory.additionalDamage)}%`), item('악세 적주피', `${fmt(state.accessory.enemyDamage)}%`),
+    item('팔찌 치적', `${fmt(state.bracelet.critRate)}%`), item('팔찌 치피', `${fmt(state.bracelet.critDamage)}%`)
   ].join('');
   $('summaryPanel').classList.remove('hidden');
   renderCombatStats();
@@ -154,14 +155,14 @@ function onNodeCardClick(event) {
 
 function getBaseStats() {
   return {
-    critRate: num($('baseCritRate').value) + num(state.accessory.critRate),
-    critDamage: num($('baseCritDamage').value, 200) + num(state.accessory.critDamage),
+    critRate: num($('baseCritRate').value) + num(state.accessory.critRate) + num($('braceletCritRate').value),
+    critDamage: num($('baseCritDamage').value, 200) + num(state.accessory.critDamage) + num($('braceletCritDamage').value),
     evolutionDamage: num($('baseEvolutionDamage').value),
-    additionalDamage: num($('baseAdditionalDamage').value) + num(state.accessory.additionalDamage),
-    enemyDamage: num($('baseEnemyDamage').value) + num(state.accessory.enemyDamage),
+    additionalDamage: num($('baseAdditionalDamage').value) + num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage),
+    enemyDamage: num($('baseEnemyDamage').value) + num(state.accessory.enemyDamage) + num(state.bracelet.enemyDamage),
     skillCritBonus: num($('skillCritBonus').value),
-    adrenalineCritRate: num($('adrenalineCritRate').value),
-    attackPower: num($('adrenalineAttackPower').value),
+    adrenalineCritRate: $('adrenalineEnabled').checked ? num($('adrenalineCritRate').value) : 0,
+    attackPower: $('adrenalineEnabled').checked ? num($('adrenalineAttackPower').value) : 0,
     moveAttackSpeed: num($('baseMoveAttackSpeed').value, 114)
   };
 }
@@ -260,6 +261,11 @@ async function searchCharacter(name) {
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || data.message || '검색 실패');
     state.accessory = data.accessoryEffects || { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+    state.bracelet = data.braceletEffects || { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+    if (data.braceletEffects) {
+      $('braceletCritRate').value = fmt(data.braceletEffects.critRate || 0);
+      $('braceletCritDamage').value = fmt(data.braceletEffects.critDamage || 0);
+    }
     renderCharacter(data.profile);
     applyProfileDefaults(data.profile);
     state.foundEffects = readEffects(data.arkPassive);
@@ -277,6 +283,7 @@ $('searchForm').addEventListener('submit', (event) => {
   if (!name) return setMessage('캐릭터명을 입력하세요.');
   searchCharacter(name);
 });
-['baseCritRate','baseCritDamage','baseEvolutionDamage','baseAdditionalDamage','baseEnemyDamage','skillCritBonus','adrenalineCritRate','adrenalineAttackPower','baseMoveAttackSpeed'].forEach(id => $(id).addEventListener('input', calculateAndRender));
+['baseCritRate','baseCritDamage','baseEvolutionDamage','baseAdditionalDamage','baseEnemyDamage','skillCritBonus','adrenalineCritRate','adrenalineAttackPower','braceletCritRate','braceletCritDamage','baseMoveAttackSpeed'].forEach(id => $(id).addEventListener('input', calculateAndRender));
+$('adrenalineEnabled').addEventListener('change', calculateAndRender);
 
 await loadDb();

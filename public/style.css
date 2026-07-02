@@ -111,3 +111,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .nodeIcon { width: 46px; height: 46px; background: rgba(2, 6, 23, .78); border-radius: 8px; overflow: hidden; }
 .nodeIcon img { width: 46px; height: 46px; object-fit: contain; }
 .nodeCard { min-height: 112px; }
+
+.checkLabel { background: rgba(15,23,42,.65); border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 62px; }
+.checkLabel input[type="checkbox"] { width: 20px; height: 20px; margin: 0; accent-color: var(--amber); }
+.checkLabel span { color: #bfdbfe; }

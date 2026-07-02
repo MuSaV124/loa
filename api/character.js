@@ -28,8 +28,9 @@ export default async function handler(req, res) {
     const arkPassive = data.ArkPassive || data.ArmoryArkPassive || null;
     const equipment = data.ArmoryEquipment || data.Equipment || [];
     const accessoryEffects = extractAccessoryEffects(equipment);
+    const braceletEffects = extractBraceletEffects(equipment);
 
-    return res.status(200).json({ ok: true, apiVersion: '1.5.0', profile, arkPassive, equipment, accessoryEffects, raw: data });
+    return res.status(200).json({ ok: true, apiVersion: '2.1.0', profile, arkPassive, equipment, accessoryEffects, braceletEffects, raw: data });
   } catch (error) {
     const message = error.name === 'AbortError' ? 'Open API 응답 시간이 길어서 중단했습니다.' : error.message;
     return res.status(500).json({ error: '서버 함수 오류', message });
@@ -64,6 +65,22 @@ function extractAccessoryEffects(equipment) {
   const accessoryTypes = new Set(['목걸이', '귀걸이', '반지']);
   for (const item of Array.isArray(equipment) ? equipment : []) {
     if (!accessoryTypes.has(item?.Type)) continue;
+    const text = tooltipText(item.Tooltip);
+    const effects = parseAccessoryText(text);
+    result.critRate += effects.critRate;
+    result.critDamage += effects.critDamage;
+    result.enemyDamage += effects.enemyDamage;
+    result.additionalDamage += effects.additionalDamage;
+    result.items.push({ type: item.Type, name: item.Name, grade: item.Grade, effects });
+  }
+  for (const key of ['critRate', 'critDamage', 'enemyDamage', 'additionalDamage']) result[key] = Math.round(result[key] * 100) / 100;
+  return result;
+}
+
+function extractBraceletEffects(equipment) {
+  const result = { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+  for (const item of Array.isArray(equipment) ? equipment : []) {
+    if (item?.Type !== '팔찌') continue;
     const text = tooltipText(item.Tooltip);
     const effects = parseAccessoryText(text);
     result.critRate += effects.critRate;
