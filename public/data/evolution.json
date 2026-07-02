@@ -1,8 +1,8 @@
 {
   "meta": {
-    "version": "3.0.0",
+    "version": "3.4.0",
     "source": "Lost Ark Ark Passive Evolution nodes",
-    "note": "진화 노드 전용. v3.0.0부터 아드 치적/공증 입력과 공이속 기준값을 지원합니다."
+    "note": "진화 노드 전체 효과 정리: 치적/치피/진피/추피/적주피 및 뭉가/음속돌파 계산 반영."
   },
   "group": "진화",
   "tiers": {
@@ -669,7 +669,14 @@
       "maxLevel": 2,
       "costPerLevel": 10,
       "icon": "🟣",
-      "levels": {},
+      "levels": {
+        "1": {
+          "evolutionDamage": 5
+        },
+        "2": {
+          "evolutionDamage": 10
+        }
+      },
       "iconImage": "/images/evolution/금단의 주문.webp"
     },
     {
@@ -680,10 +687,12 @@
       "icon": "🗡️",
       "levels": {
         "1": {
-          "critRate": 4
+          "critRate": 4,
+          "evolutionDamage": 5
         },
         "2": {
-          "critRate": 8
+          "critRate": 8,
+          "evolutionDamage": 10
         }
       },
       "iconImage": "/images/evolution/예리한 감각.webp"
@@ -696,13 +705,13 @@
       "icon": "💥",
       "levels": {
         "1": {
-          "evolutionDamage": 3
+          "evolutionDamage": 10
         },
         "2": {
-          "evolutionDamage": 6
+          "evolutionDamage": 20
         },
         "3": {
-          "evolutionDamage": 9
+          "evolutionDamage": 30
         }
       },
       "iconImage": "/images/evolution/한계 돌파.webp"
@@ -715,10 +724,10 @@
       "icon": "👥",
       "levels": {
         "1": {
-          "additionalDamage": 2
+          "evolutionDamage": 5
         },
         "2": {
-          "additionalDamage": 4
+          "evolutionDamage": 10
         }
       },
       "iconImage": "/images/evolution/최적화 훈련.webp"
@@ -738,7 +747,14 @@
       "maxLevel": 2,
       "costPerLevel": 10,
       "icon": "∞",
-      "levels": {},
+      "levels": {
+        "1": {
+          "evolutionDamage": 8
+        },
+        "2": {
+          "evolutionDamage": 16
+        }
+      },
       "iconImage": "/images/evolution/무한한 마력.webp"
     },
     {
@@ -747,7 +763,16 @@
       "maxLevel": 2,
       "costPerLevel": 10,
       "icon": "🧨",
-      "levels": {},
+      "levels": {
+        "1": {
+          "critRate": 12,
+          "evolutionDamage": 2
+        },
+        "2": {
+          "critRate": 24,
+          "evolutionDamage": 4
+        }
+      },
       "iconImage": "/images/evolution/혼신의 강타.webp"
     },
     {
@@ -774,7 +799,16 @@
       "maxLevel": 2,
       "costPerLevel": 10,
       "icon": "🔥",
-      "levels": {},
+      "levels": {
+        "1": {
+          "evolutionDamage": 12,
+          "speedBonus": 4
+        },
+        "2": {
+          "evolutionDamage": 24,
+          "speedBonus": 8
+        }
+      },
       "iconImage": "/images/evolution/파괴 전차.webp"
     },
     {
@@ -783,7 +817,14 @@
       "maxLevel": 2,
       "costPerLevel": 10,
       "icon": "🛡️",
-      "levels": {},
+      "levels": {
+        "1": {
+          "evolutionDamage": 8
+        },
+        "2": {
+          "evolutionDamage": 16
+        }
+      },
       "iconImage": "/images/evolution/타이밍 지배.webp"
     },
     {
@@ -792,7 +833,14 @@
       "maxLevel": 2,
       "costPerLevel": 10,
       "icon": "🌹",
-      "levels": {},
+      "levels": {
+        "1": {
+          "evolutionDamage": 6
+        },
+        "2": {
+          "evolutionDamage": 12
+        }
+      },
       "iconImage": "/images/evolution/정열의 춤사위.webp"
     },
     {
@@ -803,7 +851,7 @@
       "icon": "🪶",
       "levels": {
         "1": {
-          "critDamage": 12
+          "critHitDamage": 12
         }
       },
       "iconImage": "/images/evolution/회심.webp"
@@ -816,7 +864,8 @@
       "icon": "☀️",
       "levels": {
         "1": {
-          "critRate": 7
+          "critRate": 7,
+          "additionalDamage": 8.5
         }
       },
       "iconImage": "/images/evolution/달인.webp"
@@ -829,7 +878,7 @@
       "icon": "🪓",
       "levels": {
         "1": {
-          "enemyDamage": 4
+          "evolutionDamage": 20
         }
       },
       "iconImage": "/images/evolution/분쇄.webp"
@@ -872,13 +921,13 @@
         "1": {
           "evolutionDamage": 7.5,
           "critCap": 80,
-          "overCritToEvolutionDamageRate": 1.2,
-          "overCritEvolutionDamageCap": 75
+          "overCritToEvolutionDamageRate": 1.25,
+          "overCritEvolutionDamageCap": 52.5
         },
         "2": {
           "evolutionDamage": 15,
           "critCap": 80,
-          "overCritToEvolutionDamageRate": 1.4,
+          "overCritToEvolutionDamageRate": 1.5,
           "overCritEvolutionDamageCap": 75
         }
       },
@@ -893,10 +942,20 @@
       "description": "공이속 조건을 만족한다고 가정한 최대 진화형 피해",
       "levels": {
         "1": {
-          "evolutionDamage": 12
+          "sonicBreak": {
+            "rate": 0.05,
+            "overCapBonus": 4,
+            "overCapRate": 0.15,
+            "maxEvolutionDamage": 12
+          }
         },
         "2": {
-          "evolutionDamage": 24
+          "sonicBreak": {
+            "rate": 0.1,
+            "overCapBonus": 8,
+            "overCapRate": 0.3,
+            "maxEvolutionDamage": 24
+          }
         }
       },
       "iconImage": "/images/evolution/음속 돌파.webp"
@@ -959,14 +1018,7 @@
       "costPerLevel": 15,
       "icon": "🤝",
       "description": "낙인력 증가 노드. 딜 계산에서는 직접 피해 증가 없음으로 처리",
-      "levels": {
-        "1": {
-          "evolutionDamage": 0
-        },
-        "2": {
-          "evolutionDamage": 0
-        }
-      },
+      "levels": {},
       "iconImage": "/images/evolution/안정된 관리자.webp"
     }
   ]

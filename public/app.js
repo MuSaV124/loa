@@ -265,7 +265,17 @@ function applyEffect(stats, effect) {
   if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; }
   if (effect.critRate) out.critRate += effect.critRate;
   if (effect.critDamage) out.critDamage += effect.critDamage;
+  if (effect.critHitDamage) out.critHitDamage = (out.critHitDamage || 0) + effect.critHitDamage;
   if (effect.evolutionDamage) out.evolutionDamage += effect.evolutionDamage;
+  if (effect.sonicBreak) {
+    const speedIncrease = Math.max(0, (out.moveAttackSpeed || 100) - 100);
+    const overCap = Math.max(0, (out.moveAttackSpeed || 100) - 140);
+    let sonicDamage = speedIncrease * Number(effect.sonicBreak.rate || 0);
+    if (overCap > 0) sonicDamage += Number(effect.sonicBreak.overCapBonus || 0) + overCap * Number(effect.sonicBreak.overCapRate || 0);
+    sonicDamage = Math.min(sonicDamage, Number(effect.sonicBreak.maxEvolutionDamage ?? Infinity));
+    out.evolutionDamage += sonicDamage;
+    out.sonicBreakEvolutionDamage = (out.sonicBreakEvolutionDamage || 0) + sonicDamage;
+  }
   if (effect.additionalDamage) out.additionalDamage += effect.additionalDamage;
   if (effect.enemyDamage) out.enemyDamage += effect.enemyDamage;
   if (effect.finalDamage) out.enemyDamage += effect.finalDamage;
@@ -291,12 +301,12 @@ function score(stats) {
     effectiveCritRate = stats.critCap;
   }
   const critChance = Math.max(0, Math.min(effectiveCritRate, 100)) / 100;
-  const critMultiplier = 1 + critChance * ((stats.critDamage - 100) / 100);
+  const critMultiplier = (1 - critChance) + critChance * (stats.critDamage / 100) * (1 + (stats.critHitDamage || 0) / 100);
   const evoMultiplier = 1 + evo / 100;
   const addMultiplier = 1 + stats.additionalDamage / 100;
   const enemyMultiplier = 1 + stats.enemyDamage / 100;
   const attackMultiplier = 1 + (stats.attackPower || 0) / 100;
-  return { value: critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: stats.enemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0 };
+  return { value: critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: stats.critHitDamage || 0, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: stats.enemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0 };
 }
 function statsWithSelection(baseStats, selection) {
   let s = { ...baseStats };
@@ -332,7 +342,16 @@ function buildSourceSummary(current) {
     const label = `[진화] ${row.name} (Lv.${row.level})`;
     if (eff.critRate) critEvolution.push(sourceLine(label, eff.critRate));
     if (eff.critDamage) critDamageEvolution.push(sourceLine(label, eff.critDamage));
+    if (eff.critHitDamage) critDamageEvolution.push(sourceLine(label + ' 치명타 적중 피해', eff.critHitDamage));
     if (eff.evolutionDamage) evoEvolution.push(sourceLine(label, eff.evolutionDamage));
+    if (eff.sonicBreak) {
+      const speedIncrease = Math.max(0, (current.stats.moveAttackSpeed || 100) - 100);
+      const overCap = Math.max(0, (current.stats.moveAttackSpeed || 100) - 140);
+      let sonicDamage = speedIncrease * Number(eff.sonicBreak.rate || 0);
+      if (overCap > 0) sonicDamage += Number(eff.sonicBreak.overCapBonus || 0) + overCap * Number(eff.sonicBreak.overCapRate || 0);
+      sonicDamage = Math.min(sonicDamage, Number(eff.sonicBreak.maxEvolutionDamage ?? Infinity));
+      if (sonicDamage) evoEvolution.push(sourceLine(label + ' 음속 전환', sonicDamage));
+    }
     if (eff.additionalDamage) addEvolution.push(sourceLine(label, eff.additionalDamage));
     if (eff.enemyDamage || eff.finalDamage) enemyEvolution.push(sourceLine(label, Number(eff.enemyDamage || 0) + Number(eff.finalDamage || 0)));
   }
