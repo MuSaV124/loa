@@ -1,30 +1,16 @@
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
-const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [] };
+const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
 
-function escapeHtml(v) {
-  return String(v ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
-}
-function stripHtml(v) {
-  return String(v ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
-}
-function num(v, fallback = 0) {
-  const n = Number(String(v ?? '').replace(/,/g, ''));
-  return Number.isFinite(n) ? n : fallback;
-}
+function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
+function stripHtml(v) { return String(v ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(); }
+function num(v, fallback = 0) { const n = Number(String(v ?? '').replace(/,/g, '')); return Number.isFinite(n) ? n : fallback; }
 function pct(v) { return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`; }
 function fmt(v) { return Number(v || 0).toFixed(2); }
-function setMessage(text) {
-  const el = $('message');
-  if (!text) { el.classList.add('hidden'); el.textContent = ''; return; }
-  el.classList.remove('hidden'); el.textContent = text;
-}
 function item(label, value) { return `<div class="cell"><b>${label}</b><span>${escapeHtml(value ?? '-')}</span></div>`; }
-function getStat(profile, type) {
-  const found = (profile?.Stats || []).find(s => s.Type === type);
-  return found?.Value ?? '-';
-}
+function setMessage(text) { const el = $('message'); if (!text) { el.classList.add('hidden'); el.textContent = ''; return; } el.classList.remove('hidden'); el.textContent = text; }
+function getStat(profile, type) { return (profile?.Stats || []).find(s => s.Type === type)?.Value ?? '-'; }
 
 function buildIndex(db) {
   const map = new Map();
@@ -33,30 +19,27 @@ function buildIndex(db) {
   return map;
 }
 function getNode(name) { return (state.evolution?.nodes || []).find(n => n.name === name); }
-function getLevelEffect(name, level) { return getNode(name)?.levels?.[String(level)] || {}; }
-function allOptions(tier) {
-  const names = new Set(state.evolution?.tiers?.[String(tier)] || []);
-  for (const node of state.evolution?.nodes || []) if (Number(node.tier) === Number(tier)) names.add(node.name);
-  const selected = state.selected[tier]?.name;
-  if (selected && !names.has(selected)) names.add(selected);
-  return [...names];
+function getLevelEffect(name, level) {
+  const node = getNode(name);
+  const raw = node?.levels?.[String(level)] || {};
+  if (Object.keys(raw).length) return raw;
+  // 1티어 특성 노드는 레벨 비례 추정값. 실제값과 다르면 JSON에서 조정하면 됨.
+  if (name === '치명') return { critRate: level * 0.716 };
+  return {};
 }
+function allOptions(tier) { return [...new Set([...(state.evolution?.tiers?.[String(tier)] || []), ...(state.evolution?.nodes || []).filter(n => Number(n.tier) === Number(tier)).map(n => n.name)])]; }
 function defaultSelection() {
-  const selected = {};
-  for (const tier of EVOLUTION_TIERS) selected[tier] = { name: '', level: 0, source: 'manual' };
-  selected[5] = { name: '뭉툭한 가시', level: 2, source: 'default' };
-  return selected;
+  return {
+    1: { name: '치명', level: 29, source: 'default' },
+    2: { name: '예리한 감각', level: 1, source: 'default' },
+    3: { name: '일격', level: 2, source: 'default' },
+    4: { name: '회심', level: 1, source: 'default' },
+    5: { name: '뭉툭한 가시', level: 2, source: 'default' }
+  };
 }
 function readEffects(arkPassive) {
   const effects = Array.isArray(arkPassive?.Effects) ? arkPassive.Effects : [];
-  return effects.map((e, index) => ({
-    index,
-    name: e?.Name || '',
-    level: Number(e?.Level || 0),
-    description: stripHtml(e?.Description || ''),
-    tooltip: stripHtml(e?.Tooltip || ''),
-    raw: e
-  })).filter(e => e.name);
+  return effects.map((e, index) => ({ index, name: e?.Name || '', level: Number(e?.Level || 0), description: stripHtml(e?.Description || ''), tooltip: stripHtml(e?.Tooltip || ''), raw: e })).filter(e => e.name);
 }
 function classifyEvolution(effects) {
   const selected = defaultSelection();
@@ -79,54 +62,67 @@ function renderSummary(profile, arkPassive) {
   $('basicStatGrid').innerHTML = [
     item('직업', profile?.CharacterClassName), item('아이템 레벨', profile?.ItemAvgLevel), item('서버', profile?.ServerName),
     item('치명', getStat(profile, '치명')), item('신속', getStat(profile, '신속')), item('특화', getStat(profile, '특화')),
-    item('진화 포인트', point('진화')), item('깨달음 포인트', point('깨달음')), item('도약 포인트', point('도약'))
+    item('진화 포인트', point('진화')), item('악세 치적', `${fmt(state.accessory.critRate)}%`), item('악세 치피', `${fmt(state.accessory.critDamage)}%`),
+    item('악세 추피', `${fmt(state.accessory.additionalDamage)}%`), item('악세 적주피', `${fmt(state.accessory.enemyDamage)}%`)
   ].join('');
   $('summaryPanel').classList.remove('hidden');
   renderCombatStats();
 }
-function renderFoundEffects() {
-  const rows = state.foundEffects.map(e => {
-    const tier = state.index.get(e.name);
-    const known = tier ? `진화 ${tier}티어 DB 매칭` : 'DB 미매칭 / 참고용';
-    return `<div class="effect ${tier ? 'known' : ''}"><b>${escapeHtml(e.name)} Lv.${escapeHtml(e.level || '-')}</b><span>${known}</span>${e.description ? `<p>${escapeHtml(e.description)}</p>` : ''}</div>`;
-  }).join('') || '<div class="effect"><b>검색된 노드 없음</b><span>API 응답에 ArkPassive Effects가 없거나 비활성 상태입니다.</span></div>';
-  $('foundEffects').innerHTML = rows;
-  $('foundPanel').classList.remove('hidden');
+
+function tierCost(tier) {
+  let used = 0;
+  for (const row of selectedEntries()) if (row.tier === tier) used += (getNode(row.name)?.costPerLevel || 0) * row.level;
+  const max = { 1: 40, 2: 30, 3: 20, 4: 20, 5: 30 }[tier] || 0;
+  return { used, max };
 }
 function renderEvolutionTiers() {
   const html = EVOLUTION_TIERS.map(tier => {
-    const selected = state.selected[tier] || { name: '', level: 0 };
-    const options = allOptions(tier);
-    const optionHtml = [`<option value="">선택 없음</option>`, ...options.map(name => `<option value="${escapeHtml(name)}" ${name === selected.name ? 'selected' : ''}>${escapeHtml(name)}</option>`)].join('');
-    const node = getNode(selected.name);
-    const max = node?.maxLevel || Math.max(2, selected.level || 2);
-    const levelHtml = Array.from({ length: max + 1 }, (_, i) => `<option value="${i}" ${i === Number(selected.level || 0) ? 'selected' : ''}>Lv.${i}</option>`).join('');
-    const source = selected.source === 'api' ? '<em>검색됨</em>' : selected.source === 'default' ? '<em class="gray">기본값</em>' : '';
-    return `<div class="tier ${tier === 5 ? 'mainTier' : ''}"><h4>${tier}티어 ${source}</h4><select data-tier="${tier}" data-field="name">${optionHtml}</select><select data-tier="${tier}" data-field="level">${levelHtml}</select>${selected.name ? `<p>${escapeHtml(node?.description || 'DB에 계산식이 없는 노드입니다. 선택값 표시는 가능하지만 계산 수치에는 반영되지 않습니다.')}</p>` : `<p class="empty">검색된 값 없음</p>`}</div>`;
+    const cost = tierCost(tier);
+    const cards = allOptions(tier).map(name => {
+      const node = getNode(name) || { name, maxLevel: 0, icon: '◆' };
+      const selected = state.selected[tier]?.name === name;
+      const level = selected ? Number(state.selected[tier]?.level || 0) : 0;
+      const api = selected && state.selected[tier]?.source === 'api' ? '<span class="apiMark">API</span>' : '';
+      return `<button class="nodeCard ${selected && level > 0 ? 'selected' : ''}" type="button" data-tier="${tier}" data-name="${escapeHtml(name)}">
+        <div class="nodeIcon">${escapeHtml(node.icon || '◆')}</div>
+        <div class="nodeName">${escapeHtml(name)}</div>
+        <div class="nodeControls">
+          <span class="minus" data-action="minus">−</span>
+          <b>Lv.${level}</b>
+          <span class="plus" data-action="plus">＋</span>
+        </div>
+        ${api}
+      </button>`;
+    }).join('');
+    return `<div class="tierBlock"><h3>${tier}티어 <span>(${cost.max}P)</span> <em>(${cost.used}/${cost.max}P)</em></h3><div class="nodeGrid">${cards}</div></div>`;
   }).join('');
-  $('evolutionTiers').innerHTML = `<div class="groupBox"><div class="tiers">${html}</div></div>`;
-  $('evolutionTiers').querySelectorAll('select').forEach(sel => sel.addEventListener('change', onSelectionChange));
+  $('evolutionTiers').innerHTML = html;
+  $('evolutionTiers').querySelectorAll('.nodeCard').forEach(card => card.addEventListener('click', onNodeCardClick));
 }
-function onSelectionChange(event) {
-  const el = event.target;
-  const tier = Number(el.dataset.tier);
-  const field = el.dataset.field;
-  if (!state.selected[tier]) state.selected[tier] = { name: '', level: 0, source: 'manual' };
-  state.selected[tier][field] = field === 'level' ? Number(el.value) : el.value;
-  state.selected[tier].source = 'manual';
-  if (field === 'name' && !el.value) state.selected[tier].level = 0;
-  if (field === 'name' && el.value && !state.selected[tier].level) state.selected[tier].level = getNode(el.value)?.maxLevel || 1;
+function onNodeCardClick(event) {
+  const card = event.currentTarget;
+  const tier = Number(card.dataset.tier);
+  const name = card.dataset.name;
+  const node = getNode(name);
+  const max = node?.maxLevel || 0;
+  const action = event.target?.dataset?.action || 'select';
+  const cur = state.selected[tier]?.name === name ? Number(state.selected[tier]?.level || 0) : 0;
+  let nextLevel = cur;
+  if (action === 'minus') nextLevel = Math.max(0, cur - 1);
+  else if (action === 'plus') nextLevel = Math.min(max, cur + 1 || 1);
+  else nextLevel = cur > 0 ? cur : Math.min(max, 1);
+  state.selected[tier] = { name, level: nextLevel, source: 'manual' };
   renderEvolutionTiers();
   calculateAndRender();
 }
 
 function getBaseStats() {
   return {
-    critRate: num($('baseCritRate').value),
-    critDamage: num($('baseCritDamage').value, 200),
+    critRate: num($('baseCritRate').value) + num(state.accessory.critRate),
+    critDamage: num($('baseCritDamage').value, 200) + num(state.accessory.critDamage),
     evolutionDamage: num($('baseEvolutionDamage').value),
-    additionalDamage: num($('baseAdditionalDamage').value),
-    enemyDamage: num($('baseEnemyDamage').value),
+    additionalDamage: num($('baseAdditionalDamage').value) + num(state.accessory.additionalDamage),
+    enemyDamage: num($('baseEnemyDamage').value) + num(state.accessory.enemyDamage),
     skillCritBonus: num($('skillCritBonus').value)
   };
 }
@@ -143,9 +139,8 @@ function applyEffect(stats, effect) {
   if (effect.overCritEvolutionDamageCap != null) out.overCritEvolutionDamageCap = effect.overCritEvolutionDamageCap;
   return out;
 }
-function selectedEntries(selection = state.selected) {
-  return EVOLUTION_TIERS.map(tier => ({ tier, ...(selection[tier] || {}) })).filter(row => row.name && row.level > 0);
-}
+function selectedEntries(selection = state.selected) { return EVOLUTION_TIERS.map(tier => ({ tier, ...(selection[tier] || {}) })).filter(row => row.name && row.level > 0); }
+function cloneSelection() { return JSON.parse(JSON.stringify(state.selected)); }
 function score(stats) {
   let critRate = stats.critRate + stats.skillCritBonus;
   let evo = stats.evolutionDamage;
@@ -160,23 +155,18 @@ function score(stats) {
   const evoMultiplier = 1 + evo / 100;
   const addMultiplier = 1 + stats.additionalDamage / 100;
   const enemyMultiplier = 1 + stats.enemyDamage / 100;
-  return { value: critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier, critRate, critDamage: stats.critDamage, evo, additionalDamage: stats.additionalDamage, enemyDamage: stats.enemyDamage, critMultiplier, evoMultiplier, addMultiplier, enemyMultiplier };
+  return { value: critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier, critRate, critDamage: stats.critDamage, evo, additionalDamage: stats.additionalDamage, enemyDamage: stats.enemyDamage };
 }
 function statsWithSelection(baseStats, selection) {
   let s = { ...baseStats };
   for (const row of selectedEntries(selection)) s = applyEffect(s, getLevelEffect(row.name, row.level));
-  const result = score(s);
-  return { stats: s, result };
+  return { stats: s, result: score(s) };
 }
-function cloneSelection() { return JSON.parse(JSON.stringify(state.selected)); }
 function renderCombatStats(current = statsWithSelection(getBaseStats(), state.selected)) {
   $('combatStatGrid').innerHTML = [
-    item('치명타 확률', `${fmt(current.result.critRate)}%`),
-    item('치명타 피해', `${fmt(current.result.critDamage)}%`),
-    item('진피', `${fmt(current.result.evo)}%`),
-    item('추피', `${fmt(current.result.additionalDamage)}%`),
-    item('적주피', `${fmt(current.result.enemyDamage)}%`),
-    item('기대값 점수', current.result.value.toFixed(4))
+    item('치명타 확률', `${fmt(current.result.critRate)}%`), item('치명타 피해', `${fmt(current.result.critDamage)}%`),
+    item('진피', `${fmt(current.result.evo)}%`), item('추피', `${fmt(current.result.additionalDamage)}%`),
+    item('적주피', `${fmt(current.result.enemyDamage)}%`), item('기대값 점수', current.result.value.toFixed(4))
   ].join('');
 }
 function calculateAndRender() {
@@ -196,7 +186,7 @@ function calculateAndRender() {
   }
   candidates.sort((a, b) => b.calc.result.value - a.calc.result.value);
   $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>현재 선택 노드 반영 기준</span>`;
-  $('baseInfo').innerHTML = `현재 표시값: 치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%`;
+  $('baseInfo').innerHTML = `치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%`;
   $('recommendList').innerHTML = candidates.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
     const currentMark = state.selected[5]?.name === c.name ? '<em>현재</em>' : '';
@@ -219,11 +209,11 @@ async function searchCharacter(name) {
     const res = await fetch(`/api/character?name=${encodeURIComponent(name)}`);
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || data.message || '검색 실패');
+    state.accessory = data.accessoryEffects || { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
     renderCharacter(data.profile);
     state.foundEffects = readEffects(data.arkPassive);
     state.selected = classifyEvolution(state.foundEffects);
     renderSummary(data.profile, data.arkPassive);
-    renderFoundEffects();
     renderEvolutionTiers();
     calculateAndRender();
   } catch (error) { setMessage(error.message); }

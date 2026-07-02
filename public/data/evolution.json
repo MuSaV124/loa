@@ -1,120 +1,47 @@
 {
-  "meta": {
-    "version": "1.4.0",
-    "source": "Lost Ark Ark Passive Evolution common nodes",
-    "note": "진화 전용 계산기. 1~4티어는 검색/표시용이며, 현재 제공 계산식은 5티어 추천 비교 중심입니다."
-  },
+  "meta": { "version": "1.5.0", "source": "Lost Ark Ark Passive Evolution nodes", "note": "진화 노드 전용. 수치는 계산기용 데이터이므로 필요 시 public/data/evolution.json에서 조정하세요." },
   "group": "진화",
   "tiers": {
-    "1": [],
-    "2": [],
-    "3": [],
-    "4": [],
-    "5": [
-      "뭉툭한 가시",
-      "입식 타격가",
-      "인파이팅",
-      "음속 돌파",
-      "마나 용광로",
-      "안정된 관리자"
-    ]
+    "1": ["치명", "특화", "신속", "제압", "인내", "숙련"],
+    "2": ["끝없는 마나", "금단의 주문", "예리한 감각", "한계 돌파", "최적화 훈련", "축복의 여신"],
+    "3": ["무한한 마력", "혼신의 강타", "일격", "파괴 전차", "타이밍 지배", "정열의 춤사위"],
+    "4": ["회심", "달인", "분쇄", "선각자", "진군", "기원"],
+    "5": ["뭉툭한 가시", "음속 돌파", "인파이팅", "입식 타격가", "마나 용광로", "안정된 관리자"]
   },
   "nodes": [
-    {
-      "name": "뭉툭한 가시",
-      "tier": 5,
-      "maxLevel": 2,
-      "costPerLevel": 15,
-      "description": "진화형 피해 증가 + 치명타 확률 80% 제한 + 초과 치적을 진화형 피해로 전환",
-      "levels": {
-        "1": {
-          "evolutionDamage": 7.5,
-          "critCap": 80,
-          "overCritToEvolutionDamageRate": 1.2,
-          "overCritEvolutionDamageCap": 50
-        },
-        "2": {
-          "evolutionDamage": 15,
-          "critCap": 80,
-          "overCritToEvolutionDamageRate": 1.4,
-          "overCritEvolutionDamageCap": 70
-        }
-      }
-    },
-    {
-      "name": "입식 타격가",
-      "tier": 5,
-      "maxLevel": 2,
-      "costPerLevel": 15,
-      "description": "진화형 피해 기본 증가 + 입식 타격 6중첩 기준 추가 증가",
-      "levels": {
-        "1": {
-          "evolutionDamage": 10.5
-        },
-        "2": {
-          "evolutionDamage": 21
-        }
-      }
-    },
-    {
-      "name": "인파이팅",
-      "tier": 5,
-      "maxLevel": 2,
-      "costPerLevel": 15,
-      "description": "정면 승부 기준 진화형 피해 증가",
-      "levels": {
-        "1": {
-          "evolutionDamage": 9
-        },
-        "2": {
-          "evolutionDamage": 18
-        }
-      }
-    },
-    {
-      "name": "음속 돌파",
-      "tier": 5,
-      "maxLevel": 2,
-      "costPerLevel": 15,
-      "description": "공이속 조건을 만족한다고 가정한 최대 진화형 피해",
-      "levels": {
-        "1": {
-          "evolutionDamage": 12
-        },
-        "2": {
-          "evolutionDamage": 24
-        }
-      }
-    },
-    {
-      "name": "마나 용광로",
-      "tier": 5,
-      "maxLevel": 2,
-      "costPerLevel": 15,
-      "description": "마나 소모 조건을 만족한다고 가정한 최대 진화형 피해",
-      "levels": {
-        "1": {
-          "evolutionDamage": 12
-        },
-        "2": {
-          "evolutionDamage": 24
-        }
-      }
-    },
-    {
-      "name": "안정된 관리자",
-      "tier": 5,
-      "maxLevel": 2,
-      "costPerLevel": 15,
-      "description": "낙인력 증가 노드. 딜 계산에서는 직접 피해 증가 없음으로 처리",
-      "levels": {
-        "1": {
-          "evolutionDamage": 0
-        },
-        "2": {
-          "evolutionDamage": 0
-        }
-      }
-    }
+    {"name":"치명","tier":1,"maxLevel":30,"costPerLevel":1,"icon":"⚔️","levels":{"29":{"critRate":20.76},"30":{"critRate":21.48}}},
+    {"name":"특화","tier":1,"maxLevel":30,"costPerLevel":1,"icon":"⬆️","levels":{}},
+    {"name":"신속","tier":1,"maxLevel":30,"costPerLevel":1,"icon":"💨","levels":{"11":{"speedBonus":7.87}}},
+    {"name":"제압","tier":1,"maxLevel":30,"costPerLevel":1,"icon":"🦅","levels":{}},
+    {"name":"인내","tier":1,"maxLevel":30,"costPerLevel":1,"icon":"🧘","levels":{}},
+    {"name":"숙련","tier":1,"maxLevel":30,"costPerLevel":1,"icon":"🧍","levels":{}},
+
+    {"name":"끝없는 마나","tier":2,"maxLevel":3,"costPerLevel":10,"icon":"💠","levels":{}},
+    {"name":"금단의 주문","tier":2,"maxLevel":3,"costPerLevel":10,"icon":"🟣","levels":{}},
+    {"name":"예리한 감각","tier":2,"maxLevel":3,"costPerLevel":10,"icon":"🗡️","levels":{"1":{"critRate":4},"2":{"critRate":8},"3":{"critRate":12}}},
+    {"name":"한계 돌파","tier":2,"maxLevel":3,"costPerLevel":10,"icon":"💥","levels":{"1":{"evolutionDamage":3},"2":{"evolutionDamage":6},"3":{"evolutionDamage":9}}},
+    {"name":"최적화 훈련","tier":2,"maxLevel":3,"costPerLevel":10,"icon":"👥","levels":{"1":{"additionalDamage":2},"2":{"additionalDamage":4},"3":{"additionalDamage":6}}},
+    {"name":"축복의 여신","tier":2,"maxLevel":3,"costPerLevel":10,"icon":"🧎","levels":{}},
+
+    {"name":"무한한 마력","tier":3,"maxLevel":2,"costPerLevel":10,"icon":"∞","levels":{}},
+    {"name":"혼신의 강타","tier":3,"maxLevel":2,"costPerLevel":10,"icon":"🧨","levels":{}},
+    {"name":"일격","tier":3,"maxLevel":2,"costPerLevel":10,"icon":"🌩️","levels":{"1":{"critDamage":8},"2":{"critDamage":16}}},
+    {"name":"파괴 전차","tier":3,"maxLevel":2,"costPerLevel":10,"icon":"🔥","levels":{}},
+    {"name":"타이밍 지배","tier":3,"maxLevel":2,"costPerLevel":10,"icon":"🛡️","levels":{}},
+    {"name":"정열의 춤사위","tier":3,"maxLevel":2,"costPerLevel":10,"icon":"🌹","levels":{}},
+
+    {"name":"회심","tier":4,"maxLevel":2,"costPerLevel":10,"icon":"🪶","levels":{"1":{"critDamage":12},"2":{"critDamage":24}}},
+    {"name":"달인","tier":4,"maxLevel":2,"costPerLevel":10,"icon":"☀️","levels":{"1":{"critRate":7},"2":{"critRate":14}}},
+    {"name":"분쇄","tier":4,"maxLevel":2,"costPerLevel":10,"icon":"🪓","levels":{"1":{"enemyDamage":4},"2":{"enemyDamage":8}}},
+    {"name":"선각자","tier":4,"maxLevel":2,"costPerLevel":10,"icon":"🧭","levels":{}},
+    {"name":"진군","tier":4,"maxLevel":2,"costPerLevel":10,"icon":"🚩","levels":{}},
+    {"name":"기원","tier":4,"maxLevel":2,"costPerLevel":10,"icon":"💗","levels":{}},
+
+    {"name":"뭉툭한 가시","tier":5,"maxLevel":2,"costPerLevel":15,"icon":"🗡️","description":"진화형 피해 증가 + 치명타 확률 80% 제한 + 초과 치적을 진화형 피해로 전환","levels":{"1":{"evolutionDamage":7.5,"critCap":80,"overCritToEvolutionDamageRate":1.2,"overCritEvolutionDamageCap":50},"2":{"evolutionDamage":15,"critCap":80,"overCritToEvolutionDamageRate":1.4,"overCritEvolutionDamageCap":70}}},
+    {"name":"음속 돌파","tier":5,"maxLevel":2,"costPerLevel":15,"icon":"💎","description":"공이속 조건을 만족한다고 가정한 최대 진화형 피해","levels":{"1":{"evolutionDamage":12},"2":{"evolutionDamage":24}}},
+    {"name":"인파이팅","tier":5,"maxLevel":2,"costPerLevel":15,"icon":"🥊","description":"정면 승부 기준 진화형 피해 증가","levels":{"1":{"evolutionDamage":9},"2":{"evolutionDamage":18}}},
+    {"name":"입식 타격가","tier":5,"maxLevel":2,"costPerLevel":15,"icon":"🧍","description":"입식 타격 6중첩 기준 진화형 피해 증가","levels":{"1":{"evolutionDamage":10.5},"2":{"evolutionDamage":21}}},
+    {"name":"마나 용광로","tier":5,"maxLevel":2,"costPerLevel":15,"icon":"🌊","description":"마나 소모 조건을 만족한다고 가정한 최대 진화형 피해","levels":{"1":{"evolutionDamage":12},"2":{"evolutionDamage":24}}},
+    {"name":"안정된 관리자","tier":5,"maxLevel":2,"costPerLevel":15,"icon":"🤝","description":"낙인력 증가 노드. 딜 계산에서는 직접 피해 증가 없음으로 처리","levels":{"1":{"evolutionDamage":0},"2":{"evolutionDamage":0}}}
   ]
 }
