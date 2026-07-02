@@ -83,7 +83,8 @@ function renderSummary(profile, arkPassive) {
     item('치명', getStat(profile, '치명')), item('신속', getStat(profile, '신속')), item('특화', getStat(profile, '특화')),
     item('진화 포인트', point('진화')), item('악세 치적', `${fmt(state.accessory.critRate)}%`), item('악세 치피', `${fmt(state.accessory.critDamage)}%`),
     item('악세 추피', `${fmt(state.accessory.additionalDamage)}%`), item('악세 적주피', `${fmt(state.accessory.enemyDamage)}%`),
-    item('팔찌 치적', `${fmt(state.bracelet.critRate)}%`), item('팔찌 치피', `${fmt(state.bracelet.critDamage)}%`)
+    item('팔찌 치적', `${fmt(state.bracelet.critRate)}%`), item('팔찌 치피', `${fmt(state.bracelet.critDamage)}%`),
+    item('팔찌 추피', `${fmt(state.bracelet.additionalDamage)}%`), item('팔찌 적주피', `${fmt(state.bracelet.enemyDamage)}%`)
   ].join('');
   $('summaryPanel').classList.remove('hidden');
   renderCombatStats();
@@ -158,8 +159,8 @@ function getBaseStats() {
     critRate: num($('baseCritRate').value) + num(state.accessory.critRate) + num(state.bracelet.critRate) + num($('braceletCritRateManual').value),
     critDamage: num($('baseCritDamage').value, 200) + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num($('braceletCritDamageManual').value),
     evolutionDamage: num($('baseEvolutionDamage').value),
-    additionalDamage: num($('baseAdditionalDamage').value) + num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage),
-    enemyDamage: num($('baseEnemyDamage').value) + num(state.accessory.enemyDamage) + num(state.bracelet.enemyDamage),
+    additionalDamage: num($('baseAdditionalDamage').value) + num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num($('braceletAdditionalDamageManual').value),
+    enemyDamage: num($('baseEnemyDamage').value) + num(state.accessory.enemyDamage) + num(state.bracelet.enemyDamage) + num($('braceletEnemyDamageManual').value),
     skillCritBonus: num($('skillCritBonus').value),
     adrenalineCritRate: $('adrenalineEnabled').checked ? num($('adrenalineCritRate').value) : 0,
     attackPower: $('adrenalineEnabled').checked ? num($('adrenalineAttackPower').value) : 0,
@@ -281,7 +282,7 @@ $('searchForm').addEventListener('submit', (event) => {
   if (!name) return setMessage('캐릭터명을 입력하세요.');
   searchCharacter(name);
 });
-['baseCritRate','baseCritDamage','baseEvolutionDamage','baseAdditionalDamage','baseEnemyDamage','skillCritBonus','adrenalineCritRate','adrenalineAttackPower','braceletCritRateManual','braceletCritDamageManual','baseMoveAttackSpeed'].forEach(id => $(id).addEventListener('input', calculateAndRender));
+['baseCritRate','baseCritDamage','baseEvolutionDamage','baseAdditionalDamage','baseEnemyDamage','skillCritBonus','adrenalineCritRate','adrenalineAttackPower','braceletCritRateManual','braceletCritDamageManual','braceletAdditionalDamageManual','braceletEnemyDamageManual','baseMoveAttackSpeed'].forEach(id => $(id).addEventListener('input', calculateAndRender));
 $('adrenalineEnabled').addEventListener('change', calculateAndRender);
 
 await loadDb();
