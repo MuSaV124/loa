@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>로스트아크 4티어/5티어 추천 계산기</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>로스트아크 4티어/5티어 추천 계산기</h1>
+      <p>캐릭터명을 입력하면 공식 Open API에서 정보를 불러와 추천 입력값을 자동으로 채웁니다.</p>
+      <form id="searchForm" class="search">
+        <input id="characterName" type="text" placeholder="캐릭터명 입력" autocomplete="off" />
+        <button type="submit">검색</button>
+      </form>
+    </section>
+
+    <section id="status" class="status hidden"></section>
+
+    <section id="characterCard" class="card hidden">
+      <div class="profile">
+        <img id="characterImage" alt="캐릭터 이미지" />
+        <div>
+          <h2 id="characterTitle"></h2>
+          <p id="characterMeta"></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="recommendation" class="card hidden"></section>
+    <section id="equipment" class="card hidden"></section>
+    <section id="raw" class="card hidden"></section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
