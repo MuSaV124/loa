@@ -1,4 +1,4 @@
-const VERSION = '4.0.0';
+const VERSION = '4.2.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
@@ -433,7 +433,7 @@ function buildSourceSummary(current) {
   enemyLines.push(...enemyEvolution);
 
   $('sourceSummary').innerHTML = `
-    <div class="sourceTitle"><div><h3>치명타 소스 요약</h3><p>진화 노드를 바꾸면 아래 수치가 즉시 바뀝니다.</p></div><button id="resetViewButton" type="button">↻ 초기화</button></div>
+    <div class="sourceTitle"><div><h3>계산 요약</h3><p>출처별 합산값입니다. 진화 노드를 바꾸면 즉시 갱신됩니다.</p></div><button id="resetViewButton" type="button">초기화</button></div>
     ${sourceGroup('치명타 확률', 'blue', critLines, current.result.critRate)}
     ${sourceGroup('치명타 피해', 'purple', critDamageLines, current.result.critDamage)}
     ${sourceGroup('진피', 'orange', evoLines, current.result.evo)}

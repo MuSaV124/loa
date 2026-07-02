@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v4.0.0 · 추가 효과 입력 구조</span>
+        <span class="badge">v4.2.0 · 가독성 UI 개선</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -29,9 +29,8 @@
       <div id="sourceSummary" class="sourceSummary"></div>
     </section>
 
-    <section id="inputPanel" class="panel">
-      <h2>추가 효과 입력</h2>
-      <p class="hint">검색된 API 값에 아래 추가값만 더합니다. 기준값은 직접 입력하지 않고, 치명/신속 기준 스탯은 캐릭터 검색 시 자동 계산됩니다.</p>
+    <section id="inputPanel" class="panel compactPanel">
+      <div class="sectionHead"><div><h2>추가 효과</h2><p class="hint">API가 못 읽는 버프/시너지만 추가로 넣습니다.</p></div></div>
       <input id="baseCritStat" type="hidden" value="0" />
       <input id="baseSwiftStat" type="hidden" value="0" />
       <div class="manualGrid">
@@ -52,13 +51,12 @@
     </section>
 
     <section id="evolutionPanel" class="panel">
-      <h2>현재 진화 노드 선택</h2>
-      <p class="hint">이미지처럼 각 티어 노드를 카드로 선택합니다. 검색된 노드는 자동으로 맞춰지고, +/−로 직접 수정할 수 있습니다.</p>
+      <div class="sectionHead"><div><h2>진화 노드</h2><p class="hint">검색된 노드는 자동 선택됩니다. 카드의 +/−로 레벨을 수정하세요.</p></div></div>
       <div id="evolutionTiers" class="tierGroups"></div>
     </section>
 
     <section id="recommendPanel" class="panel">
-      <h2>5티어 추천 결과</h2>
+      <div class="sectionHead"><div><h2>5티어 추천</h2><p class="hint">현재 선택 대비 기대값 차이입니다.</p></div></div>
       <div class="resultLayout">
         <div>
           <h3>현재 선택 기준</h3>
@@ -81,7 +79,7 @@
     </section>
   </main>
 
-  <div class="version">Version 4.0.0</div>
+  <div class="version">Version 4.2.0</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>
