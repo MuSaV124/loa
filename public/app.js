@@ -1,4 +1,4 @@
-const VERSION = '1.7.0';
+const VERSION = '1.8.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };

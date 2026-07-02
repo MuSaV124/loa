@@ -1,8 +1,8 @@
 {
   "meta": {
-    "version": "1.7.0",
+    "version": "1.8.0",
     "source": "Lost Ark Ark Passive Evolution nodes",
-    "note": "진화 노드 전용. 수치는 계산기용 데이터이므로 필요 시 public/data/evolution.json에서 조정하세요."
+    "note": "진화 노드 전용. v1.8.0부터 업로드한 진화 노드 webp 아이콘을 사용합니다."
   },
   "group": "진화",
   "tiers": {
@@ -146,7 +146,7 @@
           "critRate": 21.48
         }
       },
-      "iconImage": "/images/evolution/crit.svg"
+      "iconImage": "/images/evolution/치명.webp"
     },
     {
       "name": "특화",
@@ -155,7 +155,7 @@
       "costPerLevel": 1,
       "icon": "⬆️",
       "levels": {},
-      "iconImage": "/images/evolution/specialization.svg"
+      "iconImage": "/images/evolution/특화.webp"
     },
     {
       "name": "신속",
@@ -168,7 +168,7 @@
           "speedBonus": 7.87
         }
       },
-      "iconImage": "/images/evolution/swift.svg"
+      "iconImage": "/images/evolution/신속.webp"
     },
     {
       "name": "제압",
@@ -177,7 +177,7 @@
       "costPerLevel": 1,
       "icon": "🦅",
       "levels": {},
-      "iconImage": "/images/evolution/domination.svg"
+      "iconImage": "/images/evolution/제압.webp"
     },
     {
       "name": "인내",
@@ -186,7 +186,7 @@
       "costPerLevel": 1,
       "icon": "🧘",
       "levels": {},
-      "iconImage": "/images/evolution/endurance.svg"
+      "iconImage": "/images/evolution/인내.webp"
     },
     {
       "name": "숙련",
@@ -195,7 +195,7 @@
       "costPerLevel": 1,
       "icon": "🧍",
       "levels": {},
-      "iconImage": "/images/evolution/expertise.svg"
+      "iconImage": "/images/evolution/숙련.webp"
     },
     {
       "name": "끝없는 마나",
@@ -204,7 +204,7 @@
       "costPerLevel": 10,
       "icon": "💠",
       "levels": {},
-      "iconImage": "/images/evolution/endless-mana.svg"
+      "iconImage": "/images/evolution/끝없는 마나.webp"
     },
     {
       "name": "금단의 주문",
@@ -213,7 +213,7 @@
       "costPerLevel": 10,
       "icon": "🟣",
       "levels": {},
-      "iconImage": "/images/evolution/forbidden-spell.svg"
+      "iconImage": "/images/evolution/금단의 주문.webp"
     },
     {
       "name": "예리한 감각",
@@ -229,7 +229,7 @@
           "critRate": 8
         }
       },
-      "iconImage": "/images/evolution/keen-sense.svg"
+      "iconImage": "/images/evolution/예리한 감각.webp"
     },
     {
       "name": "한계 돌파",
@@ -248,7 +248,7 @@
           "evolutionDamage": 9
         }
       },
-      "iconImage": "/images/evolution/limit-break.svg"
+      "iconImage": "/images/evolution/한계 돌파.webp"
     },
     {
       "name": "최적화 훈련",
@@ -264,7 +264,7 @@
           "additionalDamage": 4
         }
       },
-      "iconImage": "/images/evolution/optimized-training.svg"
+      "iconImage": "/images/evolution/최적화 훈련.webp"
     },
     {
       "name": "축복의 여신",
@@ -273,7 +273,7 @@
       "costPerLevel": 10,
       "icon": "🧎",
       "levels": {},
-      "iconImage": "/images/evolution/goddess-blessing.svg"
+      "iconImage": "/images/evolution/축복의 여신.webp"
     },
     {
       "name": "무한한 마력",
@@ -282,7 +282,7 @@
       "costPerLevel": 10,
       "icon": "∞",
       "levels": {},
-      "iconImage": "/images/evolution/infinite-magic.svg"
+      "iconImage": "/images/evolution/무한한 마력.webp"
     },
     {
       "name": "혼신의 강타",
@@ -291,7 +291,7 @@
       "costPerLevel": 10,
       "icon": "🧨",
       "levels": {},
-      "iconImage": "/images/evolution/full-swing.svg"
+      "iconImage": "/images/evolution/혼신의 강타.webp"
     },
     {
       "name": "일격",
@@ -307,7 +307,7 @@
           "critDamage": 16
         }
       },
-      "iconImage": "/images/evolution/single-strike.svg"
+      "iconImage": "/images/evolution/일격.webp"
     },
     {
       "name": "파괴 전차",
@@ -316,7 +316,7 @@
       "costPerLevel": 10,
       "icon": "🔥",
       "levels": {},
-      "iconImage": "/images/evolution/destruction-chariot.svg"
+      "iconImage": "/images/evolution/파괴 전차.webp"
     },
     {
       "name": "타이밍 지배",
@@ -325,7 +325,7 @@
       "costPerLevel": 10,
       "icon": "🛡️",
       "levels": {},
-      "iconImage": "/images/evolution/timing-control.svg"
+      "iconImage": "/images/evolution/타이밍 지배.webp"
     },
     {
       "name": "정열의 춤사위",
@@ -334,7 +334,7 @@
       "costPerLevel": 10,
       "icon": "🌹",
       "levels": {},
-      "iconImage": "/images/evolution/passionate-dance.svg"
+      "iconImage": "/images/evolution/정열의 춤사위.webp"
     },
     {
       "name": "회심",
@@ -347,7 +347,7 @@
           "critDamage": 12
         }
       },
-      "iconImage": "/images/evolution/critical.svg"
+      "iconImage": "/images/evolution/회심.webp"
     },
     {
       "name": "달인",
@@ -360,7 +360,7 @@
           "critRate": 7
         }
       },
-      "iconImage": "/images/evolution/master.svg"
+      "iconImage": "/images/evolution/달인.webp"
     },
     {
       "name": "분쇄",
@@ -373,7 +373,7 @@
           "enemyDamage": 4
         }
       },
-      "iconImage": "/images/evolution/crusher.svg"
+      "iconImage": "/images/evolution/분쇄.webp"
     },
     {
       "name": "선각자",
@@ -382,7 +382,7 @@
       "costPerLevel": 10,
       "icon": "🧭",
       "levels": {},
-      "iconImage": "/images/evolution/seer.svg"
+      "iconImage": "/images/evolution/선각자.webp"
     },
     {
       "name": "진군",
@@ -391,7 +391,7 @@
       "costPerLevel": 10,
       "icon": "🚩",
       "levels": {},
-      "iconImage": "/images/evolution/advance.svg"
+      "iconImage": "/images/evolution/진군.webp"
     },
     {
       "name": "기원",
@@ -400,7 +400,7 @@
       "costPerLevel": 10,
       "icon": "💗",
       "levels": {},
-      "iconImage": "/images/evolution/prayer.svg"
+      "iconImage": "/images/evolution/기원.webp"
     },
     {
       "name": "뭉툭한 가시",
@@ -423,7 +423,7 @@
           "overCritEvolutionDamageCap": 70
         }
       },
-      "iconImage": "/images/evolution/blunt-thorn.svg"
+      "iconImage": "/images/evolution/뭉툭한 가시.webp"
     },
     {
       "name": "음속 돌파",
@@ -440,7 +440,7 @@
           "evolutionDamage": 24
         }
       },
-      "iconImage": "/images/evolution/sound-breakthrough.svg"
+      "iconImage": "/images/evolution/음속 돌파.webp"
     },
     {
       "name": "인파이팅",
@@ -457,7 +457,7 @@
           "evolutionDamage": 18
         }
       },
-      "iconImage": "/images/evolution/infighting.svg"
+      "iconImage": "/images/evolution/인파이팅.webp"
     },
     {
       "name": "입식 타격가",
@@ -474,7 +474,7 @@
           "evolutionDamage": 21
         }
       },
-      "iconImage": "/images/evolution/standup-striker.svg"
+      "iconImage": "/images/evolution/입식 타격가.webp"
     },
     {
       "name": "마나 용광로",
@@ -491,7 +491,7 @@
           "evolutionDamage": 24
         }
       },
-      "iconImage": "/images/evolution/mana-furnace.svg"
+      "iconImage": "/images/evolution/마나 용광로.webp"
     },
     {
       "name": "안정된 관리자",
@@ -508,7 +508,7 @@
           "evolutionDamage": 0
         }
       },
-      "iconImage": "/images/evolution/stable-manager.svg"
+      "iconImage": "/images/evolution/안정된 관리자.webp"
     }
   ]
 }
