@@ -295,8 +295,10 @@ function applyEffect(stats, effect) {
   if (effect.sonicBreak) {
     const attackIncrease = Math.max(0, (out.attackSpeed || out.moveAttackSpeed || 100) - 100);
     const moveIncrease = Math.max(0, (out.moveSpeed || out.moveAttackSpeed || 100) - 100);
-    const speedIncrease = Math.min(attackIncrease, moveIncrease);
-    const overCap = Math.min(Math.max(0, (out.attackSpeed || out.moveAttackSpeed || 100) - 140), Math.max(0, (out.moveSpeed || out.moveAttackSpeed || 100) - 140));
+    // 음속돌파는 공속 증가량과 이속 증가량을 각각 계산한 뒤 합산한다.
+    // 로아 공속/이속 상한은 각각 140%라서 기본 구간 최대 증가량은 40 + 40 = 80이다.
+    const speedIncrease = attackIncrease + moveIncrease;
+    const overCap = Math.max(0, (out.attackSpeed || out.moveAttackSpeed || 100) - 140) + Math.max(0, (out.moveSpeed || out.moveAttackSpeed || 100) - 140);
     let sonicDamage = speedIncrease * Number(effect.sonicBreak.rate || 0);
     if (overCap > 0) sonicDamage += Number(effect.sonicBreak.overCapBonus || 0) + overCap * Number(effect.sonicBreak.overCapRate || 0);
     sonicDamage = Math.min(sonicDamage, Number(effect.sonicBreak.maxEvolutionDamage ?? Infinity));
@@ -374,8 +376,8 @@ function buildSourceSummary(current) {
     if (eff.sonicBreak) {
       const attackIncrease = Math.max(0, (current.stats.attackSpeed || current.stats.moveAttackSpeed || 100) - 100);
       const moveIncrease = Math.max(0, (current.stats.moveSpeed || current.stats.moveAttackSpeed || 100) - 100);
-      const speedIncrease = Math.min(attackIncrease, moveIncrease);
-      const overCap = Math.min(Math.max(0, (current.stats.attackSpeed || current.stats.moveAttackSpeed || 100) - 140), Math.max(0, (current.stats.moveSpeed || current.stats.moveAttackSpeed || 100) - 140));
+      const speedIncrease = attackIncrease + moveIncrease;
+      const overCap = Math.max(0, (current.stats.attackSpeed || current.stats.moveAttackSpeed || 100) - 140) + Math.max(0, (current.stats.moveSpeed || current.stats.moveAttackSpeed || 100) - 140);
       let sonicDamage = speedIncrease * Number(eff.sonicBreak.rate || 0);
       if (overCap > 0) sonicDamage += Number(eff.sonicBreak.overCapBonus || 0) + overCap * Number(eff.sonicBreak.overCapRate || 0);
       sonicDamage = Math.min(sonicDamage, Number(eff.sonicBreak.maxEvolutionDamage ?? Infinity));
