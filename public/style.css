@@ -142,3 +142,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   .sourceTitle { display: block; }
   .sourceTitle button { margin-top: 8px; width: 100%; }
 }
+.sourceGroup.cyan { border-color: rgba(80, 210, 255, .25); }
+.staticInfo { display:flex; flex-direction:column; gap:6px; padding:12px; border:1px solid rgba(255,255,255,.08); border-radius:12px; background:rgba(255,255,255,.03); }
+.staticInfo b { font-size:13px; }
+.staticInfo span { color:var(--muted); font-size:12px; line-height:1.35; }

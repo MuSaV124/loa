@@ -1,4 +1,4 @@
-const VERSION = '3.5.0';
+const VERSION = '3.6.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
@@ -30,7 +30,7 @@ function applyProfileDefaults(profile, selection = state.selected) {
   $('baseSwiftStat').value = Math.round(baseSwiftStat);
 }
 function critRateFromStat(critStat) { return Number(critStat || 0) * 0.03579; }
-function speedFromSwift(swiftStat) { return Number(swiftStat || 0) * 0.01717; }
+function speedFromSwift(swiftStat) { return Number(swiftStat || 0) / 58.21; }
 function buildIndex(db) {
   const map = new Map();
   for (const [tier, names] of Object.entries(db?.tiers || {})) for (const name of names || []) map.set(name, Number(tier));
@@ -260,13 +260,15 @@ function getBaseStats() {
     skillCritBonus: num($('skillCritBonus').value),
     adrenalineCritRate: $('adrenalineEnabled').checked ? num($('adrenalineCritRate').value) : 0,
     attackPower: $('adrenalineEnabled').checked ? num($('adrenalineAttackPower').value) : 0,
-    moveAttackSpeed: num($('baseMoveAttackSpeed').value, 114) + swiftSpeedBonus
+    swiftSpeedBonus,
+    baseMoveAttackSpeed: 114,
+    moveAttackSpeed: 114 + swiftSpeedBonus
   };
 }
 function applyEffect(stats, effect) {
   const out = { ...stats };
   if (effect.critStat) { out.critStat = (out.critStat || 0) + effect.critStat; out.statCritRate = critRateFromStat(out.critStat); out.critRate += critRateFromStat(effect.critStat); }
-  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; }
+  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.moveAttackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus; }
   if (effect.critRate) out.critRate += effect.critRate;
   if (effect.critDamage) out.critDamage += effect.critDamage;
   if (effect.critHitDamage) out.critHitDamage = (out.critHitDamage || 0) + effect.critHitDamage;
@@ -389,6 +391,9 @@ function buildSourceSummary(current) {
   if (num($('braceletAdditionalDamageManual').value)) addLines.push(sourceLine('팔찌 추가 보정', num($('braceletAdditionalDamageManual').value)));
   addLines.push(...addEvolution);
 
+  const speedLines = [sourceLine('기본 + 만찬 + 서폿 진화', 114, '100% + 5% + 9%')];
+  if (current.stats.swiftSpeedBonus) speedLines.push(sourceLine('신속 스탯', current.stats.swiftSpeedBonus, `신속 ${Math.round(current.stats.swiftStat || 0)}${getStatNodeLine('신속') ? ' · ' + getStatNodeLine('신속') : ''}`));
+
   const enemyLines = [];
   if (num($('baseEnemyDamage').value)) enemyLines.push(sourceLine('기준 적주피', num($('baseEnemyDamage').value)));
   if (state.accessory.enemyDamage) enemyLines.push(sourceLine('악세', state.accessory.enemyDamage));
@@ -404,6 +409,7 @@ function buildSourceSummary(current) {
     ${sourceGroup('진피', 'orange', evoLines, current.result.evo)}
     ${sourceGroup('추피', 'green', addLines, current.result.additionalDamage)}
     ${sourceGroup('적주피', 'pink', enemyLines, current.result.enemyDamage)}
+    ${sourceGroup('공이속', 'cyan', speedLines, current.result.moveAttackSpeed)}
     <div class="sourceFoot">뭉가 전환 진피는 <b>최대 75%</b>까지 적용됩니다.</div>
   `;
   const reset = $('resetViewButton');
@@ -489,7 +495,7 @@ $('searchForm').addEventListener('submit', (event) => {
   if (!name) return setMessage('캐릭터명을 입력하세요.');
   searchCharacter(name);
 });
-['baseCritStat','baseSwiftStat','baseCritDamage','baseEvolutionDamage','baseAdditionalDamage','baseEnemyDamage','skillCritBonus','adrenalineCritRate','adrenalineAttackPower','braceletCritRateManual','braceletCritDamageManual','braceletAdditionalDamageManual','braceletEnemyDamageManual','baseMoveAttackSpeed'].forEach(id => $(id).addEventListener('input', calculateAndRender));
+['baseCritStat','baseSwiftStat','baseCritDamage','baseEvolutionDamage','baseAdditionalDamage','baseEnemyDamage','skillCritBonus','adrenalineCritRate','adrenalineAttackPower','braceletCritRateManual','braceletCritDamageManual','braceletAdditionalDamageManual','braceletEnemyDamageManual'].forEach(id => $(id).addEventListener('input', calculateAndRender));
 $('adrenalineEnabled').addEventListener('change', calculateAndRender);
 
 await loadDb();

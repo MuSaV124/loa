@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>치명 스탯 × 0.03579 공식으로 기준 치적을 계산하고, 우측 소스 요약으로 수치 출처를 확인합니다.</p>
         </div>
-        <span class="badge">v3.5.0 · 깨달음/신속 공이속 수정</span>
+        <span class="badge">v3.6.0 · 신속 공이속 공식 적용</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -47,8 +47,8 @@
         <label>팔찌 치명타 피해 추가 보정(%)<input id="braceletCritDamageManual" type="number" step="0.01" value="0" /></label>
         <label>팔찌 추가 피해 추가 보정(%)<input id="braceletAdditionalDamageManual" type="number" step="0.01" value="0" /></label>
         <label>팔찌 적주피 추가 보정(%)<input id="braceletEnemyDamageManual" type="number" step="0.01" value="0" /></label>
-        <label>기본 공이속(%)<input id="baseMoveAttackSpeed" type="number" step="0.01" value="114" /></label>
-        
+        <div class="staticInfo"><b>기본 공이속</b><span>114% = 기본 100% + 만찬 5% + 서폿 진화 9%</span></div>
+        <div class="staticInfo"><b>신속 공이속</b><span>신속 ÷ 58.21 로 자동 계산</span></div>
       </div>
     </section>
 
@@ -82,7 +82,7 @@
     </section>
   </main>
 
-  <div class="version">Version 3.5.0</div>
+  <div class="version">Version 3.6.0</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>
