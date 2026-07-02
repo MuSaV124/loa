@@ -1,4 +1,4 @@
-const VERSION = '1.5.0';
+const VERSION = '1.6.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
@@ -11,6 +11,20 @@ function fmt(v) { return Number(v || 0).toFixed(2); }
 function item(label, value) { return `<div class="cell"><b>${label}</b><span>${escapeHtml(value ?? '-')}</span></div>`; }
 function setMessage(text) { const el = $('message'); if (!text) { el.classList.add('hidden'); el.textContent = ''; return; } el.classList.remove('hidden'); el.textContent = text; }
 function getStat(profile, type) { return (profile?.Stats || []).find(s => s.Type === type)?.Value ?? '-'; }
+
+function parseProfileCombat(profile) {
+  const out = { critRate: null };
+  const stats = Array.isArray(profile?.Stats) ? profile.Stats : [];
+  const crit = stats.find(s => s.Type === '치명');
+  const text = stripHtml(crit?.Tooltip || '');
+  const match = text.match(/치명타\s*(?:적중률|확률)[^0-9+]*([+]?\d+(?:\.\d+)?)%/);
+  if (match) out.critRate = Number(match[1]);
+  return out;
+}
+function applyProfileDefaults(profile) {
+  const parsed = parseProfileCombat(profile);
+  if (Number.isFinite(parsed.critRate)) $('baseCritRate').value = parsed.critRate.toFixed(2);
+}
 
 function buildIndex(db) {
   const map = new Map();
@@ -84,7 +98,7 @@ function renderEvolutionTiers() {
       const level = selected ? Number(state.selected[tier]?.level || 0) : 0;
       const api = selected && state.selected[tier]?.source === 'api' ? '<span class="apiMark">API</span>' : '';
       return `<button class="nodeCard ${selected && level > 0 ? 'selected' : ''}" type="button" data-tier="${tier}" data-name="${escapeHtml(name)}">
-        <div class="nodeIcon">${escapeHtml(node.icon || '◆')}</div>
+        <div class="nodeIcon">${node.iconImage ? `<img src="${escapeHtml(node.iconImage)}" alt="" />` : escapeHtml(node.icon || '◆')}</div>
         <div class="nodeName">${escapeHtml(name)}</div>
         <div class="nodeControls">
           <span class="minus" data-action="minus">−</span>
@@ -142,12 +156,15 @@ function applyEffect(stats, effect) {
 function selectedEntries(selection = state.selected) { return EVOLUTION_TIERS.map(tier => ({ tier, ...(selection[tier] || {}) })).filter(row => row.name && row.level > 0); }
 function cloneSelection() { return JSON.parse(JSON.stringify(state.selected)); }
 function score(stats) {
-  let critRate = stats.critRate + stats.skillCritBonus;
+  const rawCritRate = stats.critRate + stats.skillCritBonus;
+  let critRate = rawCritRate;
   let evo = stats.evolutionDamage;
+  let overCrit = 0;
+  let convertedEvolutionDamage = 0;
   if (stats.critCap != null && critRate > stats.critCap) {
-    const over = critRate - stats.critCap;
-    const converted = Math.min(over * (stats.overCritToEvolutionDamageRate || 0), stats.overCritEvolutionDamageCap ?? Infinity);
-    evo += converted;
+    overCrit = critRate - stats.critCap;
+    convertedEvolutionDamage = Math.min(overCrit * (stats.overCritToEvolutionDamageRate || 0), stats.overCritEvolutionDamageCap ?? Infinity);
+    evo += convertedEvolutionDamage;
     critRate = stats.critCap;
   }
   const critChance = Math.max(0, Math.min(critRate, 100)) / 100;
@@ -155,7 +172,7 @@ function score(stats) {
   const evoMultiplier = 1 + evo / 100;
   const addMultiplier = 1 + stats.additionalDamage / 100;
   const enemyMultiplier = 1 + stats.enemyDamage / 100;
-  return { value: critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier, critRate, critDamage: stats.critDamage, evo, additionalDamage: stats.additionalDamage, enemyDamage: stats.enemyDamage };
+  return { value: critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier, rawCritRate, critRate, critDamage: stats.critDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: stats.enemyDamage };
 }
 function statsWithSelection(baseStats, selection) {
   let s = { ...baseStats };
@@ -163,9 +180,12 @@ function statsWithSelection(baseStats, selection) {
   return { stats: s, result: score(s) };
 }
 function renderCombatStats(current = statsWithSelection(getBaseStats(), state.selected)) {
+  const convertedText = current.result.convertedEvolutionDamage > 0
+    ? `${fmt(current.result.evo)}% (뭉특 전환 +${fmt(current.result.convertedEvolutionDamage)}%)`
+    : `${fmt(current.result.evo)}%`;
   $('combatStatGrid').innerHTML = [
     item('치명타 확률', `${fmt(current.result.critRate)}%`), item('치명타 피해', `${fmt(current.result.critDamage)}%`),
-    item('진피', `${fmt(current.result.evo)}%`), item('추피', `${fmt(current.result.additionalDamage)}%`),
+    item('진피', convertedText), item('추피', `${fmt(current.result.additionalDamage)}%`),
     item('적주피', `${fmt(current.result.enemyDamage)}%`), item('기대값 점수', current.result.value.toFixed(4))
   ].join('');
 }
@@ -211,6 +231,7 @@ async function searchCharacter(name) {
     if (!res.ok || !data.ok) throw new Error(data.error || data.message || '검색 실패');
     state.accessory = data.accessoryEffects || { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
     renderCharacter(data.profile);
+    applyProfileDefaults(data.profile);
     state.foundEffects = readEffects(data.arkPassive);
     state.selected = classifyEvolution(state.foundEffects);
     renderSummary(data.profile, data.arkPassive);
