@@ -1,7 +1,7 @@
-const VERSION = '3.2.1';
+const VERSION = '3.2.2';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
-const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
+const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
 
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
 function stripHtml(v) { return String(v ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(); }
@@ -63,13 +63,40 @@ function readEffects(arkPassive) {
   const effects = Array.isArray(arkPassive?.Effects) ? arkPassive.Effects : [];
   return effects.map((e, index) => ({ index, name: e?.Name || '', level: Number(e?.Level || 0), description: stripHtml(e?.Description || ''), tooltip: stripHtml(e?.Tooltip || ''), raw: e })).filter(e => e.name);
 }
+function normalizeNodeName(name) {
+  return String(name || '').replace(/\s+/g, ' ').trim();
+}
+function parseLevelFromText(text, fallback = 1) {
+  const source = String(text || '');
+  const m = source.match(/(?:Lv\.?|레벨)\s*(\d+)/i) || source.match(/(\d+)\s*레벨/);
+  const level = Number(m?.[1] || fallback || 1);
+  return Number.isFinite(level) && level > 0 ? level : 1;
+}
 function classifyEvolution(effects) {
   const selected = {};
-  for (const effect of effects) {
-    const node = getNode(effect.name);
-    if (node) selected[effect.name] = { level: Math.min(effect.level || 1, node.maxLevel || effect.level || 1), source: 'api' };
+  const knownNodes = state.evolution?.nodes || [];
+  for (const effect of effects || []) {
+    const joined = normalizeNodeName(`${effect.name} ${effect.description} ${effect.tooltip}`);
+
+    // 1) API가 노드명을 Name으로 직접 주는 경우
+    const direct = getNode(effect.name);
+    if (direct) {
+      const level = Math.min(effect.level || parseLevelFromText(joined, 1), direct.maxLevel || 1);
+      selected[direct.name] = { level, source: 'api' };
+      continue;
+    }
+
+    // 2) API가 설명/툴팁 문자열 안에 진화 노드명을 넣어주는 경우
+    for (const node of knownNodes) {
+      if (!joined.includes(node.name)) continue;
+      const escaped = node.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const near = joined.match(new RegExp(`${escaped}[^\d]*(?:Lv\\.?|레벨)?\\s*(\\d+)?`, 'i'));
+      const level = Math.min(parseLevelFromText(near?.[0] || joined, effect.level || 1), node.maxLevel || 1);
+      selected[node.name] = { level, source: 'api' };
+    }
   }
-  return Object.keys(selected).length ? selected : defaultSelection();
+  // 검색 캐릭터의 진화 노드가 안 읽히면 이전 캐릭터/기본값을 쓰지 않고 빈 선택으로 둡니다.
+  return selected;
 }
 
 
@@ -290,7 +317,7 @@ function buildSourceSummary(current) {
     <div class="sourceFoot">뭉가 전환 진피는 <b>최대 75%</b>까지 적용됩니다.</div>
   `;
   const reset = $('resetViewButton');
-  if (reset) reset.addEventListener('click', () => { state.selected = defaultSelection(); renderEvolutionTiers(); calculateAndRender(); });
+  if (reset) reset.addEventListener('click', () => { state.selected = JSON.parse(JSON.stringify(state.apiSelected || {})); renderEvolutionTiers(); calculateAndRender(); });
 }
 
 function renderCombatStats(current = statsWithSelection(getBaseStats(), state.selected)) {
@@ -326,6 +353,7 @@ async function loadDb() {
   state.evolution = await fetch('/data/evolution.json').then(r => r.json());
   state.index = buildIndex(state.evolution);
   state.selected = defaultSelection();
+  state.apiSelected = JSON.parse(JSON.stringify(state.selected));
   $('evolutionDbStatus').textContent = `${state.index.size}개 노드 / 진화 전용`;
   renderEvolutionTiers();
   calculateAndRender();
@@ -337,6 +365,10 @@ async function searchCharacter(name) {
   $('characterCard').classList.add('hidden');
   $('characterCard').innerHTML = '';
   $('summaryPanel').classList.add('hidden');
+  state.selected = {};
+  state.apiSelected = {};
+  renderEvolutionTiers();
+  calculateAndRender();
   try {
     const res = await fetch(`/api/character?name=${encodeURIComponent(name)}&_=${Date.now()}`, { cache: 'no-store' });
     const data = await res.json();
@@ -349,10 +381,12 @@ async function searchCharacter(name) {
     renderCharacter(data.profile);
     state.foundEffects = readEffects(data.arkPassive);
     state.selected = classifyEvolution(state.foundEffects);
+    state.apiSelected = JSON.parse(JSON.stringify(state.selected));
     applyProfileDefaults(data.profile, state.selected);
-    renderSummary(data.profile, data.arkPassive);
     renderEvolutionTiers();
+    renderSummary(data.profile, data.arkPassive);
     calculateAndRender();
+    if (!Object.keys(state.selected).length) setMessage('캐릭터 정보는 갱신됐지만 API에서 진화 노드를 읽지 못했습니다. 노드는 직접 선택해 주세요.');
   } catch (error) { setMessage(error.message); }
   finally { button.disabled = false; button.textContent = '검색'; }
 }
