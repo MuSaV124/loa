@@ -1,4 +1,4 @@
-const VERSION = '2.1.0';
+const VERSION = '2.2.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
@@ -155,8 +155,8 @@ function onNodeCardClick(event) {
 
 function getBaseStats() {
   return {
-    critRate: num($('baseCritRate').value) + num(state.accessory.critRate) + num($('braceletCritRate').value),
-    critDamage: num($('baseCritDamage').value, 200) + num(state.accessory.critDamage) + num($('braceletCritDamage').value),
+    critRate: num($('baseCritRate').value) + num(state.accessory.critRate) + num(state.bracelet.critRate) + num($('braceletCritRateManual').value),
+    critDamage: num($('baseCritDamage').value, 200) + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num($('braceletCritDamageManual').value),
     evolutionDamage: num($('baseEvolutionDamage').value),
     additionalDamage: num($('baseAdditionalDamage').value) + num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage),
     enemyDamage: num($('baseEnemyDamage').value) + num(state.accessory.enemyDamage) + num(state.bracelet.enemyDamage),
@@ -262,10 +262,8 @@ async function searchCharacter(name) {
     if (!res.ok || !data.ok) throw new Error(data.error || data.message || '검색 실패');
     state.accessory = data.accessoryEffects || { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
     state.bracelet = data.braceletEffects || { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
-    if (data.braceletEffects) {
-      $('braceletCritRate').value = fmt(data.braceletEffects.critRate || 0);
-      $('braceletCritDamage').value = fmt(data.braceletEffects.critDamage || 0);
-    }
+    // 팔찌는 API 자동 합산값(state.bracelet)으로 계산에 반영합니다.
+    // 아래 수동 입력칸은 API에서 못 읽은 팔찌 옵션을 추가 보정할 때만 사용합니다.
     renderCharacter(data.profile);
     applyProfileDefaults(data.profile);
     state.foundEffects = readEffects(data.arkPassive);
@@ -283,7 +281,7 @@ $('searchForm').addEventListener('submit', (event) => {
   if (!name) return setMessage('캐릭터명을 입력하세요.');
   searchCharacter(name);
 });
-['baseCritRate','baseCritDamage','baseEvolutionDamage','baseAdditionalDamage','baseEnemyDamage','skillCritBonus','adrenalineCritRate','adrenalineAttackPower','braceletCritRate','braceletCritDamage','baseMoveAttackSpeed'].forEach(id => $(id).addEventListener('input', calculateAndRender));
+['baseCritRate','baseCritDamage','baseEvolutionDamage','baseAdditionalDamage','baseEnemyDamage','skillCritBonus','adrenalineCritRate','adrenalineAttackPower','braceletCritRateManual','braceletCritDamageManual','baseMoveAttackSpeed'].forEach(id => $(id).addEventListener('input', calculateAndRender));
 $('adrenalineEnabled').addEventListener('change', calculateAndRender);
 
 await loadDb();
