@@ -141,7 +141,13 @@ form.addEventListener('submit', async (event) => {
 
   try {
     const response = await fetch(`/api/character?name=${encodeURIComponent(name)}`);
-    const data = await response.json();
+    const text = await response.text();
+    let data;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      throw new Error(`서버가 JSON이 아닌 응답을 보냈습니다. 상태: ${response.status}. 내용: ${text.slice(0, 120)}`);
+    }
     if (!response.ok) throw new Error(data.error || '조회 실패');
 
     hideStatus();
