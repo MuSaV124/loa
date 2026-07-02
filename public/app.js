@@ -1,7 +1,7 @@
-const VERSION = '3.3.0';
+const VERSION = '3.5.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
-const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
+const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
 
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
 function stripHtml(v) { return String(v ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(); }
@@ -79,7 +79,7 @@ function addMatchesTo(out, key, text, regexList) {
   }
 }
 function parsePercentEffectText(text) {
-  const out = { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0 };
+  const out = { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0 };
   const source = stripHtml(text);
   addMatchesTo(out, 'critRate', source, [
     /치명타\s*적중률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
@@ -87,6 +87,10 @@ function parsePercentEffectText(text) {
   ]);
   addMatchesTo(out, 'critDamage', source, [
     /치명타\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+  ]);
+  addMatchesTo(out, 'evolutionDamage', source, [
+    /진화형?\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
+    /진피\s*(?:\+)?(\d+(?:\.\d+)?)%/g
   ]);
   addMatchesTo(out, 'additionalDamage', source, [
     /추가\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
@@ -102,26 +106,26 @@ function parsePercentEffectText(text) {
   return out;
 }
 function hasAnyEffect(effects) {
-  return ['critRate','critDamage','enemyDamage','additionalDamage'].some(k => Math.abs(Number(effects?.[k] || 0)) > 0);
+  return ['critRate','critDamage','evolutionDamage','enemyDamage','additionalDamage'].some(k => Math.abs(Number(effects?.[k] || 0)) > 0);
 }
 function isKnownEvolutionEffect(effect) {
   const joined = normalizeNodeName(`${effect?.name || ''} ${effect?.description || ''} ${effect?.tooltip || ''}`);
   return (state.evolution?.nodes || []).some(node => effect?.name === node.name || joined.includes(node.name));
 }
 function extractEnlightenmentEffects(effects) {
-  const result = { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+  const result = { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   for (const effect of effects || []) {
     const rawText = stripHtml(JSON.stringify(effect?.raw || {}));
     const joined = `${effect.name || ''} ${effect.description || ''} ${effect.tooltip || ''} ${rawText}`;
-    const isEnlightenment = joined.includes('깨달음');
-    if (!isEnlightenment) continue;
+    // Open API가 깨달음/진화 구분명을 안정적으로 주지 않는 경우가 있어,
+    // 진화 노드로 매칭되는 항목만 제외하고 남은 아크패시브 효과에서 필요한 수치를 읽습니다.
     if (isKnownEvolutionEffect(effect)) continue;
     const parsed = parsePercentEffectText(joined);
     if (!hasAnyEffect(parsed)) continue;
-    for (const key of ['critRate','critDamage','enemyDamage','additionalDamage']) result[key] += parsed[key];
+    for (const key of ['critRate','critDamage','evolutionDamage','enemyDamage','additionalDamage']) result[key] += parsed[key];
     result.items.push({ name: effect.name || '깨달음 효과', level: effect.level || 0, effects: parsed });
   }
-  for (const key of ['critRate','critDamage','enemyDamage','additionalDamage']) result[key] = Math.round(result[key] * 100) / 100;
+  for (const key of ['critRate','critDamage','evolutionDamage','enemyDamage','additionalDamage']) result[key] = Math.round(result[key] * 100) / 100;
   return result;
 }
 
@@ -243,14 +247,14 @@ function getBaseStats() {
   const critStat = num($('baseCritStat').value) + selectedCritStat;
   const swiftStat = num($('baseSwiftStat').value) + selectedSwiftStat;
   const statCritRate = critRateFromStat(critStat);
-  const swiftSpeedBonus = $('includeSwiftSpeed').checked ? speedFromSwift(swiftStat) : 0;
+  const swiftSpeedBonus = speedFromSwift(swiftStat);
   return {
     critStat,
     swiftStat,
     statCritRate,
     critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num($('braceletCritRateManual').value) + num(state.enlightenment.critRate),
     critDamage: num($('baseCritDamage').value, 200) + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num($('braceletCritDamageManual').value) + num(state.enlightenment.critDamage),
-    evolutionDamage: num($('baseEvolutionDamage').value),
+    evolutionDamage: num($('baseEvolutionDamage').value) + num(state.enlightenment.evolutionDamage),
     additionalDamage: num($('baseAdditionalDamage').value) + num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num($('braceletAdditionalDamageManual').value) + num(state.enlightenment.additionalDamage),
     enemyDamage: num($('baseEnemyDamage').value) + num(state.accessory.enemyDamage) + num(state.bracelet.enemyDamage) + num($('braceletEnemyDamageManual').value) + num(state.enlightenment.enemyDamage),
     skillCritBonus: num($('skillCritBonus').value),
@@ -374,6 +378,7 @@ function buildSourceSummary(current) {
 
   const evoLines = [];
   if (num($('baseEvolutionDamage').value)) evoLines.push(sourceLine('기준 진피', num($('baseEvolutionDamage').value)));
+  if (state.enlightenment.evolutionDamage) evoLines.push(sourceLine('깨달음', state.enlightenment.evolutionDamage));
   evoLines.push(...evoEvolution);
 
   const addLines = [];
@@ -452,7 +457,7 @@ async function searchCharacter(name) {
   $('summaryPanel').classList.add('hidden');
   state.selected = {};
   state.apiSelected = {};
-  state.enlightenment = { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+  state.enlightenment = { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   renderEvolutionTiers();
   calculateAndRender();
   try {
@@ -486,6 +491,5 @@ $('searchForm').addEventListener('submit', (event) => {
 });
 ['baseCritStat','baseSwiftStat','baseCritDamage','baseEvolutionDamage','baseAdditionalDamage','baseEnemyDamage','skillCritBonus','adrenalineCritRate','adrenalineAttackPower','braceletCritRateManual','braceletCritDamageManual','braceletAdditionalDamageManual','braceletEnemyDamageManual','baseMoveAttackSpeed'].forEach(id => $(id).addEventListener('input', calculateAndRender));
 $('adrenalineEnabled').addEventListener('change', calculateAndRender);
-$('includeSwiftSpeed').addEventListener('change', calculateAndRender);
 
 await loadDb();
