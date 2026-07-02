@@ -1,4 +1,4 @@
-const VERSION = '2.2.0';
+const VERSION = '2.4.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
@@ -21,9 +21,18 @@ function parseProfileCombat(profile) {
   if (match) out.critRate = Number(match[1]);
   return out;
 }
-function applyProfileDefaults(profile) {
+function currentCritNodeBonus(selection = state.selected) {
+  const level = Number(selection?.['치명']?.level || 0);
+  return Number(getLevelEffect('치명', level)?.critRate || 0);
+}
+function applyProfileDefaults(profile, selection = state.selected) {
   const parsed = parseProfileCombat(profile);
-  if (Number.isFinite(parsed.critRate)) $('baseCritRate').value = parsed.critRate.toFixed(2);
+  if (Number.isFinite(parsed.critRate)) {
+    // API 프로필의 치명타 확률에는 현재 1티어 '치명' 노드로 오른 치명 스탯이 이미 반영되어 있을 수 있습니다.
+    // 계산기에서도 선택 노드를 다시 적용하므로, 기준값에서는 현재 선택된 치명 노드 추정치를 한 번 빼서 중복 합산을 막습니다.
+    const adjusted = Math.max(0, parsed.critRate - currentCritNodeBonus(selection));
+    $('baseCritRate').value = adjusted.toFixed(2);
+  }
 }
 
 function buildIndex(db) {
@@ -266,9 +275,9 @@ async function searchCharacter(name) {
     // 팔찌는 API 자동 합산값(state.bracelet)으로 계산에 반영합니다.
     // 아래 수동 입력칸은 API에서 못 읽은 팔찌 옵션을 추가 보정할 때만 사용합니다.
     renderCharacter(data.profile);
-    applyProfileDefaults(data.profile);
     state.foundEffects = readEffects(data.arkPassive);
     state.selected = classifyEvolution(state.foundEffects);
+    applyProfileDefaults(data.profile, state.selected);
     renderSummary(data.profile, data.arkPassive);
     renderEvolutionTiers();
     calculateAndRender();

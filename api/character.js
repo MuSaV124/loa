@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     const accessoryEffects = extractAccessoryEffects(equipment);
     const braceletEffects = extractBraceletEffects(equipment);
 
-    return res.status(200).json({ ok: true, apiVersion: '2.3.0', profile, arkPassive, equipment, accessoryEffects, braceletEffects, raw: data });
+    return res.status(200).json({ ok: true, apiVersion: '2.4.0', profile, arkPassive, equipment, accessoryEffects, braceletEffects, raw: data });
   } catch (error) {
     const message = error.name === 'AbortError' ? 'Open API 응답 시간이 길어서 중단했습니다.' : error.message;
     return res.status(500).json({ error: '서버 함수 오류', message });
@@ -134,7 +134,7 @@ function addMatches(out, key, text, regexList) {
       const value = Number(match[1] || 0);
       if (!Number.isFinite(value)) continue;
       // 같은 문장을 여러 패턴이 동시에 잡는 경우 중복 합산 방지
-      const token = `${key}:${match.index}:${match[0]}`;
+      const token = `${key}:${String(match[0]).replace(/\s+/g, ' ').trim()}`;
       if (seen.has(token)) continue;
       seen.add(token);
       out[key] += value;
