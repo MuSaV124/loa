@@ -1,4 +1,4 @@
-const VERSION = '1.8.0';
+const VERSION = '2.0.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
@@ -159,7 +159,10 @@ function getBaseStats() {
     evolutionDamage: num($('baseEvolutionDamage').value),
     additionalDamage: num($('baseAdditionalDamage').value) + num(state.accessory.additionalDamage),
     enemyDamage: num($('baseEnemyDamage').value) + num(state.accessory.enemyDamage),
-    skillCritBonus: num($('skillCritBonus').value)
+    skillCritBonus: num($('skillCritBonus').value),
+    adrenalineCritRate: num($('adrenalineCritRate').value),
+    attackPower: num($('adrenalineAttackPower').value),
+    moveAttackSpeed: num($('baseMoveAttackSpeed').value, 114)
   };
 }
 function applyEffect(stats, effect) {
@@ -170,6 +173,8 @@ function applyEffect(stats, effect) {
   if (effect.additionalDamage) out.additionalDamage += effect.additionalDamage;
   if (effect.enemyDamage) out.enemyDamage += effect.enemyDamage;
   if (effect.finalDamage) out.enemyDamage += effect.finalDamage;
+  if (effect.attackPower) out.attackPower = (out.attackPower || 0) + effect.attackPower;
+  if (effect.speedBonus) out.moveAttackSpeed = (out.moveAttackSpeed || 0) + effect.speedBonus;
   if (effect.critCap != null) out.critCap = effect.critCap;
   if (effect.overCritToEvolutionDamageRate) out.overCritToEvolutionDamageRate = effect.overCritToEvolutionDamageRate;
   if (effect.overCritEvolutionDamageCap != null) out.overCritEvolutionDamageCap = effect.overCritEvolutionDamageCap;
@@ -178,7 +183,7 @@ function applyEffect(stats, effect) {
 function selectedEntries(selection = state.selected) { return Object.entries(selection || {}).map(([name, data]) => ({ name, tier: getNode(name)?.tier, level: Number(data?.level || 0), source: data?.source })).filter(row => row.name && row.level > 0 && row.tier); }
 function cloneSelection() { return JSON.parse(JSON.stringify(state.selected)); }
 function score(stats) {
-  const rawCritRate = stats.critRate + stats.skillCritBonus;
+  const rawCritRate = stats.critRate + stats.skillCritBonus + (stats.adrenalineCritRate || 0);
   let effectiveCritRate = rawCritRate;
   let evo = stats.evolutionDamage;
   let overCrit = 0;
@@ -194,7 +199,8 @@ function score(stats) {
   const evoMultiplier = 1 + evo / 100;
   const addMultiplier = 1 + stats.additionalDamage / 100;
   const enemyMultiplier = 1 + stats.enemyDamage / 100;
-  return { value: critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: stats.enemyDamage };
+  const attackMultiplier = 1 + (stats.attackPower || 0) / 100;
+  return { value: critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: stats.enemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0 };
 }
 function statsWithSelection(baseStats, selection) {
   let s = { ...baseStats };
@@ -208,7 +214,8 @@ function renderCombatStats(current = statsWithSelection(getBaseStats(), state.se
   $('combatStatGrid').innerHTML = [
     item('치명타 확률', `${fmt(current.result.critRate)}%`), item('치명타 피해', `${fmt(current.result.critDamage)}%`),
     item('진피', convertedText), item('추피', `${fmt(current.result.additionalDamage)}%`),
-    item('적주피', `${fmt(current.result.enemyDamage)}%`), item('기대값 점수', current.result.value.toFixed(4))
+    item('적주피', `${fmt(current.result.enemyDamage)}%`), item('아드 공증', `${fmt(current.result.attackPower)}%`),
+    item('공이속', `${fmt(current.result.moveAttackSpeed)}%`), item('기대값 점수', current.result.value.toFixed(4))
   ].join('');
 }
 function calculateAndRender() {
@@ -229,7 +236,7 @@ function calculateAndRender() {
   }
   candidates.sort((a, b) => b.calc.result.value - a.calc.result.value);
   $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>현재 선택 노드 반영 기준</span>`;
-  $('baseInfo').innerHTML = `치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%`;
+  $('baseInfo').innerHTML = `치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%, 공증 ${fmt(current.result.attackPower)}%, 공이속 ${fmt(current.result.moveAttackSpeed)}%`;
   $('recommendList').innerHTML = candidates.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
     const currentMark = state.selected[c.name]?.level > 0 ? '<em>현재</em>' : '';
@@ -270,6 +277,6 @@ $('searchForm').addEventListener('submit', (event) => {
   if (!name) return setMessage('캐릭터명을 입력하세요.');
   searchCharacter(name);
 });
-['baseCritRate','baseCritDamage','baseEvolutionDamage','baseAdditionalDamage','baseEnemyDamage','skillCritBonus'].forEach(id => $(id).addEventListener('input', calculateAndRender));
+['baseCritRate','baseCritDamage','baseEvolutionDamage','baseAdditionalDamage','baseEnemyDamage','skillCritBonus','adrenalineCritRate','adrenalineAttackPower','baseMoveAttackSpeed'].forEach(id => $(id).addEventListener('input', calculateAndRender));
 
 await loadDb();

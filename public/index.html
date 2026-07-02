@@ -12,9 +12,9 @@
       <div class="topline">
         <div>
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
-          <p>검색된 진화 노드를 카드 형태로 표시하고, 노드 레벨을 직접 바꾸면 치적/치피/진피/추피/적주피가 즉시 재계산됩니다.</p>
+          <p>검색된 진화 노드를 카드 형태로 표시하고, 아드/공이속 보정을 포함해 치적/치피/진피/추피/적주피가 즉시 재계산됩니다.</p>
         </div>
-        <span class="badge">v1.8.0 · 진화 전용</span>
+        <span class="badge">v2.0.0 · 진화 전용</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="무사브" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -42,6 +42,9 @@
         <label>기준 추가 피해, 추피(%)<input id="baseAdditionalDamage" type="number" step="0.01" value="0" /></label>
         <label>기준 적에게 주는 피해, 적주피(%)<input id="baseEnemyDamage" type="number" step="0.01" value="0" /></label>
         <label>주력기 치명 보정(%)<input id="skillCritBonus" type="number" step="0.01" value="0" /></label>
+        <label>아드 치명타 확률(%)<input id="adrenalineCritRate" type="number" step="0.01" value="20" /></label>
+        <label>아드 공격력 증가(%)<input id="adrenalineAttackPower" type="number" step="0.01" value="5.4" /></label>
+        <label>기본 공이속(%)<input id="baseMoveAttackSpeed" type="number" step="0.01" value="114" /></label>
       </div>
     </section>
 
@@ -70,12 +73,12 @@
       <h2>DB 상태</h2>
       <div class="grid">
         <div class="cell"><b>진화 DB</b><span id="evolutionDbStatus">대기</span></div>
-        <div class="cell"><b>계산 방식</b><span>치명 기대값 × 진피 × 추피 × 적주피</span></div>
+        <div class="cell"><b>계산 방식</b><span>치명 기대값 × 진피 × 추피 × 적주피 × 공증</span></div>
       </div>
     </section>
   </main>
 
-  <div class="version">Version 1.7.0</div>
+  <div class="version">Version 2.0.0</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>
