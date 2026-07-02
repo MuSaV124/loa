@@ -1,172 +1,248 @@
-const form = document.querySelector('#searchForm');
-const input = document.querySelector('#characterName');
-const searchButton = document.querySelector('#searchButton');
-const statusBox = document.querySelector('#status');
-const characterCard = document.querySelector('#characterCard');
-const summaryCard = document.querySelector('#summaryCard');
-const extractCard = document.querySelector('#extractCard');
+const VERSION = '1.2.0';
 
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>'"]/g, (ch) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-  }[ch]));
-}
+const $ = (id) => document.getElementById(id);
 
-function showStatus(message, isError = false) {
-  statusBox.textContent = message;
-  statusBox.classList.remove('hidden');
-  statusBox.classList.toggle('error', isError);
-}
+const state = {
+  evolutionDb: null,
+  enlightenmentDb: null,
+  leapDb: null
+};
 
-function hideStatus() { statusBox.classList.add('hidden'); }
-function hideCards() {
-  characterCard.classList.add('hidden');
-  summaryCard.classList.add('hidden');
-  extractCard.classList.add('hidden');
-}
+const GROUPS = {
+  '진화': [1, 2, 3, 4, 5],
+  '깨달음': [1, 2, 3, 4],
+  '도약': [1, 2]
+};
 
-function setLoading(isLoading) {
-  searchButton.disabled = isLoading;
-  searchButton.textContent = isLoading ? '검색...' : '검색';
-}
-
-async function readJsonResponse(response) {
-  const text = await response.text();
-  try {
-    return text ? JSON.parse(text) : {};
-  } catch {
-    throw new Error(`서버가 JSON이 아닌 응답을 보냈습니다. HTTP ${response.status}. 내용: ${text.slice(0, 160)}`);
+function setMessage(text) {
+  const el = $('message');
+  if (!text) {
+    el.classList.add('hidden');
+    el.textContent = '';
+    return;
   }
+  el.classList.remove('hidden');
+  el.textContent = text;
 }
 
-function renderCharacter(data) {
-  const p = data.profile || {};
-  document.querySelector('#characterImage').src = p.CharacterImage || '';
-  document.querySelector('#characterTitle').textContent = `${p.CharacterName || data.characterName || '-'} / ${p.CharacterClassName || '-'}`;
-  document.querySelector('#characterMeta').textContent = `서버 ${p.ServerName || '-'} · 아이템 레벨 ${p.ItemMaxLevel || p.ItemAvgLevel || '-'} · 원정대 ${p.ExpeditionLevel || '-'}`;
-  characterCard.classList.remove('hidden');
+function getStat(profile, type) {
+  const stats = profile?.Stats || [];
+  const found = stats.find(s => s.Type === type);
+  return found?.Value ?? '-';
 }
 
-function renderSummary(data) {
-  const s = data.summary || {};
-  const stats = s.stats || {};
-  const ark = s.arkPoints || {};
-  const errors = data.apiErrors || {};
+function item(label, value) {
+  return `<div class="cell"><b>${label}</b><span>${value ?? '-'}</span></div>`;
+}
 
-  summaryCard.innerHTML = `
-    <h2>검색 결과 확인</h2>
-    <div class="grid">
-      <div class="metric"><b>직업</b>${escapeHtml(s.characterClass || '-')}</div>
-      <div class="metric"><b>아이템 레벨</b>${escapeHtml(s.itemLevel || '-')}</div>
-      <div class="metric"><b>서버</b>${escapeHtml(s.serverName || '-')}</div>
-      <div class="metric"><b>치명</b>${escapeHtml(stats.crit || 0)}</div>
-      <div class="metric"><b>신속</b>${escapeHtml(stats.swiftness || 0)}</div>
-      <div class="metric"><b>특화</b>${escapeHtml(stats.specialization || 0)}</div>
-      <div class="metric"><b>진화</b>${escapeHtml(ark.evolution || 0)}</div>
-      <div class="metric"><b>깨달음</b>${escapeHtml(ark.enlightenment || 0)}</div>
-      <div class="metric"><b>도약</b>${escapeHtml(ark.leap || 0)}</div>
+function escapeHtml(v) {
+  return String(v ?? '').replace(/[&<>"']/g, (m) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[m]);
+}
+
+function stripHtml(v) {
+  return String(v ?? '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function readEffects(arkPassive) {
+  const effects = Array.isArray(arkPassive?.Effects) ? arkPassive.Effects : [];
+  return effects
+    .map((e, index) => ({
+      index,
+      name: e?.Name || '',
+      level: Number(e?.Level || 0),
+      description: stripHtml(e?.Description || ''),
+      tooltip: stripHtml(e?.Tooltip || '')
+    }))
+    .filter(e => e.name);
+}
+
+function buildNameIndex(db) {
+  const map = new Map();
+  if (!db?.tiers) return map;
+  for (const [tier, names] of Object.entries(db.tiers)) {
+    for (const name of names || []) {
+      map.set(name, Number(tier));
+    }
+  }
+  return map;
+}
+
+function isLikelyEvolution(effect) {
+  return state.evolutionIndex?.has(effect.name);
+}
+
+function isLikelyEnlightenment(effect) {
+  if (state.enlightenmentIndex?.has(effect.name)) return true;
+  // 깨달음은 직업각인/직업 특화 노드가 많아서 v1.2.0에서는 DB 미구축 시 확정 분류하지 않는다.
+  return false;
+}
+
+function isLikelyLeap(effect) {
+  if (state.leapIndex?.has(effect.name)) return true;
+  return false;
+}
+
+function classifyEffects(effects) {
+  const result = {
+    '진화': { 1: [], 2: [], 3: [], 4: [], 5: [], unknown: [] },
+    '깨달음': { 1: [], 2: [], 3: [], 4: [], unknown: [] },
+    '도약': { 1: [], 2: [], unknown: [] }
+  };
+
+  for (const effect of effects) {
+    if (isLikelyEvolution(effect)) {
+      const tier = state.evolutionIndex.get(effect.name);
+      result['진화'][tier].push(effect);
+      continue;
+    }
+
+    if (isLikelyEnlightenment(effect)) {
+      const tier = state.enlightenmentIndex.get(effect.name);
+      result['깨달음'][tier].push(effect);
+      continue;
+    }
+
+    if (isLikelyLeap(effect)) {
+      const tier = state.leapIndex.get(effect.name);
+      result['도약'][tier].push(effect);
+      continue;
+    }
+
+    // v1.2.0: 미분류는 별도 표시 대신 각 그룹 unknown에 넣지 않고 하단 안내만 둔다.
+  }
+
+  return result;
+}
+
+function renderCharacter(profile) {
+  const el = $('characterCard');
+  const image = profile?.CharacterImage || '';
+  const name = profile?.CharacterName || '-';
+  const klass = profile?.CharacterClassName || '-';
+  const server = profile?.ServerName || '-';
+  const ilvl = profile?.ItemAvgLevel || '-';
+  const combatPower = profile?.CombatPower || '-';
+
+  el.innerHTML = `
+    ${image ? `<img src="${escapeHtml(image)}" alt="" />` : ''}
+    <div>
+      <h2>${escapeHtml(name)} / ${escapeHtml(klass)}</h2>
+      <p>서버 ${escapeHtml(server)} · 아이템 레벨 ${escapeHtml(ilvl)} · 전투력 ${escapeHtml(combatPower)}</p>
     </div>
-    ${errors.arkpassive ? `<div class="warning">아크패시브 조회 경고: ${escapeHtml(errors.arkpassive)}</div>` : ''}
   `;
-  summaryCard.classList.remove('hidden');
+  el.classList.remove('hidden');
 }
 
-function renderPoints(points) {
-  const list = Array.isArray(points) ? points : [];
-  if (!list.length) return '<p class="empty">Points 데이터 없음</p>';
-  return `<div class="tableLike">${list.map((item) => `
-    <div class="row"><b>${escapeHtml(item.Name || item.Type || '-')}</b><span>${escapeHtml(item.Value ?? item.Point ?? item.Amount ?? '-')}</span><code>${escapeHtml(JSON.stringify(item))}</code></div>
-  `).join('')}</div>`;
+function renderStats(profile, arkPassive) {
+  const points = Array.isArray(arkPassive?.Points) ? arkPassive.Points : [];
+  const point = (name) => points.find(p => p.Name === name)?.Value ?? '-';
+
+  $('statGrid').innerHTML = [
+    item('직업', profile?.CharacterClassName),
+    item('아이템 레벨', profile?.ItemAvgLevel),
+    item('서버', profile?.ServerName),
+    item('치명', getStat(profile, '치명')),
+    item('신속', getStat(profile, '신속')),
+    item('특화', getStat(profile, '특화')),
+    item('진화', point('진화')),
+    item('깨달음', point('깨달음')),
+    item('도약', point('도약'))
+  ].join('');
+
+  $('resultPanel').classList.remove('hidden');
 }
 
-function renderLikelyObjects(rows) {
-  const list = Array.isArray(rows) ? rows : [];
-  if (!list.length) return '<p class="empty">노드 후보로 보이는 객체 없음</p>';
-  return `<div class="analysisList">${list.slice(0, 60).map((row) => `
-    <details class="analysisItem">
-      <summary>${escapeHtml(row.path)} ${row.name ? `· ${escapeHtml(row.name)}` : ''}</summary>
-      <div class="analysisBody">
-        <p><b>Keys</b> ${escapeHtml((row.keys || []).join(', '))}</p>
-        <p><b>Name</b> ${escapeHtml(row.name || '-')}</p>
-        <p><b>Level</b> ${escapeHtml(row.level ?? '-')}</p>
-        <p><b>Sample</b> ${escapeHtml(row.sample || '-')}</p>
+function renderTierGroups(classified) {
+  const html = Object.entries(GROUPS).map(([group, tiers]) => {
+    const tierHtml = tiers.map(tier => {
+      const nodes = classified[group]?.[tier] || [];
+      const nodeHtml = nodes.length
+        ? nodes.map(n => `<div class="node">${escapeHtml(n.name)} Lv.${escapeHtml(n.level || '-')}</div>`).join('')
+        : `<div class="empty">-</div>`;
+
+      return `<div class="tier"><h4>${tier}티어</h4>${nodeHtml}</div>`;
+    }).join('');
+
+    return `
+      <div class="groupBox" data-group="${group}">
+        <h3>${group}</h3>
+        <div class="tiers">${tierHtml}</div>
       </div>
-    </details>
-  `).join('')}</div>`;
+    `;
+  }).join('');
+
+  $('tierGroups').innerHTML = html;
+  $('tierPanel').classList.remove('hidden');
 }
 
-function renderFieldPaths(rows) {
-  const list = Array.isArray(rows) ? rows : [];
-  if (!list.length) return '<p class="empty">필드 경로 없음</p>';
-  return `<div class="pathTable">
-    ${list.slice(0, 120).map((row) => `
-      <div class="pathRow">
-        <code>${escapeHtml(row.path)}</code>
-        <span>${escapeHtml(row.type)}</span>
-        <p>${escapeHtml(row.sample || '')}</p>
-      </div>
-    `).join('')}
-  </div>`;
-}
-
-function renderExtractResult(data) {
-  const analysis = data.analysis || {};
-  extractCard.innerHTML = `
-    <h2>Open API 분석기</h2>
-    <p class="note">${escapeHtml(analysis.message || 'ArkPassive 구조를 확인합니다.')}</p>
-
-    <div class="analysisGrid">
-      <div class="analysisBox">
-        <h3>Root Keys</h3>
-        <p>${escapeHtml((analysis.rootKeys || []).join(', ') || '-')}</p>
-      </div>
-      <div class="analysisBox">
-        <h3>ArkPassive Points</h3>
-        ${renderPoints(analysis.points)}
-      </div>
-    </div>
-
-    <details class="bigDetails" open>
-      <summary>노드 후보 객체</summary>
-      ${renderLikelyObjects(analysis.likelyNodeObjects)}
-    </details>
-
-    <details class="bigDetails">
-      <summary>필드 경로 전체 보기</summary>
-      ${renderFieldPaths(analysis.fieldPaths)}
-    </details>
-
-    <details class="bigDetails">
-      <summary>ArkPassive 원본 미리보기</summary>
-      <pre class="rawPreview">${escapeHtml(analysis.rawPreview || '원본 없음')}</pre>
-    </details>
-
-    <p class="note">v1.1.0: 이 화면에서 실제 노드명/레벨이 어느 필드에 있는지 확인한 뒤 다음 버전에서 파서를 확정합니다.</p>
-  `;
-  extractCard.classList.remove('hidden');
-}
-
-form.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const name = input.value.trim();
-  if (!name) return showStatus('캐릭터명을 입력해줘.', true);
-
-  hideCards();
-  setLoading(true);
-  showStatus('캐릭터 정보를 불러오는 중...');
-
+async function loadDb() {
   try {
-    const response = await fetch(`/api/character?name=${encodeURIComponent(name)}`);
-    const data = await readJsonResponse(response);
-    if (!response.ok) throw new Error(data.error || `조회 실패: HTTP ${response.status}`);
+    const [evolution, enlightenment, leap] = await Promise.all([
+      fetch('/data/evolution.json').then(r => r.json()),
+      fetch('/data/enlightenment-breaker-sura.json').then(r => r.json()),
+      fetch('/data/leap-breaker.json').then(r => r.json())
+    ]);
 
-    hideStatus();
-    renderCharacter(data);
-    renderSummary(data);
-    renderExtractResult(data);
+    state.evolutionDb = evolution;
+    state.enlightenmentDb = enlightenment;
+    state.leapDb = leap;
+    state.evolutionIndex = buildNameIndex(evolution);
+    state.enlightenmentIndex = buildNameIndex(enlightenment);
+    state.leapIndex = buildNameIndex(leap);
+
+    $('evolutionDbStatus').textContent = `${state.evolutionIndex.size}개 노드 매핑`;
   } catch (error) {
-    showStatus(error.message, true);
-  } finally {
-    setLoading(false);
+    $('evolutionDbStatus').textContent = 'DB 로드 실패';
+    console.error(error);
   }
+}
+
+async function searchCharacter(name) {
+  const button = $('searchButton');
+  button.disabled = true;
+  button.textContent = '검색...';
+  setMessage('');
+
+  try {
+    const res = await fetch(`/api/character?name=${encodeURIComponent(name)}`);
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || data.message || '검색 실패');
+    }
+
+    const profile = data.profile;
+    const arkPassive = data.arkPassive;
+
+    renderCharacter(profile);
+    renderStats(profile, arkPassive);
+
+    const effects = readEffects(arkPassive);
+    const classified = classifyEffects(effects);
+    renderTierGroups(classified);
+  } catch (error) {
+    setMessage(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = '검색';
+  }
+}
+
+$('searchForm').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const name = $('characterName').value.trim();
+  if (!name) return setMessage('캐릭터명을 입력하세요.');
+  searchCharacter(name);
 });
+
+await loadDb();

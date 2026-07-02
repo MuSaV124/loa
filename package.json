@@ -1,16 +1,19 @@
 {
-  "name": "lostark-vercel-api-calculator",
-  "version": "1.0.5",
+  "name": "lostark-node-recommend-calculator",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vercel dev",
-    "start": "vercel dev"
+    "generate:inven": "node scripts/generate-inven-db.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0"
+  },
+  "devDependencies": {
+    "vercel": "^34.0.0"
   },
   "engines": {
     "node": ">=20"
-  },
-  "devDependencies": {
-    "vercel": "latest"
   }
 }

@@ -1,39 +1,47 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LOSTARK 노드 추천 계산기</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <main class="wrap">
-    <section class="hero">
+    <section class="panel hero">
       <h1>LOSTARK 노드 추천 계산기</h1>
-      <p>v1.1.0: Open API ArkPassive 구조를 분석해서 노드명/레벨 위치를 확인합니다.</p>
+      <p>v1.2.0: 인벤 DB 기반 JSON 구조를 준비하고, API 노드를 티어별로 분류합니다.</p>
       <form id="searchForm" class="search">
-        <input id="characterName" type="text" placeholder="캐릭터명 입력" autocomplete="off" />
+        <input id="characterName" value="무사브" autocomplete="off" placeholder="캐릭터명 입력" />
         <button id="searchButton" type="submit">검색</button>
       </form>
+      <div id="message" class="message hidden"></div>
     </section>
 
-    <section id="status" class="status hidden"></section>
+    <section id="characterCard" class="panel character hidden"></section>
 
-    <section id="characterCard" class="card hidden">
-      <div class="profile">
-        <img id="characterImage" alt="캐릭터 이미지" />
-        <div>
-          <h2 id="characterTitle"></h2>
-          <p id="characterMeta"></p>
-        </div>
+    <section id="resultPanel" class="panel hidden">
+      <h2>검색 결과 확인</h2>
+      <div id="statGrid" class="grid"></div>
+    </section>
+
+    <section id="tierPanel" class="panel hidden">
+      <h2>선택 노드 티어 분류</h2>
+      <p class="hint">진화는 공통 DB 기준, 깨달음/도약은 직업별 DB가 필요합니다.</p>
+      <div id="tierGroups" class="tierGroups"></div>
+    </section>
+
+    <section id="dbPanel" class="panel">
+      <h2>DB 상태</h2>
+      <div class="grid">
+        <div class="cell"><b>진화 DB</b><span id="evolutionDbStatus">대기</span></div>
+        <div class="cell"><b>깨달음 DB</b><span>브레이커/수라의 길 구조 준비</span></div>
+        <div class="cell"><b>도약 DB</b><span>브레이커 구조 준비</span></div>
       </div>
     </section>
-
-    <section id="summaryCard" class="card hidden"></section>
-    <section id="extractCard" class="card hidden"></section>
   </main>
 
-  <footer class="version">Version 1.1.0</footer>
-  <script src="/app.js"></script>
+  <div class="version">Version 1.2.0</div>
+  <script type="module" src="/app.js"></script>
 </body>
 </html>

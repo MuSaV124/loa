@@ -1,11 +1,18 @@
 {
   "version": 2,
   "functions": {
-    "api/character.js": {
+    "api/**/*.js": {
       "maxDuration": 10
     }
   },
-  "rewrites": [
-    { "source": "/", "destination": "/public/index.html" }
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    }
   ]
 }
