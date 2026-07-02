@@ -1,4 +1,4 @@
-const VERSION = '4.4.2';
+const VERSION = '4.4.4';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -85,14 +85,21 @@ function readEffects(arkPassive) {
   return effects.map((e, index) => ({ index, name: e?.Name || '', level: Number(e?.Level || 0), description: stripHtml(e?.Description || ''), tooltip: stripHtml(e?.Tooltip || ''), raw: e })).filter(e => e.name);
 }
 
+function normalizeMatchToken(text) {
+  return String(text || '').replace(/\s+/g, ' ').trim();
+}
 function addMatchesTo(out, key, text, regexList) {
+  // Open API Tooltip은 같은 설명이 여러 필드/중첩 JSON에 반복되는 경우가 있어
+  // match.index 기준으로 더하면 블래스터처럼 40%가 80%로 중복 적용될 수 있습니다.
+  // 같은 항목 안에서는 같은 문장/수치 조합을 1회만 반영합니다.
   const seen = new Set();
   for (const re of regexList) {
+    re.lastIndex = 0;
     let match;
     while ((match = re.exec(text)) !== null) {
       const value = Number(match[1] || 0);
       if (!Number.isFinite(value)) continue;
-      const token = `${key}:${match.index}:${value}`;
+      const token = `${key}:${value}:${normalizeMatchToken(match[0])}`;
       if (seen.has(token)) continue;
       seen.add(token);
       out[key] += value;
@@ -159,8 +166,15 @@ function levelNearName(text, nodeName, fallback = 1) {
   if (near) return Number(near[1]);
   return fallback;
 }
+function enlightenmentSignature(effect, parsed) {
+  const values = ['critRate','critDamage','evolutionDamage','enemyDamage','additionalDamage','attackSpeed','moveSpeed']
+    .map(k => `${k}:${Number(parsed?.[k] || 0).toFixed(3)}`).join('|');
+  const special = parsed?.windfuryAgility ? `|windfury:${parsed.windfuryAgility.level}` : '';
+  return `${normalizeNodeName(effect?.name || '')}|lv:${Number(effect?.level || 0)}|${values}${special}`;
+}
 function extractEnlightenmentEffects(effects) {
   const result = { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
+  const applied = new Set();
   for (const effect of effects || []) {
     const joined = effectFullText(effect);
     const normalized = normalizeNodeName(`${effect?.name || ''} ${joined}`);
@@ -192,6 +206,9 @@ function extractEnlightenmentEffects(effects) {
     }
 
     if (!hasAnyEffect(parsed) && !parsed.attackSpeed && !parsed.moveSpeed && !parsed.windfuryAgility) continue;
+    const sig = enlightenmentSignature(effect, parsed);
+    if (applied.has(sig)) continue;
+    applied.add(sig);
     for (const key of ['critRate','critDamage','evolutionDamage','enemyDamage','additionalDamage','attackSpeed','moveSpeed']) result[key] += Number(parsed[key] || 0);
     result.items.push({ name: effect.name || '깨달음 효과', level: effect.level || 0, effects: parsed });
   }
