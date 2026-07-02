@@ -1,6 +1,6 @@
 {
   "meta": {
-    "version": "1.6.0",
+    "version": "1.7.0",
     "source": "Lost Ark Ark Passive Evolution nodes",
     "note": "진화 노드 전용. 수치는 계산기용 데이터이므로 필요 시 public/data/evolution.json에서 조정하세요."
   },
@@ -55,6 +55,90 @@
       "costPerLevel": 1,
       "icon": "⚔️",
       "levels": {
+        "1": {
+          "critRate": 0.72
+        },
+        "2": {
+          "critRate": 1.43
+        },
+        "3": {
+          "critRate": 2.15
+        },
+        "4": {
+          "critRate": 2.86
+        },
+        "5": {
+          "critRate": 3.58
+        },
+        "6": {
+          "critRate": 4.3
+        },
+        "7": {
+          "critRate": 5.01
+        },
+        "8": {
+          "critRate": 5.73
+        },
+        "9": {
+          "critRate": 6.44
+        },
+        "10": {
+          "critRate": 7.16
+        },
+        "11": {
+          "critRate": 7.88
+        },
+        "12": {
+          "critRate": 8.59
+        },
+        "13": {
+          "critRate": 9.31
+        },
+        "14": {
+          "critRate": 10.02
+        },
+        "15": {
+          "critRate": 10.74
+        },
+        "16": {
+          "critRate": 11.46
+        },
+        "17": {
+          "critRate": 12.17
+        },
+        "18": {
+          "critRate": 12.89
+        },
+        "19": {
+          "critRate": 13.6
+        },
+        "20": {
+          "critRate": 14.32
+        },
+        "21": {
+          "critRate": 15.04
+        },
+        "22": {
+          "critRate": 15.75
+        },
+        "23": {
+          "critRate": 16.47
+        },
+        "24": {
+          "critRate": 17.18
+        },
+        "25": {
+          "critRate": 17.9
+        },
+        "26": {
+          "critRate": 18.62
+        },
+        "27": {
+          "critRate": 19.33
+        },
+        "28": {
+          "critRate": 20.05
+        },
         "29": {
           "critRate": 20.76
         },
@@ -116,7 +200,7 @@
     {
       "name": "끝없는 마나",
       "tier": 2,
-      "maxLevel": 3,
+      "maxLevel": 2,
       "costPerLevel": 10,
       "icon": "💠",
       "levels": {},
@@ -125,7 +209,7 @@
     {
       "name": "금단의 주문",
       "tier": 2,
-      "maxLevel": 3,
+      "maxLevel": 2,
       "costPerLevel": 10,
       "icon": "🟣",
       "levels": {},
@@ -134,7 +218,7 @@
     {
       "name": "예리한 감각",
       "tier": 2,
-      "maxLevel": 3,
+      "maxLevel": 2,
       "costPerLevel": 10,
       "icon": "🗡️",
       "levels": {
@@ -143,9 +227,6 @@
         },
         "2": {
           "critRate": 8
-        },
-        "3": {
-          "critRate": 12
         }
       },
       "iconImage": "/images/evolution/keen-sense.svg"
@@ -172,7 +253,7 @@
     {
       "name": "최적화 훈련",
       "tier": 2,
-      "maxLevel": 3,
+      "maxLevel": 2,
       "costPerLevel": 10,
       "icon": "👥",
       "levels": {
@@ -181,9 +262,6 @@
         },
         "2": {
           "additionalDamage": 4
-        },
-        "3": {
-          "additionalDamage": 6
         }
       },
       "iconImage": "/images/evolution/optimized-training.svg"
@@ -261,15 +339,12 @@
     {
       "name": "회심",
       "tier": 4,
-      "maxLevel": 2,
+      "maxLevel": 1,
       "costPerLevel": 10,
       "icon": "🪶",
       "levels": {
         "1": {
           "critDamage": 12
-        },
-        "2": {
-          "critDamage": 24
         }
       },
       "iconImage": "/images/evolution/critical.svg"
@@ -277,15 +352,12 @@
     {
       "name": "달인",
       "tier": 4,
-      "maxLevel": 2,
+      "maxLevel": 1,
       "costPerLevel": 10,
       "icon": "☀️",
       "levels": {
         "1": {
           "critRate": 7
-        },
-        "2": {
-          "critRate": 14
         }
       },
       "iconImage": "/images/evolution/master.svg"
@@ -293,15 +365,12 @@
     {
       "name": "분쇄",
       "tier": 4,
-      "maxLevel": 2,
+      "maxLevel": 1,
       "costPerLevel": 10,
       "icon": "🪓",
       "levels": {
         "1": {
           "enemyDamage": 4
-        },
-        "2": {
-          "enemyDamage": 8
         }
       },
       "iconImage": "/images/evolution/crusher.svg"
@@ -309,7 +378,7 @@
     {
       "name": "선각자",
       "tier": 4,
-      "maxLevel": 2,
+      "maxLevel": 1,
       "costPerLevel": 10,
       "icon": "🧭",
       "levels": {},
@@ -318,7 +387,7 @@
     {
       "name": "진군",
       "tier": 4,
-      "maxLevel": 2,
+      "maxLevel": 1,
       "costPerLevel": 10,
       "icon": "🚩",
       "levels": {},
@@ -327,7 +396,7 @@
     {
       "name": "기원",
       "tier": 4,
-      "maxLevel": 2,
+      "maxLevel": 1,
       "costPerLevel": 10,
       "icon": "💗",
       "levels": {},

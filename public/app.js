@@ -1,4 +1,4 @@
-const VERSION = '1.6.0';
+const VERSION = '1.7.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
@@ -44,11 +44,15 @@ function getLevelEffect(name, level) {
 function allOptions(tier) { return [...new Set([...(state.evolution?.tiers?.[String(tier)] || []), ...(state.evolution?.nodes || []).filter(n => Number(n.tier) === Number(tier)).map(n => n.name)])]; }
 function defaultSelection() {
   return {
-    1: { name: '치명', level: 29, source: 'default' },
-    2: { name: '예리한 감각', level: 1, source: 'default' },
-    3: { name: '일격', level: 2, source: 'default' },
-    4: { name: '회심', level: 1, source: 'default' },
-    5: { name: '뭉툭한 가시', level: 2, source: 'default' }
+    '치명': { level: 29, source: 'default' },
+    '신속': { level: 11, source: 'default' },
+    '예리한 감각': { level: 1, source: 'default' },
+    '한계 돌파': { level: 1, source: 'default' },
+    '최적화 훈련': { level: 1, source: 'default' },
+    '일격': { level: 2, source: 'default' },
+    '회심': { level: 1, source: 'default' },
+    '달인': { level: 1, source: 'default' },
+    '뭉툭한 가시': { level: 2, source: 'default' }
   };
 }
 function readEffects(arkPassive) {
@@ -56,13 +60,14 @@ function readEffects(arkPassive) {
   return effects.map((e, index) => ({ index, name: e?.Name || '', level: Number(e?.Level || 0), description: stripHtml(e?.Description || ''), tooltip: stripHtml(e?.Tooltip || ''), raw: e })).filter(e => e.name);
 }
 function classifyEvolution(effects) {
-  const selected = defaultSelection();
+  const selected = {};
   for (const effect of effects) {
-    const tier = state.index.get(effect.name);
-    if (tier) selected[tier] = { name: effect.name, level: effect.level || 1, source: 'api' };
+    const node = getNode(effect.name);
+    if (node) selected[effect.name] = { level: Math.min(effect.level || 1, node.maxLevel || effect.level || 1), source: 'api' };
   }
-  return selected;
+  return Object.keys(selected).length ? selected : defaultSelection();
 }
+
 
 function renderCharacter(profile) {
   const el = $('characterCard');
@@ -89,14 +94,31 @@ function tierCost(tier) {
   const max = { 1: 40, 2: 30, 3: 20, 4: 20, 5: 30 }[tier] || 0;
   return { used, max };
 }
+function clampLevelByTierBudget(name, desiredLevel) {
+  const node = getNode(name);
+  if (!node) return 0;
+  const tier = Number(node.tier);
+  const maxLevel = Number(node.maxLevel || 0);
+  let next = Math.max(0, Math.min(maxLevel, desiredLevel));
+  const tierMax = { 1: 40, 2: 30, 3: 20, 4: 20, 5: 30 }[tier] || Infinity;
+  const cost = Number(node.costPerLevel || 0);
+  if (!cost) return next;
+  let usedWithoutThis = 0;
+  for (const row of selectedEntries()) {
+    if (row.name !== name && row.tier === tier) usedWithoutThis += (getNode(row.name)?.costPerLevel || 0) * row.level;
+  }
+  const availableLevels = Math.floor(Math.max(0, tierMax - usedWithoutThis) / cost);
+  return Math.min(next, availableLevels);
+}
 function renderEvolutionTiers() {
   const html = EVOLUTION_TIERS.map(tier => {
     const cost = tierCost(tier);
+    const over = cost.used > cost.max ? ' over' : '';
     const cards = allOptions(tier).map(name => {
       const node = getNode(name) || { name, maxLevel: 0, icon: '◆' };
-      const selected = state.selected[tier]?.name === name;
-      const level = selected ? Number(state.selected[tier]?.level || 0) : 0;
-      const api = selected && state.selected[tier]?.source === 'api' ? '<span class="apiMark">API</span>' : '';
+      const selected = !!state.selected[name];
+      const level = selected ? Number(state.selected[name]?.level || 0) : 0;
+      const api = selected && state.selected[name]?.source === 'api' ? '<span class="apiMark">API</span>' : '';
       return `<button class="nodeCard ${selected && level > 0 ? 'selected' : ''}" type="button" data-tier="${tier}" data-name="${escapeHtml(name)}">
         <div class="nodeIcon">${node.iconImage ? `<img src="${escapeHtml(node.iconImage)}" alt="" />` : escapeHtml(node.icon || '◆')}</div>
         <div class="nodeName">${escapeHtml(name)}</div>
@@ -108,27 +130,27 @@ function renderEvolutionTiers() {
         ${api}
       </button>`;
     }).join('');
-    return `<div class="tierBlock"><h3>${tier}티어 <span>(${cost.max}P)</span> <em>(${cost.used}/${cost.max}P)</em></h3><div class="nodeGrid">${cards}</div></div>`;
+    return `<div class="tierBlock"><h3 class="${over}">${tier}티어 <span>(${cost.max}P)</span> <em>(${cost.used}/${cost.max}P)</em></h3><div class="nodeGrid">${cards}</div></div>`;
   }).join('');
   $('evolutionTiers').innerHTML = html;
   $('evolutionTiers').querySelectorAll('.nodeCard').forEach(card => card.addEventListener('click', onNodeCardClick));
 }
 function onNodeCardClick(event) {
   const card = event.currentTarget;
-  const tier = Number(card.dataset.tier);
   const name = card.dataset.name;
-  const node = getNode(name);
-  const max = node?.maxLevel || 0;
   const action = event.target?.dataset?.action || 'select';
-  const cur = state.selected[tier]?.name === name ? Number(state.selected[tier]?.level || 0) : 0;
+  const cur = Number(state.selected[name]?.level || 0);
   let nextLevel = cur;
-  if (action === 'minus') nextLevel = Math.max(0, cur - 1);
-  else if (action === 'plus') nextLevel = Math.min(max, cur + 1 || 1);
-  else nextLevel = cur > 0 ? cur : Math.min(max, 1);
-  state.selected[tier] = { name, level: nextLevel, source: 'manual' };
+  if (action === 'minus') nextLevel = cur - 1;
+  else if (action === 'plus') nextLevel = cur + 1;
+  else nextLevel = cur > 0 ? 0 : 1;
+  nextLevel = clampLevelByTierBudget(name, nextLevel);
+  if (nextLevel <= 0) delete state.selected[name];
+  else state.selected[name] = { level: nextLevel, source: 'manual' };
   renderEvolutionTiers();
   calculateAndRender();
 }
+
 
 function getBaseStats() {
   return {
@@ -153,26 +175,26 @@ function applyEffect(stats, effect) {
   if (effect.overCritEvolutionDamageCap != null) out.overCritEvolutionDamageCap = effect.overCritEvolutionDamageCap;
   return out;
 }
-function selectedEntries(selection = state.selected) { return EVOLUTION_TIERS.map(tier => ({ tier, ...(selection[tier] || {}) })).filter(row => row.name && row.level > 0); }
+function selectedEntries(selection = state.selected) { return Object.entries(selection || {}).map(([name, data]) => ({ name, tier: getNode(name)?.tier, level: Number(data?.level || 0), source: data?.source })).filter(row => row.name && row.level > 0 && row.tier); }
 function cloneSelection() { return JSON.parse(JSON.stringify(state.selected)); }
 function score(stats) {
   const rawCritRate = stats.critRate + stats.skillCritBonus;
-  let critRate = rawCritRate;
+  let effectiveCritRate = rawCritRate;
   let evo = stats.evolutionDamage;
   let overCrit = 0;
   let convertedEvolutionDamage = 0;
-  if (stats.critCap != null && critRate > stats.critCap) {
-    overCrit = critRate - stats.critCap;
+  if (stats.critCap != null && rawCritRate > stats.critCap) {
+    overCrit = rawCritRate - stats.critCap;
     convertedEvolutionDamage = Math.min(overCrit * (stats.overCritToEvolutionDamageRate || 0), stats.overCritEvolutionDamageCap ?? Infinity);
     evo += convertedEvolutionDamage;
-    critRate = stats.critCap;
+    effectiveCritRate = stats.critCap;
   }
-  const critChance = Math.max(0, Math.min(critRate, 100)) / 100;
+  const critChance = Math.max(0, Math.min(effectiveCritRate, 100)) / 100;
   const critMultiplier = 1 + critChance * ((stats.critDamage - 100) / 100);
   const evoMultiplier = 1 + evo / 100;
   const addMultiplier = 1 + stats.additionalDamage / 100;
   const enemyMultiplier = 1 + stats.enemyDamage / 100;
-  return { value: critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier, rawCritRate, critRate, critDamage: stats.critDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: stats.enemyDamage };
+  return { value: critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: stats.enemyDamage };
 }
 function statsWithSelection(baseStats, selection) {
   let s = { ...baseStats };
@@ -181,7 +203,7 @@ function statsWithSelection(baseStats, selection) {
 }
 function renderCombatStats(current = statsWithSelection(getBaseStats(), state.selected)) {
   const convertedText = current.result.convertedEvolutionDamage > 0
-    ? `${fmt(current.result.evo)}% (뭉특 전환 +${fmt(current.result.convertedEvolutionDamage)}%)`
+    ? `${fmt(current.result.evo)}% (뭉가 전환 +${fmt(current.result.convertedEvolutionDamage)}%)`
     : `${fmt(current.result.evo)}%`;
   $('combatStatGrid').innerHTML = [
     item('치명타 확률', `${fmt(current.result.critRate)}%`), item('치명타 피해', `${fmt(current.result.critDamage)}%`),
@@ -200,7 +222,8 @@ function calculateAndRender() {
     if (!node) continue;
     const level = node.maxLevel || 2;
     const next = cloneSelection();
-    next[5] = { name, level, source: 'candidate' };
+    for (const opt of allOptions(5)) delete next[opt];
+    next[name] = { level, source: 'candidate' };
     const calc = statsWithSelection(baseStats, next);
     candidates.push({ name, level, calc, diff: ((calc.result.value / baseValue) - 1) * 100 });
   }
@@ -209,7 +232,7 @@ function calculateAndRender() {
   $('baseInfo').innerHTML = `치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%`;
   $('recommendList').innerHTML = candidates.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
-    const currentMark = state.selected[5]?.name === c.name ? '<em>현재</em>' : '';
+    const currentMark = state.selected[c.name]?.level > 0 ? '<em>현재</em>' : '';
     return `<div class="recommend ${cls}"><div><b>${i + 1}. ${escapeHtml(c.name)} Lv.${c.level}</b>${currentMark}<small>점수 ${c.calc.result.value.toFixed(4)} · 치적 ${fmt(c.calc.result.critRate)}% · 진피 ${fmt(c.calc.result.evo)}%</small></div><strong>${pct(c.diff)}</strong></div>`;
   }).join('');
 }
