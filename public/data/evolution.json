@@ -56,97 +56,98 @@
       "icon": "⚔️",
       "levels": {
         "1": {
-          "critRate": 0.72
+          "statBonus": 50
         },
         "2": {
-          "critRate": 1.43
+          "statBonus": 100
         },
         "3": {
-          "critRate": 2.15
+          "statBonus": 150
         },
         "4": {
-          "critRate": 2.86
+          "statBonus": 200
         },
         "5": {
-          "critRate": 3.58
+          "statBonus": 250
         },
         "6": {
-          "critRate": 4.3
+          "statBonus": 300
         },
         "7": {
-          "critRate": 5.01
+          "statBonus": 350
         },
         "8": {
-          "critRate": 5.73
+          "statBonus": 400
         },
         "9": {
-          "critRate": 6.44
+          "statBonus": 450
         },
         "10": {
-          "critRate": 7.16
+          "statBonus": 500
         },
         "11": {
-          "critRate": 7.88
+          "statBonus": 550
         },
         "12": {
-          "critRate": 8.59
+          "statBonus": 600
         },
         "13": {
-          "critRate": 9.31
+          "statBonus": 650
         },
         "14": {
-          "critRate": 10.02
+          "statBonus": 700
         },
         "15": {
-          "critRate": 10.74
+          "statBonus": 750
         },
         "16": {
-          "critRate": 11.46
+          "statBonus": 800
         },
         "17": {
-          "critRate": 12.17
+          "statBonus": 850
         },
         "18": {
-          "critRate": 12.89
+          "statBonus": 900
         },
         "19": {
-          "critRate": 13.6
+          "statBonus": 950
         },
         "20": {
-          "critRate": 14.32
+          "statBonus": 1000
         },
         "21": {
-          "critRate": 15.04
+          "statBonus": 1050
         },
         "22": {
-          "critRate": 15.75
+          "statBonus": 1100
         },
         "23": {
-          "critRate": 16.47
+          "statBonus": 1150
         },
         "24": {
-          "critRate": 17.18
+          "statBonus": 1200
         },
         "25": {
-          "critRate": 17.9
+          "statBonus": 1250
         },
         "26": {
-          "critRate": 18.62
+          "statBonus": 1300
         },
         "27": {
-          "critRate": 19.33
+          "statBonus": 1350
         },
         "28": {
-          "critRate": 20.05
+          "statBonus": 1400
         },
         "29": {
-          "critRate": 20.76
+          "statBonus": 1450
         },
         "30": {
-          "critRate": 21.48
+          "statBonus": 1500
         }
       },
-      "iconImage": "/images/evolution/치명.webp"
+      "iconImage": "/images/evolution/치명.webp",
+      "description": "1레벨당 해당 전투 특성 +50"
     },
     {
       "name": "특화",
@@ -154,8 +155,100 @@
       "maxLevel": 30,
       "costPerLevel": 1,
       "icon": "⬆️",
-      "levels": {},
-      "iconImage": "/images/evolution/특화.webp"
+      "levels": {
+        "1": {
+          "statBonus": 50
+        },
+        "2": {
+          "statBonus": 100
+        },
+        "3": {
+          "statBonus": 150
+        },
+        "4": {
+          "statBonus": 200
+        },
+        "5": {
+          "statBonus": 250
+        },
+        "6": {
+          "statBonus": 300
+        },
+        "7": {
+          "statBonus": 350
+        },
+        "8": {
+          "statBonus": 400
+        },
+        "9": {
+          "statBonus": 450
+        },
+        "10": {
+          "statBonus": 500
+        },
+        "11": {
+          "statBonus": 550
+        },
+        "12": {
+          "statBonus": 600
+        },
+        "13": {
+          "statBonus": 650
+        },
+        "14": {
+          "statBonus": 700
+        },
+        "15": {
+          "statBonus": 750
+        },
+        "16": {
+          "statBonus": 800
+        },
+        "17": {
+          "statBonus": 850
+        },
+        "18": {
+          "statBonus": 900
+        },
+        "19": {
+          "statBonus": 950
+        },
+        "20": {
+          "statBonus": 1000
+        },
+        "21": {
+          "statBonus": 1050
+        },
+        "22": {
+          "statBonus": 1100
+        },
+        "23": {
+          "statBonus": 1150
+        },
+        "24": {
+          "statBonus": 1200
+        },
+        "25": {
+          "statBonus": 1250
+        },
+        "26": {
+          "statBonus": 1300
+        },
+        "27": {
+          "statBonus": 1350
+        },
+        "28": {
+          "statBonus": 1400
+        },
+        "29": {
+          "statBonus": 1450
+        },
+        "30": {
+          "statBonus": 1500
+        }
+      },
+      "iconImage": "/images/evolution/특화.webp",
+      "description": "1레벨당 해당 전투 특성 +50"
     },
     {
       "name": "신속",
@@ -164,11 +257,99 @@
       "costPerLevel": 1,
       "icon": "💨",
       "levels": {
+        "1": {
+          "statBonus": 50
+        },
+        "2": {
+          "statBonus": 100
+        },
+        "3": {
+          "statBonus": 150
+        },
+        "4": {
+          "statBonus": 200
+        },
+        "5": {
+          "statBonus": 250
+        },
+        "6": {
+          "statBonus": 300
+        },
+        "7": {
+          "statBonus": 350
+        },
+        "8": {
+          "statBonus": 400
+        },
+        "9": {
+          "statBonus": 450
+        },
+        "10": {
+          "statBonus": 500
+        },
         "11": {
-          "speedBonus": 7.87
+          "statBonus": 550
+        },
+        "12": {
+          "statBonus": 600
+        },
+        "13": {
+          "statBonus": 650
+        },
+        "14": {
+          "statBonus": 700
+        },
+        "15": {
+          "statBonus": 750
+        },
+        "16": {
+          "statBonus": 800
+        },
+        "17": {
+          "statBonus": 850
+        },
+        "18": {
+          "statBonus": 900
+        },
+        "19": {
+          "statBonus": 950
+        },
+        "20": {
+          "statBonus": 1000
+        },
+        "21": {
+          "statBonus": 1050
+        },
+        "22": {
+          "statBonus": 1100
+        },
+        "23": {
+          "statBonus": 1150
+        },
+        "24": {
+          "statBonus": 1200
+        },
+        "25": {
+          "statBonus": 1250
+        },
+        "26": {
+          "statBonus": 1300
+        },
+        "27": {
+          "statBonus": 1350
+        },
+        "28": {
+          "statBonus": 1400
+        },
+        "29": {
+          "statBonus": 1450
+        },
+        "30": {
+          "statBonus": 1500
         }
       },
-      "iconImage": "/images/evolution/신속.webp"
+      "iconImage": "/images/evolution/신속.webp",
+      "description": "1레벨당 해당 전투 특성 +50"
     },
     {
       "name": "제압",
@@ -176,8 +357,100 @@
       "maxLevel": 30,
       "costPerLevel": 1,
       "icon": "🦅",
-      "levels": {},
-      "iconImage": "/images/evolution/제압.webp"
+      "levels": {
+        "1": {
+          "statBonus": 50
+        },
+        "2": {
+          "statBonus": 100
+        },
+        "3": {
+          "statBonus": 150
+        },
+        "4": {
+          "statBonus": 200
+        },
+        "5": {
+          "statBonus": 250
+        },
+        "6": {
+          "statBonus": 300
+        },
+        "7": {
+          "statBonus": 350
+        },
+        "8": {
+          "statBonus": 400
+        },
+        "9": {
+          "statBonus": 450
+        },
+        "10": {
+          "statBonus": 500
+        },
+        "11": {
+          "statBonus": 550
+        },
+        "12": {
+          "statBonus": 600
+        },
+        "13": {
+          "statBonus": 650
+        },
+        "14": {
+          "statBonus": 700
+        },
+        "15": {
+          "statBonus": 750
+        },
+        "16": {
+          "statBonus": 800
+        },
+        "17": {
+          "statBonus": 850
+        },
+        "18": {
+          "statBonus": 900
+        },
+        "19": {
+          "statBonus": 950
+        },
+        "20": {
+          "statBonus": 1000
+        },
+        "21": {
+          "statBonus": 1050
+        },
+        "22": {
+          "statBonus": 1100
+        },
+        "23": {
+          "statBonus": 1150
+        },
+        "24": {
+          "statBonus": 1200
+        },
+        "25": {
+          "statBonus": 1250
+        },
+        "26": {
+          "statBonus": 1300
+        },
+        "27": {
+          "statBonus": 1350
+        },
+        "28": {
+          "statBonus": 1400
+        },
+        "29": {
+          "statBonus": 1450
+        },
+        "30": {
+          "statBonus": 1500
+        }
+      },
+      "iconImage": "/images/evolution/제압.webp",
+      "description": "1레벨당 해당 전투 특성 +50"
     },
     {
       "name": "인내",
@@ -185,8 +458,100 @@
       "maxLevel": 30,
       "costPerLevel": 1,
       "icon": "🧘",
-      "levels": {},
-      "iconImage": "/images/evolution/인내.webp"
+      "levels": {
+        "1": {
+          "statBonus": 50
+        },
+        "2": {
+          "statBonus": 100
+        },
+        "3": {
+          "statBonus": 150
+        },
+        "4": {
+          "statBonus": 200
+        },
+        "5": {
+          "statBonus": 250
+        },
+        "6": {
+          "statBonus": 300
+        },
+        "7": {
+          "statBonus": 350
+        },
+        "8": {
+          "statBonus": 400
+        },
+        "9": {
+          "statBonus": 450
+        },
+        "10": {
+          "statBonus": 500
+        },
+        "11": {
+          "statBonus": 550
+        },
+        "12": {
+          "statBonus": 600
+        },
+        "13": {
+          "statBonus": 650
+        },
+        "14": {
+          "statBonus": 700
+        },
+        "15": {
+          "statBonus": 750
+        },
+        "16": {
+          "statBonus": 800
+        },
+        "17": {
+          "statBonus": 850
+        },
+        "18": {
+          "statBonus": 900
+        },
+        "19": {
+          "statBonus": 950
+        },
+        "20": {
+          "statBonus": 1000
+        },
+        "21": {
+          "statBonus": 1050
+        },
+        "22": {
+          "statBonus": 1100
+        },
+        "23": {
+          "statBonus": 1150
+        },
+        "24": {
+          "statBonus": 1200
+        },
+        "25": {
+          "statBonus": 1250
+        },
+        "26": {
+          "statBonus": 1300
+        },
+        "27": {
+          "statBonus": 1350
+        },
+        "28": {
+          "statBonus": 1400
+        },
+        "29": {
+          "statBonus": 1450
+        },
+        "30": {
+          "statBonus": 1500
+        }
+      },
+      "iconImage": "/images/evolution/인내.webp",
+      "description": "1레벨당 해당 전투 특성 +50"
     },
     {
       "name": "숙련",
@@ -194,8 +559,100 @@
       "maxLevel": 30,
       "costPerLevel": 1,
       "icon": "🧍",
-      "levels": {},
-      "iconImage": "/images/evolution/숙련.webp"
+      "levels": {
+        "1": {
+          "statBonus": 50
+        },
+        "2": {
+          "statBonus": 100
+        },
+        "3": {
+          "statBonus": 150
+        },
+        "4": {
+          "statBonus": 200
+        },
+        "5": {
+          "statBonus": 250
+        },
+        "6": {
+          "statBonus": 300
+        },
+        "7": {
+          "statBonus": 350
+        },
+        "8": {
+          "statBonus": 400
+        },
+        "9": {
+          "statBonus": 450
+        },
+        "10": {
+          "statBonus": 500
+        },
+        "11": {
+          "statBonus": 550
+        },
+        "12": {
+          "statBonus": 600
+        },
+        "13": {
+          "statBonus": 650
+        },
+        "14": {
+          "statBonus": 700
+        },
+        "15": {
+          "statBonus": 750
+        },
+        "16": {
+          "statBonus": 800
+        },
+        "17": {
+          "statBonus": 850
+        },
+        "18": {
+          "statBonus": 900
+        },
+        "19": {
+          "statBonus": 950
+        },
+        "20": {
+          "statBonus": 1000
+        },
+        "21": {
+          "statBonus": 1050
+        },
+        "22": {
+          "statBonus": 1100
+        },
+        "23": {
+          "statBonus": 1150
+        },
+        "24": {
+          "statBonus": 1200
+        },
+        "25": {
+          "statBonus": 1250
+        },
+        "26": {
+          "statBonus": 1300
+        },
+        "27": {
+          "statBonus": 1350
+        },
+        "28": {
+          "statBonus": 1400
+        },
+        "29": {
+          "statBonus": 1450
+        },
+        "30": {
+          "statBonus": 1500
+        }
+      },
+      "iconImage": "/images/evolution/숙련.webp",
+      "description": "1레벨당 해당 전투 특성 +50"
     },
     {
       "name": "끝없는 마나",
@@ -408,19 +865,19 @@
       "maxLevel": 2,
       "costPerLevel": 15,
       "icon": "🗡️",
-      "description": "진화형 피해 증가 + 치명타 확률 80% 제한 + 초과 치적을 진화형 피해로 전환",
+      "description": "진화형 피해 증가 + 치명타 확률 80% 초과분을 진화형 피해로 전환(최대 75%)",
       "levels": {
         "1": {
           "evolutionDamage": 7.5,
           "critCap": 80,
           "overCritToEvolutionDamageRate": 1.2,
-          "overCritEvolutionDamageCap": 50
+          "overCritEvolutionDamageCap": 75
         },
         "2": {
           "evolutionDamage": 15,
           "critCap": 80,
           "overCritToEvolutionDamageRate": 1.4,
-          "overCritEvolutionDamageCap": 70
+          "overCritEvolutionDamageCap": 75
         }
       },
       "iconImage": "/images/evolution/뭉툭한 가시.webp"

@@ -12,9 +12,9 @@
       <div class="topline">
         <div>
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
-          <p>치명 스탯 × 0.03579 공식으로 기준 치적을 계산하고, 진화 1티어 변경 시 치명 스탯과 치적이 같이 재계산됩니다.</p>
+          <p>치명 스탯 × 0.03579 공식으로 기준 치적을 계산하고, 우측 소스 요약으로 수치 출처를 확인합니다.</p>
         </div>
-        <span class="badge">v3.0.0 · 스탯 기반</span>
+        <span class="badge">v3.1.0 · 소스 요약</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="무사브" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -30,11 +30,12 @@
       <p class="hint">아래 값은 현재 선택한 진화 노드와 API 악세/팔찌, 아드 입력값을 반영한 표시값입니다.</p>
       <div id="basicStatGrid" class="grid"></div>
       <div id="combatStatGrid" class="grid statHighlight"></div>
+      <div id="sourceSummary" class="sourceSummary"></div>
     </section>
 
     <section id="inputPanel" class="panel">
       <h2>기준값 입력</h2>
-      <p class="hint">v3부터 기준 치적은 직접 입력하지 않고 치명 스탯으로 계산합니다. 검색 시 API 치명 스탯에서 현재 1티어 치명분을 제외해 기준 치명 스탯을 잡습니다.</p>
+      <p class="hint">v3.1부터 1티어 노드는 Lv.1당 스탯 +50으로 계산합니다. 검색 시 API 치명/신속 스탯에서 현재 1티어 선택분을 제외해 기준 스탯을 잡습니다.</p>
       <div class="manualGrid">
         <label>기준 치명 스탯<input id="baseCritStat" type="number" step="1" value="0" /></label>
         <label>기준 신속 스탯<input id="baseSwiftStat" type="number" step="1" value="0" /></label>
@@ -85,7 +86,7 @@
     </section>
   </main>
 
-  <div class="version">Version 3.0.0</div>
+  <div class="version">Version 3.1.0</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

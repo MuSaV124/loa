@@ -1,4 +1,4 @@
-const VERSION = '3.0.0';
+const VERSION = '3.1.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
@@ -18,7 +18,7 @@ function parseProfileStats(profile) {
 }
 function tier1StatBonus(name, selection = state.selected) {
   const level = Number(selection?.[name]?.level || 0);
-  return level * 20;
+  return level * 50;
 }
 function applyProfileDefaults(profile, selection = state.selected) {
   state.profileStats = parseProfileStats(profile);
@@ -39,8 +39,9 @@ function buildIndex(db) {
 }
 function getNode(name) { return (state.evolution?.nodes || []).find(n => n.name === name); }
 function getLevelEffect(name, level) {
-  if (name === '치명') return { critStat: level * 20 };
-  if (name === '신속') return { swiftStat: level * 20 };
+  if (name === '치명') return { critStat: level * 50 };
+  if (name === '신속') return { swiftStat: level * 50 };
+  if (['특화','제압','인내','숙련'].includes(name)) return { statBonus: level * 50 };
   const node = getNode(name);
   return node?.levels?.[String(level)] || {};
 }
@@ -226,6 +227,82 @@ function statsWithSelection(baseStats, selection) {
   }
   return { stats: s, result: score(s) };
 }
+
+function sourceLine(label, value, detail = '') {
+  const detailHtml = detail ? `<small>${escapeHtml(detail)}</small>` : '';
+  return `<div class="sourceLine"><span>${escapeHtml(label)}${detailHtml}</span><b>${pct(Number(value || 0))}</b></div>`;
+}
+function sourceGroup(title, colorClass, lines, total) {
+  const body = lines.length ? lines.join('') : `<div class="sourceLine muted"><span>해당 없음</span><b>+0.00%</b></div>`;
+  return `<div class="sourceGroup ${colorClass}"><div class="sourceHead"><strong>${escapeHtml(title)}</strong><em>${pct(Number(total || 0))}</em></div>${body}</div>`;
+}
+function getStatNodeLine(name) {
+  const lv = Number(state.selected?.[name]?.level || 0);
+  return lv > 0 ? `${name} Lv.${lv} · +${lv * 50}` : '';
+}
+function buildSourceSummary(current) {
+  const base = getBaseStats();
+  const critEvolution = [];
+  const critDamageEvolution = [];
+  const evoEvolution = [];
+  const addEvolution = [];
+  const enemyEvolution = [];
+  for (const row of selectedEntries()) {
+    if (row.name === '치명' || row.name === '신속') continue;
+    const eff = getLevelEffect(row.name, row.level);
+    const label = `[진화] ${row.name} (Lv.${row.level})`;
+    if (eff.critRate) critEvolution.push(sourceLine(label, eff.critRate));
+    if (eff.critDamage) critDamageEvolution.push(sourceLine(label, eff.critDamage));
+    if (eff.evolutionDamage) evoEvolution.push(sourceLine(label, eff.evolutionDamage));
+    if (eff.additionalDamage) addEvolution.push(sourceLine(label, eff.additionalDamage));
+    if (eff.enemyDamage || eff.finalDamage) enemyEvolution.push(sourceLine(label, Number(eff.enemyDamage || 0) + Number(eff.finalDamage || 0)));
+  }
+  if (current.result.convertedEvolutionDamage > 0) evoEvolution.push(sourceLine('[진화] 뭉가 전환', current.result.convertedEvolutionDamage, `80% 초과분 · 최대 75%`));
+  const critLines = [sourceLine('치명 스탯', current.stats.statCritRate || 0, `치명 ${Math.round(current.stats.critStat || 0)}${getStatNodeLine('치명') ? ' · ' + getStatNodeLine('치명') : ''}`)];
+  if (base.adrenalineCritRate) critLines.push(sourceLine('아드레날린', base.adrenalineCritRate));
+  if (state.accessory.critRate) critLines.push(sourceLine('악세', state.accessory.critRate));
+  if (state.bracelet.critRate) critLines.push(sourceLine('팔찌', state.bracelet.critRate));
+  if (num($('braceletCritRateManual').value)) critLines.push(sourceLine('팔찌 추가 보정', num($('braceletCritRateManual').value)));
+  if (base.skillCritBonus) critLines.push(sourceLine('주력기 보정', base.skillCritBonus));
+  critLines.push(...critEvolution);
+
+  const critDamageLines = [sourceLine('기준 치명타 피해', num($('baseCritDamage').value, 200))];
+  if (state.accessory.critDamage) critDamageLines.push(sourceLine('악세', state.accessory.critDamage));
+  if (state.bracelet.critDamage) critDamageLines.push(sourceLine('팔찌', state.bracelet.critDamage));
+  if (num($('braceletCritDamageManual').value)) critDamageLines.push(sourceLine('팔찌 추가 보정', num($('braceletCritDamageManual').value)));
+  critDamageLines.push(...critDamageEvolution);
+
+  const evoLines = [];
+  if (num($('baseEvolutionDamage').value)) evoLines.push(sourceLine('기준 진피', num($('baseEvolutionDamage').value)));
+  evoLines.push(...evoEvolution);
+
+  const addLines = [];
+  if (num($('baseAdditionalDamage').value)) addLines.push(sourceLine('기준 추피', num($('baseAdditionalDamage').value)));
+  if (state.accessory.additionalDamage) addLines.push(sourceLine('악세', state.accessory.additionalDamage));
+  if (state.bracelet.additionalDamage) addLines.push(sourceLine('팔찌', state.bracelet.additionalDamage));
+  if (num($('braceletAdditionalDamageManual').value)) addLines.push(sourceLine('팔찌 추가 보정', num($('braceletAdditionalDamageManual').value)));
+  addLines.push(...addEvolution);
+
+  const enemyLines = [];
+  if (num($('baseEnemyDamage').value)) enemyLines.push(sourceLine('기준 적주피', num($('baseEnemyDamage').value)));
+  if (state.accessory.enemyDamage) enemyLines.push(sourceLine('악세', state.accessory.enemyDamage));
+  if (state.bracelet.enemyDamage) enemyLines.push(sourceLine('팔찌', state.bracelet.enemyDamage));
+  if (num($('braceletEnemyDamageManual').value)) enemyLines.push(sourceLine('팔찌 추가 보정', num($('braceletEnemyDamageManual').value)));
+  enemyLines.push(...enemyEvolution);
+
+  $('sourceSummary').innerHTML = `
+    <div class="sourceTitle"><div><h3>치명타 소스 요약</h3><p>진화 노드를 바꾸면 아래 수치가 즉시 바뀝니다.</p></div><button id="resetViewButton" type="button">↻ 초기화</button></div>
+    ${sourceGroup('치명타 확률', 'blue', critLines, current.result.critRate)}
+    ${sourceGroup('치명타 피해', 'purple', critDamageLines, current.result.critDamage)}
+    ${sourceGroup('진피', 'orange', evoLines, current.result.evo)}
+    ${sourceGroup('추피', 'green', addLines, current.result.additionalDamage)}
+    ${sourceGroup('적주피', 'pink', enemyLines, current.result.enemyDamage)}
+    <div class="sourceFoot">뭉가 전환 진피는 <b>최대 75%</b>까지 적용됩니다.</div>
+  `;
+  const reset = $('resetViewButton');
+  if (reset) reset.addEventListener('click', () => { state.selected = defaultSelection(); renderEvolutionTiers(); calculateAndRender(); });
+}
+
 function renderCombatStats(current = statsWithSelection(getBaseStats(), state.selected)) {
   const convertedText = current.result.convertedEvolutionDamage > 0
     ? `${fmt(current.result.evo)}% (뭉가 전환 +${fmt(current.result.convertedEvolutionDamage)}%)`
@@ -237,6 +314,7 @@ function renderCombatStats(current = statsWithSelection(getBaseStats(), state.se
     item('적주피', `${fmt(current.result.enemyDamage)}%`), item('아드 공증', `${fmt(current.result.attackPower)}%`),
     item('공이속', `${fmt(current.result.moveAttackSpeed)}%`), item('기대값 점수', current.result.value.toFixed(4))
   ].join('');
+  buildSourceSummary(current);
 }
 function calculateAndRender() {
   const baseStats = getBaseStats();
@@ -260,7 +338,7 @@ function calculateAndRender() {
   $('recommendList').innerHTML = candidates.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
     const currentMark = state.selected[c.name]?.level > 0 ? '<em>현재</em>' : '';
-    return `<div class="recommend ${cls}"><div><b>${i + 1}. ${escapeHtml(c.name)} Lv.${c.level}</b>${currentMark}<small>점수 ${c.calc.result.value.toFixed(4)} · 치적 ${fmt(c.calc.result.critRate)}% · 진피 ${fmt(c.calc.result.evo)}%</small></div><strong>${pct(c.diff)}</strong></div>`;
+    return `<div class="recommend ${cls}"><div><b>${i + 1}. ${escapeHtml(c.name)} Lv.${c.level}</b>${currentMark}<small>점수 ${c.calc.result.value.toFixed(4)}</small></div><strong>${pct(c.diff)}</strong></div>`;
   }).join('');
 }
 

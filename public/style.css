@@ -115,3 +115,30 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .checkLabel { background: rgba(15,23,42,.65); border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 62px; }
 .checkLabel input[type="checkbox"] { width: 20px; height: 20px; margin: 0; accent-color: var(--amber); }
 .checkLabel span { color: #bfdbfe; }
+
+
+/* v3.1 source summary UI */
+.sourceSummary { margin-top: 18px; border-top: 1px solid rgba(148, 163, 184, .16); padding-top: 14px; }
+.sourceTitle { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.sourceTitle h3 { margin: 0 0 4px; font-size: 18px; }
+.sourceTitle p { margin: 0; color: var(--muted); font-size: 12px; }
+.sourceTitle button { border: 1px solid var(--line); background: rgba(15,23,42,.78); color: var(--text); border-radius: 0; padding: 8px 12px; font-weight: 900; cursor: pointer; }
+.sourceGroup { border-left: 4px solid var(--blue); padding: 0 0 12px 12px; margin-bottom: 12px; }
+.sourceGroup.purple { border-left-color: #a855f7; }
+.sourceGroup.orange { border-left-color: #f59e0b; }
+.sourceGroup.green { border-left-color: #22c55e; }
+.sourceGroup.pink { border-left-color: #fb7185; }
+.sourceHead { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 7px; }
+.sourceHead strong { font-size: 14px; color: #f8fafc; }
+.sourceHead em { font-style: normal; font-weight: 950; color: #f8fafc; }
+.sourceLine { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 3px 0; color: #cbd5e1; font-size: 13px; }
+.sourceLine span { min-width: 0; }
+.sourceLine small { display: block; color: var(--muted); margin-top: 2px; font-size: 11px; }
+.sourceLine b { white-space: nowrap; font-size: 12px; color: #dbeafe; }
+.sourceLine.muted { opacity: .55; }
+.sourceFoot { margin-top: 8px; color: var(--muted); font-size: 12px; }
+.sourceFoot b { color: #fbbf24; }
+@media (max-width: 560px) {
+  .sourceTitle { display: block; }
+  .sourceTitle button { margin-top: 8px; width: 100%; }
+}
