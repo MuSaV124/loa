@@ -1,4 +1,4 @@
-const VERSION = '4.6.4';
+const VERSION = '4.6.5';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -178,7 +178,7 @@ function isLeapEffect(effect, joinedText = '') {
   const source = normalizeNodeName(`${effect?.name || ''} ${effect?.description || ''} ${effect?.tooltip || ''} ${joinedText || ''}`);
   const normalized = normalizeNodeName(source).toLowerCase();
 
-  // v4.6.4: 도약은 아직 계산 대상이 아닙니다.
+  // v4.6.5: 보조 안전장치. 기본 구분은 extractEnlightenmentEffects의 Name 화이트리스트에서 처리합니다.
   // Open API가 도약 효과를 깨달음과 같은 ArkPassive.Effects 묶음으로 내려주는 경우가 있어
   // 깨달음 파싱에서 도약 텍스트가 포함된 항목은 전부 제외합니다.
   return normalized.includes('도약') || normalized.includes('leap');
@@ -187,12 +187,14 @@ function extractEnlightenmentEffects(effects) {
   const result = { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
   const applied = new Set();
   for (const effect of effects || []) {
+    const categoryName = normalizeNodeName(effect?.name || '');
+    // v4.6.5: Open API의 ArkPassive.Effects는 Name 값으로 깨달음/진화/도약을 구분합니다.
+    // 깨달음 계산에는 Name이 정확히 '깨달음'인 항목만 사용합니다.
+    // 도약은 Name이 '도약'으로 내려오므로 이 단계에서 자동 제외됩니다.
+    if (categoryName !== '깨달음') continue;
+
     const joined = effectFullText(effect);
     const normalized = normalizeNodeName(`${effect?.name || ''} ${joined}`);
-    // Open API가 깨달음/진화/도약 구분명을 안정적으로 주지 않는 경우가 있어,
-    // 진화 노드와 도약 노드는 제외하고 남은 깨달음 항목에서 필요한 수치만 읽습니다.
-    if (isKnownEvolutionEffect(effect)) continue;
-    if (isLeapEffect(effect, joined)) continue;
     const parsed = parsePercentEffectText(joined);
 
     // 기상술사 질풍노도/기민함처럼 문장 안에 고정 수치가 아니라
@@ -625,7 +627,7 @@ function enlightenmentAppliedDetailHtml(base) {
   pushTotal('추피', state.enlightenment.additionalDamage);
   pushTotal('적주피', state.enlightenment.enemyDamage);
   const totalLine = totals.length ? `<div class="enlightenmentDetailTotal"><strong>깨달음 합계</strong><em>${escapeHtml(totals.join(' / '))}</em></div>` : '';
-  return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 깨달음 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. 도약 효과는 v4.6.4 기준 계산에서 제외합니다.</p></div></details>`;
+  return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 깨달음 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. v4.6.5부터 API Name이 '깨달음'인 항목만 깨달음으로 반영합니다. 도약/진화 항목은 깨달음 계산에서 제외합니다.</p></div></details>`;
 }
 
 function buildSourceSummary(current) {
