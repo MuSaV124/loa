@@ -382,8 +382,7 @@ function getBaseStats(selection = state.selected) {
   const swiftSpeedBonus = speedFromSwift(swiftStat);
   const extraCritRate = num($('extraCritRate').value);
   const extraCritDamage = num($('extraCritDamage').value);
-  const skillCritRate = 0;
-  const skillCritDamage = num($('skillCritDamage').value);
+  const skillCritDamage = 0;
   const extraEvolutionDamage = num($('extraEvolutionDamage').value);
   const extraAdditionalDamage = num($('extraAdditionalDamage').value);
   const extraEnemyDamage = num($('extraEnemyDamage').value);
@@ -428,8 +427,8 @@ function getBaseStats(selection = state.selected) {
     critStat,
     swiftStat,
     statCritRate,
-    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + dynamicEnlightenmentCritRate + extraCritRate + skillCritRate + critSynergy + backAttackCritRate,
-    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage + skillCritDamage,
+    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate,
+    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage,
     critHitDamage: num(state.accessory.critHitDamage) + num(state.bracelet.critHitDamage),
     critHitDamageSources,
     evolutionDamage: num(state.enlightenment.evolutionDamage) + extraEvolutionDamage,
@@ -453,8 +452,6 @@ function getBaseStats(selection = state.selected) {
     moveSpeed,
     extraCritRate,
     extraCritDamage,
-    skillCritRate,
-    skillCritDamage,
     extraEvolutionDamage,
     extraAdditionalDamage,
     extraEnemyDamage,
@@ -623,7 +620,6 @@ function buildSourceSummary(current) {
   if (state.enlightenment.critDamage) critDamageLines.push(sourceLine('깨달음', state.enlightenment.critDamage));
   if (base.dynamicEnlightenmentCritDamage) critDamageLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritDamage));
   if (base.extraCritDamage) critDamageLines.push(sourceLine('추가 입력', base.extraCritDamage));
-  if (base.skillCritDamage) critDamageLines.push(sourceLine('스킬 치피 증가', base.skillCritDamage));
   critDamageLines.push(...critDamageEvolution);
 
   const critHitLines = [];
@@ -829,7 +825,7 @@ $('searchForm').addEventListener('submit', (event) => {
   if (!name) return setMessage('캐릭터명을 입력하세요.');
   searchCharacter(name);
 });
-['extraCritRate','extraCritDamage','skillCritDamage','extraEvolutionDamage','extraAdditionalDamage','extraEnemyDamage','extraAttackSpeed','extraMoveSpeed','adrenalineCritRate','adrenalineAttackPower'].forEach(id => $(id).addEventListener('input', calculateAndRender));
+['extraCritRate','extraCritDamage','extraEvolutionDamage','extraAdditionalDamage','extraEnemyDamage','extraAttackSpeed','extraMoveSpeed','adrenalineCritRate','adrenalineAttackPower'].forEach(id => $(id).addEventListener('input', calculateAndRender));
 $('adrenalineEnabled').addEventListener('change', calculateAndRender);
 $('critSynergyEnabled').addEventListener('change', calculateAndRender);
 $('backAttackEnabled').addEventListener('change', calculateAndRender);
