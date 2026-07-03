@@ -453,13 +453,16 @@ function getBaseStats() {
     extraMoveSpeed
   };
 }
-function applyEffect(stats, effect) {
+function applyEffect(stats, effect, sourceLabel = '진화') {
   const out = { ...stats };
   if (effect.critStat) { out.critStat = (out.critStat || 0) + effect.critStat; out.statCritRate = critRateFromStat(out.critStat); out.critRate += critRateFromStat(effect.critStat); }
   if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.attackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.extraAttackSpeed || 0); out.moveSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.extraMoveSpeed || 0); out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
   if (effect.critRate) out.critRate += effect.critRate;
   if (effect.critDamage) out.critDamage += effect.critDamage;
-  if (effect.critHitDamage) out.critHitDamage = (out.critHitDamage || 0) + effect.critHitDamage;
+  if (effect.critHitDamage) {
+    out.critHitDamage = (out.critHitDamage || 0) + effect.critHitDamage;
+    out.critHitDamageSources = [...(out.critHitDamageSources || []), { label: sourceLabel, value: effect.critHitDamage }];
+  }
   if (effect.evolutionDamage) out.evolutionDamage += effect.evolutionDamage;
   if (effect.sonicBreak) {
     const attackIncrease = Math.max(0, (out.attackSpeed || out.moveAttackSpeed || 100) - 100);
@@ -535,7 +538,7 @@ function statsWithSelection(baseStats, selection) {
   let s = { ...baseStats };
   for (const row of selectedEntries(selection)) {
     if (row.name === '치명' || row.name === '신속') continue;
-    s = applyEffect(s, getLevelEffect(row.name, row.level));
+    s = applyEffect(s, getLevelEffect(row.name, row.level), `진화 ${row.name}`);
   }
   return { stats: s, result: score(s) };
 }
