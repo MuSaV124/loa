@@ -1,4 +1,4 @@
-const VERSION = '4.6.1';
+const VERSION = '4.6.2';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -715,15 +715,21 @@ function sameNameSet(a, b) {
   const bb = [...(b || [])].sort().join('|');
   return aa === bb;
 }
-function candidateMemo(fourNames, fiveName, calc) {
+function candidateMemo(fourNames, fiveName, calc, penaltyApplied = false) {
   const current4 = currentTierNames(4);
   const current5 = currentTierNames(5).join(' + ') || '-';
   const bits = [];
   if (sameNameSet(fourNames, current4) && fiveName === current5) bits.push('현재 조합');
   else bits.push(`${tier4PairLabel(fourNames)} / ${fiveName}`);
   if (calc?.result?.convertedEvolutionDamage > 0) bits.push(`뭉가 전환 ${fmt(calc.result.convertedEvolutionDamage)}%(기본 포함 총 ${fmt(calc.result.convertedEvolutionDamage + 15)}%)`);
+  if (penaltyApplied) bits.push('주력기 단타 보정 -2.5%(추천만)');
   if (calc?.result?.sonicBreakEvolutionDamage > 0) bits.push(`음속 ${fmt(calc.result.sonicBreakEvolutionDamage)}%`);
   return bits.join(' / ');
+}
+function recommendationValueFor(fiveName, calc, singleHitPenaltyEnabled) {
+  const value = Number(calc?.result?.value || 0);
+  if (singleHitPenaltyEnabled && fiveName === '뭉툭한 가시') return value * 0.975;
+  return value;
 }
 function calculateAndRender() {
   const current = statsWithSelection(state.selected);
@@ -732,6 +738,7 @@ function calculateAndRender() {
   const baseValue = current.result.value || 1;
   const candidates = [];
   const excludeManaForge = Boolean($('excludeManaForge')?.checked);
+  const singleHitPenaltyEnabled = Boolean($('singleHitMainSkill')?.checked);
   const tier4Options = allOptions(4).filter(name => getNode(name));
   const tier5Options = allOptions(5).filter(name => getNode(name) && !(excludeManaForge && name === '마나 용광로'));
 
@@ -752,15 +759,17 @@ function calculateAndRender() {
       for (const fourName of fourNames) next[fourName] = { level: fourLevel, source: 'candidate' };
       next[fiveName] = { level: fiveLevel, source: 'candidate' };
       const calc = statsWithSelection(next);
-      candidates.push({ fourNames, fourLevel, fiveName, fiveLevel, calc, diff: ((calc.result.value / baseValue) - 1) * 100 });
+      const recValue = recommendationValueFor(fiveName, calc, singleHitPenaltyEnabled);
+      const penaltyApplied = singleHitPenaltyEnabled && fiveName === '뭉툭한 가시';
+      candidates.push({ fourNames, fourLevel, fiveName, fiveLevel, calc, recValue, penaltyApplied, diff: ((recValue / baseValue) - 1) * 100 });
     }
   }
-  candidates.sort((a, b) => b.calc.result.value - a.calc.result.value);
+  candidates.sort((a, b) => b.recValue - a.recValue);
   const top = candidates.slice(0, 5);
-  $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>너의 정보는 현재 1~5티어 그대로 계산 · 추천표는 현재 4/5티어 제거 후 후보 4/5티어 적용값</span>`;
+  $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>너의 정보는 현재 1~5티어 그대로 계산 · 추천표는 현재 4/5티어 제거 후 후보 4/5티어 적용값${singleHitPenaltyEnabled ? ' · 뭉가 후보는 추천점수만 -2.5%' : ''}</span>`;
   $('baseInfo').innerHTML = `치명 ${Math.round(current.stats.critStat || 0)} / 스탯치적 ${fmt(current.stats.statCritRate || 0)}%, 최종치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 치적주피 ${fmt(current.result.critHitDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%, 공증 ${fmt(current.result.attackPower)}%, 공속 ${fmt(current.result.attackSpeed)}%, 이속 ${fmt(current.result.moveSpeed)}%`;
   $('recommendList').innerHTML = `<div class="comboTableWrap"><table class="comboTable">
-    <thead><tr><th>순위</th><th>추천 4티어</th><th>추천 5티어</th><th>골랐을 때 기대값</th><th>현재 대비</th><th>계산치적</th><th>진피</th><th>계산 기준</th></tr></thead>
+    <thead><tr><th>순위</th><th>추천 4티어</th><th>추천 5티어</th><th>추천점수</th><th>현재 대비</th><th>계산치적</th><th>진피</th><th>계산 기준</th></tr></thead>
     <tbody>${top.map((c, i) => {
       const cls = c.diff >= 0 ? 'up' : 'down';
       const currentCombo = (sameNameSet(c.fourNames, currentTierNames(4)) && state.selected[c.fiveName]?.level > 0) ? '<em>현재</em>' : '';
@@ -768,11 +777,11 @@ function calculateAndRender() {
         <td><b>${i + 1}</b></td>
         <td><strong>${escapeHtml(tier4PairLabel(c.fourNames))}</strong></td>
         <td><span class="nodePill">${escapeHtml(c.fiveName)} Lv.${c.fiveLevel}</span>${currentCombo}</td>
-        <td>${c.calc.result.value.toFixed(4)}</td>
+        <td>${c.recValue.toFixed(4)}${c.penaltyApplied ? `<small>기대값 ${c.calc.result.value.toFixed(4)}</small>` : ''}</td>
         <td class="${cls}">${pct(c.diff)}</td>
         <td>${fmt(c.calc.result.critRate)}%</td>
         <td>${fmt(c.calc.result.evo)}%</td>
-        <td>${escapeHtml(candidateMemo(c.fourNames, c.fiveName, c.calc))}</td>
+        <td>${escapeHtml(candidateMemo(c.fourNames, c.fiveName, c.calc, c.penaltyApplied))}</td>
       </tr>`;
     }).join('')}</tbody>
   </table></div>`;
@@ -830,5 +839,6 @@ $('adrenalineEnabled').addEventListener('change', calculateAndRender);
 $('critSynergyEnabled').addEventListener('change', calculateAndRender);
 $('backAttackEnabled').addEventListener('change', calculateAndRender);
 $('excludeManaForge')?.addEventListener('change', calculateAndRender);
+$('singleHitMainSkill')?.addEventListener('change', calculateAndRender);
 
 await loadDb();

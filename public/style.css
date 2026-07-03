@@ -590,3 +590,6 @@ select {
   .comboTable { font-size: 13px; }
   .comboTable th, .comboTable td { padding: 11px 10px; }
 }
+
+.recommendChecks { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+.comboTable td small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
