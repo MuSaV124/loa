@@ -1,4 +1,4 @@
-const VERSION = '4.5.3';
+const VERSION = '4.5.4';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -359,6 +359,18 @@ function multiplyPercentSources(sources) {
 function effectivePercentFromSources(sources) {
   return (multiplyPercentSources(sources) - 1) * 100;
 }
+function additivePercentFromSources(sources) {
+  return (sources || []).reduce((sum, src) => {
+    const v = typeof src === 'number' ? src : Number(src?.value || 0);
+    return sum + (Number.isFinite(v) ? v : 0);
+  }, 0);
+}
+function safePercentSources(sources, aggregateValue, aggregateLabel = '합산값') {
+  const list = Array.isArray(sources) ? sources.filter(src => Math.abs(Number(src?.value ?? src ?? 0)) > 0.0001) : [];
+  if (list.length) return list;
+  const v = Number(aggregateValue || 0);
+  return Math.abs(v) > 0.0001 ? [{ label: aggregateLabel, value: v }] : [];
+}
 
 
 function getBaseStats() {
@@ -495,16 +507,19 @@ function score(stats) {
     effectiveCritRate = stats.critCap;
   }
   const critChance = Math.max(0, Math.min(effectiveCritRate, 100)) / 100;
-  const critHitMultiplier = multiplyPercentSources([...(stats.critHitDamageSources || []), ...(stats.critHitDamage ? [{ value: stats.critHitDamage }] : [])]);
+  const critHitSources = safePercentSources(stats.critHitDamageSources, stats.critHitDamage, '치명타 적중 주피');
+  const critHitMultiplier = multiplyPercentSources(critHitSources);
   const critMultiplier = (1 - critChance) + critChance * (stats.critDamage / 100) * critHitMultiplier;
   const evoMultiplier = 1 + evo / 100;
   const addMultiplier = 1 + stats.additionalDamage / 100;
   const enemyMultiplier = stats.enemyDamageSources?.length ? multiplyPercentSources(stats.enemyDamageSources) : (1 + (stats.enemyDamage || 0) / 100);
   const effectiveEnemyDamage = (enemyMultiplier - 1) * 100;
   const effectiveCritHitDamage = (critHitMultiplier - 1) * 100;
+  const displayEnemyDamage = additivePercentFromSources(stats.enemyDamageSources);
+  const displayCritHitDamage = additivePercentFromSources(critHitSources);
   const attackMultiplier = 1 + (stats.attackPower || 0) / 100;
   const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier;
-  return { value, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
+  return { value, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
 }
 function statsWithSelection(baseStats, selection) {
   let s = { ...baseStats };
@@ -569,12 +584,14 @@ function buildSourceSummary(current) {
   const critDamageLines = [sourceLine('기본 치명타 피해', 200)];
   if (state.accessory.critDamage) critDamageLines.push(sourceLine('악세', state.accessory.critDamage));
   if (state.bracelet.critDamage) critDamageLines.push(sourceLine('팔찌', state.bracelet.critDamage));
-  if (state.accessory.critHitDamage) critDamageLines.push(sourceLine('악세 · 치명타 적중 주피', state.accessory.critHitDamage));
-  if (state.bracelet.critHitDamage) critDamageLines.push(sourceLine('팔찌 · 치명타 적중 주피', state.bracelet.critHitDamage));
   if (state.enlightenment.critDamage) critDamageLines.push(sourceLine('깨달음', state.enlightenment.critDamage));
   if (base.dynamicEnlightenmentCritDamage) critDamageLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritDamage));
   if (base.extraCritDamage) critDamageLines.push(sourceLine('추가 입력', base.extraCritDamage));
   critDamageLines.push(...critDamageEvolution);
+
+  const critHitLines = [];
+  for (const src of current.stats.critHitDamageSources || []) critHitLines.push(sourceLine(src.label || '치명타 적중 주피', Number(src.value || 0)));
+  if (!critHitLines.length && current.stats.critHitDamage) critHitLines.push(sourceLine('치명타 적중 주피', current.stats.critHitDamage));
 
   const evoLines = [];
   if (state.enlightenment.evolutionDamage) evoLines.push(sourceLine('깨달음', state.enlightenment.evolutionDamage));
@@ -608,15 +625,16 @@ function buildSourceSummary(current) {
   enemyLines.push(...enemyEvolution);
 
   $('sourceSummary').innerHTML = `
-    <div class="sourceTitle"><div><h3>계산 요약</h3><p>추피·치피·진피는 합산, 적주피·치적주피는 곱연산으로 계산합니다.</p></div><button id="resetViewButton" type="button">초기화</button></div>
+    <div class="sourceTitle"><div><h3>계산 요약</h3><p>표시는 출처별 합산값, 기대값은 로아식 합연산/곱연산으로 계산합니다.</p></div><button id="resetViewButton" type="button">초기화</button></div>
     ${sourceGroup('치명타 확률', 'blue', critLines, current.result.critRate)}
     ${sourceGroup('치명타 피해', 'purple', critDamageLines, current.result.critDamage)}
+    ${sourceGroup('치명타 적중 주피', 'pink', critHitLines, current.result.critHitDamage)}
     ${sourceGroup('진피', 'orange', evoLines, current.result.evo)}
     ${sourceGroup('추피', 'green', addLines, current.result.additionalDamage)}
     ${sourceGroup('적주피', 'pink', enemyLines, current.result.enemyDamage)}
     ${sourceGroup('공격 속도', 'cyan', attackSpeedLines, current.result.attackSpeed)}
     ${sourceGroup('이동 속도', 'cyan', moveSpeedLines, current.result.moveSpeed)}
-    <div class="sourceFoot">뭉가 전환 진피는 <b>최대 75%</b>까지 적용됩니다.</div>
+    <div class="sourceFoot">UI의 치피·진피·추피는 합산 표시이며, 적주피·치명타 적중 주피는 내부 기대값에서 출처별 곱연산으로 적용됩니다. 뭉가 전환 진피는 <b>최대 75%</b>까지 적용됩니다.</div>
   `;
   const reset = $('resetViewButton');
   if (reset) reset.addEventListener('click', () => { state.selected = JSON.parse(JSON.stringify(state.apiSelected || {})); renderEvolutionTiers(); calculateAndRender(); });
@@ -707,7 +725,7 @@ function calculateAndRender() {
   candidates.sort((a, b) => b.calc.result.value - a.calc.result.value);
   const top = candidates.slice(0, 5);
   $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>현재 1~5티어 선택 기준</span>`;
-  $('baseInfo').innerHTML = `치명 ${Math.round(current.stats.critStat || 0)} / 스탯치적 ${fmt(current.stats.statCritRate || 0)}%, 최종치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%, 공증 ${fmt(current.result.attackPower)}%, 공속 ${fmt(current.result.attackSpeed)}%, 이속 ${fmt(current.result.moveSpeed)}%`;
+  $('baseInfo').innerHTML = `치명 ${Math.round(current.stats.critStat || 0)} / 스탯치적 ${fmt(current.stats.statCritRate || 0)}%, 최종치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 치적주피 ${fmt(current.result.critHitDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%, 공증 ${fmt(current.result.attackPower)}%, 공속 ${fmt(current.result.attackSpeed)}%, 이속 ${fmt(current.result.moveSpeed)}%`;
   $('recommendList').innerHTML = `<div class="comboTableWrap"><table class="comboTable">
     <thead><tr><th>순위</th><th>4티어</th><th>5티어</th><th>기대값</th><th>차이</th><th>치적</th><th>진피</th><th>참고</th></tr></thead>
     <tbody>${top.map((c, i) => {
