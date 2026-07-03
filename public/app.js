@@ -382,7 +382,7 @@ function getBaseStats(selection = state.selected) {
   const swiftSpeedBonus = speedFromSwift(swiftStat);
   const extraCritRate = num($('extraCritRate').value);
   const extraCritDamage = num($('extraCritDamage').value);
-  const skillCritRate = num($('skillCritRate').value);
+  const skillCritRate = 0;
   const skillCritDamage = num($('skillCritDamage').value);
   const extraEvolutionDamage = num($('extraEvolutionDamage').value);
   const extraAdditionalDamage = num($('extraAdditionalDamage').value);
@@ -615,7 +615,6 @@ function buildSourceSummary(current) {
   if (state.enlightenment.critRate) critLines.push(sourceLine('깨달음', state.enlightenment.critRate));
   if (base.dynamicEnlightenmentCritRate) critLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritRate));
   if (base.extraCritRate) critLines.push(sourceLine('추가 입력', base.extraCritRate));
-  if (base.skillCritRate) critLines.push(sourceLine('스킬 치적 증가', base.skillCritRate));
   critLines.push(...critEvolution);
 
   const critDamageLines = [sourceLine('기본 치명타 피해', 200)];
@@ -830,7 +829,7 @@ $('searchForm').addEventListener('submit', (event) => {
   if (!name) return setMessage('캐릭터명을 입력하세요.');
   searchCharacter(name);
 });
-['extraCritRate','extraCritDamage','skillCritRate','skillCritDamage','extraEvolutionDamage','extraAdditionalDamage','extraEnemyDamage','extraAttackSpeed','extraMoveSpeed','adrenalineCritRate','adrenalineAttackPower'].forEach(id => $(id).addEventListener('input', calculateAndRender));
+['extraCritRate','extraCritDamage','skillCritDamage','extraEvolutionDamage','extraAdditionalDamage','extraEnemyDamage','extraAttackSpeed','extraMoveSpeed','adrenalineCritRate','adrenalineAttackPower'].forEach(id => $(id).addEventListener('input', calculateAndRender));
 $('adrenalineEnabled').addEventListener('change', calculateAndRender);
 $('critSynergyEnabled').addEventListener('change', calculateAndRender);
 $('backAttackEnabled').addEventListener('change', calculateAndRender);
