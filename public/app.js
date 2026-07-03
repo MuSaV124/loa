@@ -1,4 +1,4 @@
-const VERSION = '4.6.5';
+const VERSION = '4.6.6';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -178,7 +178,7 @@ function isLeapEffect(effect, joinedText = '') {
   const source = normalizeNodeName(`${effect?.name || ''} ${effect?.description || ''} ${effect?.tooltip || ''} ${joinedText || ''}`);
   const normalized = normalizeNodeName(source).toLowerCase();
 
-  // v4.6.5: 보조 안전장치. 기본 구분은 extractEnlightenmentEffects의 Name 화이트리스트에서 처리합니다.
+  // v4.6.6: 보조 안전장치. 기본 구분은 extractEnlightenmentEffects의 Name 화이트리스트에서 처리합니다.
   // Open API가 도약 효과를 깨달음과 같은 ArkPassive.Effects 묶음으로 내려주는 경우가 있어
   // 깨달음 파싱에서 도약 텍스트가 포함된 항목은 전부 제외합니다.
   return normalized.includes('도약') || normalized.includes('leap');
@@ -188,7 +188,7 @@ function extractEnlightenmentEffects(effects) {
   const applied = new Set();
   for (const effect of effects || []) {
     const categoryName = normalizeNodeName(effect?.name || '');
-    // v4.6.5: Open API의 ArkPassive.Effects는 Name 값으로 깨달음/진화/도약을 구분합니다.
+    // v4.6.6: Open API의 ArkPassive.Effects는 Name 값으로 깨달음/진화/도약을 구분합니다.
     // 깨달음 계산에는 Name이 정확히 '깨달음'인 항목만 사용합니다.
     // 도약은 Name이 '도약'으로 내려오므로 이 단계에서 자동 제외됩니다.
     if (categoryName !== '깨달음') continue;
@@ -627,7 +627,7 @@ function enlightenmentAppliedDetailHtml(base) {
   pushTotal('추피', state.enlightenment.additionalDamage);
   pushTotal('적주피', state.enlightenment.enemyDamage);
   const totalLine = totals.length ? `<div class="enlightenmentDetailTotal"><strong>깨달음 합계</strong><em>${escapeHtml(totals.join(' / '))}</em></div>` : '';
-  return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 깨달음 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. v4.6.5부터 API Name이 '깨달음'인 항목만 깨달음으로 반영합니다. 도약/진화 항목은 깨달음 계산에서 제외합니다.</p></div></details>`;
+  return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 깨달음 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. v4.6.6부터 API Name이 '깨달음'인 항목만 깨달음으로 반영합니다. 도약/진화 항목은 깨달음 계산에서 제외합니다.</p></div></details>`;
 }
 
 function buildSourceSummary(current) {
@@ -788,11 +788,25 @@ function recommendationValueFor(fiveName, calc, singleHitPenaltyEnabled) {
   if (singleHitPenaltyEnabled && fiveName === '뭉툭한 가시') return value * 0.975;
   return value;
 }
+function hasSameTier45(selection, fourNames, fiveName) {
+  const selected4 = selectedEntries(selection).filter(row => Number(row.tier) === 4).map(row => row.name);
+  const selected5 = selectedEntries(selection).filter(row => Number(row.tier) === 5).map(row => row.name);
+  return sameNameSet(fourNames, selected4) && selected5.includes(fiveName);
+}
+function candidateTag(c) {
+  const tags = [];
+  if (hasSameTier45(state.apiSelected, c.fourNames, c.fiveName)) tags.push('<em class="apiTag">API</em>');
+  if (hasSameTier45(state.selected, c.fourNames, c.fiveName)) tags.push('<em class="currentTag">현재</em>');
+  if (c.penaltyApplied) tags.push('<em class="penaltyTag">단타 -2.5%</em>');
+  return tags.join('');
+}
 function calculateAndRender() {
   const current = statsWithSelection(state.selected);
+  const apiBase = statsWithSelection(Object.keys(state.apiSelected || {}).length ? state.apiSelected : state.selected);
   renderCombatStats(current);
   renderKeenEfficiency(current);
-  const baseValue = current.result.value || 1;
+  const baseValue = apiBase.result.value || current.result.value || 1;
+  const currentDiff = ((current.result.value / baseValue) - 1) * 100;
   const candidates = [];
   const excludeManaForge = Boolean($('excludeManaForge')?.checked);
   const singleHitPenaltyEnabled = Boolean($('singleHitMainSkill')?.checked);
@@ -823,25 +837,26 @@ function calculateAndRender() {
   }
   candidates.sort((a, b) => b.recValue - a.recValue);
   const top = candidates.slice(0, 5);
-  $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>너의 정보는 현재 1~5티어 그대로 계산 · 추천표는 현재 4/5티어 제거 후 후보 4/5티어 적용값${singleHitPenaltyEnabled ? ' · 뭉가 후보는 추천점수만 -2.5%' : ''}</span>`;
-  $('baseInfo').innerHTML = `치명 ${Math.round(current.stats.critStat || 0)} / 스탯치적 ${fmt(current.stats.statCritRate || 0)}%, 최종치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 치적주피 ${fmt(current.result.critHitDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%, 공증 ${fmt(current.result.attackPower)}%, 공속 ${fmt(current.result.attackSpeed)}%, 이속 ${fmt(current.result.moveSpeed)}%`;
-  $('recommendList').innerHTML = `<div class="comboTableWrap"><table class="comboTable">
-    <thead><tr><th>순위</th><th>추천 4티어</th><th>추천 5티어</th><th>추천점수</th><th>현재 대비</th><th>계산치적</th><th>진피</th><th>계산 기준</th></tr></thead>
-    <tbody>${top.map((c, i) => {
+  const currentDiffText = `${currentDiff >= 0 ? '+' : ''}${currentDiff.toFixed(2)}%`;
+  $('currentScore').innerHTML = `<strong>${apiBase.result.value.toFixed(4)}</strong><span>API가 읽어온 원본 1~5티어 기대값을 비교 기준으로 고정합니다.${singleHitPenaltyEnabled ? ' 뭉가 후보는 추천점수만 -2.5% 적용.' : ''}</span><div class="scoreMini">현재 화면 선택값 ${current.result.value.toFixed(4)} <b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>`;
+  $('baseInfo').innerHTML = `API 기준: 치명 ${Math.round(apiBase.stats.critStat || 0)} / 최종치적 ${fmt(apiBase.result.critRate)}%, 치피 ${fmt(apiBase.result.critDamage)}%, 치적주피 ${fmt(apiBase.result.critHitDamage)}%, 진피 ${fmt(apiBase.result.evo)}%, 추피 ${fmt(apiBase.result.additionalDamage)}%, 적주피 ${fmt(apiBase.result.enemyDamage)}%, 공증 ${fmt(apiBase.result.attackPower)}%`;
+  $('recommendList').innerHTML = `<div class="comboCards">${top.map((c, i) => {
       const cls = c.diff >= 0 ? 'up' : 'down';
-      const currentCombo = (sameNameSet(c.fourNames, currentTierNames(4)) && state.selected[c.fiveName]?.level > 0) ? '<em>현재</em>' : '';
-      return `<tr class="${i === 0 ? 'best' : ''}">
-        <td><b>${i + 1}</b></td>
-        <td><strong>${escapeHtml(tier4PairLabel(c.fourNames))}</strong></td>
-        <td><span class="nodePill">${escapeHtml(c.fiveName)} Lv.${c.fiveLevel}</span>${currentCombo}</td>
-        <td>${c.recValue.toFixed(4)}${c.penaltyApplied ? `<small>기대값 ${c.calc.result.value.toFixed(4)}</small>` : ''}</td>
-        <td class="${cls}">${pct(c.diff)}</td>
-        <td>${fmt(c.calc.result.critRate)}%</td>
-        <td>${fmt(c.calc.result.evo)}%</td>
-        <td>${escapeHtml(candidateMemo(c.fourNames, c.fiveName, c.calc, c.penaltyApplied))}</td>
-      </tr>`;
-    }).join('')}</tbody>
-  </table></div>`;
+      const memo = candidateMemo(c.fourNames, c.fiveName, c.calc, c.penaltyApplied);
+      return `<article class="comboCard ${i === 0 ? 'best' : ''}">
+        <div class="rankBadge">${i + 1}</div>
+        <div class="comboMain">
+          <div class="comboTitle"><strong>${escapeHtml(tier4PairLabel(c.fourNames))}</strong><span class="nodePill">${escapeHtml(c.fiveName)} Lv.${c.fiveLevel}</span>${candidateTag(c)}</div>
+          <div class="comboMemo">${escapeHtml(memo)}</div>
+        </div>
+        <div class="comboMetrics">
+          <div><span>추천점수</span><b>${c.recValue.toFixed(4)}</b>${c.penaltyApplied ? `<small>이론 ${c.calc.result.value.toFixed(4)}</small>` : ''}</div>
+          <div><span>API 대비</span><b class="${cls}">${pct(c.diff)}</b></div>
+          <div><span>계산치적</span><b>${fmt(c.calc.result.critRate)}%</b></div>
+          <div><span>진피</span><b>${fmt(c.calc.result.evo)}%</b></div>
+        </div>
+      </article>`;
+    }).join('')}</div>`;
 }
 
 async function loadDb() {
