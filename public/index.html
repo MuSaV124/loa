@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v4.5.4 · 표시/계산 분리</span>
+        <span class="badge">v4.5.5 · 현재 노드 보정</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -30,7 +30,7 @@
     </section>
 
     <section id="inputPanel" class="panel compactPanel">
-      <div class="sectionHead"><div><h2>추가 효과</h2><p class="hint">API가 못 읽는 버프/시너지만 추가로 넣습니다.</p></div></div>
+      <div class="sectionHead"><div><h2>추가 효과</h2><p class="hint">로아와 수치처럼 현재 4/5티어가 포함된 값은 아래 보정 체크를 켠 상태로 넣습니다.</p></div></div>
       <input id="baseCritStat" type="hidden" value="0" />
       <input id="baseSwiftStat" type="hidden" value="0" />
       <div class="manualGrid">
@@ -43,6 +43,7 @@
         <label>추가 이동 속도(%)<input id="extraMoveSpeed" type="number" step="0.01" value="0" /></label>
         <label class="checkLabel"><span>치적 시너지 적용 (+10%)</span><input id="critSynergyEnabled" type="checkbox" /></label>
         <label class="checkLabel"><span>아드레날린 적용</span><input id="adrenalineEnabled" type="checkbox" checked /></label>
+        <label class="checkLabel wideCheck"><span>추가 입력값에서 현재 4/5티어 효과 제외</span><input id="removeCurrentTier45FromInputs" type="checkbox" checked /></label>
         <label>아드 치명타 확률(%)<input id="adrenalineCritRate" type="number" step="0.01" value="20" /></label>
         <label>아드 공격력 증가(%)<input id="adrenalineAttackPower" type="number" step="0.01" value="5.4" /></label>
         <div class="staticInfo"><b>기본 공이속</b><span>114% = 기본 100% + 만찬 5% + 서폿 진화 9%</span></div>
@@ -79,7 +80,7 @@
     </section>
   </main>
 
-  <div class="version">Version 4.5.4</div>
+  <div class="version">Version 4.5.5</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

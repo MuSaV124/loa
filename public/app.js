@@ -1,4 +1,4 @@
-const VERSION = '4.5.4';
+const VERSION = '4.5.5';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -373,6 +373,49 @@ function safePercentSources(sources, aggregateValue, aggregateLabel = '합산값
 }
 
 
+function isTier45Node(name) {
+  const tier = Number(getNode(name)?.tier || 0);
+  return tier === 4 || tier === 5;
+}
+function selectedTier45FlatEffects(selection = state.selected) {
+  const total = { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, additionalDamage: 0, enemyDamage: 0, finalDamage: 0, attackPower: 0, speedBonus: 0 };
+  for (const row of selectedEntries(selection)) {
+    if (!isTier45Node(row.name)) continue;
+    const eff = getLevelEffect(row.name, row.level);
+    for (const key of Object.keys(total)) total[key] += Number(eff?.[key] || 0);
+  }
+  return total;
+}
+function subtractCurrentTier45FromBase(stats, selection = state.selected) {
+  if (!$('removeCurrentTier45FromInputs')?.checked) return stats;
+  const eff = selectedTier45FlatEffects(selection);
+  const out = { ...stats };
+  out.critRate = Math.max(0, Number(out.critRate || 0) - eff.critRate);
+  out.critDamage = Math.max(0, Number(out.critDamage || 0) - eff.critDamage);
+  out.critHitDamage = Math.max(0, Number(out.critHitDamage || 0) - eff.critHitDamage);
+  out.evolutionDamage = Math.max(0, Number(out.evolutionDamage || 0) - eff.evolutionDamage);
+  out.additionalDamage = Math.max(0, Number(out.additionalDamage || 0) - eff.additionalDamage);
+  out.attackPower = Math.max(0, Number(out.attackPower || 0) - eff.attackPower);
+  out.attackSpeed = Math.max(0, Number(out.attackSpeed || 0) - eff.speedBonus);
+  out.moveSpeed = Math.max(0, Number(out.moveSpeed || 0) - eff.speedBonus);
+  out.moveAttackSpeed = Math.min(out.attackSpeed || 0, out.moveSpeed || 0);
+
+  const removeEnemy = eff.enemyDamage + eff.finalDamage;
+  if (removeEnemy > 0) {
+    out.enemyDamageSources = [...(out.enemyDamageSources || [])];
+    const idx = out.enemyDamageSources.findIndex(src => src?.label === '추가 입력');
+    if (idx >= 0) {
+      const current = Number(out.enemyDamageSources[idx].value || 0);
+      const next = Math.max(0, current - removeEnemy);
+      if (next > 0.0001) out.enemyDamageSources[idx] = { ...out.enemyDamageSources[idx], value: next };
+      else out.enemyDamageSources.splice(idx, 1);
+    }
+    out.enemyDamage = effectivePercentFromSources(out.enemyDamageSources);
+  }
+  return out;
+}
+
+
 function getBaseStats() {
   const selectedCritStat = tier1StatBonus('치명');
   const selectedSwiftStat = tier1StatBonus('신속');
@@ -419,7 +462,7 @@ function getBaseStats() {
     ...collectItemDamageSources(state.accessory, 'critHitDamage', '악세'),
     ...collectItemDamageSources(state.bracelet, 'critHitDamage', '팔찌')
   ];
-  return {
+  const rawBase = {
     critStat,
     swiftStat,
     statCritRate,
@@ -452,6 +495,7 @@ function getBaseStats() {
     extraAttackSpeed,
     extraMoveSpeed
   };
+  return subtractCurrentTier45FromBase(rawBase, state.selected);
 }
 function applyEffect(stats, effect) {
   const out = { ...stats };
@@ -796,5 +840,6 @@ $('searchForm').addEventListener('submit', (event) => {
 $('adrenalineEnabled').addEventListener('change', calculateAndRender);
 $('critSynergyEnabled').addEventListener('change', calculateAndRender);
 $('excludeManaForge')?.addEventListener('change', calculateAndRender);
+$('removeCurrentTier45FromInputs')?.addEventListener('change', calculateAndRender);
 
 await loadDb();
