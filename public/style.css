@@ -593,3 +593,48 @@ select {
 
 .recommendChecks { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
 .comboTable td small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+
+
+.enlightenmentDetails {
+  margin-top: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 14px;
+  background: rgba(255,255,255,.04);
+  overflow: hidden;
+}
+.enlightenmentDetails summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  font-weight: 800;
+  color: #e8eefc;
+}
+.enlightenmentDetailBody {
+  padding: 0 14px 14px;
+}
+.enlightenmentDetailLine,
+.enlightenmentDetailTotal {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255,255,255,.08);
+  font-size: 13px;
+}
+.enlightenmentDetailLine span,
+.enlightenmentDetailTotal em {
+  text-align: right;
+  color: #c9d3e8;
+  font-style: normal;
+}
+.enlightenmentDetailLine.muted span {
+  color: #8b95aa;
+}
+.enlightenmentDetailTotal strong {
+  color: #fff;
+}
+.enlightenmentDetailBody p {
+  margin: 8px 0 0;
+  color: #8b95aa;
+  font-size: 12px;
+  line-height: 1.45;
+}

@@ -1,4 +1,4 @@
-const VERSION = '4.6.2';
+const VERSION = '4.6.3';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -574,6 +574,50 @@ function getStatNodeLine(name) {
   const lv = Number(state.selected?.[name]?.level || 0);
   return lv > 0 ? `${name} Lv.${lv} · +${lv * 50}` : '';
 }
+
+function enlightenmentAppliedDetailHtml(base) {
+  const rows = [];
+  for (const item of state.enlightenment.items || []) {
+    const eff = item?.effects || {};
+    const parts = [];
+    const push = (label, key) => {
+      const value = Number(eff?.[key] || 0);
+      if (Number.isFinite(value) && Math.abs(value) > 0.0001) parts.push(`${label} ${pct(value)}`);
+    };
+    push('치적', 'critRate');
+    push('치피', 'critDamage');
+    push('진피', 'evolutionDamage');
+    push('추피', 'additionalDamage');
+    push('적주피', 'enemyDamage');
+    if (eff?.windfuryAgility) {
+      const cr = Number(base?.dynamicEnlightenmentCritRate || 0);
+      const cd = Number(base?.dynamicEnlightenmentCritDamage || 0);
+      const dyn = [];
+      if (Math.abs(cr) > 0.0001) dyn.push(`치적 ${pct(cr)}`);
+      if (Math.abs(cd) > 0.0001) dyn.push(`치피 ${pct(cd)}`);
+      if (dyn.length) parts.push(`기민함 동적 ${dyn.join(' / ')}`);
+    }
+    if (!parts.length) continue;
+    const lv = Number(item?.level || 0) ? ` Lv.${Number(item.level)}` : '';
+    rows.push(`<div class="enlightenmentDetailLine"><b>${escapeHtml((item?.name || '깨달음 효과') + lv)}</b><span>${escapeHtml(parts.join(' / '))}</span></div>`);
+  }
+  if (!rows.length) {
+    return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역</summary><div class="enlightenmentDetailBody"><div class="enlightenmentDetailLine muted"><span>API에서 적용된 깨달음 수치가 없습니다.</span></div></div></details>`;
+  }
+  const totals = [];
+  const pushTotal = (label, value) => {
+    const v = Number(value || 0);
+    if (Number.isFinite(v) && Math.abs(v) > 0.0001) totals.push(`${label} ${pct(v)}`);
+  };
+  pushTotal('치적', state.enlightenment.critRate + Number(base?.dynamicEnlightenmentCritRate || 0));
+  pushTotal('치피', state.enlightenment.critDamage + Number(base?.dynamicEnlightenmentCritDamage || 0));
+  pushTotal('진피', state.enlightenment.evolutionDamage);
+  pushTotal('추피', state.enlightenment.additionalDamage);
+  pushTotal('적주피', state.enlightenment.enemyDamage);
+  const totalLine = totals.length ? `<div class="enlightenmentDetailTotal"><strong>깨달음 합계</strong><em>${escapeHtml(totals.join(' / '))}</em></div>` : '';
+  return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 깨달음 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. 직업별 DB 없이 API에서 읽힌 수치만 표시합니다.</p></div></details>`;
+}
+
 function buildSourceSummary(current) {
   const base = getBaseStats();
   const critEvolution = [];
@@ -668,6 +712,7 @@ function buildSourceSummary(current) {
     ${sourceGroup('적주피', 'pink', enemyLines, current.result.enemyDamage)}
     ${sourceGroup('공격 속도', 'cyan', attackSpeedLines, current.result.attackSpeed)}
     ${sourceGroup('이동 속도', 'cyan', moveSpeedLines, current.result.moveSpeed)}
+    ${enlightenmentAppliedDetailHtml(base)}
     <div class="sourceFoot">UI의 치피·진피·추피는 합산 표시이며, 적주피·치명타 적중 주피는 내부 기대값에서 출처별 곱연산으로 적용됩니다. 뭉가 Lv.2는 <b>기본 진피 15% + 초과 치적 전환 최대 60% = 총 75%</b> 기준입니다.</div>
   `;
   const reset = $('resetViewButton');
