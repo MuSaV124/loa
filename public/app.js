@@ -1,10 +1,31 @@
-const VERSION = '4.0.0';
+const VERSION = '4.5.3';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
-const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] } };
+const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
 
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
-function stripHtml(v) { return String(v ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(); }
+function escapeRegExp(v) { return String(v || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function stripHtml(v) { return String(v ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&#40;/g, '(').replace(/&#41;/g, ')').replace(/&#37;/g, '%').replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim(); }
+function collectTextDeep(value, bucket = []) {
+  if (value == null) return bucket;
+  if (typeof value === 'string') {
+    const cleaned = stripHtml(value);
+    if (cleaned) bucket.push(cleaned);
+    const t = value.trim();
+    if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+      try { collectTextDeep(JSON.parse(t), bucket); } catch {}
+    }
+    return bucket;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') { bucket.push(String(value)); return bucket; }
+  if (Array.isArray(value)) { for (const item of value) collectTextDeep(item, bucket); return bucket; }
+  if (typeof value === 'object') { for (const v of Object.values(value)) collectTextDeep(v, bucket); return bucket; }
+  return bucket;
+}
+function effectFullText(effect) {
+  const parts = collectTextDeep({ name: effect?.name, level: effect?.level, description: effect?.description, tooltip: effect?.tooltip, raw: effect?.raw });
+  return [...new Set(parts)].join(' ');
+}
 function num(v, fallback = 0) { const n = Number(String(v ?? '').replace(/,/g, '')); return Number.isFinite(n) ? n : fallback; }
 function pct(v) { return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`; }
 function fmt(v) { return Number(v || 0).toFixed(2); }
@@ -64,39 +85,50 @@ function readEffects(arkPassive) {
   return effects.map((e, index) => ({ index, name: e?.Name || '', level: Number(e?.Level || 0), description: stripHtml(e?.Description || ''), tooltip: stripHtml(e?.Tooltip || ''), raw: e })).filter(e => e.name);
 }
 
+function normalizeMatchToken(text) {
+  return String(text || '').replace(/\s+/g, ' ').trim();
+}
 function addMatchesTo(out, key, text, regexList) {
+  // 깨달음 Tooltip은 같은 문장이 raw JSON, Element_*, Description 쪽에 반복되어 들어오는 경우가 있습니다.
+  // 그래서 한 효과 안에서 같은 계열 수치는 합산하지 않고 가장 큰 유효값 1개만 사용합니다.
+  // 예: 블래스터 깨달음 치피 40%가 중복 파싱되어 80%가 되는 문제 방지.
+  let best = 0;
   const seen = new Set();
   for (const re of regexList) {
+    re.lastIndex = 0;
     let match;
     while ((match = re.exec(text)) !== null) {
       const value = Number(match[1] || 0);
       if (!Number.isFinite(value)) continue;
-      const token = `${key}:${String(match[0]).replace(/\s+/g, ' ').trim()}:${match.index}`;
+      const token = `${key}:${value}:${normalizeMatchToken(match[0])}`;
       if (seen.has(token)) continue;
       seen.add(token);
-      out[key] += value;
+      best = Math.max(best, value);
     }
   }
+  if (best > 0) out[key] += best;
 }
 function parsePercentEffectText(text) {
   const out = { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0 };
   const source = stripHtml(text);
   addMatchesTo(out, 'critRate', source, [
-    /치명타\s*적중률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
-    /치명타\s*확률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+    /치명타\s*적중률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:만큼)?\s*(?:증가|상승)?/g,
+    /치명타\s*확률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:만큼)?\s*(?:증가|상승)?/g,
+    /치명타\s*(?:적중률|확률)[^0-9+]{0,30}\+?(\d+(?:\.\d+)?)%/g
   ]);
   addMatchesTo(out, 'critDamage', source, [
-    /치명타\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+    /치명타\s*피해(?:량)?(?:이|가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:만큼)?\s*(?:증가|상승)?/g
   ]);
   addMatchesTo(out, 'evolutionDamage', source, [
-    /진화형?\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
+    /진화형?\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:만큼)?\s*(?:증가|상승)?/g,
+    /진화\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:만큼)?\s*(?:증가|상승)?/g,
     /진피\s*(?:\+)?(\d+(?:\.\d+)?)%/g
   ]);
   addMatchesTo(out, 'additionalDamage', source, [
-    /추가\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+    /추가\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:만큼)?\s*(?:증가|상승)?/g
   ]);
   addMatchesTo(out, 'enemyDamage', source, [
-    /(?<!무력화\s*상태의\s*)적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
+    /(?<!무력화\s*상태의\s*)적에게\s*주는\s*(?:모든\s*)?피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:만큼)?\s*(?:증가|상승)?/g,
     /공격이\s*치명타로\s*적중\s*시\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /백어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /헤드어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
@@ -109,23 +141,80 @@ function hasAnyEffect(effects) {
   return ['critRate','critDamage','evolutionDamage','enemyDamage','additionalDamage'].some(k => Math.abs(Number(effects?.[k] || 0)) > 0);
 }
 function isKnownEvolutionEffect(effect) {
+  const name = normalizeNodeName(effect?.name || '');
   const joined = normalizeNodeName(`${effect?.name || ''} ${effect?.description || ''} ${effect?.tooltip || ''}`);
-  return (state.evolution?.nodes || []).some(node => effect?.name === node.name || joined.includes(node.name));
+
+  // ArkPassive.Effects가 '진화/깨달음/도약' 같은 카테고리 단위로 내려오는 경우가 있습니다.
+  // 특히 깨달음 설명에는 '치명타'라는 단어가 들어가는데, 기존 로직은 1티어 노드 '치명'과
+  // 부분 문자열로 매칭되어 깨달음을 진화 노드로 오인했습니다.
+  if (name.includes('깨달음')) return false;
+  if (name.includes('도약')) return false;
+  if (name.includes('진화')) return true;
+
+  return (state.evolution?.nodes || []).some(node => {
+    if (name === node.name) return true;
+    const nodeName = String(node.name || '');
+    // 치명/신속/특화처럼 일반 단어와 겹치는 1티어 스탯명은 부분 매칭하지 않습니다.
+    if (['치명','특화','신속','제압','인내','숙련'].includes(nodeName)) return false;
+    const escaped = escapeRegExp(nodeName);
+    return new RegExp(`(?:\\[진화\\]|진화|^|\\s)${escaped}(?:\\s*Lv\\.?|\\s*레벨|\\s*\\(|\\s|$)`, 'i').test(joined);
+  });
+}
+function levelNearName(text, nodeName, fallback = 1) {
+  const source = String(text || '');
+  const escaped = escapeRegExp(nodeName);
+  const near = source.match(new RegExp(`${escaped}.{0,80}(?:Lv\\.?|레벨)\\s*(\\d+)`, 'i'))
+    || source.match(new RegExp(`${escaped}.{0,80}([1-5])\\s*단계`, 'i'));
+  if (near) return Number(near[1]);
+  return fallback;
+}
+function enlightenmentSignature(effect, parsed) {
+  const values = ['critRate','critDamage','evolutionDamage','enemyDamage','additionalDamage','attackSpeed','moveSpeed']
+    .map(k => `${k}:${Number(parsed?.[k] || 0).toFixed(3)}`).join('|');
+  const special = parsed?.windfuryAgility ? `|windfury:${parsed.windfuryAgility.level}` : '';
+  return `${normalizeNodeName(effect?.name || '')}|lv:${Number(effect?.level || 0)}|${values}${special}`;
 }
 function extractEnlightenmentEffects(effects) {
-  const result = { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+  const result = { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
+  const applied = new Set();
   for (const effect of effects || []) {
-    const rawText = stripHtml(JSON.stringify(effect?.raw || {}));
-    const joined = `${effect.name || ''} ${effect.description || ''} ${effect.tooltip || ''} ${rawText}`;
+    const joined = effectFullText(effect);
+    const normalized = normalizeNodeName(`${effect?.name || ''} ${joined}`);
     // Open API가 깨달음/진화 구분명을 안정적으로 주지 않는 경우가 있어,
     // 진화 노드로 매칭되는 항목만 제외하고 남은 아크패시브 효과에서 필요한 수치를 읽습니다.
     if (isKnownEvolutionEffect(effect)) continue;
     const parsed = parsePercentEffectText(joined);
-    if (!hasAnyEffect(parsed)) continue;
-    for (const key of ['critRate','critDamage','evolutionDamage','enemyDamage','additionalDamage']) result[key] += parsed[key];
+
+    // 기상술사 질풍노도/기민함처럼 문장 안에 고정 수치가 아니라
+    // 공속/이속 증가량을 참조하는 깨달음 효과는 별도 계산합니다.
+    const baseLevel = Math.max(1, Number(effect?.level || parseLevelFromText(joined, 1) || 1));
+    if (normalized.includes('질풍노도')) {
+      parsed.attackSpeed = (parsed.attackSpeed || 0) + 12;
+      parsed.moveSpeed = (parsed.moveSpeed || 0) + 12;
+    }
+    if (normalized.includes('기민함')) {
+      const lv = Math.min(3, levelNearName(joined, '기민함', baseLevel));
+      const critDamageRate = [0, 0.4, 0.8, 1.2][lv] || 0;
+      const critRateRate = [0, 0.1, 0.2, 0.3][lv] || 0;
+      parsed.windfuryAgility = { level: lv, critDamageRate, critRateRate };
+    }
+    if (normalized.includes('자연의 흐름')) {
+      const lv = Math.min(5, levelNearName(joined, '자연의 흐름', baseLevel));
+      parsed.enemyDamage += lv * 1.2;
+    }
+    if (normalized.includes('바람의 길')) {
+      const lv = Math.min(5, levelNearName(joined, '바람의 길', baseLevel));
+      parsed.enemyDamage += lv * 1.2; // 최대 2중첩 기준: 0.6/1.2/1.8/2.4/3.0 × 2
+    }
+
+    if (!hasAnyEffect(parsed) && !parsed.attackSpeed && !parsed.moveSpeed && !parsed.windfuryAgility) continue;
+    const sig = enlightenmentSignature(effect, parsed);
+    if (applied.has(sig)) continue;
+    applied.add(sig);
+    for (const key of ['critRate','critDamage','evolutionDamage','enemyDamage','additionalDamage','attackSpeed','moveSpeed']) result[key] += Number(parsed[key] || 0);
     result.items.push({ name: effect.name || '깨달음 효과', level: effect.level || 0, effects: parsed });
   }
-  for (const key of ['critRate','critDamage','evolutionDamage','enemyDamage','additionalDamage']) result[key] = Math.round(result[key] * 100) / 100;
+  for (const key of ['critRate','critDamage','evolutionDamage','enemyDamage','additionalDamage','attackSpeed','moveSpeed']) result[key] = Math.round(result[key] * 100) / 100;
   return result;
 }
 
@@ -241,6 +330,37 @@ function onNodeCardClick(event) {
 }
 
 
+function pushDamageSource(list, label, value) {
+  const v = Number(value || 0);
+  if (!Number.isFinite(v) || Math.abs(v) < 0.0001) return;
+  list.push({ label, value: v });
+}
+function collectItemDamageSources(group, key, groupLabel) {
+  const list = [];
+  let usedItem = false;
+  for (const item of group?.items || []) {
+    const value = Number(item?.effects?.[key] || 0);
+    if (!Number.isFinite(value) || Math.abs(value) < 0.0001) continue;
+    usedItem = true;
+    pushDamageSource(list, `${groupLabel} · ${item.type || item.name || '옵션'}`, value);
+  }
+  if (!usedItem && Number(group?.[key] || 0)) pushDamageSource(list, groupLabel, group[key]);
+  return list;
+}
+function multiplyPercentSources(sources) {
+  let multiplier = 1;
+  for (const src of sources || []) {
+    const v = typeof src === 'number' ? src : Number(src?.value || 0);
+    if (!Number.isFinite(v)) continue;
+    multiplier *= (1 + v / 100);
+  }
+  return multiplier;
+}
+function effectivePercentFromSources(sources) {
+  return (multiplyPercentSources(sources) - 1) * 100;
+}
+
+
 function getBaseStats() {
   const selectedCritStat = tier1StatBonus('치명');
   const selectedSwiftStat = tier1StatBonus('신속');
@@ -257,24 +377,61 @@ function getBaseStats() {
   const extraMoveSpeed = num($('extraMoveSpeed').value);
   const critSynergy = $('critSynergyEnabled').checked ? 10 : 0;
   const baseSpeed = 114;
+  const enlightenmentAttackSpeed = num(state.enlightenment.attackSpeed);
+  const enlightenmentMoveSpeed = num(state.enlightenment.moveSpeed);
+  const attackSpeed = baseSpeed + swiftSpeedBonus + enlightenmentAttackSpeed + extraAttackSpeed;
+  const moveSpeed = baseSpeed + swiftSpeedBonus + enlightenmentMoveSpeed + extraMoveSpeed;
+  let dynamicEnlightenmentCritRate = 0;
+  let dynamicEnlightenmentCritDamage = 0;
+  for (const item of state.enlightenment.items || []) {
+    const wf = item?.effects?.windfuryAgility;
+    if (!wf) continue;
+    // 기상술사 '기민함'은 기본 공속/이속 증가량을 기준으로 계산합니다.
+    // 로아의 공속/이속 상한은 각각 140%라서 증가량은 최대 40%까지만 반영됩니다.
+    // Lv1: 치피 40% / 치적 10%, Lv2: 80% / 20%, Lv3: 120% / 30%
+    // 최대값: Lv1 치피 16%·치적 4%, Lv2 치피 32%·치적 8%, Lv3 치피 48%·치적 12%
+    const cappedAttackIncrease = Math.max(0, Math.min(attackSpeed, 140) - 100);
+    const cappedMoveIncrease = Math.max(0, Math.min(moveSpeed, 140) - 100);
+    dynamicEnlightenmentCritDamage += cappedAttackIncrease * Number(wf.critDamageRate || 0);
+    dynamicEnlightenmentCritRate += cappedMoveIncrease * Number(wf.critRateRate || 0);
+  }
+  dynamicEnlightenmentCritRate = Math.round(dynamicEnlightenmentCritRate * 100) / 100;
+  dynamicEnlightenmentCritDamage = Math.round(dynamicEnlightenmentCritDamage * 100) / 100;
+  const enemyDamageSources = [
+    ...collectItemDamageSources(state.accessory, 'enemyDamage', '악세'),
+    ...collectItemDamageSources(state.bracelet, 'enemyDamage', '팔찌')
+  ];
+  pushDamageSource(enemyDamageSources, '깨달음', state.enlightenment.enemyDamage);
+  pushDamageSource(enemyDamageSources, '추가 입력', extraEnemyDamage);
+  const critHitDamageSources = [
+    ...collectItemDamageSources(state.accessory, 'critHitDamage', '악세'),
+    ...collectItemDamageSources(state.bracelet, 'critHitDamage', '팔찌')
+  ];
   return {
     critStat,
     swiftStat,
     statCritRate,
-    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + extraCritRate + critSynergy,
-    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + extraCritDamage,
+    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy,
+    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage,
+    critHitDamage: num(state.accessory.critHitDamage) + num(state.bracelet.critHitDamage),
+    critHitDamageSources,
     evolutionDamage: num(state.enlightenment.evolutionDamage) + extraEvolutionDamage,
     additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + extraAdditionalDamage,
-    enemyDamage: num(state.accessory.enemyDamage) + num(state.bracelet.enemyDamage) + num(state.enlightenment.enemyDamage) + extraEnemyDamage,
+    enemyDamage: effectivePercentFromSources(enemyDamageSources),
+    enemyDamageSources,
     skillCritBonus: 0,
     critSynergy,
     adrenalineCritRate: $('adrenalineEnabled').checked ? num($('adrenalineCritRate').value) : 0,
     attackPower: $('adrenalineEnabled').checked ? num($('adrenalineAttackPower').value) : 0,
     swiftSpeedBonus,
+    enlightenmentAttackSpeed,
+    enlightenmentMoveSpeed,
+    dynamicEnlightenmentCritRate,
+    dynamicEnlightenmentCritDamage,
     baseMoveAttackSpeed: baseSpeed,
-    moveAttackSpeed: baseSpeed + swiftSpeedBonus + Math.min(extraAttackSpeed, extraMoveSpeed),
-    attackSpeed: baseSpeed + swiftSpeedBonus + extraAttackSpeed,
-    moveSpeed: baseSpeed + swiftSpeedBonus + extraMoveSpeed,
+    moveAttackSpeed: Math.min(attackSpeed, moveSpeed),
+    attackSpeed,
+    moveSpeed,
     extraCritRate,
     extraCritDamage,
     extraEvolutionDamage,
@@ -306,8 +463,14 @@ function applyEffect(stats, effect) {
     out.sonicBreakEvolutionDamage = (out.sonicBreakEvolutionDamage || 0) + sonicDamage;
   }
   if (effect.additionalDamage) out.additionalDamage += effect.additionalDamage;
-  if (effect.enemyDamage) out.enemyDamage += effect.enemyDamage;
-  if (effect.finalDamage) out.enemyDamage += effect.finalDamage;
+  if (effect.enemyDamage) {
+    out.enemyDamageSources = [...(out.enemyDamageSources || []), { label: '진화', value: effect.enemyDamage }];
+    out.enemyDamage = effectivePercentFromSources(out.enemyDamageSources);
+  }
+  if (effect.finalDamage) {
+    out.enemyDamageSources = [...(out.enemyDamageSources || []), { label: '진화', value: effect.finalDamage }];
+    out.enemyDamage = effectivePercentFromSources(out.enemyDamageSources);
+  }
   if (effect.attackPower) out.attackPower = (out.attackPower || 0) + effect.attackPower;
   if (effect.speedBonus) { out.attackSpeed = (out.attackSpeed || out.moveAttackSpeed || 0) + effect.speedBonus; out.moveSpeed = (out.moveSpeed || out.moveAttackSpeed || 0) + effect.speedBonus; out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
   if (effect.critCap != null) out.critCap = effect.critCap;
@@ -318,6 +481,8 @@ function applyEffect(stats, effect) {
 function selectedEntries(selection = state.selected) { return Object.entries(selection || {}).map(([name, data]) => ({ name, tier: getNode(name)?.tier, level: Number(data?.level || 0), source: data?.source })).filter(row => row.name && row.level > 0 && row.tier); }
 function cloneSelection() { return JSON.parse(JSON.stringify(state.selected)); }
 function score(stats) {
+  // Lost Ark damage buckets: same bucket effects are additive first, then each bucket is multiplied.
+  // Expected value = crit EV × 진화형피해 × 추가피해 × 적에게주는피해 × 공격력증가.
   const rawCritRate = stats.critRate + stats.skillCritBonus + (stats.adrenalineCritRate || 0);
   let effectiveCritRate = rawCritRate;
   let evo = stats.evolutionDamage;
@@ -330,12 +495,16 @@ function score(stats) {
     effectiveCritRate = stats.critCap;
   }
   const critChance = Math.max(0, Math.min(effectiveCritRate, 100)) / 100;
-  const critMultiplier = (1 - critChance) + critChance * (stats.critDamage / 100) * (1 + (stats.critHitDamage || 0) / 100);
+  const critHitMultiplier = multiplyPercentSources([...(stats.critHitDamageSources || []), ...(stats.critHitDamage ? [{ value: stats.critHitDamage }] : [])]);
+  const critMultiplier = (1 - critChance) + critChance * (stats.critDamage / 100) * critHitMultiplier;
   const evoMultiplier = 1 + evo / 100;
   const addMultiplier = 1 + stats.additionalDamage / 100;
-  const enemyMultiplier = 1 + stats.enemyDamage / 100;
+  const enemyMultiplier = stats.enemyDamageSources?.length ? multiplyPercentSources(stats.enemyDamageSources) : (1 + (stats.enemyDamage || 0) / 100);
+  const effectiveEnemyDamage = (enemyMultiplier - 1) * 100;
+  const effectiveCritHitDamage = (critHitMultiplier - 1) * 100;
   const attackMultiplier = 1 + (stats.attackPower || 0) / 100;
-  return { value: critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: stats.critHitDamage || 0, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: stats.enemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
+  const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier;
+  return { value, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
 }
 function statsWithSelection(baseStats, selection) {
   let s = { ...baseStats };
@@ -393,13 +562,17 @@ function buildSourceSummary(current) {
   if (state.accessory.critRate) critLines.push(sourceLine('악세', state.accessory.critRate));
   if (state.bracelet.critRate) critLines.push(sourceLine('팔찌', state.bracelet.critRate));
   if (state.enlightenment.critRate) critLines.push(sourceLine('깨달음', state.enlightenment.critRate));
+  if (base.dynamicEnlightenmentCritRate) critLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritRate));
   if (base.extraCritRate) critLines.push(sourceLine('추가 입력', base.extraCritRate));
   critLines.push(...critEvolution);
 
   const critDamageLines = [sourceLine('기본 치명타 피해', 200)];
   if (state.accessory.critDamage) critDamageLines.push(sourceLine('악세', state.accessory.critDamage));
   if (state.bracelet.critDamage) critDamageLines.push(sourceLine('팔찌', state.bracelet.critDamage));
+  if (state.accessory.critHitDamage) critDamageLines.push(sourceLine('악세 · 치명타 적중 주피', state.accessory.critHitDamage));
+  if (state.bracelet.critHitDamage) critDamageLines.push(sourceLine('팔찌 · 치명타 적중 주피', state.bracelet.critHitDamage));
   if (state.enlightenment.critDamage) critDamageLines.push(sourceLine('깨달음', state.enlightenment.critDamage));
+  if (base.dynamicEnlightenmentCritDamage) critDamageLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritDamage));
   if (base.extraCritDamage) critDamageLines.push(sourceLine('추가 입력', base.extraCritDamage));
   critDamageLines.push(...critDamageEvolution);
 
@@ -422,6 +595,8 @@ function buildSourceSummary(current) {
     attackSpeedLines.push(sourceLine('신속 스탯', current.stats.swiftSpeedBonus, swiftDetail));
     moveSpeedLines.push(sourceLine('신속 스탯', current.stats.swiftSpeedBonus, swiftDetail));
   }
+  if (base.enlightenmentAttackSpeed) attackSpeedLines.push(sourceLine('깨달음', base.enlightenmentAttackSpeed));
+  if (base.enlightenmentMoveSpeed) moveSpeedLines.push(sourceLine('깨달음', base.enlightenmentMoveSpeed));
   if (base.extraAttackSpeed) attackSpeedLines.push(sourceLine('추가 입력', base.extraAttackSpeed));
   if (base.extraMoveSpeed) moveSpeedLines.push(sourceLine('추가 입력', base.extraMoveSpeed));
 
@@ -433,7 +608,7 @@ function buildSourceSummary(current) {
   enemyLines.push(...enemyEvolution);
 
   $('sourceSummary').innerHTML = `
-    <div class="sourceTitle"><div><h3>치명타 소스 요약</h3><p>진화 노드를 바꾸면 아래 수치가 즉시 바뀝니다.</p></div><button id="resetViewButton" type="button">↻ 초기화</button></div>
+    <div class="sourceTitle"><div><h3>계산 요약</h3><p>추피·치피·진피는 합산, 적주피·치적주피는 곱연산으로 계산합니다.</p></div><button id="resetViewButton" type="button">초기화</button></div>
     ${sourceGroup('치명타 확률', 'blue', critLines, current.result.critRate)}
     ${sourceGroup('치명타 피해', 'purple', critDamageLines, current.result.critDamage)}
     ${sourceGroup('진피', 'orange', evoLines, current.result.evo)}
@@ -450,30 +625,106 @@ function buildSourceSummary(current) {
 function renderCombatStats(current = statsWithSelection(getBaseStats(), state.selected)) {
   buildSourceSummary(current);
 }
+
+function keenEfficiency(current, bonusCritDamage) {
+  const critRate = Math.max(0, Math.min(100, Number(current?.result?.effectiveCritRate ?? current?.result?.critRate ?? 0))) / 100;
+  const critDamage = Number(current?.result?.critDamage || 200);
+  const before = (1 - critRate) + critRate * (critDamage / 100);
+  const after = ((1 - critRate) + critRate * ((critDamage + bonusCritDamage) / 100)) * 0.98;
+  if (!before || !Number.isFinite(before) || !Number.isFinite(after)) return 0;
+  return ((after / before) - 1) * 100;
+}
+function renderKeenEfficiency(current) {
+  const el = $('keenEfficiency');
+  if (!el) return;
+  const rows = [
+    { name: '전설 예둔', bonus: 44 },
+    { name: '유물 예둔', bonus: 52 }
+  ].map(row => {
+    const eff = keenEfficiency(current, row.bonus);
+    const recommend = eff >= 16;
+    return `<div class="keenCard ${recommend ? 'recommend' : 'normal'}">
+      <div><b>${row.name}</b><span>치명타 피해 +${row.bonus}% / 평균 페널티 0.98 적용</span></div>
+      <strong>${eff.toFixed(2)}%</strong>
+      <em>${recommend ? '추천' : '비추천'}</em>
+    </div>`;
+  }).join('');
+  const crit = Math.max(0, Math.min(100, Number(current?.result?.effectiveCritRate ?? current?.result?.critRate ?? 0)));
+  el.innerHTML = `<div class="keenNote">계산 기준: 실제 치적 ${crit.toFixed(2)}% / 치피 ${Number(current?.result?.critDamage || 0).toFixed(2)}%</div>${rows}`;
+}
+function currentTierNames(tier) {
+  return selectedEntries().filter(row => Number(row.tier) === Number(tier)).map(row => row.name);
+}
+function tier4PairLabel(names) {
+  return (names || []).filter(Boolean).join(' + ') || '-';
+}
+function sameNameSet(a, b) {
+  const aa = [...(a || [])].sort().join('|');
+  const bb = [...(b || [])].sort().join('|');
+  return aa === bb;
+}
+function candidateMemo(fourNames, fiveName, calc) {
+  const current4 = currentTierNames(4);
+  const current5 = currentTierNames(5).join(' + ') || '-';
+  const bits = [];
+  if (sameNameSet(fourNames, current4) && fiveName === current5) bits.push('현재 조합');
+  else bits.push(`${tier4PairLabel(fourNames)} / ${fiveName}`);
+  if (calc?.result?.convertedEvolutionDamage > 0) bits.push(`뭉가 전환 ${fmt(calc.result.convertedEvolutionDamage)}%`);
+  if (calc?.result?.sonicBreakEvolutionDamage > 0) bits.push(`음속 ${fmt(calc.result.sonicBreakEvolutionDamage)}%`);
+  return bits.join(' / ');
+}
 function calculateAndRender() {
   const baseStats = getBaseStats();
   const current = statsWithSelection(baseStats, state.selected);
   renderCombatStats(current);
+  renderKeenEfficiency(current);
   const baseValue = current.result.value || 1;
   const candidates = [];
-  for (const name of allOptions(5)) {
-    const node = getNode(name);
-    if (!node) continue;
-    const level = node.maxLevel || 2;
-    const next = cloneSelection();
-    for (const opt of allOptions(5)) delete next[opt];
-    next[name] = { level, source: 'candidate' };
-    const calc = statsWithSelection(baseStats, next);
-    candidates.push({ name, level, calc, diff: ((calc.result.value / baseValue) - 1) * 100 });
+  const excludeManaForge = Boolean($('excludeManaForge')?.checked);
+  const tier4Options = allOptions(4).filter(name => getNode(name));
+  const tier5Options = allOptions(5).filter(name => getNode(name) && !(excludeManaForge && name === '마나 용광로'));
+
+  const tier4Pairs = [];
+  for (let i = 0; i < tier4Options.length; i++) {
+    for (let j = i + 1; j < tier4Options.length; j++) {
+      tier4Pairs.push([tier4Options[i], tier4Options[j]]);
+    }
+  }
+  for (const fourNames of tier4Pairs) {
+    const fourLevel = 1;
+    for (const fiveName of tier5Options) {
+      const fiveNode = getNode(fiveName);
+      const fiveLevel = fiveNode?.maxLevel || 2;
+      const next = cloneSelection();
+      for (const opt of allOptions(4)) delete next[opt];
+      for (const opt of allOptions(5)) delete next[opt];
+      for (const fourName of fourNames) next[fourName] = { level: fourLevel, source: 'candidate' };
+      next[fiveName] = { level: fiveLevel, source: 'candidate' };
+      const calc = statsWithSelection(baseStats, next);
+      candidates.push({ fourNames, fourLevel, fiveName, fiveLevel, calc, diff: ((calc.result.value / baseValue) - 1) * 100 });
+    }
   }
   candidates.sort((a, b) => b.calc.result.value - a.calc.result.value);
-  $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>현재 선택 노드 반영 기준</span>`;
+  const top = candidates.slice(0, 5);
+  $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>현재 1~5티어 선택 기준</span>`;
   $('baseInfo').innerHTML = `치명 ${Math.round(current.stats.critStat || 0)} / 스탯치적 ${fmt(current.stats.statCritRate || 0)}%, 최종치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%, 공증 ${fmt(current.result.attackPower)}%, 공속 ${fmt(current.result.attackSpeed)}%, 이속 ${fmt(current.result.moveSpeed)}%`;
-  $('recommendList').innerHTML = candidates.map((c, i) => {
-    const cls = c.diff >= 0 ? 'up' : 'down';
-    const currentMark = state.selected[c.name]?.level > 0 ? '<em>현재</em>' : '';
-    return `<div class="recommend ${cls}"><div><b>${i + 1}. ${escapeHtml(c.name)} Lv.${c.level}</b>${currentMark}<small>점수 ${c.calc.result.value.toFixed(4)}</small></div><strong>${pct(c.diff)}</strong></div>`;
-  }).join('');
+  $('recommendList').innerHTML = `<div class="comboTableWrap"><table class="comboTable">
+    <thead><tr><th>순위</th><th>4티어</th><th>5티어</th><th>기대값</th><th>차이</th><th>치적</th><th>진피</th><th>참고</th></tr></thead>
+    <tbody>${top.map((c, i) => {
+      const cls = c.diff >= 0 ? 'up' : 'down';
+      const currentCombo = (sameNameSet(c.fourNames, currentTierNames(4)) && state.selected[c.fiveName]?.level > 0) ? '<em>현재</em>' : '';
+      return `<tr class="${i === 0 ? 'best' : ''}">
+        <td><b>${i + 1}</b></td>
+        <td><strong>${escapeHtml(tier4PairLabel(c.fourNames))}</strong></td>
+        <td><span class="nodePill">${escapeHtml(c.fiveName)} Lv.${c.fiveLevel}</span>${currentCombo}</td>
+        <td>${c.calc.result.value.toFixed(4)}</td>
+        <td class="${cls}">${pct(c.diff)}</td>
+        <td>${fmt(c.calc.result.critRate)}%</td>
+        <td>${fmt(c.calc.result.evo)}%</td>
+        <td>${escapeHtml(candidateMemo(c.fourNames, c.fiveName, c.calc))}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
 }
 
 async function loadDb() {
@@ -481,7 +732,6 @@ async function loadDb() {
   state.index = buildIndex(state.evolution);
   state.selected = defaultSelection();
   state.apiSelected = JSON.parse(JSON.stringify(state.selected));
-  $('evolutionDbStatus').textContent = `${state.index.size}개 노드 / 진화 전용`;
   renderEvolutionTiers();
   calculateAndRender();
 }
@@ -494,7 +744,7 @@ async function searchCharacter(name) {
   $('summaryPanel').classList.add('hidden');
   state.selected = {};
   state.apiSelected = {};
-  state.enlightenment = { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+  state.enlightenment = { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
   renderEvolutionTiers();
   calculateAndRender();
   try {
@@ -502,8 +752,8 @@ async function searchCharacter(name) {
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || data.message || '검색 실패');
     if (!data.profile?.CharacterName) throw new Error('캐릭터 프로필을 가져오지 못했습니다.');
-    state.accessory = data.accessoryEffects || { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
-    state.bracelet = data.braceletEffects || { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+    state.accessory = data.accessoryEffects || { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+    state.bracelet = data.braceletEffects || { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
     renderCharacter(data.profile);
     state.foundEffects = readEffects(data.arkPassive);
     state.enlightenment = extractEnlightenmentEffects(state.foundEffects);
@@ -527,5 +777,6 @@ $('searchForm').addEventListener('submit', (event) => {
 ['extraCritRate','extraCritDamage','extraEvolutionDamage','extraAdditionalDamage','extraEnemyDamage','extraAttackSpeed','extraMoveSpeed','adrenalineCritRate','adrenalineAttackPower'].forEach(id => $(id).addEventListener('input', calculateAndRender));
 $('adrenalineEnabled').addEventListener('change', calculateAndRender);
 $('critSynergyEnabled').addEventListener('change', calculateAndRender);
+$('excludeManaForge')?.addEventListener('change', calculateAndRender);
 
 await loadDb();
