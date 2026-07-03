@@ -916,7 +916,7 @@
       "maxLevel": 2,
       "costPerLevel": 15,
       "icon": "🗡️",
-      "description": "진화형 피해 증가 + 치명타 확률 80% 초과분을 진화형 피해로 전환(최대 75%)",
+      "description": "진화형 피해 증가 + 치명타 확률 80% 초과분을 진화형 피해로 전환(Lv.2 기준 총 진피 최대 75%)",
       "levels": {
         "1": {
           "evolutionDamage": 7.5,
@@ -928,7 +928,7 @@
           "evolutionDamage": 15,
           "critCap": 80,
           "overCritToEvolutionDamageRate": 1.5,
-          "overCritEvolutionDamageCap": 75
+          "overCritEvolutionDamageCap": 60
         }
       },
       "iconImage": "/images/evolution/뭉툭한 가시.webp"

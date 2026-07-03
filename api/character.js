@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     const accessoryEffects = extractAccessoryEffects(equipment);
     const braceletEffects = extractBraceletEffects(equipment);
 
-    return res.status(200).json({ ok: true, apiVersion: '4.4.5', profile, arkPassive, equipment, accessoryEffects, braceletEffects, raw: data });
+    return res.status(200).json({ ok: true, apiVersion: '4.5.4', profile, arkPassive, equipment, accessoryEffects, braceletEffects, raw: data });
   } catch (error) {
     const message = error.name === 'AbortError' ? 'Open API 응답 시간이 길어서 중단했습니다.' : error.message;
     return res.status(500).json({ error: '서버 함수 오류', message });
@@ -64,7 +64,7 @@ function tooltipText(tooltip) {
 }
 
 function extractAccessoryEffects(equipment) {
-  const result = { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+  const result = { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   const accessoryTypes = new Set(['목걸이', '귀걸이', '반지']);
   for (const item of Array.isArray(equipment) ? equipment : []) {
     if (!accessoryTypes.has(item?.Type)) continue;
@@ -72,32 +72,34 @@ function extractAccessoryEffects(equipment) {
     const effects = parseAccessoryText(text);
     result.critRate += effects.critRate;
     result.critDamage += effects.critDamage;
+    result.critHitDamage += effects.critHitDamage;
     result.enemyDamage += effects.enemyDamage;
     result.additionalDamage += effects.additionalDamage;
     result.items.push({ type: item.Type, name: item.Name, grade: item.Grade, effects });
   }
-  for (const key of ['critRate', 'critDamage', 'enemyDamage', 'additionalDamage']) result[key] = Math.round(result[key] * 100) / 100;
+  for (const key of ['critRate', 'critDamage', 'critHitDamage', 'enemyDamage', 'additionalDamage']) result[key] = Math.round(result[key] * 100) / 100;
   return result;
 }
 
 function extractBraceletEffects(equipment) {
-  const result = { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+  const result = { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   for (const item of Array.isArray(equipment) ? equipment : []) {
     if (item?.Type !== '팔찌') continue;
     const text = tooltipText(item.Tooltip);
     const effects = parseAccessoryText(text);
     result.critRate += effects.critRate;
     result.critDamage += effects.critDamage;
+    result.critHitDamage += effects.critHitDamage;
     result.enemyDamage += effects.enemyDamage;
     result.additionalDamage += effects.additionalDamage;
     result.items.push({ type: item.Type, name: item.Name, grade: item.Grade, effects });
   }
-  for (const key of ['critRate', 'critDamage', 'enemyDamage', 'additionalDamage']) result[key] = Math.round(result[key] * 100) / 100;
+  for (const key of ['critRate', 'critDamage', 'critHitDamage', 'enemyDamage', 'additionalDamage']) result[key] = Math.round(result[key] * 100) / 100;
   return result;
 }
 
 function parseAccessoryText(text) {
-  const out = { critRate: 0, critDamage: 0, enemyDamage: 0, additionalDamage: 0 };
+  const out = { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0 };
   const source = stripHtml(text);
 
   // 팔찌/악세 툴팁은 문장형, 축약형(+), HTML 조각이 섞여 들어와서
@@ -115,11 +117,15 @@ function parseAccessoryText(text) {
     /추가\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
   ]);
 
+  // 치명타 적중 시 적주피는 일반 적주피가 아니라 치명타 배율 안에서 별도 곱연산으로 계산합니다.
+  addMatches(out, 'critHitDamage', source, [
+    /공격이\s*치명타로\s*적중\s*시\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+  ]);
+
   // "무력화 상태의 적에게 주는 피해"는 별도 조건부라 제외하고,
-  // 일반 적주피/쿨증 적주피/치명타 적중 시 적주피/백·헤드·비방향성 적주피는 자동 합산합니다.
+  // 일반 적주피/쿨증 적주피/백·헤드·비방향성 적주피는 각 출처별 곱연산으로 계산합니다.
   addMatches(out, 'enemyDamage', source, [
     /(?<!무력화\s*상태의\s*)적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
-    /공격이\s*치명타로\s*적중\s*시\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /백어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /헤드어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /방향성\s*공격이\s*아닌\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
