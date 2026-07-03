@@ -590,6 +590,3 @@ select {
   .comboTable { font-size: 13px; }
   .comboTable th, .comboTable td { padding: 11px 10px; }
 }
-
-.wideCheck { grid-column: span 2; }
-@media (max-width: 720px) { .wideCheck { grid-column: span 1; } }

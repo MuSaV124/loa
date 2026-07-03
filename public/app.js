@@ -373,49 +373,6 @@ function safePercentSources(sources, aggregateValue, aggregateLabel = '합산값
 }
 
 
-function isTier45Node(name) {
-  const tier = Number(getNode(name)?.tier || 0);
-  return tier === 4 || tier === 5;
-}
-function selectedTier45FlatEffects(selection = state.selected) {
-  const total = { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, additionalDamage: 0, enemyDamage: 0, finalDamage: 0, attackPower: 0, speedBonus: 0 };
-  for (const row of selectedEntries(selection)) {
-    if (!isTier45Node(row.name)) continue;
-    const eff = getLevelEffect(row.name, row.level);
-    for (const key of Object.keys(total)) total[key] += Number(eff?.[key] || 0);
-  }
-  return total;
-}
-function subtractCurrentTier45FromBase(stats, selection = state.selected) {
-  if (!$('removeCurrentTier45FromInputs')?.checked) return stats;
-  const eff = selectedTier45FlatEffects(selection);
-  const out = { ...stats };
-  out.critRate = Math.max(0, Number(out.critRate || 0) - eff.critRate);
-  out.critDamage = Math.max(0, Number(out.critDamage || 0) - eff.critDamage);
-  out.critHitDamage = Math.max(0, Number(out.critHitDamage || 0) - eff.critHitDamage);
-  out.evolutionDamage = Math.max(0, Number(out.evolutionDamage || 0) - eff.evolutionDamage);
-  out.additionalDamage = Math.max(0, Number(out.additionalDamage || 0) - eff.additionalDamage);
-  out.attackPower = Math.max(0, Number(out.attackPower || 0) - eff.attackPower);
-  out.attackSpeed = Math.max(0, Number(out.attackSpeed || 0) - eff.speedBonus);
-  out.moveSpeed = Math.max(0, Number(out.moveSpeed || 0) - eff.speedBonus);
-  out.moveAttackSpeed = Math.min(out.attackSpeed || 0, out.moveSpeed || 0);
-
-  const removeEnemy = eff.enemyDamage + eff.finalDamage;
-  if (removeEnemy > 0) {
-    out.enemyDamageSources = [...(out.enemyDamageSources || [])];
-    const idx = out.enemyDamageSources.findIndex(src => src?.label === '추가 입력');
-    if (idx >= 0) {
-      const current = Number(out.enemyDamageSources[idx].value || 0);
-      const next = Math.max(0, current - removeEnemy);
-      if (next > 0.0001) out.enemyDamageSources[idx] = { ...out.enemyDamageSources[idx], value: next };
-      else out.enemyDamageSources.splice(idx, 1);
-    }
-    out.enemyDamage = effectivePercentFromSources(out.enemyDamageSources);
-  }
-  return out;
-}
-
-
 function getBaseStats() {
   const selectedCritStat = tier1StatBonus('치명');
   const selectedSwiftStat = tier1StatBonus('신속');
@@ -462,7 +419,7 @@ function getBaseStats() {
     ...collectItemDamageSources(state.accessory, 'critHitDamage', '악세'),
     ...collectItemDamageSources(state.bracelet, 'critHitDamage', '팔찌')
   ];
-  const rawBase = {
+  return {
     critStat,
     swiftStat,
     statCritRate,
@@ -495,7 +452,6 @@ function getBaseStats() {
     extraAttackSpeed,
     extraMoveSpeed
   };
-  return subtractCurrentTier45FromBase(rawBase, state.selected);
 }
 function applyEffect(stats, effect) {
   const out = { ...stats };
@@ -535,7 +491,15 @@ function applyEffect(stats, effect) {
   return out;
 }
 function selectedEntries(selection = state.selected) { return Object.entries(selection || {}).map(([name, data]) => ({ name, tier: getNode(name)?.tier, level: Number(data?.level || 0), source: data?.source })).filter(row => row.name && row.level > 0 && row.tier); }
-function cloneSelection() { return JSON.parse(JSON.stringify(state.selected)); }
+function cloneSelection(selection = state.selected) { return JSON.parse(JSON.stringify(selection)); }
+function selectionWithoutTiers(selection = state.selected, tiers = [4, 5]) {
+  const next = cloneSelection(selection);
+  const tierSet = new Set(tiers.map(Number));
+  for (const row of selectedEntries(next)) {
+    if (tierSet.has(Number(row.tier))) delete next[row.name];
+  }
+  return next;
+}
 function score(stats) {
   // Lost Ark damage buckets: same bucket effects are additive first, then each bucket is multiplied.
   // Expected value = crit EV × 진화형피해 × 추가피해 × 적에게주는피해 × 공격력증가.
@@ -757,9 +721,9 @@ function calculateAndRender() {
     for (const fiveName of tier5Options) {
       const fiveNode = getNode(fiveName);
       const fiveLevel = fiveNode?.maxLevel || 2;
-      const next = cloneSelection();
-      for (const opt of allOptions(4)) delete next[opt];
-      for (const opt of allOptions(5)) delete next[opt];
+      // 추천 계산은 현재 선택/입력값을 직접 깎지 않습니다.
+      // 1~3티어와 로아와/추가 입력값은 유지하고, 추천 계산용 selection에서만 현재 4/5티어를 제거한 뒤 후보 4/5티어를 다시 넣습니다.
+      const next = selectionWithoutTiers(state.selected, [4, 5]);
       for (const fourName of fourNames) next[fourName] = { level: fourLevel, source: 'candidate' };
       next[fiveName] = { level: fiveLevel, source: 'candidate' };
       const calc = statsWithSelection(baseStats, next);
@@ -768,10 +732,10 @@ function calculateAndRender() {
   }
   candidates.sort((a, b) => b.calc.result.value - a.calc.result.value);
   const top = candidates.slice(0, 5);
-  $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>현재 1~5티어 선택 기준</span>`;
+  $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>현재 1~5티어 선택 기준 · 추천표는 현재 4/5티어를 뺀 뒤 후보 4/5티어를 넣어 계산</span>`;
   $('baseInfo').innerHTML = `치명 ${Math.round(current.stats.critStat || 0)} / 스탯치적 ${fmt(current.stats.statCritRate || 0)}%, 최종치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 치적주피 ${fmt(current.result.critHitDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%, 공증 ${fmt(current.result.attackPower)}%, 공속 ${fmt(current.result.attackSpeed)}%, 이속 ${fmt(current.result.moveSpeed)}%`;
   $('recommendList').innerHTML = `<div class="comboTableWrap"><table class="comboTable">
-    <thead><tr><th>순위</th><th>4티어</th><th>5티어</th><th>기대값</th><th>차이</th><th>치적</th><th>진피</th><th>참고</th></tr></thead>
+    <thead><tr><th>순위</th><th>4티어</th><th>5티어</th><th>추천 적용 기대값</th><th>현재 대비</th><th>치적</th><th>진피</th><th>계산 기준</th></tr></thead>
     <tbody>${top.map((c, i) => {
       const cls = c.diff >= 0 ? 'up' : 'down';
       const currentCombo = (sameNameSet(c.fourNames, currentTierNames(4)) && state.selected[c.fiveName]?.level > 0) ? '<em>현재</em>' : '';
@@ -840,6 +804,5 @@ $('searchForm').addEventListener('submit', (event) => {
 $('adrenalineEnabled').addEventListener('change', calculateAndRender);
 $('critSynergyEnabled').addEventListener('change', calculateAndRender);
 $('excludeManaForge')?.addEventListener('change', calculateAndRender);
-$('removeCurrentTier45FromInputs')?.addEventListener('change', calculateAndRender);
 
 await loadDb();
