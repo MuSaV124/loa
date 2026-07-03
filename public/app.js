@@ -1,4 +1,4 @@
-const VERSION = '4.5.5';
+const VERSION = '4.6.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -373,9 +373,9 @@ function safePercentSources(sources, aggregateValue, aggregateLabel = '합산값
 }
 
 
-function getBaseStats() {
-  const selectedCritStat = tier1StatBonus('치명');
-  const selectedSwiftStat = tier1StatBonus('신속');
+function getBaseStats(selection = state.selected) {
+  const selectedCritStat = tier1StatBonus('치명', selection);
+  const selectedSwiftStat = tier1StatBonus('신속', selection);
   const critStat = num($('baseCritStat').value) + selectedCritStat;
   const swiftStat = num($('baseSwiftStat').value) + selectedSwiftStat;
   const statCritRate = critRateFromStat(critStat);
@@ -456,7 +456,7 @@ function getBaseStats() {
 function applyEffect(stats, effect, sourceLabel = '진화') {
   const out = { ...stats };
   if (effect.critStat) { out.critStat = (out.critStat || 0) + effect.critStat; out.statCritRate = critRateFromStat(out.critStat); out.critRate += critRateFromStat(effect.critStat); }
-  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.attackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.extraAttackSpeed || 0); out.moveSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.extraMoveSpeed || 0); out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
+  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.attackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentAttackSpeed || 0) + (out.extraAttackSpeed || 0); out.moveSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentMoveSpeed || 0) + (out.extraMoveSpeed || 0); out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
   if (effect.critRate) out.critRate += effect.critRate;
   if (effect.critDamage) out.critDamage += effect.critDamage;
   if (effect.critHitDamage) {
@@ -534,9 +534,22 @@ function score(stats) {
   const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier;
   return { value, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
 }
-function statsWithSelection(baseStats, selection) {
-  let s = { ...baseStats };
-  for (const row of selectedEntries(selection)) {
+function cloneBaseStats(stats) {
+  return {
+    ...stats,
+    enemyDamageSources: [...(stats.enemyDamageSources || [])],
+    critHitDamageSources: [...(stats.critHitDamageSources || [])]
+  };
+}
+function statsWithSelection(selection = state.selected) {
+  // v4.6.0 계산 엔진 순서 고정:
+  // 1) 선택 세팅 기준 기본 스탯 생성
+  // 2) 4/5티어 추천 계산이면 selection에서 현재 4/5티어를 이미 제거한 상태로 들어옴
+  // 3) 해당 selection의 진화 노드를 전부 적용
+  // 4) 모든 치적/치피/진피/추피/적주피/공증/공이속이 확정된 뒤 score()에서 뭉가를 마지막 처리
+  let s = cloneBaseStats(getBaseStats(selection));
+  const entries = selectedEntries(selection).sort((a, b) => Number(a.tier) - Number(b.tier));
+  for (const row of entries) {
     if (row.name === '치명' || row.name === '신속') continue;
     s = applyEffect(s, getLevelEffect(row.name, row.level), `진화 ${row.name}`);
   }
@@ -653,7 +666,7 @@ function buildSourceSummary(current) {
   if (reset) reset.addEventListener('click', () => { state.selected = JSON.parse(JSON.stringify(state.apiSelected || {})); renderEvolutionTiers(); calculateAndRender(); });
 }
 
-function renderCombatStats(current = statsWithSelection(getBaseStats(), state.selected)) {
+function renderCombatStats(current = statsWithSelection(state.selected)) {
   buildSourceSummary(current);
 }
 
@@ -705,8 +718,7 @@ function candidateMemo(fourNames, fiveName, calc) {
   return bits.join(' / ');
 }
 function calculateAndRender() {
-  const baseStats = getBaseStats();
-  const current = statsWithSelection(baseStats, state.selected);
+  const current = statsWithSelection(state.selected);
   renderCombatStats(current);
   renderKeenEfficiency(current);
   const baseValue = current.result.value || 1;
@@ -731,16 +743,16 @@ function calculateAndRender() {
       const next = selectionWithoutTiers(state.selected, [4, 5]);
       for (const fourName of fourNames) next[fourName] = { level: fourLevel, source: 'candidate' };
       next[fiveName] = { level: fiveLevel, source: 'candidate' };
-      const calc = statsWithSelection(baseStats, next);
+      const calc = statsWithSelection(next);
       candidates.push({ fourNames, fourLevel, fiveName, fiveLevel, calc, diff: ((calc.result.value / baseValue) - 1) * 100 });
     }
   }
   candidates.sort((a, b) => b.calc.result.value - a.calc.result.value);
   const top = candidates.slice(0, 5);
-  $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>현재 1~5티어 선택 기준 · 추천표는 현재 4/5티어를 뺀 뒤 후보 4/5티어를 넣어 계산</span>`;
+  $('currentScore').innerHTML = `<strong>${current.result.value.toFixed(4)}</strong><span>너의 정보는 현재 1~5티어 그대로 계산 · 추천표는 현재 4/5티어 제거 후 후보 4/5티어 적용값</span>`;
   $('baseInfo').innerHTML = `치명 ${Math.round(current.stats.critStat || 0)} / 스탯치적 ${fmt(current.stats.statCritRate || 0)}%, 최종치적 ${fmt(current.result.critRate)}%, 치피 ${fmt(current.result.critDamage)}%, 치적주피 ${fmt(current.result.critHitDamage)}%, 진피 ${fmt(current.result.evo)}%, 추피 ${fmt(current.result.additionalDamage)}%, 적주피 ${fmt(current.result.enemyDamage)}%, 공증 ${fmt(current.result.attackPower)}%, 공속 ${fmt(current.result.attackSpeed)}%, 이속 ${fmt(current.result.moveSpeed)}%`;
   $('recommendList').innerHTML = `<div class="comboTableWrap"><table class="comboTable">
-    <thead><tr><th>순위</th><th>4티어</th><th>5티어</th><th>추천 적용 기대값</th><th>현재 대비</th><th>치적</th><th>진피</th><th>계산 기준</th></tr></thead>
+    <thead><tr><th>순위</th><th>추천 4티어</th><th>추천 5티어</th><th>골랐을 때 기대값</th><th>현재 대비</th><th>계산치적</th><th>진피</th><th>계산 기준</th></tr></thead>
     <tbody>${top.map((c, i) => {
       const cls = c.diff >= 0 ? 'up' : 'down';
       const currentCombo = (sameNameSet(c.fourNames, currentTierNames(4)) && state.selected[c.fiveName]?.level > 0) ? '<em>현재</em>' : '';
