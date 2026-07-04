@@ -1,4 +1,4 @@
-const VERSION = '4.6.9';
+const VERSION = '4.7.0';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -482,6 +482,7 @@ function applyEffect(stats, effect, sourceLabel = '진화') {
     out.critHitDamageSources = [...(out.critHitDamageSources || []), { label: sourceLabel, value: effect.critHitDamage }];
   }
   if (effect.evolutionDamage) out.evolutionDamage += effect.evolutionDamage;
+  if (effect.cooldownReduction) out.cooldownReduction = (out.cooldownReduction || 0) + effect.cooldownReduction;
   if (effect.sonicBreak) {
     const attackIncrease = Math.max(0, (out.attackSpeed || out.moveAttackSpeed || 100) - 100);
     const moveIncrease = Math.max(0, (out.moveSpeed || out.moveAttackSpeed || 100) - 100);
@@ -549,8 +550,14 @@ function score(stats) {
   const displayEnemyDamage = additivePercentFromSources(stats.enemyDamageSources);
   const displayCritHitDamage = additivePercentFromSources(critHitSources);
   const attackMultiplier = 1 + (stats.attackPower || 0) / 100;
-  const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier;
-  return { value, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
+  // v4.7.0: 쿨감 실전 반영. 전분 '쿨타임 비율' 기본 75% 고정.
+  // 이론 DPS 증가분 [1/(1-CDR)-1] 중 75%만 추천 기대값에 반영한다.
+  const cooldownReduction = Math.max(0, Math.min(Number(stats.cooldownReduction || 0), 95));
+  const cooldownRatio = 0.75;
+  const theoreticalCooldownGain = cooldownReduction > 0 ? (1 / (1 - cooldownReduction / 100) - 1) : 0;
+  const cooldownMultiplier = 1 + theoreticalCooldownGain * cooldownRatio;
+  const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier * cooldownMultiplier;
+  return { value, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
 }
 function cloneBaseStats(stats) {
   return {
@@ -627,7 +634,7 @@ function enlightenmentAppliedDetailHtml(base) {
   pushTotal('추피', state.enlightenment.additionalDamage);
   pushTotal('적주피', state.enlightenment.enemyDamage);
   const totalLine = totals.length ? `<div class="enlightenmentDetailTotal"><strong>깨달음 합계</strong><em>${escapeHtml(totals.join(' / '))}</em></div>` : '';
-  return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 깨달음 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. v4.6.9부터 API Name이 '깨달음'인 항목만 깨달음으로 반영합니다. 도약/진화 항목은 깨달음 계산에서 제외합니다.</p></div></details>`;
+  return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 깨달음 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. v4.7.0부터 API Name이 '깨달음'인 항목만 깨달음으로 반영합니다. 도약/진화 항목은 깨달음 계산에서 제외합니다.</p></div></details>`;
 }
 
 function buildSourceSummary(current) {

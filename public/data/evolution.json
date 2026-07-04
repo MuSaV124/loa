@@ -724,10 +724,12 @@
       "icon": "👥",
       "levels": {
         "1": {
-          "evolutionDamage": 5
+          "evolutionDamage": 5,
+          "cooldownReduction": 4
         },
         "2": {
-          "evolutionDamage": 10
+          "evolutionDamage": 10,
+          "cooldownReduction": 8
         }
       },
       "iconImage": "/images/evolution/최적화 훈련.webp"
