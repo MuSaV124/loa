@@ -1,4 +1,4 @@
-const VERSION = '4.6.6';
+const VERSION = '4.6.8';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -627,7 +627,7 @@ function enlightenmentAppliedDetailHtml(base) {
   pushTotal('추피', state.enlightenment.additionalDamage);
   pushTotal('적주피', state.enlightenment.enemyDamage);
   const totalLine = totals.length ? `<div class="enlightenmentDetailTotal"><strong>깨달음 합계</strong><em>${escapeHtml(totals.join(' / '))}</em></div>` : '';
-  return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 깨달음 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. v4.6.6부터 API Name이 '깨달음'인 항목만 깨달음으로 반영합니다. 도약/진화 항목은 깨달음 계산에서 제외합니다.</p></div></details>`;
+  return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 깨달음 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. v4.6.8부터 API Name이 '깨달음'인 항목만 깨달음으로 반영합니다. 도약/진화 항목은 깨달음 계산에서 제외합니다.</p></div></details>`;
 }
 
 function buildSourceSummary(current) {
@@ -875,25 +875,28 @@ function calculateAndRender() {
   candidates.sort((a, b) => b.recValue - a.recValue);
   const top = candidates.slice(0, 5);
   const currentDiffText = `${currentDiff >= 0 ? '+' : ''}${currentDiff.toFixed(2)}%`;
-  $('currentScore').innerHTML = `<strong>${apiBase.result.value.toFixed(4)}</strong><span>API가 읽어온 원본 1~5티어 기대값을 비교 기준으로 고정합니다.${singleHitPenaltyEnabled ? ' 뭉가 후보는 추천점수만 -2.5% 적용.' : ''}</span><div class="scoreMini">현재 화면 선택값 ${current.result.value.toFixed(4)} <b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>`;
-  $('baseInfo').innerHTML = `API 기준: 치명 ${Math.round(apiBase.stats.critStat || 0)} / 최종치적 ${fmt(apiBase.result.critRate)}%, 치피 ${fmt(apiBase.result.critDamage)}%, 치적주피 ${fmt(apiBase.result.critHitDamage)}%, 진피 ${fmt(apiBase.result.evo)}%, 추피 ${fmt(apiBase.result.additionalDamage)}%, 적주피 ${fmt(apiBase.result.enemyDamage)}%, 공증 ${fmt(apiBase.result.attackPower)}%`;
-  $('recommendList').innerHTML = `<div class="comboCards">${top.map((c, i) => {
+  $('currentScore').innerHTML = `<div class="apiBaselineRow">
+    <div><span>API 원본 기대값</span><b>${apiBase.result.value.toFixed(4)}</b></div>
+    <div><span>현재 화면 선택값</span><b>${current.result.value.toFixed(4)}</b></div>
+    <div><span>현재 대비</span><b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>
+    <p>비교 기준은 API가 읽어온 원본 아크패시브 기대값으로 고정됩니다.${singleHitPenaltyEnabled ? ' 뭉가 후보는 추천점수만 -2.5% 적용됩니다.' : ''}</p>
+  </div>`;
+  $('baseInfo').innerHTML = `<b>API 기준 상세</b><span>치명 ${Math.round(apiBase.stats.critStat || 0)} · 최종치적 ${fmt(apiBase.result.critRate)}% · 치피 ${fmt(apiBase.result.critDamage)}% · 치적주피 ${fmt(apiBase.result.critHitDamage)}% · 진피 ${fmt(apiBase.result.evo)}% · 추피 ${fmt(apiBase.result.additionalDamage)}% · 적주피 ${fmt(apiBase.result.enemyDamage)}% · 공증 ${fmt(apiBase.result.attackPower)}%</span>`;
+  $('recommendList').innerHTML = `<div class="comboRows">${top.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
     const memo = candidateMemo(c.fourNames, c.fiveName, c.calc, c.penaltyApplied);
-    return `<article class="comboCard ${i === 0 ? 'best' : ''}">
+    return `<article class="comboRow ${i === 0 ? 'best' : ''}">
       <div class="rankBadge">${i + 1}</div>
-      <div class="comboMain">
+      <div class="rowBuild">
         <div class="tierLine"><span>2T</span><strong>${escapeHtml(tier2Label(c.tier2Entries))}</strong></div>
         <div class="tierLine"><span>4T</span><strong>${escapeHtml(tier4PairLabel(c.fourNames))}</strong></div>
         <div class="tierLine"><span>5T</span><strong class="nodePill">${escapeHtml(c.fiveName)} Lv.${c.fiveLevel}</strong>${candidateTag(c)}</div>
         <div class="comboMemo">${escapeHtml(memo)}</div>
       </div>
-      <div class="comboMetrics">
-        <div><span>추천점수</span><b>${c.recValue.toFixed(4)}</b>${c.penaltyApplied ? `<small>이론 ${c.calc.result.value.toFixed(4)}</small>` : ''}</div>
-        <div><span>API 대비</span><b class="${cls}">${pct(c.diff)}</b></div>
-        <div><span>계산치적</span><b>${fmt(c.calc.result.critRate)}%</b></div>
-        <div><span>진피</span><b>${fmt(c.calc.result.evo)}%</b></div>
-      </div>
+      <div class="rowMetric"><span>추천</span><b>${c.recValue.toFixed(4)}</b>${c.penaltyApplied ? `<small>이론 ${c.calc.result.value.toFixed(4)}</small>` : ''}</div>
+      <div class="rowMetric"><span>API 대비</span><b class="${cls}">${pct(c.diff)}</b></div>
+      <div class="rowMetric"><span>치적</span><b>${fmt(c.calc.result.critRate)}%</b></div>
+      <div class="rowMetric"><span>진피</span><b>${fmt(c.calc.result.evo)}%</b></div>
     </article>`;
   }).join('')}</div>`;
 }
