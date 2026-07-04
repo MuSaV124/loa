@@ -952,7 +952,8 @@ $('searchForm').addEventListener('submit', (event) => {
 $('adrenalineEnabled').addEventListener('change', calculateAndRender);
 $('critSynergyEnabled').addEventListener('change', calculateAndRender);
 $('backAttackEnabled').addEventListener('change', calculateAndRender);
-$('excludeManaForge')?.addEventListener('change', calculateAndRender);
+$('excludeCooldown')?.addEventListener('change', calculateAndRender);
+$('noManaMainSkill')?.addEventListener('change', calculateAndRender);
 $('singleHitMainSkill')?.addEventListener('change', calculateAndRender);
 
 await loadDb();
