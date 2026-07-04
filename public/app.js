@@ -788,15 +788,41 @@ function recommendationValueFor(fiveName, calc, singleHitPenaltyEnabled) {
   if (singleHitPenaltyEnabled && fiveName === '뭉툭한 가시') return value * 0.975;
   return value;
 }
-function hasSameTier45(selection, fourNames, fiveName) {
+function tier2Label(entries) {
+  return entries.map(x => `${x.name} Lv.${x.level}`).join(' + ');
+}
+function tier2Allocations(options) {
+  const out = [];
+  function walk(i, remain, picked) {
+    if (i >= options.length) {
+      if (remain === 0 && picked.length) out.push(picked.map(x => ({ ...x })));
+      return;
+    }
+    const name = options[i];
+    const node = getNode(name);
+    const max = Math.min(Number(node?.maxLevel || 0), remain);
+    for (let lv = 0; lv <= max; lv++) {
+      if (lv > 0) picked.push({ name, level: lv });
+      walk(i + 1, remain - lv, picked);
+      if (lv > 0) picked.pop();
+    }
+  }
+  walk(0, 3, []); // 2티어 30P = 10P × 3레벨
+  return out;
+}
+function hasSameTier245(selection, tier2Entries, fourNames, fiveName) {
+  const selected2 = selectedEntries(selection).filter(row => Number(row.tier) === 2).map(row => ({ name: row.name, level: Number(row.level) }));
   const selected4 = selectedEntries(selection).filter(row => Number(row.tier) === 4).map(row => row.name);
   const selected5 = selectedEntries(selection).filter(row => Number(row.tier) === 5).map(row => row.name);
-  return sameNameSet(fourNames, selected4) && selected5.includes(fiveName);
+  const a = [...selected2].sort((x,y) => x.name.localeCompare(y.name));
+  const b = [...tier2Entries].sort((x,y) => x.name.localeCompare(y.name));
+  const same2 = a.length === b.length && a.every((x,i) => x.name === b[i].name && x.level === b[i].level);
+  return same2 && sameNameSet(fourNames, selected4) && selected5.includes(fiveName);
 }
 function candidateTag(c) {
   const tags = [];
-  if (hasSameTier45(state.apiSelected, c.fourNames, c.fiveName)) tags.push('<em class="apiTag">API</em>');
-  if (hasSameTier45(state.selected, c.fourNames, c.fiveName)) tags.push('<em class="currentTag">현재</em>');
+  if (hasSameTier245(state.apiSelected, c.tier2Entries, c.fourNames, c.fiveName)) tags.push('<em class="apiTag">API</em>');
+  if (hasSameTier245(state.selected, c.tier2Entries, c.fourNames, c.fiveName)) tags.push('<em class="currentTag">현재</em>');
   if (c.penaltyApplied) tags.push('<em class="penaltyTag">단타 -2.5%</em>');
   return tags.join('');
 }
@@ -808,31 +834,42 @@ function calculateAndRender() {
   const baseValue = apiBase.result.value || current.result.value || 1;
   const currentDiff = ((current.result.value / baseValue) - 1) * 100;
   const candidates = [];
-  const excludeManaForge = Boolean($('excludeManaForge')?.checked);
+  const noManaMainSkill = Boolean($('noManaMainSkill')?.checked);
+  const excludeCooldown = Boolean($('excludeCooldown')?.checked);
   const singleHitPenaltyEnabled = Boolean($('singleHitMainSkill')?.checked);
+
+  // 딜러 추천 규칙: 축복의 여신은 항상 제외. 한계 돌파만 Lv.3 가능하며 DB maxLevel을 그대로 사용.
+  const tier2Options = allOptions(2).filter(name => {
+    if (!getNode(name) || name === '축복의 여신') return false;
+    if (excludeCooldown && name === '최적화 훈련') return false;
+    if (noManaMainSkill && ['끝없는 마나', '금단의 주문'].includes(name)) return false;
+    return true;
+  });
+  const tier2Candidates = tier2Allocations(tier2Options);
   const tier4Options = allOptions(4).filter(name => getNode(name));
-  const tier5Options = allOptions(5).filter(name => getNode(name) && !(excludeManaForge && name === '마나 용광로'));
+  const tier5Options = allOptions(5).filter(name => getNode(name) && !(noManaMainSkill && name === '마나 용광로'));
 
   const tier4Pairs = [];
   for (let i = 0; i < tier4Options.length; i++) {
-    for (let j = i + 1; j < tier4Options.length; j++) {
-      tier4Pairs.push([tier4Options[i], tier4Options[j]]);
-    }
+    for (let j = i + 1; j < tier4Options.length; j++) tier4Pairs.push([tier4Options[i], tier4Options[j]]);
   }
-  for (const fourNames of tier4Pairs) {
-    const fourLevel = 1;
-    for (const fiveName of tier5Options) {
-      const fiveNode = getNode(fiveName);
-      const fiveLevel = fiveNode?.maxLevel || 2;
-      // 추천 계산은 현재 선택/입력값을 직접 깎지 않습니다.
-      // 1~3티어와 로아와/추가 입력값은 유지하고, 추천 계산용 selection에서만 현재 4/5티어를 제거한 뒤 후보 4/5티어를 다시 넣습니다.
-      const next = selectionWithoutTiers(state.selected, [4, 5]);
-      for (const fourName of fourNames) next[fourName] = { level: fourLevel, source: 'candidate' };
-      next[fiveName] = { level: fiveLevel, source: 'candidate' };
-      const calc = statsWithSelection(next);
-      const recValue = recommendationValueFor(fiveName, calc, singleHitPenaltyEnabled);
-      const penaltyApplied = singleHitPenaltyEnabled && fiveName === '뭉툭한 가시';
-      candidates.push({ fourNames, fourLevel, fiveName, fiveLevel, calc, recValue, penaltyApplied, diff: ((recValue / baseValue) - 1) * 100 });
+
+  for (const tier2Entries of tier2Candidates) {
+    for (const fourNames of tier4Pairs) {
+      const fourLevel = 1;
+      for (const fiveName of tier5Options) {
+        const fiveNode = getNode(fiveName);
+        const fiveLevel = fiveNode?.maxLevel || 2;
+        // 추천 계산에서 현재 2/4/5티어만 제거하고 후보 조합을 삽입. 1/3티어와 입력값은 유지.
+        const next = selectionWithoutTiers(state.selected, [2, 4, 5]);
+        for (const e of tier2Entries) next[e.name] = { level: e.level, source: 'candidate' };
+        for (const fourName of fourNames) next[fourName] = { level: fourLevel, source: 'candidate' };
+        next[fiveName] = { level: fiveLevel, source: 'candidate' };
+        const calc = statsWithSelection(next);
+        const recValue = recommendationValueFor(fiveName, calc, singleHitPenaltyEnabled);
+        const penaltyApplied = singleHitPenaltyEnabled && fiveName === '뭉툭한 가시';
+        candidates.push({ tier2Entries, fourNames, fourLevel, fiveName, fiveLevel, calc, recValue, penaltyApplied, diff: ((recValue / baseValue) - 1) * 100 });
+      }
     }
   }
   candidates.sort((a, b) => b.recValue - a.recValue);
@@ -841,22 +878,24 @@ function calculateAndRender() {
   $('currentScore').innerHTML = `<strong>${apiBase.result.value.toFixed(4)}</strong><span>API가 읽어온 원본 1~5티어 기대값을 비교 기준으로 고정합니다.${singleHitPenaltyEnabled ? ' 뭉가 후보는 추천점수만 -2.5% 적용.' : ''}</span><div class="scoreMini">현재 화면 선택값 ${current.result.value.toFixed(4)} <b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>`;
   $('baseInfo').innerHTML = `API 기준: 치명 ${Math.round(apiBase.stats.critStat || 0)} / 최종치적 ${fmt(apiBase.result.critRate)}%, 치피 ${fmt(apiBase.result.critDamage)}%, 치적주피 ${fmt(apiBase.result.critHitDamage)}%, 진피 ${fmt(apiBase.result.evo)}%, 추피 ${fmt(apiBase.result.additionalDamage)}%, 적주피 ${fmt(apiBase.result.enemyDamage)}%, 공증 ${fmt(apiBase.result.attackPower)}%`;
   $('recommendList').innerHTML = `<div class="comboCards">${top.map((c, i) => {
-      const cls = c.diff >= 0 ? 'up' : 'down';
-      const memo = candidateMemo(c.fourNames, c.fiveName, c.calc, c.penaltyApplied);
-      return `<article class="comboCard ${i === 0 ? 'best' : ''}">
-        <div class="rankBadge">${i + 1}</div>
-        <div class="comboMain">
-          <div class="comboTitle"><strong>${escapeHtml(tier4PairLabel(c.fourNames))}</strong><span class="nodePill">${escapeHtml(c.fiveName)} Lv.${c.fiveLevel}</span>${candidateTag(c)}</div>
-          <div class="comboMemo">${escapeHtml(memo)}</div>
-        </div>
-        <div class="comboMetrics">
-          <div><span>추천점수</span><b>${c.recValue.toFixed(4)}</b>${c.penaltyApplied ? `<small>이론 ${c.calc.result.value.toFixed(4)}</small>` : ''}</div>
-          <div><span>API 대비</span><b class="${cls}">${pct(c.diff)}</b></div>
-          <div><span>계산치적</span><b>${fmt(c.calc.result.critRate)}%</b></div>
-          <div><span>진피</span><b>${fmt(c.calc.result.evo)}%</b></div>
-        </div>
-      </article>`;
-    }).join('')}</div>`;
+    const cls = c.diff >= 0 ? 'up' : 'down';
+    const memo = candidateMemo(c.fourNames, c.fiveName, c.calc, c.penaltyApplied);
+    return `<article class="comboCard ${i === 0 ? 'best' : ''}">
+      <div class="rankBadge">${i + 1}</div>
+      <div class="comboMain">
+        <div class="tierLine"><span>2T</span><strong>${escapeHtml(tier2Label(c.tier2Entries))}</strong></div>
+        <div class="tierLine"><span>4T</span><strong>${escapeHtml(tier4PairLabel(c.fourNames))}</strong></div>
+        <div class="tierLine"><span>5T</span><strong class="nodePill">${escapeHtml(c.fiveName)} Lv.${c.fiveLevel}</strong>${candidateTag(c)}</div>
+        <div class="comboMemo">${escapeHtml(memo)}</div>
+      </div>
+      <div class="comboMetrics">
+        <div><span>추천점수</span><b>${c.recValue.toFixed(4)}</b>${c.penaltyApplied ? `<small>이론 ${c.calc.result.value.toFixed(4)}</small>` : ''}</div>
+        <div><span>API 대비</span><b class="${cls}">${pct(c.diff)}</b></div>
+        <div><span>계산치적</span><b>${fmt(c.calc.result.critRate)}%</b></div>
+        <div><span>진피</span><b>${fmt(c.calc.result.evo)}%</b></div>
+      </div>
+    </article>`;
+  }).join('')}</div>`;
 }
 
 async function loadDb() {

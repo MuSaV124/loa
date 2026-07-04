@@ -58,10 +58,11 @@
 
     <section id="recommendPanel" class="panel">
       <div class="sectionHead recommendHead">
-        <div><h2>4/5티어 조합 추천</h2><p class="hint">1~3티어와 입력값은 유지하고, 추천 계산용으로만 후보 4/5티어를 넣어 비교합니다. 비교 기준은 API가 읽어온 원본 아크패시브 기대값으로 고정됩니다. 단타 보정은 뭉가 후보의 추천점수에만 -2.5% 적용됩니다.</p></div>
+        <div><h2>2/4/5티어 조합 추천</h2><p class="hint">1/3티어와 입력값은 유지하고 후보 2/4/5티어 조합을 비교합니다. 2티어는 총 30P 기준이며 축복의 여신은 딜러 추천에서 제외합니다. 비교 기준은 API 원본 아크패시브 기대값으로 고정됩니다.</p></div>
         <div class="recommendChecks">
           <label class="miniCheck"><span>주력기 단타 스킬 보정</span><input id="singleHitMainSkill" type="checkbox" /></label>
-          <label class="miniCheck"><span>마나용광로 제외</span><input id="excludeManaForge" type="checkbox" /></label>
+          <label class="miniCheck"><span>쿨감 효과 제외</span><input id="excludeCooldown" type="checkbox" /></label>
+          <label class="miniCheck"><span>주력기 마나 사용 안함</span><input id="noManaMainSkill" type="checkbox" /></label>
         </div>
       </div>
       <div class="resultLayout">
@@ -83,7 +84,7 @@
     </section>
   </main>
 
-  <div class="version">Version 4.6.6</div>
+  <div class="version">Version 4.6.7</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>
