@@ -785,7 +785,7 @@ select {
 }
 .comboRow {
   display: grid;
-  grid-template-columns: 34px minmax(430px, 1fr) repeat(4, minmax(82px, 104px));
+  grid-template-columns: 34px minmax(430px, 1fr) repeat(3, minmax(92px, 116px));
   align-items: center;
   gap: 10px;
   border: 1px solid rgba(148,163,184,.14);
@@ -884,9 +884,9 @@ select {
 }
 
 
-/* v4.7.1 추천 카드 가독성 보정 */
+/* v4.7.2 추천 카드 가독성 보정 */
 .comboRow {
-  grid-template-columns: 34px minmax(520px, 1fr) repeat(4, minmax(88px, 112px));
+  grid-template-columns: 34px minmax(520px, 1fr) repeat(3, minmax(96px, 120px));
   align-items: stretch;
 }
 .rowBuild {
