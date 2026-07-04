@@ -1,4 +1,4 @@
-const VERSION = '4.7.0';
+const VERSION = '4.7.1';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -550,7 +550,7 @@ function score(stats) {
   const displayEnemyDamage = additivePercentFromSources(stats.enemyDamageSources);
   const displayCritHitDamage = additivePercentFromSources(critHitSources);
   const attackMultiplier = 1 + (stats.attackPower || 0) / 100;
-  // v4.7.0: 쿨감 실전 반영. 전분 '쿨타임 비율' 기본 75% 고정.
+  // v4.7.1: 쿨감 실전 반영. 전분 '쿨타임 비율' 기본 75% 고정.
   // 이론 DPS 증가분 [1/(1-CDR)-1] 중 75%만 추천 기대값에 반영한다.
   const cooldownReduction = Math.max(0, Math.min(Number(stats.cooldownReduction || 0), 95));
   const cooldownRatio = 0.75;
@@ -634,7 +634,7 @@ function enlightenmentAppliedDetailHtml(base) {
   pushTotal('추피', state.enlightenment.additionalDamage);
   pushTotal('적주피', state.enlightenment.enemyDamage);
   const totalLine = totals.length ? `<div class="enlightenmentDetailTotal"><strong>깨달음 합계</strong><em>${escapeHtml(totals.join(' / '))}</em></div>` : '';
-  return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 깨달음 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. v4.7.0부터 API Name이 '깨달음'인 항목만 깨달음으로 반영합니다. 도약/진화 항목은 깨달음 계산에서 제외합니다.</p></div></details>`;
+  return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 깨달음 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. v4.7.1부터 API Name이 '깨달음'인 항목만 깨달음으로 반영합니다. 도약/진화 항목은 깨달음 계산에서 제외합니다.</p></div></details>`;
 }
 
 function buildSourceSummary(current) {
@@ -829,6 +829,9 @@ function recommendationValueFor(fiveName, calc, singleHitPenaltyEnabled) {
 function tier2Label(entries) {
   return entries.map(x => shortNodeLabel(x.name, x.level)).join(' + ');
 }
+function tier2ChipHtml(entries) {
+  return (entries || []).map(x => `<b class="miniChip">${escapeHtml(shortNodeLabel(x.name, x.level))}</b>`).join('');
+}
 function tier2Allocations(options) {
   const out = [];
   function walk(i, remain, picked) {
@@ -862,8 +865,13 @@ function candidateTag(c) {
   if (hasSameTier245(state.apiSelected, c.tier2Entries, c.fourNames, c.fiveName)) tags.push('<em class="apiTag">API</em>');
   if (hasSameTier245(state.selected, c.tier2Entries, c.fourNames, c.fiveName)) tags.push('<em class="currentTag">현재</em>');
   if (c.penaltyApplied) tags.push('<em class="penaltyTag">단타 -2.5%</em>');
-  if (c.critOverPenalty > 0) tags.push(`<em class="penaltyTag">치적초과 -${fmt(c.critOverPenalty)}%</em>`);
   return tags.join('');
+}
+function penaltyNoteHtml(c) {
+  const notes = [];
+  if (c.critOverPenalty > 0) notes.push(`치적초과 -${fmt(c.critOverPenalty)}% 추천보정`);
+  if (c.penaltyApplied) notes.push('단타 -2.5% 추천보정');
+  return notes.length ? `<div class="penaltyNote">${escapeHtml(notes.join(' · '))}</div>` : '';
 }
 function calculateAndRender() {
   const current = statsWithSelection(state.selected);
@@ -932,10 +940,11 @@ function calculateAndRender() {
     return `<article class="comboRow ${i === 0 ? 'best' : ''}">
       <div class="rankBadge">${i + 1}</div>
       <div class="rowBuild">
-        <div class="tierLine"><span>2T</span><strong>${escapeHtml(tier2Label(c.tier2Entries))}</strong></div>
+        <div class="tierLine tier2Line"><span>2T</span><strong class="chipWrap">${tier2ChipHtml(c.tier2Entries)}</strong></div>
         <div class="tierLine"><span>4T</span><strong>${escapeHtml(tier4PairLabel(c.fourNames))}</strong></div>
         <div class="tierLine"><span>5T</span><strong class="nodePill">${escapeHtml(c.fiveName)} Lv.${c.fiveLevel}</strong>${candidateTag(c)}</div>
         <div class="comboMemo">${escapeHtml(memo)}</div>
+        ${penaltyNoteHtml(c)}
       </div>
       <div class="rowMetric"><span>추천</span><b>${c.recValue.toFixed(4)}</b>${(c.penaltyApplied || c.critOverPenalty > 0) ? `<small>이론 ${c.calc.result.value.toFixed(4)}</small>` : ''}</div>
       <div class="rowMetric"><span>API 대비</span><b class="${cls}">${pct(c.diff)}</b></div>
