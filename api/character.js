@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     const abilityStoneEffects = extractAbilityStoneEffects(equipment);
     const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
 
-    return res.status(200).json({ ok: true, apiVersion: '4.8.2', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, raw: data });
+    return res.status(200).json({ ok: true, apiVersion: '4.8.3', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, raw: data });
   } catch (error) {
     const message = error.name === 'AbortError' ? 'Open API 응답 시간이 길어서 중단했습니다.' : error.message;
     return res.status(500).json({ error: '서버 함수 오류', message });
@@ -143,7 +143,7 @@ function extractEngravingEffects(engravingData) {
   const result = {
     rawText: '',
     items: [],
-    effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 },
+    effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 },
     adrenaline: { adopted: false, level: 0, grade: '', bookLevel: 0, critRate: 0, attackPower: 0 }
   };
   if (!engravingData) return result;
@@ -193,37 +193,38 @@ const DEALER_ENGRAVING_BOOK_RULES = {
   '아드레날린': { hero4: { attackPower: 5.4, critRate: 8 }, legendary4: { attackPower: 5.4, critRate: 14 }, relic4: { attackPower: 5.4, critRate: 20 } },
   '예리한 둔기': { hero4: { critDamage: 36 }, legendary4: { critDamage: 44 }, relic4: { critDamage: 52 } },
   '질량 증가': { hero4: { enemyDamage: 13 }, legendary4: { enemyDamage: 16 }, relic4: { enemyDamage: 19 } },
-  '돌격대장': { hero4: { enemyDamage: 13 }, legendary4: { enemyDamage: 16 }, relic4: { enemyDamage: 19 } },
-  '기습의 대가': { hero4: { enemyDamage: 16 }, legendary4: { enemyDamage: 19.8 }, relic4: { enemyDamage: 22.6 } },
-  '결투의 대가': { hero4: { enemyDamage: 16 }, legendary4: { enemyDamage: 19.8 }, relic4: { enemyDamage: 22.6 } },
-  '타격의 대가': { hero4: { enemyDamage: 11 }, legendary4: { enemyDamage: 14 }, relic4: { enemyDamage: 17 } },
-  '바리케이드': { hero4: { enemyDamage: 11 }, legendary4: { enemyDamage: 14 }, relic4: { enemyDamage: 17 } },
-  '안정된 상태': { hero4: { enemyDamage: 11 }, legendary4: { enemyDamage: 14 }, relic4: { enemyDamage: 17 } },
-  '속전속결': { hero4: { enemyDamage: 16 }, legendary4: { enemyDamage: 18 }, relic4: { enemyDamage: 21 } },
-  '슈퍼 차지': { hero4: { enemyDamage: 16 }, legendary4: { enemyDamage: 18 }, relic4: { enemyDamage: 21 } },
-  '마나 효율 증가': { hero4: { enemyDamage: 11 }, legendary4: { enemyDamage: 13 }, relic4: { enemyDamage: 16 } }
+  // 아래 각인은 조건부 피해이므로 적주피에 합산하지 않는다.
+  '돌격대장': { hero4: { conditionalDamage: 13 }, legendary4: { conditionalDamage: 16 }, relic4: { conditionalDamage: 19 } },
+  '기습의 대가': { hero4: { conditionalDamage: 16 }, legendary4: { conditionalDamage: 19.8 }, relic4: { conditionalDamage: 22.6 } },
+  '결투의 대가': { hero4: { conditionalDamage: 16 }, legendary4: { conditionalDamage: 19.8 }, relic4: { conditionalDamage: 22.6 } },
+  '타격의 대가': { hero4: { conditionalDamage: 11 }, legendary4: { conditionalDamage: 14 }, relic4: { conditionalDamage: 17 } },
+  '바리케이드': { hero4: { conditionalDamage: 11 }, legendary4: { conditionalDamage: 14 }, relic4: { conditionalDamage: 17 } },
+  '안정된 상태': { hero4: { conditionalDamage: 11 }, legendary4: { conditionalDamage: 14 }, relic4: { conditionalDamage: 17 } },
+  '속전속결': { hero4: { conditionalDamage: 16 }, legendary4: { conditionalDamage: 18 }, relic4: { conditionalDamage: 21 } },
+  '슈퍼 차지': { hero4: { conditionalDamage: 16 }, legendary4: { conditionalDamage: 18 }, relic4: { conditionalDamage: 21 } },
+  '마나 효율 증가': { hero4: { conditionalDamage: 11 }, legendary4: { conditionalDamage: 13 }, relic4: { conditionalDamage: 16 } }
 };
 
 const STONE_ENGRAVING_BONUS_RULES = {
   '원한': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
   '저주받은 인형': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
   '질량 증가': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
-  '바리케이드': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
-  '속전속결': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
-  '슈퍼 차지': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
-  '마나 효율 증가': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
-  '안정된 상태': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
-  '타격의 대가': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
-  '결투의 대가': { enemyDamage: [0, 2.70, 3.40, 4.70, 5.40] },
-  '기습의 대가': { enemyDamage: [0, 2.70, 3.40, 4.70, 5.40] },
-  '돌격대장': { enemyDamage: [0, 7.50, 9.40, 13.20, 15.00] },
+  '바리케이드': { conditionalDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '속전속결': { conditionalDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '슈퍼 차지': { conditionalDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '마나 효율 증가': { conditionalDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '안정된 상태': { conditionalDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '타격의 대가': { conditionalDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '결투의 대가': { conditionalDamage: [0, 2.70, 3.40, 4.70, 5.40] },
+  '기습의 대가': { conditionalDamage: [0, 2.70, 3.40, 4.70, 5.40] },
+  '돌격대장': { conditionalDamage: [0, 7.50, 9.40, 13.20, 15.00] },
   '예리한 둔기': { critDamage: [0, 7.50, 9.40, 13.20, 15.00] },
   '아드레날린': { attackPower: [0, 2.88, 3.60, 4.98, 5.70] }
 };
 
 function evaluateBookRule(rule, grade, bookLevel) {
   const rank = engravingBookRank(grade, bookLevel);
-  const out = { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 };
+  const out = { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 };
   const keys = new Set([...Object.keys(rule.hero4 || {}), ...Object.keys(rule.legendary4 || {}), ...Object.keys(rule.relic4 || {})]);
   for (const key of keys) {
     const h = Number(rule.hero4?.[key] || 0);
