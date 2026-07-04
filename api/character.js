@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     const abilityStoneEffects = extractAbilityStoneEffects(equipment);
     const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
 
-    return res.status(200).json({ ok: true, apiVersion: '4.8.1', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, raw: data });
+    return res.status(200).json({ ok: true, apiVersion: '4.8.2', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, raw: data });
   } catch (error) {
     const message = error.name === 'AbortError' ? 'Open API 응답 시간이 길어서 중단했습니다.' : error.message;
     return res.status(500).json({ error: '서버 함수 오류', message });
@@ -101,7 +101,7 @@ function extractBraceletEffects(equipment) {
 }
 
 function extractAbilityStoneEffects(equipment) {
-  const result = { attackPower: 0, engravings: [], items: [] };
+  const result = { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 }, engravings: [], items: [] };
   for (const item of Array.isArray(equipment) ? equipment : []) {
     if (item?.Type !== '어빌리티 스톤') continue;
     const text = tooltipText(item.Tooltip);
@@ -109,18 +109,33 @@ function extractAbilityStoneEffects(equipment) {
     const engravingRe = /\[([^\]]+)\]\s*(?:Lv\.?|레벨)\s*(\d+)/g;
     let match;
     while ((match = engravingRe.exec(text)) !== null) {
-      const name = stripHtml(match[1]).trim();
-      const level = Number(match[2] || 0);
-      if (!name || !Number.isFinite(level)) continue;
+      const name = normalizeEngravingName(stripHtml(match[1]).trim());
+      const level = Math.max(0, Math.min(4, Number(match[2] || 0)));
+      if (!name || !Number.isFinite(level) || /감소/.test(name)) continue;
       engravings.push({ name, level });
     }
     const atkMatch = text.match(/기본\s*공격력\s*\+(\d+(?:\.\d+)?)%/);
     const attackPower = atkMatch ? Number(atkMatch[1]) : 0;
     result.attackPower += Number.isFinite(attackPower) ? attackPower : 0;
+
+    const itemEffects = { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 };
+    for (const e of engravings) {
+      const rule = STONE_ENGRAVING_BONUS_RULES[e.name];
+      if (!rule) continue;
+      for (const key of Object.keys(itemEffects)) {
+        const arr = rule[key];
+        if (Array.isArray(arr)) itemEffects[key] += Number(arr[e.level] || 0);
+      }
+    }
+    for (const key of Object.keys(itemEffects)) {
+      itemEffects[key] = round2(itemEffects[key]);
+      result.effects[key] += itemEffects[key];
+    }
     result.engravings.push(...engravings);
-    result.items.push({ type: item.Type, name: item.Name, grade: item.Grade, attackPower, engravings });
+    result.items.push({ type: item.Type, name: item.Name, grade: item.Grade, attackPower, engravings, effects: itemEffects });
   }
-  result.attackPower = Math.round(result.attackPower * 100) / 100;
+  result.attackPower = round2(result.attackPower);
+  for (const key of Object.keys(result.effects)) result.effects[key] = round2(result.effects[key]);
   return result;
 }
 
@@ -129,29 +144,33 @@ function extractEngravingEffects(engravingData) {
     rawText: '',
     items: [],
     effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 },
-    adrenaline: { adopted: false, level: 0, critRate: 0, attackPower: 0 }
+    adrenaline: { adopted: false, level: 0, grade: '', bookLevel: 0, critRate: 0, attackPower: 0 }
   };
   if (!engravingData) return result;
 
   const rawText = tooltipText(engravingData);
   result.rawText = rawText.slice(0, 8000);
-  const engravings = collectEngravingLevels(engravingData, rawText);
+  const books = collectEngravingBooks(engravingData, rawText);
   const seen = new Set();
 
-  for (const e of engravings) {
+  for (const e of books) {
     const name = normalizeEngravingName(e.name);
-    const level = Math.max(1, Math.min(3, Number(e.level || 0)));
-    if (!name || !level || seen.has(`${name}:${level}`)) continue;
-    seen.add(`${name}:${level}`);
-    const rule = DEALER_ENGRAVING_RULES[name];
+    const grade = normalizeBookGrade(e.grade);
+    const bookLevel = normalizeBookLevel(e.bookLevel ?? e.level ?? e.count);
+    if (!name || !grade || bookLevel == null || seen.has(`${name}:${grade}:${bookLevel}`)) continue;
+    seen.add(`${name}:${grade}:${bookLevel}`);
+    const rule = DEALER_ENGRAVING_BOOK_RULES[name];
     if (!rule) continue;
-    result.items.push({ name, level });
 
-    const eff = rule[level] || rule[3] || {};
+    const eff = evaluateBookRule(rule, grade, bookLevel);
+    result.items.push({ name, grade, bookLevel, count: bookLevel * 5, effects: eff });
+
     if (name === '아드레날린') {
       result.adrenaline = {
         adopted: true,
-        level,
+        level: bookLevel,
+        grade,
+        bookLevel,
         critRate: Number(eff.critRate || 0),
         attackPower: Number(eff.attackPower || 0)
       };
@@ -160,33 +179,131 @@ function extractEngravingEffects(engravingData) {
     for (const key of Object.keys(result.effects)) result.effects[key] += Number(eff[key] || 0);
   }
 
-  for (const key of Object.keys(result.effects)) result.effects[key] = Math.round(Number(result.effects[key] || 0) * 100) / 100;
-  result.adrenaline.critRate = Math.round(Number(result.adrenaline.critRate || 0) * 100) / 100;
-  result.adrenaline.attackPower = Math.round(Number(result.adrenaline.attackPower || 0) * 100) / 100;
+  for (const key of Object.keys(result.effects)) result.effects[key] = round2(result.effects[key]);
+  result.adrenaline.critRate = round2(result.adrenaline.critRate);
+  result.adrenaline.attackPower = round2(result.adrenaline.attackPower);
   return result;
 }
 
-const DEALER_ENGRAVING_RULES = {
-  // 딜러 각인서 본체 효과. 어빌리티 스톤 보너스와 분리.
-  // 보스/레이드 몬스터 피해 증가는 계산기 내부에서 적주피(enemyDamage)로 환산한다.
-  '원한': { 1: { enemyDamage: 4 }, 2: { enemyDamage: 10 }, 3: { enemyDamage: 21 } },
-  '저주받은 인형': { 1: { enemyDamage: 3 }, 2: { enemyDamage: 8 }, 3: { enemyDamage: 17 } },
-  '아드레날린': { 1: { attackPower: 1.8, critRate: 5 }, 2: { attackPower: 3.6, critRate: 10 }, 3: { attackPower: 5.4, critRate: 20 } },
-  '예리한 둔기': { 1: { critDamage: 10 }, 2: { critDamage: 25 }, 3: { critDamage: 44 } },
-  '질량 증가': { 1: { attackPower: 4 }, 2: { attackPower: 10 }, 3: { attackPower: 18 } },
-  '돌격대장': { 1: { enemyDamage: 5 }, 2: { enemyDamage: 10 }, 3: { enemyDamage: 18 } },
-  '기습의 대가': { 1: { enemyDamage: 7 }, 2: { enemyDamage: 15 }, 3: { enemyDamage: 25 } },
-  '결투의 대가': { 1: { enemyDamage: 7 }, 2: { enemyDamage: 15 }, 3: { enemyDamage: 25 } },
-  '타격의 대가': { 1: { enemyDamage: 7 }, 2: { enemyDamage: 15 }, 3: { enemyDamage: 25 } },
-  '바리케이드': { 1: { enemyDamage: 5 }, 2: { enemyDamage: 10 }, 3: { enemyDamage: 18 } },
-  '안정된 상태': { 1: { enemyDamage: 5 }, 2: { enemyDamage: 10 }, 3: { enemyDamage: 20 } },
-  '속전속결': { 1: { enemyDamage: 5 }, 2: { enemyDamage: 12 }, 3: { enemyDamage: 20 } },
-  '슈퍼 차지': { 1: { enemyDamage: 5 }, 2: { enemyDamage: 12 }, 3: { enemyDamage: 20 } },
-  '마나 효율 증가': { 1: { enemyDamage: 5 }, 2: { enemyDamage: 10 }, 3: { enemyDamage: 16 } }
+// 각인서는 전투 각인 Lv.1~3이 아니라 영웅/전설/유물 등급과 0~4 연마 레벨로 효과가 정해진다.
+// 기준점: 영웅 4레벨 / 전설 4레벨(=유물 0레벨) / 유물 4레벨.
+const DEALER_ENGRAVING_BOOK_RULES = {
+  '원한': { hero4: { enemyDamage: 15 }, legendary4: { enemyDamage: 18 }, relic4: { enemyDamage: 21 } },
+  '저주받은 인형': { hero4: { enemyDamage: 11 }, legendary4: { enemyDamage: 14 }, relic4: { enemyDamage: 17 } },
+  '아드레날린': { hero4: { attackPower: 5.4, critRate: 8 }, legendary4: { attackPower: 5.4, critRate: 14 }, relic4: { attackPower: 5.4, critRate: 20 } },
+  '예리한 둔기': { hero4: { critDamage: 36 }, legendary4: { critDamage: 44 }, relic4: { critDamage: 52 } },
+  '질량 증가': { hero4: { enemyDamage: 13 }, legendary4: { enemyDamage: 16 }, relic4: { enemyDamage: 19 } },
+  '돌격대장': { hero4: { enemyDamage: 13 }, legendary4: { enemyDamage: 16 }, relic4: { enemyDamage: 19 } },
+  '기습의 대가': { hero4: { enemyDamage: 16 }, legendary4: { enemyDamage: 19.8 }, relic4: { enemyDamage: 22.6 } },
+  '결투의 대가': { hero4: { enemyDamage: 16 }, legendary4: { enemyDamage: 19.8 }, relic4: { enemyDamage: 22.6 } },
+  '타격의 대가': { hero4: { enemyDamage: 11 }, legendary4: { enemyDamage: 14 }, relic4: { enemyDamage: 17 } },
+  '바리케이드': { hero4: { enemyDamage: 11 }, legendary4: { enemyDamage: 14 }, relic4: { enemyDamage: 17 } },
+  '안정된 상태': { hero4: { enemyDamage: 11 }, legendary4: { enemyDamage: 14 }, relic4: { enemyDamage: 17 } },
+  '속전속결': { hero4: { enemyDamage: 16 }, legendary4: { enemyDamage: 18 }, relic4: { enemyDamage: 21 } },
+  '슈퍼 차지': { hero4: { enemyDamage: 16 }, legendary4: { enemyDamage: 18 }, relic4: { enemyDamage: 21 } },
+  '마나 효율 증가': { hero4: { enemyDamage: 11 }, legendary4: { enemyDamage: 13 }, relic4: { enemyDamage: 16 } }
 };
 
+const STONE_ENGRAVING_BONUS_RULES = {
+  '원한': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '저주받은 인형': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '질량 증가': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '바리케이드': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '속전속결': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '슈퍼 차지': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '마나 효율 증가': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '안정된 상태': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '타격의 대가': { enemyDamage: [0, 3.00, 3.75, 5.25, 6.00] },
+  '결투의 대가': { enemyDamage: [0, 2.70, 3.40, 4.70, 5.40] },
+  '기습의 대가': { enemyDamage: [0, 2.70, 3.40, 4.70, 5.40] },
+  '돌격대장': { enemyDamage: [0, 7.50, 9.40, 13.20, 15.00] },
+  '예리한 둔기': { critDamage: [0, 7.50, 9.40, 13.20, 15.00] },
+  '아드레날린': { attackPower: [0, 2.88, 3.60, 4.98, 5.70] }
+};
+
+function evaluateBookRule(rule, grade, bookLevel) {
+  const rank = engravingBookRank(grade, bookLevel);
+  const out = { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 };
+  const keys = new Set([...Object.keys(rule.hero4 || {}), ...Object.keys(rule.legendary4 || {}), ...Object.keys(rule.relic4 || {})]);
+  for (const key of keys) {
+    const h = Number(rule.hero4?.[key] || 0);
+    const l = Number(rule.legendary4?.[key] || 0);
+    const r = Number(rule.relic4?.[key] || 0);
+    let v;
+    if (rank <= 4) v = h * (rank / 4);
+    else if (rank <= 8) v = h + (l - h) * ((rank - 4) / 4);
+    else v = l + (r - l) * ((rank - 8) / 4);
+    out[key] = round2(v);
+  }
+  return out;
+}
+
+function engravingBookRank(grade, bookLevel) {
+  const lv = Math.max(0, Math.min(4, Number(bookLevel || 0)));
+  if (grade === '영웅') return lv;
+  if (grade === '전설') return 4 + lv;
+  if (grade === '유물') return 8 + lv;
+  return lv;
+}
+
+function normalizeBookGrade(value) {
+  const text = stripHtml(value).trim();
+  if (/유물/.test(text)) return '유물';
+  if (/전설/.test(text)) return '전설';
+  if (/영웅/.test(text)) return '영웅';
+  return '';
+}
+
+function normalizeBookLevel(value) {
+  if (value == null || value === '') return null;
+  const n = Number(String(value).replace(/[^0-9.]/g, ''));
+  if (!Number.isFinite(n)) return null;
+  if (n > 4) return Math.max(0, Math.min(4, Math.floor(n / 5))); // 장수로 들어온 경우
+  return Math.max(0, Math.min(4, Math.floor(n)));
+}
+
+function collectEngravingBooks(data, rawText) {
+  const out = [];
+  const names = Object.keys(DEALER_ENGRAVING_BOOK_RULES).sort((a, b) => b.length - a.length);
+  const hasDealerName = (v) => {
+    const t = stripHtml(v);
+    return names.find(n => t.includes(n));
+  };
+  const visit = (value) => {
+    if (!value) return;
+    if (Array.isArray(value)) return value.forEach(visit);
+    if (typeof value !== 'object') return;
+    const possibleName = value.Name || value.name || value.EngravingName || value.Title || value.title;
+    const name = hasDealerName(possibleName || '') || hasDealerName(JSON.stringify(value));
+    const grade = normalizeBookGrade(value.Grade || value.grade || value.BookGrade || value.bookGrade || value.Rarity || value.rarity || value.IconGrade || '');
+    const lvRaw = value.Level ?? value.level ?? value.BookLevel ?? value.bookLevel ?? value.Lv ?? value.lv ?? value.Count ?? value.count ?? value.ReadCount ?? value.readCount;
+    const bookLevel = normalizeBookLevel(lvRaw);
+    if (name && grade && bookLevel != null) out.push({ name, grade, bookLevel });
+    for (const v of Object.values(value)) if (v && typeof v === 'object') visit(v);
+  };
+  visit(data);
+
+  const nameRe = names.map(escapeRegExp).join('|');
+  const text = rawText || '';
+  const patterns = [
+    new RegExp(`(${nameRe})[^가-힣A-Za-z0-9]{0,20}(영웅|전설|유물)[^0-9]{0,12}(?:Lv\\.?|레벨)?\\s*([0-4]|[0-9]{1,2})`, 'g'),
+    new RegExp(`(영웅|전설|유물)[^가-힣A-Za-z0-9]{0,20}(${nameRe})[^0-9]{0,12}(?:Lv\\.?|레벨)?\\s*([0-4]|[0-9]{1,2})`, 'g'),
+    new RegExp(`(${nameRe})[^가-힣A-Za-z0-9]{0,20}(영웅|전설|유물)[^0-9]{0,12}([0-9]{1,2})\\s*장`, 'g'),
+    new RegExp(`(영웅|전설|유물)[^가-힣A-Za-z0-9]{0,20}(${nameRe})[^0-9]{0,12}([0-9]{1,2})\\s*장`, 'g')
+  ];
+  for (const re of patterns) {
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const a = m[1], b = m[2], c = m[3];
+      if (normalizeBookGrade(a)) out.push({ grade: normalizeBookGrade(a), name: b, bookLevel: normalizeBookLevel(c) });
+      else out.push({ name: a, grade: normalizeBookGrade(b), bookLevel: normalizeBookLevel(c) });
+    }
+  }
+  return out;
+}
+
 function normalizeEngravingName(name) {
-  const n = stripHtml(name).replace(/\s+/g, ' ').trim();
+  const n = stripHtml(name).replace(/\\s+/g, ' ').trim();
   const aliases = {
     '저주 받은 인형': '저주받은 인형',
     '슈퍼차지': '슈퍼 차지',
@@ -196,37 +313,12 @@ function normalizeEngravingName(name) {
   return aliases[n] || n;
 }
 
-function collectEngravingLevels(data, rawText) {
-  const out = [];
-  const visit = (value) => {
-    if (!value) return;
-    if (Array.isArray(value)) return value.forEach(visit);
-    if (typeof value !== 'object') return;
-    const possibleName = value.Name || value.name || value.EngravingName || value.Title || value.title;
-    const possibleLevel = value.Level || value.level || value.Lv || value.lv;
-    if (possibleName && possibleLevel) out.push({ name: possibleName, level: Number(possibleLevel) });
-    for (const v of Object.values(value)) if (v && typeof v === 'object') visit(v);
-  };
-  visit(data);
-
-  const names = Object.keys(DEALER_ENGRAVING_RULES).sort((a, b) => b.length - a.length).map(escapeRegExp).join('|');
-  const patterns = [
-    new RegExp(`(${names})\\s*(?:Lv\\.?|레벨)\\s*(\\d)`, 'g'),
-    new RegExp(`(${names})[^가-힣A-Za-z0-9]{0,20}(?:Lv\\.?|레벨)\\s*(\\d)`, 'g'),
-    new RegExp(`(?:Lv\\.?|레벨)\\s*(\\d)[^가-힣A-Za-z0-9]{0,20}(${names})`, 'g')
-  ];
-  for (const re of patterns) {
-    let m;
-    while ((m = re.exec(rawText || '')) !== null) {
-      if (Number(m[1])) out.push({ name: m[2], level: Number(m[1]) });
-      else out.push({ name: m[1], level: Number(m[2]) });
-    }
-  }
-  return out;
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
 }
 
-function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function round2(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
 }
 
 function parseAccessoryText(text) {

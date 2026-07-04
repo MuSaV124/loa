@@ -1,4 +1,4 @@
-const VERSION = '4.8.1';
+const VERSION = '4.8.2';
 
 function emptyEngravingState() {
   return { effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 }, items: [], rawText: '', adrenaline: { adopted: false, level: 0, critRate: 0, attackPower: 0 } };
@@ -6,7 +6,7 @@ function emptyEngravingState() {
 
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
-const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, engravings: [], items: [] }, engraving: emptyEngravingState(), enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
+const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
 
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
 function escapeRegExp(v) { return String(v || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -436,6 +436,7 @@ function getBaseStats(selection = state.selected) {
   ];
   pushDamageSource(enemyDamageSources, '깨달음', state.enlightenment.enemyDamage);
   pushDamageSource(enemyDamageSources, '각인서/API', state.engraving?.effects?.enemyDamage);
+  pushDamageSource(enemyDamageSources, '어빌리티 스톤 각인 보너스', state.abilityStone?.effects?.enemyDamage);
   pushDamageSource(enemyDamageSources, '추가 입력', extraEnemyDamage);
   if ($('adrenalineEnabled')?.checked && !state.engraving?.adrenaline?.adopted && adrenalineReplacementDamage > 0) {
     pushDamageSource(enemyDamageSources, '아드 대체 각인 차감', -adrenalineReplacementDamage);
@@ -449,12 +450,12 @@ function getBaseStats(selection = state.selected) {
     critStat,
     swiftStat,
     statCritRate,
-    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.engraving?.effects?.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate,
-    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.engraving?.effects?.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage,
+    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.engraving?.effects?.critRate) + num(state.abilityStone?.effects?.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate,
+    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.engraving?.effects?.critDamage) + num(state.abilityStone?.effects?.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage,
     critHitDamage: num(state.accessory.critHitDamage) + num(state.bracelet.critHitDamage),
     critHitDamageSources,
     evolutionDamage: num(state.enlightenment.evolutionDamage) + extraEvolutionDamage,
-    additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + num(state.engraving?.effects?.additionalDamage) + extraAdditionalDamage,
+    additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + num(state.engraving?.effects?.additionalDamage) + num(state.abilityStone?.effects?.additionalDamage) + extraAdditionalDamage,
     enemyDamage: effectivePercentFromSources(enemyDamageSources),
     enemyDamageSources,
     skillCritBonus: 0,
@@ -462,7 +463,7 @@ function getBaseStats(selection = state.selected) {
     backAttackCritRate,
     backAttackEnemyDamage,
     adrenalineCritRate: $('adrenalineEnabled').checked ? num($('adrenalineCritRate').value) : 0,
-    attackPower: ($('adrenalineEnabled').checked ? num($('adrenalineAttackPower').value) : 0) + num(state.abilityStone?.attackPower) + num(state.engraving?.effects?.attackPower),
+    attackPower: ($('adrenalineEnabled').checked ? num($('adrenalineAttackPower').value) : 0) + num(state.abilityStone?.attackPower) + num(state.abilityStone?.effects?.attackPower) + num(state.engraving?.effects?.attackPower),
     swiftSpeedBonus,
     enlightenmentAttackSpeed,
     enlightenmentMoveSpeed,
@@ -660,7 +661,7 @@ function engravingAppliedDetailHtml() {
     if (parts.length) rows.push(`<div class="enlightenmentDetailLine"><b>${escapeHtml(item.name || '어빌리티 스톤')}</b><span>${escapeHtml(parts.join(' / '))}</span></div>`);
   }
   if (engravingItems.length) {
-    rows.push(`<div class="enlightenmentDetailLine"><b>각인서/API</b><span>${escapeHtml(engravingItems.map(e => `${e.name} Lv.${e.level}`).join(' / '))}</span></div>`);
+    rows.push(`<div class="enlightenmentDetailLine"><b>각인서/API</b><span>${escapeHtml(engravingItems.map(e => `${e.name} ${e.grade ? '[' + e.grade + '] ' : ''}${Number.isFinite(Number(e.bookLevel)) ? (e.bookLevel * 5) + '장 Lv.' + e.bookLevel : 'Lv.' + (e.level ?? 0)}`).join(' / '))}</span></div>`);
   }
   const eff = state.engraving?.effects || {};
   const effParts = [];
@@ -669,7 +670,15 @@ function engravingAppliedDetailHtml() {
   if (Number(eff.additionalDamage || 0)) effParts.push(`추피 ${pct(eff.additionalDamage)}`);
   if (Number(eff.enemyDamage || 0)) effParts.push(`적주피 ${pct(eff.enemyDamage)}`);
   if (Number(eff.attackPower || 0)) effParts.push(`공격력 ${pct(eff.attackPower)}`);
-  if (effParts.length) rows.push(`<div class="enlightenmentDetailLine"><b>각인 효과 파싱값</b><span>${escapeHtml(effParts.join(' / '))}</span></div>`);
+  if (effParts.length) rows.push(`<div class="enlightenmentDetailLine"><b>각인서 효과 파싱값</b><span>${escapeHtml(effParts.join(' / '))}</span></div>`);
+  const stoneEff = state.abilityStone?.effects || {};
+  const stoneEffParts = [];
+  if (stoneEff.critRate) stoneEffParts.push(`치적 +${fmt(stoneEff.critRate)}%`);
+  if (stoneEff.critDamage) stoneEffParts.push(`치피 +${fmt(stoneEff.critDamage)}%`);
+  if (stoneEff.additionalDamage) stoneEffParts.push(`추피 +${fmt(stoneEff.additionalDamage)}%`);
+  if (stoneEff.enemyDamage) stoneEffParts.push(`적주피 +${fmt(stoneEff.enemyDamage)}%`);
+  if (stoneEff.attackPower) stoneEffParts.push(`공격력 +${fmt(stoneEff.attackPower)}%`);
+  if (stoneEffParts.length) rows.push(`<div class="enlightenmentDetailLine"><b>스톤 각인 보너스</b><span>${escapeHtml(stoneEffParts.join(' / '))}</span></div>`);
   if (!rows.length) return `<details class="enlightenmentDetails"><summary>어빌리티 스톤 / 각인서 적용 내역</summary><div class="enlightenmentDetailBody"><div class="enlightenmentDetailLine muted"><span>API에서 파싱된 어빌리티 스톤/각인서 효과가 없습니다.</span></div></div></details>`;
   return `<details class="enlightenmentDetails" open><summary>어빌리티 스톤 / 각인서 적용 내역</summary><div class="enlightenmentDetailBody">${rows.join('')}</div></details>`;
 }
@@ -711,6 +720,7 @@ function buildSourceSummary(current) {
   if (state.bracelet.critRate) critLines.push(sourceLine('팔찌', state.bracelet.critRate));
   if (state.enlightenment.critRate) critLines.push(sourceLine('깨달음', state.enlightenment.critRate));
   if (state.engraving?.effects?.critRate) critLines.push(sourceLine('각인서/API', state.engraving.effects.critRate));
+  if (state.abilityStone?.effects?.critRate) critLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critRate));
   if (base.dynamicEnlightenmentCritRate) critLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritRate));
   if (base.extraCritRate) critLines.push(sourceLine('추가 입력', base.extraCritRate));
   critLines.push(...critEvolution);
@@ -720,6 +730,7 @@ function buildSourceSummary(current) {
   if (state.bracelet.critDamage) critDamageLines.push(sourceLine('팔찌', state.bracelet.critDamage));
   if (state.enlightenment.critDamage) critDamageLines.push(sourceLine('깨달음', state.enlightenment.critDamage));
   if (state.engraving?.effects?.critDamage) critDamageLines.push(sourceLine('각인서/API', state.engraving.effects.critDamage));
+  if (state.abilityStone?.effects?.critDamage) critDamageLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critDamage));
   if (base.dynamicEnlightenmentCritDamage) critDamageLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritDamage));
   if (base.extraCritDamage) critDamageLines.push(sourceLine('추가 입력', base.extraCritDamage));
   critDamageLines.push(...critDamageEvolution);
@@ -738,6 +749,7 @@ function buildSourceSummary(current) {
   if (state.bracelet.additionalDamage) addLines.push(sourceLine('팔찌', state.bracelet.additionalDamage));
   if (state.enlightenment.additionalDamage) addLines.push(sourceLine('깨달음', state.enlightenment.additionalDamage));
   if (state.engraving?.effects?.additionalDamage) addLines.push(sourceLine('각인서/API', state.engraving.effects.additionalDamage));
+  if (state.abilityStone?.effects?.additionalDamage) addLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.additionalDamage));
   if (base.extraAdditionalDamage) addLines.push(sourceLine('추가 입력', base.extraAdditionalDamage));
   addLines.push(...addEvolution);
 
@@ -758,6 +770,7 @@ function buildSourceSummary(current) {
   if (state.bracelet.enemyDamage) enemyLines.push(sourceLine('팔찌', state.bracelet.enemyDamage));
   if (state.enlightenment.enemyDamage) enemyLines.push(sourceLine('깨달음', state.enlightenment.enemyDamage));
   if (state.engraving?.effects?.enemyDamage) enemyLines.push(sourceLine('각인서/API', state.engraving.effects.enemyDamage));
+  if (state.abilityStone?.effects?.enemyDamage) enemyLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.enemyDamage));
   if (base.extraEnemyDamage) enemyLines.push(sourceLine('추가 입력', base.extraEnemyDamage));
   if (base.backAttackEnemyDamage) enemyLines.push(sourceLine('백어택', base.backAttackEnemyDamage));
   enemyLines.push(...enemyEvolution);
@@ -765,6 +778,7 @@ function buildSourceSummary(current) {
   const attackPowerLines = [];
   if (base.adrenalineAttackPower) attackPowerLines.push(sourceLine('아드레날린', base.adrenalineAttackPower));
   if (state.abilityStone?.attackPower) attackPowerLines.push(sourceLine('어빌리티 스톤', state.abilityStone.attackPower, '기본 공격력 보너스'));
+  if (state.abilityStone?.effects?.attackPower) attackPowerLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.attackPower));
   if (state.engraving?.effects?.attackPower) attackPowerLines.push(sourceLine('각인서/API', state.engraving.effects.attackPower));
 
   $('sourceSummary').innerHTML = `
@@ -1037,7 +1051,7 @@ async function searchCharacter(name) {
   $('summaryPanel').classList.add('hidden');
   state.selected = {};
   state.apiSelected = {};
-  state.abilityStone = { attackPower: 0, engravings: [], items: [] };
+  state.abilityStone = { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 }, engravings: [], items: [] };
   state.engraving = emptyEngravingState();
   state.enlightenment = { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
   renderEvolutionTiers();
@@ -1049,7 +1063,7 @@ async function searchCharacter(name) {
     if (!data.profile?.CharacterName) throw new Error('캐릭터 프로필을 가져오지 못했습니다.');
     state.accessory = data.accessoryEffects || { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
     state.bracelet = data.braceletEffects || { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
-    state.abilityStone = data.abilityStoneEffects || { attackPower: 0, engravings: [], items: [] };
+    state.abilityStone = data.abilityStoneEffects || { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 }, engravings: [], items: [] };
     state.engraving = data.engravingEffects || emptyEngravingState();
     syncAdrenalineControlsFromEngraving();
     renderCharacter(data.profile);
