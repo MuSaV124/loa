@@ -1,4 +1,4 @@
-const VERSION = '4.6.8';
+const VERSION = '4.6.9';
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
@@ -627,7 +627,7 @@ function enlightenmentAppliedDetailHtml(base) {
   pushTotal('추피', state.enlightenment.additionalDamage);
   pushTotal('적주피', state.enlightenment.enemyDamage);
   const totalLine = totals.length ? `<div class="enlightenmentDetailTotal"><strong>깨달음 합계</strong><em>${escapeHtml(totals.join(' / '))}</em></div>` : '';
-  return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 깨달음 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. v4.6.8부터 API Name이 '깨달음'인 항목만 깨달음으로 반영합니다. 도약/진화 항목은 깨달음 계산에서 제외합니다.</p></div></details>`;
+  return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 깨달음 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. v4.6.9부터 API Name이 '깨달음'인 항목만 깨달음으로 반영합니다. 도약/진화 항목은 깨달음 계산에서 제외합니다.</p></div></details>`;
 }
 
 function buildSourceSummary(current) {
@@ -764,6 +764,19 @@ function renderKeenEfficiency(current) {
 function currentTierNames(tier) {
   return selectedEntries().filter(row => Number(row.tier) === Number(tier)).map(row => row.name);
 }
+function shortNodeName(name) {
+  const map = {
+    '끝없는 마나': '끝마',
+    '금단의 주문': '금주',
+    '예리한 감각': '예감',
+    '한계 돌파': '한돌',
+    '최적화 훈련': '최훈'
+  };
+  return map[name] || name;
+}
+function shortNodeLabel(name, level) {
+  return `${shortNodeName(name)} Lv.${level}`;
+}
 function tier4PairLabel(names) {
   return (names || []).filter(Boolean).join(' + ') || '-';
 }
@@ -772,24 +785,42 @@ function sameNameSet(a, b) {
   const bb = [...(b || [])].sort().join('|');
   return aa === bb;
 }
-function candidateMemo(fourNames, fiveName, calc, penaltyApplied = false) {
+function candidateMemo(fourNames, fiveName, calc, singleHitPenalty = false, critOverPenalty = 0) {
   const current4 = currentTierNames(4);
   const current5 = currentTierNames(5).join(' + ') || '-';
   const bits = [];
   if (sameNameSet(fourNames, current4) && fiveName === current5) bits.push('현재 조합');
   else bits.push(`${tier4PairLabel(fourNames)} / ${fiveName}`);
   if (calc?.result?.convertedEvolutionDamage > 0) bits.push(`뭉가 전환 ${fmt(calc.result.convertedEvolutionDamage)}%(기본 포함 총 ${fmt(calc.result.convertedEvolutionDamage + 15)}%)`);
-  if (penaltyApplied) bits.push('주력기 단타 보정 -2.5%(추천만)');
+  if (singleHitPenalty) bits.push('주력기 단타 보정 -2.5%(추천만)');
+  if (critOverPenalty > 0) bits.push(`치적 초과 보정 -${fmt(critOverPenalty)}%(추천만)`);
   if (calc?.result?.sonicBreakEvolutionDamage > 0) bits.push(`음속 ${fmt(calc.result.sonicBreakEvolutionDamage)}%`);
   return bits.join(' / ');
 }
+function recommendationAdjustmentFor(fiveName, calc, singleHitPenaltyEnabled) {
+  let multiplier = 1;
+  const details = { singleHitPenalty: false, critOverPenalty: 0 };
+  if (singleHitPenaltyEnabled && fiveName === '뭉툭한 가시') {
+    multiplier *= 0.975;
+    details.singleHitPenalty = true;
+  }
+  // 뭉가가 아닌 조합은 치적 100% 초과분이 실제 딜 기대값에는 버려지므로,
+  // 추천 순위에서만 초과 치적 1%당 -0.3%, 최대 -3% 안전 보정을 적용한다.
+  if (fiveName !== '뭉툭한 가시') {
+    const overCrit = Math.max(0, Number(calc?.result?.critRate || 0) - 100);
+    const penalty = Math.min(overCrit * 0.3, 3);
+    if (penalty > 0) {
+      multiplier *= (1 - penalty / 100);
+      details.critOverPenalty = penalty;
+    }
+  }
+  return { value: Number(calc?.result?.value || 0) * multiplier, ...details };
+}
 function recommendationValueFor(fiveName, calc, singleHitPenaltyEnabled) {
-  const value = Number(calc?.result?.value || 0);
-  if (singleHitPenaltyEnabled && fiveName === '뭉툭한 가시') return value * 0.975;
-  return value;
+  return recommendationAdjustmentFor(fiveName, calc, singleHitPenaltyEnabled).value;
 }
 function tier2Label(entries) {
-  return entries.map(x => `${x.name} Lv.${x.level}`).join(' + ');
+  return entries.map(x => shortNodeLabel(x.name, x.level)).join(' + ');
 }
 function tier2Allocations(options) {
   const out = [];
@@ -824,6 +855,7 @@ function candidateTag(c) {
   if (hasSameTier245(state.apiSelected, c.tier2Entries, c.fourNames, c.fiveName)) tags.push('<em class="apiTag">API</em>');
   if (hasSameTier245(state.selected, c.tier2Entries, c.fourNames, c.fiveName)) tags.push('<em class="currentTag">현재</em>');
   if (c.penaltyApplied) tags.push('<em class="penaltyTag">단타 -2.5%</em>');
+  if (c.critOverPenalty > 0) tags.push(`<em class="penaltyTag">치적초과 -${fmt(c.critOverPenalty)}%</em>`);
   return tags.join('');
 }
 function calculateAndRender() {
@@ -866,9 +898,14 @@ function calculateAndRender() {
         for (const fourName of fourNames) next[fourName] = { level: fourLevel, source: 'candidate' };
         next[fiveName] = { level: fiveLevel, source: 'candidate' };
         const calc = statsWithSelection(next);
-        const recValue = recommendationValueFor(fiveName, calc, singleHitPenaltyEnabled);
-        const penaltyApplied = singleHitPenaltyEnabled && fiveName === '뭉툭한 가시';
-        candidates.push({ tier2Entries, fourNames, fourLevel, fiveName, fiveLevel, calc, recValue, penaltyApplied, diff: ((recValue / baseValue) - 1) * 100 });
+        const adjustment = recommendationAdjustmentFor(fiveName, calc, singleHitPenaltyEnabled);
+        const recValue = adjustment.value;
+        candidates.push({
+          tier2Entries, fourNames, fourLevel, fiveName, fiveLevel, calc, recValue,
+          penaltyApplied: adjustment.singleHitPenalty,
+          critOverPenalty: adjustment.critOverPenalty,
+          diff: ((recValue / baseValue) - 1) * 100
+        });
       }
     }
   }
@@ -879,12 +916,12 @@ function calculateAndRender() {
     <div><span>API 원본 기대값</span><b>${apiBase.result.value.toFixed(4)}</b></div>
     <div><span>현재 화면 선택값</span><b>${current.result.value.toFixed(4)}</b></div>
     <div><span>현재 대비</span><b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>
-    <p>비교 기준은 API가 읽어온 원본 아크패시브 기대값으로 고정됩니다.${singleHitPenaltyEnabled ? ' 뭉가 후보는 추천점수만 -2.5% 적용됩니다.' : ''}</p>
+    <p>비교 기준은 API가 읽어온 원본 아크패시브 기대값으로 고정됩니다.${singleHitPenaltyEnabled ? ' 뭉가 후보는 추천점수만 -2.5% 적용됩니다. 비뭉가 후보는 치적 100% 초과분 1%당 -0.3%(최대 -3%) 추천 보정이 적용됩니다.' : ''}</p>
   </div>`;
   $('baseInfo').innerHTML = `<b>API 기준 상세</b><span>치명 ${Math.round(apiBase.stats.critStat || 0)} · 최종치적 ${fmt(apiBase.result.critRate)}% · 치피 ${fmt(apiBase.result.critDamage)}% · 치적주피 ${fmt(apiBase.result.critHitDamage)}% · 진피 ${fmt(apiBase.result.evo)}% · 추피 ${fmt(apiBase.result.additionalDamage)}% · 적주피 ${fmt(apiBase.result.enemyDamage)}% · 공증 ${fmt(apiBase.result.attackPower)}%</span>`;
   $('recommendList').innerHTML = `<div class="comboRows">${top.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
-    const memo = candidateMemo(c.fourNames, c.fiveName, c.calc, c.penaltyApplied);
+    const memo = candidateMemo(c.fourNames, c.fiveName, c.calc, c.penaltyApplied, c.critOverPenalty);
     return `<article class="comboRow ${i === 0 ? 'best' : ''}">
       <div class="rankBadge">${i + 1}</div>
       <div class="rowBuild">
@@ -893,7 +930,7 @@ function calculateAndRender() {
         <div class="tierLine"><span>5T</span><strong class="nodePill">${escapeHtml(c.fiveName)} Lv.${c.fiveLevel}</strong>${candidateTag(c)}</div>
         <div class="comboMemo">${escapeHtml(memo)}</div>
       </div>
-      <div class="rowMetric"><span>추천</span><b>${c.recValue.toFixed(4)}</b>${c.penaltyApplied ? `<small>이론 ${c.calc.result.value.toFixed(4)}</small>` : ''}</div>
+      <div class="rowMetric"><span>추천</span><b>${c.recValue.toFixed(4)}</b>${(c.penaltyApplied || c.critOverPenalty > 0) ? `<small>이론 ${c.calc.result.value.toFixed(4)}</small>` : ''}</div>
       <div class="rowMetric"><span>API 대비</span><b class="${cls}">${pct(c.diff)}</b></div>
       <div class="rowMetric"><span>치적</span><b>${fmt(c.calc.result.critRate)}%</b></div>
       <div class="rowMetric"><span>진피</span><b>${fmt(c.calc.result.evo)}%</b></div>
