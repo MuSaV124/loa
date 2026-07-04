@@ -884,7 +884,7 @@ select {
 }
 
 
-/* v4.7.2 추천 카드 가독성 보정 */
+/* v4.7.3 추천 카드 가독성 보정 */
 .comboRow {
   grid-template-columns: 34px minmax(520px, 1fr) repeat(3, minmax(96px, 120px));
   align-items: stretch;
@@ -965,5 +965,132 @@ select {
   }
   .rowBuild .comboMemo {
     white-space: normal;
+  }
+}
+
+
+/* v4.7.3 추천 카드 재정렬 */
+.comboRows {
+  gap: 10px;
+}
+.comboRow {
+  display: grid !important;
+  grid-template-columns: 38px minmax(0, 1fr) 370px !important;
+  gap: 14px !important;
+  align-items: center !important;
+  padding: 12px 14px !important;
+  min-height: 74px;
+}
+.comboRow.best {
+  box-shadow: inset 4px 0 0 rgba(34,197,94,.88);
+}
+.rankBadge {
+  align-self: center;
+}
+.rowBuild {
+  display: block !important;
+  min-width: 0;
+}
+.buildMain {
+  display: grid;
+  grid-template-columns: minmax(210px, 1fr) minmax(130px, .55fr) minmax(170px, .7fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.tierLine {
+  min-width: 0;
+}
+.tierLine strong {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+.chipWrap {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 5px !important;
+}
+.miniChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 7px;
+  border-radius: 8px;
+  background: rgba(96,165,250,.12);
+  border: 1px solid rgba(96,165,250,.18);
+  color: #f8fafc;
+  font-size: 12px;
+  line-height: 1.15;
+  font-weight: 950;
+  white-space: nowrap;
+}
+.rowMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+.rowMetric {
+  min-width: 0;
+  padding: 8px 10px !important;
+}
+.rowMetric span {
+  font-size: 10px;
+}
+.rowMetric b {
+  font-size: 14px;
+}
+.rowMetric small {
+  font-size: 10px;
+}
+.rowBuild .comboMemo {
+  margin-top: 8px !important;
+  padding-top: 7px !important;
+  border-top: 1px solid rgba(148,163,184,.10);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+.penaltyNote {
+  margin-top: 6px;
+  display: inline-flex;
+  width: auto;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(251,113,133,.13);
+  border: 1px solid rgba(251,113,133,.24);
+  color: #fecdd3;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.25;
+  white-space: normal;
+}
+.apiTag, .currentTag, .penaltyTag {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+@media (max-width: 1180px) {
+  .comboRow {
+    grid-template-columns: 38px minmax(0, 1fr) !important;
+  }
+  .rowMetrics {
+    grid-column: 2 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .buildMain {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 680px) {
+  .comboRow {
+    grid-template-columns: 34px minmax(0, 1fr) !important;
+    padding: 10px !important;
+  }
+  .rowMetrics {
+    grid-column: 1 / -1;
   }
 }
