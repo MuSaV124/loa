@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 9000);
-    const url = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}?filters=profiles+equipment+arkpassive`;
+    const url = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}?filters=profiles+equipment+arkpassive+engravings`;
 
     const response = await fetch(url, {
       headers: { Authorization: `bearer ${apiKey}`, Accept: 'application/json' },
@@ -32,8 +32,10 @@ export default async function handler(req, res) {
     const equipment = data.ArmoryEquipment || data.Equipment || [];
     const accessoryEffects = extractAccessoryEffects(equipment);
     const braceletEffects = extractBraceletEffects(equipment);
+    const abilityStoneEffects = extractAbilityStoneEffects(equipment);
+    const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
 
-    return res.status(200).json({ ok: true, apiVersion: '4.5.4', profile, arkPassive, equipment, accessoryEffects, braceletEffects, raw: data });
+    return res.status(200).json({ ok: true, apiVersion: '4.8.0', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, raw: data });
   } catch (error) {
     const message = error.name === 'AbortError' ? 'Open API 응답 시간이 길어서 중단했습니다.' : error.message;
     return res.status(500).json({ error: '서버 함수 오류', message });
@@ -95,6 +97,64 @@ function extractBraceletEffects(equipment) {
     result.items.push({ type: item.Type, name: item.Name, grade: item.Grade, effects });
   }
   for (const key of ['critRate', 'critDamage', 'critHitDamage', 'enemyDamage', 'additionalDamage']) result[key] = Math.round(result[key] * 100) / 100;
+  return result;
+}
+
+function extractAbilityStoneEffects(equipment) {
+  const result = { attackPower: 0, engravings: [], items: [] };
+  for (const item of Array.isArray(equipment) ? equipment : []) {
+    if (item?.Type !== '어빌리티 스톤') continue;
+    const text = tooltipText(item.Tooltip);
+    const engravings = [];
+    const engravingRe = /\[([^\]]+)\]\s*(?:Lv\.?|레벨)\s*(\d+)/g;
+    let match;
+    while ((match = engravingRe.exec(text)) !== null) {
+      const name = stripHtml(match[1]).trim();
+      const level = Number(match[2] || 0);
+      if (!name || !Number.isFinite(level)) continue;
+      engravings.push({ name, level });
+    }
+    const atkMatch = text.match(/기본\s*공격력\s*\+(\d+(?:\.\d+)?)%/);
+    const attackPower = atkMatch ? Number(atkMatch[1]) : 0;
+    result.attackPower += Number.isFinite(attackPower) ? attackPower : 0;
+    result.engravings.push(...engravings);
+    result.items.push({ type: item.Type, name: item.Name, grade: item.Grade, attackPower, engravings });
+  }
+  result.attackPower = Math.round(result.attackPower * 100) / 100;
+  return result;
+}
+
+function extractEngravingEffects(engravingData) {
+  const result = { rawText: '', items: [], effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 } };
+  if (!engravingData) return result;
+  const rawText = tooltipText(engravingData);
+  result.rawText = rawText.slice(0, 5000);
+
+  // API 구조가 캐릭터/패치에 따라 다르게 내려올 수 있어서 Name/Tooltip/Description 계열을 모두 훑되,
+  // 실제 딜 반영은 명확한 퍼센트 문장만 제한적으로 파싱합니다.
+  const parsed = parseAccessoryText(rawText);
+  result.effects.critRate += parsed.critRate;
+  result.effects.critDamage += parsed.critDamage;
+  result.effects.additionalDamage += parsed.additionalDamage;
+  result.effects.enemyDamage += parsed.enemyDamage;
+
+  const attackPowerMatches = [
+    /공격력(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
+    /기본\s*공격력\s*(?:\+)?(\d+(?:\.\d+)?)%/g
+  ];
+  addMatches(result.effects, 'attackPower', rawText, attackPowerMatches);
+
+  const nameLevelRe = /\[?([가-힣A-Za-z\s]+)\]?\s*(?:Lv\.?|레벨)\s*(\d+)/g;
+  let m;
+  const seen = new Set();
+  while ((m = nameLevelRe.exec(rawText)) !== null) {
+    const name = stripHtml(m[1]).trim();
+    const level = Number(m[2] || 0);
+    if (!name || !level || seen.has(`${name}:${level}`)) continue;
+    seen.add(`${name}:${level}`);
+    result.items.push({ name, level });
+  }
+  for (const key of Object.keys(result.effects)) result.effects[key] = Math.round(Number(result.effects[key] || 0) * 100) / 100;
   return result;
 }
 
