@@ -699,6 +699,7 @@ function buildSourceSummary(current) {
   const base = getBaseStats();
   const critEvolution = [];
   const critDamageEvolution = [];
+  const critHitEvolution = [];
   const evoEvolution = [];
   const addEvolution = [];
   const enemyEvolution = [];
@@ -708,7 +709,7 @@ function buildSourceSummary(current) {
     const label = `[진화] ${row.name} (Lv.${row.level})`;
     if (eff.critRate) critEvolution.push(sourceLine(label, eff.critRate));
     if (eff.critDamage) critDamageEvolution.push(sourceLine(label, eff.critDamage));
-    if (eff.critHitDamage) critDamageEvolution.push(sourceLine(label + ' 치명타 적중 피해', eff.critHitDamage));
+    if (eff.critHitDamage) critHitEvolution.push(sourceLine(label + ' 치명타 적중 주피', eff.critHitDamage));
     if (eff.evolutionDamage) evoEvolution.push(sourceLine(label, eff.evolutionDamage));
     if (eff.sonicBreak) {
       const attackIncrease = Math.max(0, (current.stats.attackSpeed || current.stats.moveAttackSpeed || 100) - 100);
@@ -749,6 +750,7 @@ function buildSourceSummary(current) {
 
   const critHitLines = [];
   for (const src of current.stats.critHitDamageSources || []) critHitLines.push(sourceLine(src.label || '치명타 적중 주피', Number(src.value || 0)));
+  critHitLines.push(...critHitEvolution);
   if (!critHitLines.length && current.stats.critHitDamage) critHitLines.push(sourceLine('치명타 적중 주피', current.stats.critHitDamage));
 
   const evoLines = [];
@@ -1065,7 +1067,7 @@ async function searchCharacter(name) {
   state.apiSelected = {};
   state.abilityStone = { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
   state.engraving = emptyEngravingState();
-  state.enlightenment = { critRate: 0, critDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
+  state.enlightenment = { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
   renderEvolutionTiers();
   calculateAndRender();
   try {
