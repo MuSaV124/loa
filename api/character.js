@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     const abilityStoneEffects = extractAbilityStoneEffects(equipment);
     const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
 
-    return res.status(200).json({ ok: true, apiVersion: '4.8.0', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, raw: data });
+    return res.status(200).json({ ok: true, apiVersion: '4.8.1', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, raw: data });
   } catch (error) {
     const message = error.name === 'AbortError' ? 'Open API 응답 시간이 길어서 중단했습니다.' : error.message;
     return res.status(500).json({ error: '서버 함수 오류', message });
@@ -100,61 +100,126 @@ function extractBraceletEffects(equipment) {
   return result;
 }
 
+const DEALER_ENGRAVING_RULES = {
+  '결투의 대가': { effectsByLevel: { 1: { enemyDamage: 4 }, 2: { enemyDamage: 4.8 }, 3: { enemyDamage: 7.6 } }, stoneByLevel: { 1: { enemyDamage: 2.7 }, 2: { enemyDamage: 3.4 }, 3: { enemyDamage: 4.7 }, 4: { enemyDamage: 5.4 } } },
+  '기습의 대가': { effectsByLevel: { 1: { enemyDamage: 4 }, 2: { enemyDamage: 4.8 }, 3: { enemyDamage: 7.6 } }, stoneByLevel: { 1: { enemyDamage: 2.7 }, 2: { enemyDamage: 3.4 }, 3: { enemyDamage: 4.7 }, 4: { enemyDamage: 5.4 } } },
+  '마나 효율 증가': { effectsByLevel: { 1: { enemyDamage: 11 }, 2: { enemyDamage: 13 }, 3: { enemyDamage: 16 } }, stoneByLevel: { 1: { enemyDamage: 3 }, 2: { enemyDamage: 3.75 }, 3: { enemyDamage: 5.25 }, 4: { enemyDamage: 6 } } },
+  '바리케이드': { effectsByLevel: { 1: { enemyDamage: 11 }, 2: { enemyDamage: 14 }, 3: { enemyDamage: 17 } }, stoneByLevel: { 1: { enemyDamage: 3 }, 2: { enemyDamage: 3.75 }, 3: { enemyDamage: 5.25 }, 4: { enemyDamage: 6 } } },
+  '속전속결': { effectsByLevel: { 1: { enemyDamage: 16 }, 2: { enemyDamage: 18 }, 3: { enemyDamage: 21 } }, stoneByLevel: { 1: { enemyDamage: 3 }, 2: { enemyDamage: 3.75 }, 3: { enemyDamage: 5.25 }, 4: { enemyDamage: 6 } } },
+  '슈퍼 차지': { effectsByLevel: { 1: { enemyDamage: 16 }, 2: { enemyDamage: 18 }, 3: { enemyDamage: 21 } }, stoneByLevel: { 1: { enemyDamage: 3 }, 2: { enemyDamage: 3.75 }, 3: { enemyDamage: 5.25 }, 4: { enemyDamage: 6 } } },
+  '아드레날린': { effectsByLevel: { 1: { attackPower: 1.8, critRate: 8 }, 2: { attackPower: 3.6, critRate: 14 }, 3: { attackPower: 5.4, critRate: 20 } }, stoneByLevel: { 1: { attackPower: 2.88 }, 2: { attackPower: 3.6 }, 3: { attackPower: 4.98 }, 4: { attackPower: 5.7 } } },
+  '안정된 상태': { effectsByLevel: { 1: { enemyDamage: 11 }, 2: { enemyDamage: 14 }, 3: { enemyDamage: 17 } }, stoneByLevel: { 1: { enemyDamage: 3 }, 2: { enemyDamage: 3.75 }, 3: { enemyDamage: 5.25 }, 4: { enemyDamage: 6 } } },
+  '예리한 둔기': { effectsByLevel: { 1: { critDamage: 36 }, 2: { critDamage: 44 }, 3: { critDamage: 52 } }, stoneByLevel: { 1: { critDamage: 7.5 }, 2: { critDamage: 9.4 }, 3: { critDamage: 13.2 }, 4: { critDamage: 15 } } },
+  '원한': { effectsByLevel: { 1: { enemyDamage: 15 }, 2: { enemyDamage: 18 }, 3: { enemyDamage: 21 } }, stoneByLevel: { 1: { enemyDamage: 3 }, 2: { enemyDamage: 3.75 }, 3: { enemyDamage: 5.25 }, 4: { enemyDamage: 6 } } },
+  '저주받은 인형': { effectsByLevel: { 1: { enemyDamage: 11 }, 2: { enemyDamage: 14 }, 3: { enemyDamage: 17 } }, stoneByLevel: { 1: { enemyDamage: 3 }, 2: { enemyDamage: 3.75 }, 3: { enemyDamage: 5.25 }, 4: { enemyDamage: 6 } } },
+  '질량 증가': { effectsByLevel: { 1: { enemyDamage: 13 }, 2: { enemyDamage: 16 }, 3: { enemyDamage: 19 } }, stoneByLevel: { 1: { enemyDamage: 3 }, 2: { enemyDamage: 3.75 }, 3: { enemyDamage: 5.25 }, 4: { enemyDamage: 6 } } },
+  '타격의 대가': { effectsByLevel: { 1: { enemyDamage: 11 }, 2: { enemyDamage: 14 }, 3: { enemyDamage: 17 } }, stoneByLevel: { 1: { enemyDamage: 3 }, 2: { enemyDamage: 3.75 }, 3: { enemyDamage: 5.25 }, 4: { enemyDamage: 6 } } }
+};
+
+const EMPTY_ENGRAVING_EFFECTS = { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 };
+const DEBUFF_ENGRAVING_NAMES = ['방어력 감소', '공격력 감소', '공격속도 감소', '이동속도 감소'];
+
+function normalizeEngravingName(name) {
+  return stripHtml(name)
+    .replace(/\s+/g, ' ')
+    .replace(/^\[|\]$/g, '')
+    .trim();
+}
+
+function addEffectBucket(target, source) {
+  if (!source) return;
+  for (const key of Object.keys(EMPTY_ENGRAVING_EFFECTS)) {
+    const value = Number(source[key] || 0);
+    if (Number.isFinite(value)) target[key] += value;
+  }
+}
+
+function roundEffectBucket(target) {
+  for (const key of Object.keys(EMPTY_ENGRAVING_EFFECTS)) target[key] = Math.round(Number(target[key] || 0) * 100) / 100;
+  return target;
+}
+
+function parseEngravingNameLevels(text) {
+  const found = [];
+  const source = stripHtml(text);
+  const patterns = [
+    /\[([^\]]+)\]\s*(?:Lv\.?|레벨)\s*(\d+)/g,
+    /([가-힣A-Za-z\s]+?)\s*(?:Lv\.?|레벨)\s*(\d+)/g
+  ];
+  const seen = new Set();
+  for (const re of patterns) {
+    let m;
+    while ((m = re.exec(source)) !== null) {
+      const name = normalizeEngravingName(m[1]);
+      const level = Number(m[2] || 0);
+      if (!name || !level || DEBUFF_ENGRAVING_NAMES.some(d => name.includes(d))) continue;
+      const canonical = Object.keys(DEALER_ENGRAVING_RULES).find(key => name.includes(key));
+      const finalName = canonical || name;
+      const token = `${finalName}:${level}`;
+      if (seen.has(token)) continue;
+      seen.add(token);
+      found.push({ name: finalName, level });
+    }
+  }
+  return found;
+}
+
 function extractAbilityStoneEffects(equipment) {
-  const result = { attackPower: 0, engravings: [], items: [] };
+  const result = { ...EMPTY_ENGRAVING_EFFECTS, attackPower: 0, baseAttackPower: 0, engravings: [], items: [] };
   for (const item of Array.isArray(equipment) ? equipment : []) {
     if (item?.Type !== '어빌리티 스톤') continue;
     const text = tooltipText(item.Tooltip);
-    const engravings = [];
-    const engravingRe = /\[([^\]]+)\]\s*(?:Lv\.?|레벨)\s*(\d+)/g;
-    let match;
-    while ((match = engravingRe.exec(text)) !== null) {
-      const name = stripHtml(match[1]).trim();
-      const level = Number(match[2] || 0);
-      if (!name || !Number.isFinite(level)) continue;
-      engravings.push({ name, level });
+    const engravings = parseEngravingNameLevels(text);
+    const effects = { ...EMPTY_ENGRAVING_EFFECTS };
+    for (const e of engravings) {
+      const rule = DEALER_ENGRAVING_RULES[e.name];
+      if (rule?.stoneByLevel?.[e.level]) addEffectBucket(effects, rule.stoneByLevel[e.level]);
     }
     const atkMatch = text.match(/기본\s*공격력\s*\+(\d+(?:\.\d+)?)%/);
-    const attackPower = atkMatch ? Number(atkMatch[1]) : 0;
-    result.attackPower += Number.isFinite(attackPower) ? attackPower : 0;
+    const baseAttackPower = atkMatch ? Number(atkMatch[1]) : 0;
+    if (Number.isFinite(baseAttackPower)) {
+      effects.attackPower += baseAttackPower;
+      result.baseAttackPower += baseAttackPower;
+    }
+    roundEffectBucket(effects);
+    addEffectBucket(result, effects);
     result.engravings.push(...engravings);
-    result.items.push({ type: item.Type, name: item.Name, grade: item.Grade, attackPower, engravings });
+    result.items.push({ type: item.Type, name: item.Name, grade: item.Grade, attackPower: baseAttackPower, baseAttackPower, effects, engravings });
   }
+  roundEffectBucket(result);
   result.attackPower = Math.round(result.attackPower * 100) / 100;
+  result.baseAttackPower = Math.round(result.baseAttackPower * 100) / 100;
   return result;
 }
 
 function extractEngravingEffects(engravingData) {
-  const result = { rawText: '', items: [], effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 } };
+  const result = { rawText: '', items: [], effects: { ...EMPTY_ENGRAVING_EFFECTS } };
   if (!engravingData) return result;
   const rawText = tooltipText(engravingData);
   result.rawText = rawText.slice(0, 5000);
 
-  // API 구조가 캐릭터/패치에 따라 다르게 내려올 수 있어서 Name/Tooltip/Description 계열을 모두 훑되,
-  // 실제 딜 반영은 명확한 퍼센트 문장만 제한적으로 파싱합니다.
-  const parsed = parseAccessoryText(rawText);
-  result.effects.critRate += parsed.critRate;
-  result.effects.critDamage += parsed.critDamage;
-  result.effects.additionalDamage += parsed.additionalDamage;
-  result.effects.enemyDamage += parsed.enemyDamage;
-
-  const attackPowerMatches = [
-    /공격력(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
-    /기본\s*공격력\s*(?:\+)?(\d+(?:\.\d+)?)%/g
-  ];
-  addMatches(result.effects, 'attackPower', rawText, attackPowerMatches);
-
-  const nameLevelRe = /\[?([가-힣A-Za-z\s]+)\]?\s*(?:Lv\.?|레벨)\s*(\d+)/g;
-  let m;
+  const items = parseEngravingNameLevels(rawText)
+    .filter(item => DEALER_ENGRAVING_RULES[item.name]?.effectsByLevel?.[item.level]);
   const seen = new Set();
-  while ((m = nameLevelRe.exec(rawText)) !== null) {
-    const name = stripHtml(m[1]).trim();
-    const level = Number(m[2] || 0);
-    if (!name || !level || seen.has(`${name}:${level}`)) continue;
-    seen.add(`${name}:${level}`);
-    result.items.push({ name, level });
+  for (const item of items) {
+    const token = `${item.name}:${item.level}`;
+    if (seen.has(token)) continue;
+    seen.add(token);
+    result.items.push(item);
+    addEffectBucket(result.effects, DEALER_ENGRAVING_RULES[item.name].effectsByLevel[item.level]);
   }
-  for (const key of Object.keys(result.effects)) result.effects[key] = Math.round(Number(result.effects[key] || 0) * 100) / 100;
+
+  // 알려진 딜러 각인명을 찾지 못한 경우에만 제한적인 구형 툴팁 파싱을 fallback으로 사용합니다.
+  // 이렇게 해야 아드레날린의 "공격력 0.9%, 최대 6중첩" 같은 문장을 +0.9%로 오인식하지 않습니다.
+  if (!result.items.length) {
+    const parsed = parseAccessoryText(rawText);
+    result.effects.critRate += parsed.critRate;
+    result.effects.critDamage += parsed.critDamage;
+    result.effects.additionalDamage += parsed.additionalDamage;
+    result.effects.enemyDamage += parsed.enemyDamage;
+  }
+
+  roundEffectBucket(result.effects);
   return result;
 }
 
