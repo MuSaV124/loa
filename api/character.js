@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     const abilityStoneEffects = extractAbilityStoneEffects(equipment);
     const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
 
-    return res.status(200).json({ ok: true, apiVersion: '4.8.3', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, raw: data });
+    return res.status(200).json({ ok: true, apiVersion: '4.8.4', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, raw: data });
   } catch (error) {
     const message = error.name === 'AbortError' ? 'Open API 응답 시간이 길어서 중단했습니다.' : error.message;
     return res.status(500).json({ error: '서버 함수 오류', message });
@@ -101,7 +101,7 @@ function extractBraceletEffects(equipment) {
 }
 
 function extractAbilityStoneEffects(equipment) {
-  const result = { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 }, engravings: [], items: [] };
+  const result = { attackPower: 0, effects: { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 }, engravings: [], items: [] };
   for (const item of Array.isArray(equipment) ? equipment : []) {
     if (item?.Type !== '어빌리티 스톤') continue;
     const text = tooltipText(item.Tooltip);
@@ -118,7 +118,7 @@ function extractAbilityStoneEffects(equipment) {
     const attackPower = atkMatch ? Number(atkMatch[1]) : 0;
     result.attackPower += Number.isFinite(attackPower) ? attackPower : 0;
 
-    const itemEffects = { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 };
+    const itemEffects = { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0 };
     for (const e of engravings) {
       const rule = STONE_ENGRAVING_BONUS_RULES[e.name];
       if (!rule) continue;
@@ -143,7 +143,7 @@ function extractEngravingEffects(engravingData) {
   const result = {
     rawText: '',
     items: [],
-    effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 },
+    effects: { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 },
     adrenaline: { adopted: false, level: 0, grade: '', bookLevel: 0, critRate: 0, attackPower: 0 }
   };
   if (!engravingData) return result;
@@ -224,7 +224,7 @@ const STONE_ENGRAVING_BONUS_RULES = {
 
 function evaluateBookRule(rule, grade, bookLevel) {
   const rank = engravingBookRank(grade, bookLevel);
-  const out = { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 };
+  const out = { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 };
   const keys = new Set([...Object.keys(rule.hero4 || {}), ...Object.keys(rule.legendary4 || {}), ...Object.keys(rule.relic4 || {})]);
   for (const key of keys) {
     const h = Number(rule.hero4?.[key] || 0);
@@ -349,7 +349,7 @@ function parseAccessoryText(text) {
   // "무력화 상태의 적에게 주는 피해"는 별도 조건부라 제외하고,
   // 일반 적주피/쿨증 적주피/백·헤드·비방향성 적주피는 각 출처별 곱연산으로 계산합니다.
   addMatches(out, 'enemyDamage', source, [
-    /(?<!무력화\s*상태의\s*)적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
+    /(?<!무력화\s*상태의\s*)(?<!치명타로\s*적중\s*시\s*)적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /백어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /헤드어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /방향성\s*공격이\s*아닌\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
