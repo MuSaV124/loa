@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     const abilityStoneEffects = extractAbilityStoneEffects(equipment);
     const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
 
-    return res.status(200).json({ ok: true, apiVersion: '4.8.4', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, raw: data });
+    return res.status(200).json({ ok: true, apiVersion: '4.8.5', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, raw: data });
   } catch (error) {
     const message = error.name === 'AbortError' ? 'Open API 응답 시간이 길어서 중단했습니다.' : error.message;
     return res.status(500).json({ error: '서버 함수 오류', message });
@@ -366,8 +366,10 @@ function addMatches(out, key, text, regexList) {
     while ((match = re.exec(text)) !== null) {
       const value = Number(match[1] || 0);
       if (!Number.isFinite(value)) continue;
-      // 같은 문장을 여러 패턴이 동시에 잡는 경우 중복 합산 방지
-      const token = `${key}:${String(match[0]).replace(/\s+/g, ' ').trim()}`;
+      // 같은 위치를 여러 패턴이 동시에 잡는 경우만 중복 합산 방지합니다.
+      // 팔찌는 서로 다른 옵션 슬롯에 같은 문구가 반복될 수 있으므로
+      // 문구 내용만으로 dedupe하면 정상 옵션이 누락됩니다.
+      const token = `${key}:${match.index}:${String(match[0]).replace(/\s+/g, ' ').trim()}`;
       if (seen.has(token)) continue;
       seen.add(token);
       out[key] += value;

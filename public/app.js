@@ -1,4 +1,4 @@
-const VERSION = '4.8.4';
+const VERSION = '4.8.5';
 
 function emptyEngravingState() {
   return { effects: { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, items: [], rawText: '', adrenaline: { adopted: false, level: 0, critRate: 0, attackPower: 0 } };
