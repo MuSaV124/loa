@@ -1,4 +1,4 @@
-const VERSION = '4.9.1';
+const VERSION = '4.9.2';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -914,7 +914,7 @@ function candidateMemo(fourNames, fiveName, calc, singleHitPenalty = false, crit
   if (Boolean($('excludeCooldown')?.checked) && (calc?.result?.cooldownReduction || 0) === 0) bits.push('쿨감 제외');
   if (critLowPenalty > 0) bits.push(`치적 95% 이하 보정 -${fmt(critLowPenalty)}%(추천만)`);
   if (critOverPenalty > 0) bits.push(`치적 초과 보정 -${fmt(critOverPenalty)}%(추천만)`);
-  if (manaStabilityBonus > 0) bits.push(`마나 안정성 +${fmt(manaStabilityBonus)}%(추천만)`);
+  if (manaStabilityBonus > 0) bits.push(`마나 안정성 +${fmt(manaStabilityBonus)}% 보정`);
   if (calc?.result?.sonicBreakEvolutionDamage > 0) bits.push(`음속 ${fmt(calc.result.sonicBreakEvolutionDamage)}%`);
   return bits.join(' / ');
 }
@@ -998,7 +998,7 @@ function penaltyNoteHtml(c) {
   const notes = [];
   if (c.critLowPenalty > 0) notes.push(`치적 95% 이하 -${fmt(c.critLowPenalty)}% 추천보정`);
   if (c.critOverPenalty > 0) notes.push(`치적초과 -${fmt(c.critOverPenalty)}% 추천보정`);
-  if (c.manaStabilityBonus > 0) notes.push(`마나 안정성 +${fmt(c.manaStabilityBonus)}% 추천보정`);
+  if (c.manaStabilityBonus > 0) notes.push(`마나 안정성 +${fmt(c.manaStabilityBonus)}% 보정`);
   if (c.penaltyApplied) notes.push('단타 -2.5% 추천보정');
   return notes.length ? `<div class="penaltyNote">${escapeHtml(notes.join(' · '))}</div>` : '';
 }
@@ -1007,8 +1007,13 @@ function calculateAndRender() {
   const apiBase = statsWithSelection(Object.keys(state.apiSelected || {}).length ? state.apiSelected : state.selected);
   renderCombatStats(current);
   renderKeenEfficiency(current);
-  const baseValue = apiBase.result.value || current.result.value || 1;
-  const currentDiff = ((current.result.value / baseValue) - 1) * 100;
+  const apiSelectionForBaseline = Object.keys(state.apiSelected || {}).length ? state.apiSelected : state.selected;
+  const apiManaStabilityBonus = manaStabilityBonusFromSelection(apiSelectionForBaseline);
+  const currentManaStabilityBonus = manaStabilityBonusFromSelection(state.selected);
+  const apiBaseAdjustedValue = Number(apiBase.result.value || 0) * (1 + apiManaStabilityBonus / 100);
+  const currentAdjustedValue = Number(current.result.value || 0) * (1 + currentManaStabilityBonus / 100);
+  const baseValue = apiBaseAdjustedValue || currentAdjustedValue || current.result.value || 1;
+  const currentDiff = ((currentAdjustedValue / baseValue) - 1) * 100;
   const candidates = [];
   const noManaMainSkill = Boolean($('noManaMainSkill')?.checked);
   const excludeCooldown = isCooldownExcluded();
@@ -1066,13 +1071,16 @@ function calculateAndRender() {
   candidates.sort((a, b) => b.recValue - a.recValue);
   const top = candidates.slice(0, 5);
   const currentDiffText = `${currentDiff >= 0 ? '+' : ''}${currentDiff.toFixed(2)}%`;
+  const apiManaLabel = apiManaStabilityBonus > 0 ? `<small>이론 ${apiBase.result.value.toFixed(4)} · 마나 안정성 +${fmt(apiManaStabilityBonus)}%</small>` : '';
+  const currentManaLabel = currentManaStabilityBonus > 0 ? `<small>이론 ${current.result.value.toFixed(4)} · 마나 안정성 +${fmt(currentManaStabilityBonus)}%</small>` : '';
   $('currentScore').innerHTML = `<div class="apiBaselineRow">
-    <div><span>API 원본 기대값</span><b>${apiBase.result.value.toFixed(4)}</b></div>
-    <div><span>현재 화면 선택값</span><b>${current.result.value.toFixed(4)}</b></div>
+    <div><span>API 원본 기대값</span><b>${apiBaseAdjustedValue.toFixed(4)}</b>${apiManaLabel}</div>
+    <div><span>현재 화면 선택값</span><b>${currentAdjustedValue.toFixed(4)}</b>${currentManaLabel}</div>
     <div><span>현재 대비</span><b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>
-    <p>비교 기준은 API가 읽어온 원본 아크패시브 기대값으로 고정됩니다.${singleHitPenaltyEnabled ? ' 뭉가 후보는 추천점수만 -2.5% 적용됩니다. 비뭉가 후보는 치적 100% 초과분 1%당 -0.5% 추천 보정이 적용됩니다.' : ''}</p>
+    <p>비교 기준은 API가 읽어온 원본 아크패시브 기대값으로 고정됩니다. 마나 부족 직업 보정은 API 기준값과 추천 후보에 동일하게 적용됩니다.${singleHitPenaltyEnabled ? ' 뭉가 후보는 추천점수만 -2.5% 적용됩니다. 비뭉가 후보는 치적 100% 초과분 1%당 -0.5% 추천 보정이 적용됩니다.' : ''}</p>
   </div>`;
-  $('baseInfo').innerHTML = `<b>API 기준 상세</b><span>치명 ${Math.round(apiBase.stats.critStat || 0)} · 최종치적 ${fmt(apiBase.result.critRate)}% · 치피 ${fmt(apiBase.result.critDamage)}% · 치적주피 ${fmt(apiBase.result.critHitDamage)}% · 진피 ${fmt(apiBase.result.evo)}% · 추피 ${fmt(apiBase.result.additionalDamage)}% · 적주피 ${fmt(apiBase.result.enemyDamage)}% · 공증 ${fmt(apiBase.result.attackPower)}%</span>`;
+  const apiManaDetail = apiManaStabilityBonus > 0 ? ` · 마나 안정성 +${fmt(apiManaStabilityBonus)}%` : '';
+  $('baseInfo').innerHTML = `<b>API 기준 상세</b><span>치명 ${Math.round(apiBase.stats.critStat || 0)} · 최종치적 ${fmt(apiBase.result.critRate)}% · 치피 ${fmt(apiBase.result.critDamage)}% · 치적주피 ${fmt(apiBase.result.critHitDamage)}% · 진피 ${fmt(apiBase.result.evo)}% · 추피 ${fmt(apiBase.result.additionalDamage)}% · 적주피 ${fmt(apiBase.result.enemyDamage)}% · 공증 ${fmt(apiBase.result.attackPower)}%${apiManaDetail}</span>`;
   $('recommendList').innerHTML = top.length ? `<div class="comboRows">${top.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
     const memo = candidateMemo(c.fourNames, c.fiveName, c.calc, c.penaltyApplied, c.critOverPenalty, c.critLowPenalty, c.manaStabilityBonus);
