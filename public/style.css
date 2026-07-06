@@ -1139,3 +1139,6 @@ select {
     grid-column: 1 / -1;
   }
 }
+
+.shareControl.disabled { opacity: 0.55; }
+.shareControl.disabled::after { content: '적용값 0%'; margin-left: 8px; color: #fbbf24; font-size: 12px; font-weight: 700; }
