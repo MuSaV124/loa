@@ -1,10 +1,17 @@
-const VERSION = '4.8.9';
+const VERSION = '4.8.10';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
   const node = getNode(name);
   if (!node) return COOLDOWN_NODE_NAMES.includes(name);
   return COOLDOWN_NODE_NAMES.includes(name) || Object.values(node.levels || {}).some(effect => Number(effect?.cooldownReduction || 0) > 0);
+}
+function hasCooldownCandidate(tier2Entries, fourNames, fiveName) {
+  return [
+    ...(tier2Entries || []).map(x => x.name),
+    ...(fourNames || []),
+    fiveName
+  ].filter(Boolean).some(name => hasCooldownEffect(name));
 }
 
 function emptyEngravingState() {
@@ -886,7 +893,7 @@ function candidateMemo(fourNames, fiveName, calc, singleHitPenalty = false, crit
   else bits.push(`${tier4PairLabel(fourNames)} / ${fiveName}`);
   if (calc?.result?.convertedEvolutionDamage > 0) bits.push(`뭉가 전환 ${fmt(calc.result.convertedEvolutionDamage)}%(기본 포함 총 ${fmt(calc.result.convertedEvolutionDamage + 15)}%)`);
   if (singleHitPenalty) bits.push('주력기 단타 보정 -2.5%(추천만)');
-  if (Boolean($('excludeCooldown')?.checked) && (stats.result?.cooldownReduction || 0) === 0) bits.push('쿨감 제외');
+  if (Boolean($('excludeCooldown')?.checked) && (calc?.result?.cooldownReduction || 0) === 0) bits.push('쿨감 제외');
   if (critOverPenalty > 0) bits.push(`치적 초과 보정 -${fmt(critOverPenalty)}%(추천만)`);
   if (calc?.result?.sonicBreakEvolutionDamage > 0) bits.push(`음속 ${fmt(calc.result.sonicBreakEvolutionDamage)}%`);
   return bits.join(' / ');
@@ -998,6 +1005,7 @@ function calculateAndRender() {
     for (const fourNames of tier4Pairs) {
       const fourLevel = 1;
       for (const fiveName of tier5Options) {
+        if (excludeCooldown && hasCooldownCandidate(tier2Entries, fourNames, fiveName)) continue;
         const fiveNode = getNode(fiveName);
         const fiveLevel = fiveNode?.maxLevel || 2;
         // 추천 계산에서 현재 2/4/5티어만 제거하고 후보 조합을 삽입. 1/3티어와 입력값은 유지.
@@ -1027,7 +1035,7 @@ function calculateAndRender() {
     <p>비교 기준은 API가 읽어온 원본 아크패시브 기대값으로 고정됩니다.${singleHitPenaltyEnabled ? ' 뭉가 후보는 추천점수만 -2.5% 적용됩니다. 비뭉가 후보는 치적 100% 초과분 1%당 -0.3%(최대 -3%) 추천 보정이 적용됩니다.' : ''}</p>
   </div>`;
   $('baseInfo').innerHTML = `<b>API 기준 상세</b><span>치명 ${Math.round(apiBase.stats.critStat || 0)} · 최종치적 ${fmt(apiBase.result.critRate)}% · 치피 ${fmt(apiBase.result.critDamage)}% · 치적주피 ${fmt(apiBase.result.critHitDamage)}% · 진피 ${fmt(apiBase.result.evo)}% · 추피 ${fmt(apiBase.result.additionalDamage)}% · 적주피 ${fmt(apiBase.result.enemyDamage)}% · 공증 ${fmt(apiBase.result.attackPower)}%</span>`;
-  $('recommendList').innerHTML = `<div class="comboRows">${top.map((c, i) => {
+  $('recommendList').innerHTML = top.length ? `<div class="comboRows">${top.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
     const memo = candidateMemo(c.fourNames, c.fiveName, c.calc, c.penaltyApplied, c.critOverPenalty);
     return `<article class="comboRow ${i === 0 ? 'best' : ''}">
@@ -1047,7 +1055,7 @@ function calculateAndRender() {
         <div class="rowMetric"><span>치적</span><b>${fmt(c.calc.result.critRate)}%</b></div>
       </div>
     </article>`;
-  }).join('')}</div>`;
+  }).join('')}</div>` : `<div class="emptyNotice">추천 가능한 2/4/5티어 조합이 없습니다. 쿨감 효과 제외 상태에서는 끝없는 마나/최적화 훈련 등 쿨감 노드가 추천 후보에서 제거됩니다.</div>`;
 }
 
 async function loadDb() {
