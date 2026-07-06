@@ -1,4 +1,4 @@
-const VERSION = '4.9.3';
+const VERSION = '4.9.4';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -863,6 +863,10 @@ function renderKeenEfficiency(current) {
 function currentTierNames(tier) {
   return selectedEntries().filter(row => Number(row.tier) === Number(tier)).map(row => row.name);
 }
+function tier5NameFromSelection(selection) {
+  const entry = selectedEntries(selection || {}).find(row => Number(row.tier) === 5);
+  return entry?.name || '';
+}
 function shortNodeName(name) {
   const map = {
     '끝없는 마나': '끝마',
@@ -928,7 +932,7 @@ function recommendationAdjustmentFor(fiveName, calc, singleHitPenaltyEnabled, se
 
   const finalCritRate = Number(calc?.result?.critRate || 0);
 
-  // v4.9.3 추천 보정:
+  // v4.9.4 추천 보정:
   // 1) 최종 치적 95% 이하이면 추천값 -0.5% 고정 보정.
   // 2) 일반 조합은 치적 100% 초과분 1%p당 추천값 -0.5% 보정.
   // 3) 뭉툭한 가시는 치적 120% 초과분 1%p당 추천값 -0.5% 보정.
@@ -1009,10 +1013,16 @@ function calculateAndRender() {
   renderCombatStats(current);
   renderKeenEfficiency(current);
   const apiSelectionForBaseline = Object.keys(state.apiSelected || {}).length ? state.apiSelected : state.selected;
-  const apiManaStabilityBonus = manaStabilityBonusFromSelection(apiSelectionForBaseline);
-  const currentManaStabilityBonus = manaStabilityBonusFromSelection(state.selected);
-  const apiBaseAdjustedValue = Number(apiBase.result.value || 0) * (1 + apiManaStabilityBonus / 100);
-  const currentAdjustedValue = Number(current.result.value || 0) * (1 + currentManaStabilityBonus / 100);
+  const apiFiveName = tier5NameFromSelection(apiSelectionForBaseline);
+  const currentFiveName = tier5NameFromSelection(state.selected);
+  // API 기준값에도 추천 후보와 동일한 치적 보정/마나 안정성 보정을 적용해야 API 대비가 비대칭으로 뜨지 않습니다.
+  // 단타 주력기 보정은 사용자가 후보 선별용으로 켜는 추천 전용 보정이므로 API/현재 기준값에는 적용하지 않습니다.
+  const apiBaseAdjustment = recommendationAdjustmentFor(apiFiveName, apiBase, false, apiSelectionForBaseline);
+  const currentAdjustment = recommendationAdjustmentFor(currentFiveName, current, false, state.selected);
+  const apiBaseAdjustedValue = apiBaseAdjustment.value || Number(apiBase.result.value || 0);
+  const currentAdjustedValue = currentAdjustment.value || Number(current.result.value || 0);
+  const apiManaStabilityBonus = apiBaseAdjustment.manaStabilityBonus || 0;
+  const currentManaStabilityBonus = currentAdjustment.manaStabilityBonus || 0;
   const baseValue = apiBaseAdjustedValue || currentAdjustedValue || current.result.value || 1;
   const currentDiff = ((currentAdjustedValue / baseValue) - 1) * 100;
   const candidates = [];
@@ -1072,15 +1082,27 @@ function calculateAndRender() {
   candidates.sort((a, b) => b.recValue - a.recValue);
   const top = candidates.slice(0, 5);
   const currentDiffText = `${currentDiff >= 0 ? '+' : ''}${currentDiff.toFixed(2)}%`;
-  const apiManaLabel = apiManaStabilityBonus > 0 ? `<small>이론 ${apiBase.result.value.toFixed(4)} · 마나 안정성 +${fmt(apiManaStabilityBonus)}%</small>` : '';
-  const currentManaLabel = currentManaStabilityBonus > 0 ? `<small>이론 ${current.result.value.toFixed(4)} · 마나 안정성 +${fmt(currentManaStabilityBonus)}%</small>` : '';
+  const apiAdjustParts = [];
+  if (apiBaseAdjustment.critLowPenalty > 0) apiAdjustParts.push(`치적 95% 이하 -${fmt(apiBaseAdjustment.critLowPenalty)}%`);
+  if (apiBaseAdjustment.critOverPenalty > 0) apiAdjustParts.push(`치적초과 -${fmt(apiBaseAdjustment.critOverPenalty)}%`);
+  if (apiBaseAdjustment.manaStabilityBonus > 0) apiAdjustParts.push(`마나 안정성 +${fmt(apiBaseAdjustment.manaStabilityBonus)}%`);
+  const currentAdjustParts = [];
+  if (currentAdjustment.critLowPenalty > 0) currentAdjustParts.push(`치적 95% 이하 -${fmt(currentAdjustment.critLowPenalty)}%`);
+  if (currentAdjustment.critOverPenalty > 0) currentAdjustParts.push(`치적초과 -${fmt(currentAdjustment.critOverPenalty)}%`);
+  if (currentAdjustment.manaStabilityBonus > 0) currentAdjustParts.push(`마나 안정성 +${fmt(currentAdjustment.manaStabilityBonus)}%`);
+  const apiManaLabel = apiAdjustParts.length ? `<small>이론 ${apiBase.result.value.toFixed(4)} · ${escapeHtml(apiAdjustParts.join(' · '))}</small>` : '';
+  const currentManaLabel = currentAdjustParts.length ? `<small>이론 ${current.result.value.toFixed(4)} · ${escapeHtml(currentAdjustParts.join(' · '))}</small>` : '';
   $('currentScore').innerHTML = `<div class="apiBaselineRow">
     <div><span>API 원본 기대값</span><b>${apiBaseAdjustedValue.toFixed(4)}</b>${apiManaLabel}</div>
     <div><span>현재 화면 선택값</span><b>${currentAdjustedValue.toFixed(4)}</b>${currentManaLabel}</div>
     <div><span>현재 대비</span><b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>
-    <p>비교 기준은 API가 읽어온 원본 아크패시브 기대값으로 고정됩니다. 마나 부족 직업 보정은 API 기준값과 추천 후보에 동일하게 적용됩니다.${singleHitPenaltyEnabled ? ' 뭉가 후보는 추천점수만 -2.5% 적용됩니다. 비뭉가 후보는 치적 100% 초과분 1%당 -0.5% 추천 보정이 적용됩니다.' : ''}</p>
+    <p>비교 기준은 API가 읽어온 원본 아크패시브 기대값으로 고정됩니다. 치적 95% 이하/초과 보정과 마나 부족 직업 보정은 API 기준값과 추천 후보에 동일하게 적용됩니다.${singleHitPenaltyEnabled ? ' 뭉가 후보는 추가로 추천점수만 -2.5% 적용됩니다.' : ''}</p>
   </div>`;
-  const apiManaDetail = apiManaStabilityBonus > 0 ? ` · 마나 안정성 +${fmt(apiManaStabilityBonus)}%` : '';
+  const apiDetailParts = [];
+  if (apiBaseAdjustment.critLowPenalty > 0) apiDetailParts.push(`치적 95% 이하 -${fmt(apiBaseAdjustment.critLowPenalty)}%`);
+  if (apiBaseAdjustment.critOverPenalty > 0) apiDetailParts.push(`치적초과 -${fmt(apiBaseAdjustment.critOverPenalty)}%`);
+  if (apiBaseAdjustment.manaStabilityBonus > 0) apiDetailParts.push(`마나 안정성 +${fmt(apiBaseAdjustment.manaStabilityBonus)}%`);
+  const apiManaDetail = apiDetailParts.length ? ` · ${escapeHtml(apiDetailParts.join(' · '))}` : '';
   $('baseInfo').innerHTML = `<b>API 기준 상세</b><span>치명 ${Math.round(apiBase.stats.critStat || 0)} · 최종치적 ${fmt(apiBase.result.critRate)}% · 치피 ${fmt(apiBase.result.critDamage)}% · 치적주피 ${fmt(apiBase.result.critHitDamage)}% · 진피 ${fmt(apiBase.result.evo)}% · 추피 ${fmt(apiBase.result.additionalDamage)}% · 적주피 ${fmt(apiBase.result.enemyDamage)}% · 공증 ${fmt(apiBase.result.attackPower)}%${apiManaDetail}</span>`;
   $('recommendList').innerHTML = top.length ? `<div class="comboRows">${top.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
