@@ -662,10 +662,12 @@
       "icon": "💠",
       "levels": {
         "1": {
-          "cooldownReduction": 7
+          "cooldownReduction": 7,
+          "manaReduction": 10
         },
         "2": {
-          "cooldownReduction": 14
+          "cooldownReduction": 14,
+          "manaReduction": 20
         }
       },
       "iconImage": "/images/evolution/끝없는 마나.webp",
@@ -679,14 +681,16 @@
       "icon": "🟣",
       "levels": {
         "1": {
-          "evolutionDamage": 10
+          "evolutionDamage": 10,
+          "manaReduction": 6
         },
         "2": {
-          "evolutionDamage": 20
+          "evolutionDamage": 20,
+          "manaReduction": 12
         }
       },
       "iconImage": "/images/evolution/금단의 주문.webp",
-      "description": "진화형 피해 5%/10% 증가 + 마나 스킬 진화형 피해 5%/10% 추가 증가. 마나 주력기 기준 총 진피 10%/20%"
+      "description": "진화형 피해 5%/10% 증가 + 마나 스킬 진화형 피해 5%/10% 추가 증가, 마나 소모량 6%/12% 감소"
     },
     {
       "name": "예리한 감각",
@@ -761,11 +765,13 @@
       "levels": {
         "1": {
           "evolutionDamage": 8,
-          "cooldownReduction": 7
+          "cooldownReduction": 7,
+          "manaReduction": 8
         },
         "2": {
           "evolutionDamage": 16,
-          "cooldownReduction": 14
+          "cooldownReduction": 14,
+          "manaReduction": 16
         }
       },
       "iconImage": "/images/evolution/무한한 마력.webp",

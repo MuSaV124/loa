@@ -1,4 +1,4 @@
-const VERSION = '4.9.0';
+const VERSION = '4.9.1';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -885,7 +885,25 @@ function sameNameSet(a, b) {
   const bb = [...(b || [])].sort().join('|');
   return aa === bb;
 }
-function candidateMemo(fourNames, fiveName, calc, singleHitPenalty = false, critOverPenalty = 0, critLowPenalty = 0) {
+
+function isManaShortageBonusEnabled() {
+  return Boolean($('manaShortageClass')?.checked) && !Boolean($('noManaMainSkill')?.checked);
+}
+function manaStabilityBonusFromSelection(selection = state.selected) {
+  if (!isManaShortageBonusEnabled()) return 0;
+  const table = {
+    '끝없는 마나': { 1: 0.5, 2: 1.0 },
+    '금단의 주문': { 1: 0.3, 2: 0.6 },
+    '무한한 마력': { 1: 0.4, 2: 0.8 }
+  };
+  let bonus = 0;
+  for (const [name, levels] of Object.entries(table)) {
+    const lv = Math.max(0, Math.min(Number(selection?.[name]?.level || 0), 2));
+    bonus += Number(levels[lv] || 0);
+  }
+  return bonus;
+}
+function candidateMemo(fourNames, fiveName, calc, singleHitPenalty = false, critOverPenalty = 0, critLowPenalty = 0, manaStabilityBonus = 0) {
   const current4 = currentTierNames(4);
   const current5 = currentTierNames(5).join(' + ') || '-';
   const bits = [];
@@ -896,12 +914,13 @@ function candidateMemo(fourNames, fiveName, calc, singleHitPenalty = false, crit
   if (Boolean($('excludeCooldown')?.checked) && (calc?.result?.cooldownReduction || 0) === 0) bits.push('쿨감 제외');
   if (critLowPenalty > 0) bits.push(`치적 95% 이하 보정 -${fmt(critLowPenalty)}%(추천만)`);
   if (critOverPenalty > 0) bits.push(`치적 초과 보정 -${fmt(critOverPenalty)}%(추천만)`);
+  if (manaStabilityBonus > 0) bits.push(`마나 안정성 +${fmt(manaStabilityBonus)}%(추천만)`);
   if (calc?.result?.sonicBreakEvolutionDamage > 0) bits.push(`음속 ${fmt(calc.result.sonicBreakEvolutionDamage)}%`);
   return bits.join(' / ');
 }
-function recommendationAdjustmentFor(fiveName, calc, singleHitPenaltyEnabled) {
+function recommendationAdjustmentFor(fiveName, calc, singleHitPenaltyEnabled, selection = state.selected) {
   let multiplier = 1;
-  const details = { singleHitPenalty: false, critOverPenalty: 0, critLowPenalty: 0 };
+  const details = { singleHitPenalty: false, critOverPenalty: 0, critLowPenalty: 0, manaStabilityBonus: 0 };
   if (singleHitPenaltyEnabled && fiveName === '뭉툭한 가시') {
     multiplier *= 0.975;
     details.singleHitPenalty = true;
@@ -909,7 +928,7 @@ function recommendationAdjustmentFor(fiveName, calc, singleHitPenaltyEnabled) {
 
   const finalCritRate = Number(calc?.result?.critRate || 0);
 
-  // v4.9.0 추천 보정:
+  // v4.9.1 추천 보정:
   // 1) 최종 치적 95% 이하이면 추천값 -0.5% 고정 보정.
   // 2) 뭉툭한 가시가 아닌 조합은 치적 100% 초과분 1%p당 추천값 -0.5% 보정.
   //    뭉툭한 가시는 초과 치적이 진화형 피해로 전환되므로 초과 보정을 적용하지 않는다.
@@ -924,6 +943,11 @@ function recommendationAdjustmentFor(fiveName, calc, singleHitPenaltyEnabled) {
       multiplier *= Math.max(0, 1 - penalty / 100);
       details.critOverPenalty = penalty;
     }
+  }
+  const manaBonus = manaStabilityBonusFromSelection(selection);
+  if (manaBonus > 0) {
+    multiplier *= (1 + manaBonus / 100);
+    details.manaStabilityBonus = manaBonus;
   }
   return { value: Number(calc?.result?.value || 0) * multiplier, ...details };
 }
@@ -972,7 +996,9 @@ function candidateTag(c) {
 }
 function penaltyNoteHtml(c) {
   const notes = [];
+  if (c.critLowPenalty > 0) notes.push(`치적 95% 이하 -${fmt(c.critLowPenalty)}% 추천보정`);
   if (c.critOverPenalty > 0) notes.push(`치적초과 -${fmt(c.critOverPenalty)}% 추천보정`);
+  if (c.manaStabilityBonus > 0) notes.push(`마나 안정성 +${fmt(c.manaStabilityBonus)}% 추천보정`);
   if (c.penaltyApplied) notes.push('단타 -2.5% 추천보정');
   return notes.length ? `<div class="penaltyNote">${escapeHtml(notes.join(' · '))}</div>` : '';
 }
@@ -1024,12 +1050,14 @@ function calculateAndRender() {
         for (const fourName of fourNames) next[fourName] = { level: fourLevel, source: 'candidate' };
         next[fiveName] = { level: fiveLevel, source: 'candidate' };
         const calc = statsWithSelection(next);
-        const adjustment = recommendationAdjustmentFor(fiveName, calc, singleHitPenaltyEnabled);
+        const adjustment = recommendationAdjustmentFor(fiveName, calc, singleHitPenaltyEnabled, next);
         const recValue = adjustment.value;
         candidates.push({
           tier2Entries, fourNames, fourLevel, fiveName, fiveLevel, calc, recValue,
           penaltyApplied: adjustment.singleHitPenalty,
           critOverPenalty: adjustment.critOverPenalty,
+          critLowPenalty: adjustment.critLowPenalty,
+          manaStabilityBonus: adjustment.manaStabilityBonus,
           diff: ((recValue / baseValue) - 1) * 100
         });
       }
@@ -1042,12 +1070,12 @@ function calculateAndRender() {
     <div><span>API 원본 기대값</span><b>${apiBase.result.value.toFixed(4)}</b></div>
     <div><span>현재 화면 선택값</span><b>${current.result.value.toFixed(4)}</b></div>
     <div><span>현재 대비</span><b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>
-    <p>비교 기준은 API가 읽어온 원본 아크패시브 기대값으로 고정됩니다.${singleHitPenaltyEnabled ? ' 뭉가 후보는 추천점수만 -2.5% 적용됩니다. 비뭉가 후보는 치적 100% 초과분 1%당 -0.3%(최대 -3%) 추천 보정이 적용됩니다.' : ''}</p>
+    <p>비교 기준은 API가 읽어온 원본 아크패시브 기대값으로 고정됩니다.${singleHitPenaltyEnabled ? ' 뭉가 후보는 추천점수만 -2.5% 적용됩니다. 비뭉가 후보는 치적 100% 초과분 1%당 -0.5% 추천 보정이 적용됩니다.' : ''}</p>
   </div>`;
   $('baseInfo').innerHTML = `<b>API 기준 상세</b><span>치명 ${Math.round(apiBase.stats.critStat || 0)} · 최종치적 ${fmt(apiBase.result.critRate)}% · 치피 ${fmt(apiBase.result.critDamage)}% · 치적주피 ${fmt(apiBase.result.critHitDamage)}% · 진피 ${fmt(apiBase.result.evo)}% · 추피 ${fmt(apiBase.result.additionalDamage)}% · 적주피 ${fmt(apiBase.result.enemyDamage)}% · 공증 ${fmt(apiBase.result.attackPower)}%</span>`;
   $('recommendList').innerHTML = top.length ? `<div class="comboRows">${top.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
-    const memo = candidateMemo(c.fourNames, c.fiveName, c.calc, c.penaltyApplied, c.critOverPenalty, c.critLowPenalty);
+    const memo = candidateMemo(c.fourNames, c.fiveName, c.calc, c.penaltyApplied, c.critOverPenalty, c.critLowPenalty, c.manaStabilityBonus);
     return `<article class="comboRow ${i === 0 ? 'best' : ''}">
       <div class="rankBadge">${i + 1}</div>
       <div class="rowBuild">
@@ -1060,7 +1088,7 @@ function calculateAndRender() {
         ${penaltyNoteHtml(c)}
       </div>
       <div class="rowMetrics">
-        <div class="rowMetric"><span>추천값</span><b>${c.recValue.toFixed(4)}</b>${(c.penaltyApplied || c.critOverPenalty > 0 || c.critLowPenalty > 0) ? `<small>이론 ${c.calc.result.value.toFixed(4)}</small>` : ''}</div>
+        <div class="rowMetric"><span>추천값</span><b>${c.recValue.toFixed(4)}</b>${(c.penaltyApplied || c.critOverPenalty > 0 || c.critLowPenalty > 0 || c.manaStabilityBonus > 0) ? `<small>이론 ${c.calc.result.value.toFixed(4)}</small>` : ''}</div>
         <div class="rowMetric"><span>API 대비</span><b class="${cls}">${pct(c.diff)}</b></div>
         <div class="rowMetric"><span>치적</span><b>${fmt(c.calc.result.critRate)}%</b></div>
       </div>
@@ -1142,6 +1170,7 @@ $('critSynergyEnabled').addEventListener('change', calculateAndRender);
 $('backAttackEnabled').addEventListener('change', calculateAndRender);
 $('excludeCooldown')?.addEventListener('change', calculateAndRender);
 $('noManaMainSkill')?.addEventListener('change', calculateAndRender);
+$('manaShortageClass')?.addEventListener('change', calculateAndRender);
 $('singleHitMainSkill')?.addEventListener('change', calculateAndRender);
 $('mainSkillDamageShare')?.addEventListener('input', calculateAndRender);
 
