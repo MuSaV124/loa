@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v4.8.6 · 2/4/5티어 추천</span>
+        <span class="badge">v4.8.7 · 2/4/5티어 추천</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -64,6 +64,7 @@
           <label class="miniCheck"><span>주력기 단타 스킬 보정</span><input id="singleHitMainSkill" type="checkbox" /></label>
           <label class="miniCheck"><span>쿨감 효과 제외</span><input id="excludeCooldown" type="checkbox" /></label>
           <label class="miniCheck"><span>주력기 마나 사용 안함</span><input id="noManaMainSkill" type="checkbox" /></label>
+          <label><span>주력기 딜 지분(%)</span><input id="mainSkillDamageShare" type="number" min="0" max="100" step="1" value="60" /></label>
         </div>
       </div>
       <div class="resultLayout recommendLayout468">
@@ -85,7 +86,7 @@
     </section>
   </main>
 
-  <div class="version">Version 4.8.6</div>
+  <div class="version">Version 4.8.7</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

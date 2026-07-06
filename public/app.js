@@ -1,4 +1,4 @@
-const VERSION = '4.8.6';
+const VERSION = '4.8.7';
 
 function emptyEngravingState() {
   return { effects: { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, items: [], rawText: '', adrenaline: { adopted: false, level: 0, critRate: 0, attackPower: 0 } };
@@ -569,10 +569,11 @@ function score(stats) {
   const displayEnemyDamage = additivePercentFromSources(stats.enemyDamageSources);
   const displayCritHitDamage = additivePercentFromSources(critHitSources);
   const attackMultiplier = 1 + (stats.attackPower || 0) / 100;
-  // v4.8.0: 쿨감 실전 반영. 전분 '쿨타임 비율' 기본 75% 고정.
-  // 이론 DPS 증가분 [1/(1-CDR)-1] 중 75%만 추천 기대값에 반영한다.
+  // v4.8.7: 쿨감의 이론 DPS 증가분을 사용자가 입력한 '주력기 딜 지분'만큼 반영.
+  // 기본값 60%. 예: 쿨감 14%, 지분 60% => [1/(1-0.14)-1] × 0.60.
   const cooldownReduction = Math.max(0, Math.min(Number(stats.cooldownReduction || 0), 95));
-  const cooldownRatio = 0.75;
+  const mainSkillDamageSharePct = Math.max(0, Math.min(Number($('mainSkillDamageShare')?.value ?? 60), 100));
+  const cooldownRatio = mainSkillDamageSharePct / 100;
   const theoreticalCooldownGain = cooldownReduction > 0 ? (1 / (1 - cooldownReduction / 100) - 1) : 0;
   const cooldownMultiplier = 1 + theoreticalCooldownGain * cooldownRatio;
   const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier * cooldownMultiplier;
@@ -1108,5 +1109,6 @@ $('backAttackEnabled').addEventListener('change', calculateAndRender);
 $('excludeCooldown')?.addEventListener('change', calculateAndRender);
 $('noManaMainSkill')?.addEventListener('change', calculateAndRender);
 $('singleHitMainSkill')?.addEventListener('change', calculateAndRender);
+$('mainSkillDamageShare')?.addEventListener('input', calculateAndRender);
 
 await loadDb();
