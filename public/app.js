@@ -1,4 +1,4 @@
-const VERSION = '4.9.2';
+const VERSION = '4.9.3';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -928,16 +928,17 @@ function recommendationAdjustmentFor(fiveName, calc, singleHitPenaltyEnabled, se
 
   const finalCritRate = Number(calc?.result?.critRate || 0);
 
-  // v4.9.1 추천 보정:
+  // v4.9.3 추천 보정:
   // 1) 최종 치적 95% 이하이면 추천값 -0.5% 고정 보정.
-  // 2) 뭉툭한 가시가 아닌 조합은 치적 100% 초과분 1%p당 추천값 -0.5% 보정.
-  //    뭉툭한 가시는 초과 치적이 진화형 피해로 전환되므로 초과 보정을 적용하지 않는다.
+  // 2) 일반 조합은 치적 100% 초과분 1%p당 추천값 -0.5% 보정.
+  // 3) 뭉툭한 가시는 치적 120% 초과분 1%p당 추천값 -0.5% 보정.
   if (finalCritRate <= 95) {
     multiplier *= 0.995;
     details.critLowPenalty = 0.5;
   }
-  if (fiveName !== '뭉툭한 가시') {
-    const overCrit = Math.max(0, finalCritRate - 100);
+  {
+    const critCap = fiveName === '뭉툭한 가시' ? 120 : 100;
+    const overCrit = Math.max(0, finalCritRate - critCap);
     const penalty = overCrit * 0.5;
     if (penalty > 0) {
       multiplier *= Math.max(0, 1 - penalty / 100);
