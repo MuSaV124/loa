@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v4.5.5 · 표시/계산 분리</span>
+        <span class="badge">v4.8.6 · 2/4/5티어 추천</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -42,9 +42,11 @@
         <label>추가 공격 속도(%)<input id="extraAttackSpeed" type="number" step="0.01" value="0" /></label>
         <label>추가 이동 속도(%)<input id="extraMoveSpeed" type="number" step="0.01" value="0" /></label>
         <label class="checkLabel"><span>치적 시너지 적용 (+10%)</span><input id="critSynergyEnabled" type="checkbox" /></label>
+        <label class="checkLabel"><span>백어택 적용 (+치적 10% / 피해 5%)</span><input id="backAttackEnabled" type="checkbox" /></label>
         <label class="checkLabel"><span>아드레날린 적용</span><input id="adrenalineEnabled" type="checkbox" checked /></label>
         <label>아드 치명타 확률(%)<input id="adrenalineCritRate" type="number" step="0.01" value="20" /></label>
         <label>아드 공격력 증가(%)<input id="adrenalineAttackPower" type="number" step="0.01" value="5.4" /></label>
+        <label id="adrenalineReplacementWrap" class="hidden">아드 대체 각인 효율 차감(%)<input id="adrenalineReplacementDamage" type="number" step="0.01" value="0" /></label>
         <div class="staticInfo"><b>기본 공이속</b><span>114% = 기본 100% + 만찬 5% + 서폿 진화 9%</span></div>
         <div class="staticInfo"><b>신속 공이속</b><span>신속 ÷ 58.21 로 자동 계산</span></div>
       </div>
@@ -57,18 +59,22 @@
 
     <section id="recommendPanel" class="panel">
       <div class="sectionHead recommendHead">
-        <div><h2>4/5티어 조합 추천</h2><p class="hint">1~3티어와 입력값은 유지하고, 추천 계산용으로만 현재 4/5티어를 제거한 뒤 후보 4/5티어를 넣어 비교합니다. 기대값은 합연산/곱연산을 분리해 계산합니다.</p></div>
-        <label class="miniCheck"><span>마나용광로 제외</span><input id="excludeManaForge" type="checkbox" /></label>
-      </div>
-      <div class="resultLayout">
-        <div>
-          <h3>현재 선택 기준</h3>
-          <div id="currentScore" class="scoreBox"></div>
-          <div id="baseInfo" class="baseInfo"></div>
+        <div><h2>2/4/5티어 조합 추천</h2><p class="hint">1/3티어와 입력값은 유지하고 후보 2/4/5티어 조합을 비교합니다. 2티어는 총 30P 기준이며 축복의 여신은 딜러 추천에서 제외합니다. 비교 기준은 API 원본 아크패시브 기대값으로 고정됩니다.</p></div>
+        <div class="recommendChecks">
+          <label class="miniCheck"><span>주력기 단타 스킬 보정</span><input id="singleHitMainSkill" type="checkbox" /></label>
+          <label class="miniCheck"><span>쿨감 효과 제외</span><input id="excludeCooldown" type="checkbox" /></label>
+          <label class="miniCheck"><span>주력기 마나 사용 안함</span><input id="noManaMainSkill" type="checkbox" /></label>
         </div>
-        <div>
+      </div>
+      <div class="resultLayout recommendLayout468">
+        <div class="recommendMain468">
           <h3>추천 TOP5</h3>
           <div id="recommendList" class="recommendList"></div>
+        </div>
+        <div class="apiBaseline468">
+          <h3>API 원본 기준</h3>
+          <div id="currentScore" class="scoreBox"></div>
+          <div id="baseInfo" class="baseInfo"></div>
         </div>
       </div>
     </section>
@@ -79,7 +85,7 @@
     </section>
   </main>
 
-  <div class="version">Version 4.5.5</div>
+  <div class="version">Version 4.8.6</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

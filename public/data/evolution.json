@@ -660,8 +660,16 @@
       "maxLevel": 2,
       "costPerLevel": 10,
       "icon": "💠",
-      "levels": {},
-      "iconImage": "/images/evolution/끝없는 마나.webp"
+      "levels": {
+        "1": {
+          "cooldownReduction": 7
+        },
+        "2": {
+          "cooldownReduction": 14
+        }
+      },
+      "iconImage": "/images/evolution/끝없는 마나.webp",
+      "description": "마나 사용 스킬 재사용 대기시간 7%/14% 감소, 마나 소모량 10%/20% 감소"
     },
     {
       "name": "금단의 주문",
@@ -671,13 +679,14 @@
       "icon": "🟣",
       "levels": {
         "1": {
-          "evolutionDamage": 5
+          "evolutionDamage": 10
         },
         "2": {
-          "evolutionDamage": 10
+          "evolutionDamage": 20
         }
       },
-      "iconImage": "/images/evolution/금단의 주문.webp"
+      "iconImage": "/images/evolution/금단의 주문.webp",
+      "description": "진화형 피해 5%/10% 증가 + 마나 스킬 진화형 피해 5%/10% 추가 증가. 마나 주력기 기준 총 진피 10%/20%"
     },
     {
       "name": "예리한 감각",
@@ -724,10 +733,12 @@
       "icon": "👥",
       "levels": {
         "1": {
-          "evolutionDamage": 5
+          "evolutionDamage": 5,
+          "cooldownReduction": 4
         },
         "2": {
-          "evolutionDamage": 10
+          "evolutionDamage": 10,
+          "cooldownReduction": 8
         }
       },
       "iconImage": "/images/evolution/최적화 훈련.webp"
@@ -749,13 +760,16 @@
       "icon": "∞",
       "levels": {
         "1": {
-          "evolutionDamage": 8
+          "evolutionDamage": 8,
+          "cooldownReduction": 7
         },
         "2": {
-          "evolutionDamage": 16
+          "evolutionDamage": 16,
+          "cooldownReduction": 14
         }
       },
-      "iconImage": "/images/evolution/무한한 마력.webp"
+      "iconImage": "/images/evolution/무한한 마력.webp",
+      "description": "진화형 피해 8%/16% 증가, 마나 스킬 재사용 대기시간 7%/14% 감소, 마나 소모량 8%/16% 감소"
     },
     {
       "name": "혼신의 강타",
