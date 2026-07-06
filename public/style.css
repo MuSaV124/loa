@@ -512,7 +512,52 @@ select {
   white-space: nowrap;
 }
 .miniCheck input { width: 18px; height: 18px; margin: 0; accent-color: var(--amber); }
-@media (max-width: 560px) { .recommendHead { align-items: flex-start; } .miniCheck { width: 100%; justify-content: space-between; border-radius: 10px; } }
+
+.recommendChecks {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.recommendCheckRow {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.shareControl {
+  display: inline-grid;
+  grid-template-columns: auto 74px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 13px;
+  border: 1px solid rgba(148, 163, 184, .28);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, .72);
+  color: #e5e7eb;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.shareControl em {
+  margin-left: 4px;
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 800;
+}
+.shareControl input {
+  width: 74px;
+  height: 30px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  text-align: right;
+}
+.shareControl input:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+.shareControl b { color: var(--muted); }
+@media (max-width: 560px) { .recommendHead { align-items: flex-start; } .recommendChecks, .recommendCheckRow { width: 100%; align-items: stretch; justify-content: stretch; } .miniCheck { width: 100%; justify-content: space-between; border-radius: 10px; } .shareControl { width: 100%; grid-template-columns: minmax(0, 1fr) 74px auto; } }
 
 /* v4.5.0 4/5 tier combination recommendation table */
 .comboTableWrap {

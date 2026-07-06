@@ -1,4 +1,5 @@
-const VERSION = '4.8.7';
+const VERSION = '4.8.8';
+const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 
 function emptyEngravingState() {
   return { effects: { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, items: [], rawText: '', adrenaline: { adopted: false, level: 0, critRate: 0, attackPower: 0 } };
@@ -569,10 +570,11 @@ function score(stats) {
   const displayEnemyDamage = additivePercentFromSources(stats.enemyDamageSources);
   const displayCritHitDamage = additivePercentFromSources(critHitSources);
   const attackMultiplier = 1 + (stats.attackPower || 0) / 100;
-  // v4.8.7: 쿨감의 이론 DPS 증가분을 사용자가 입력한 '주력기 딜 지분'만큼 반영.
-  // 기본값 60%. 예: 쿨감 14%, 지분 60% => [1/(1-0.14)-1] × 0.60.
-  const cooldownReduction = Math.max(0, Math.min(Number(stats.cooldownReduction || 0), 95));
-  const mainSkillDamageSharePct = Math.max(0, Math.min(Number($('mainSkillDamageShare')?.value ?? 60), 100));
+  // v4.8.8: 쿨감의 이론 DPS 증가분을 사용자가 입력한 '주력기 딜 지분'만큼 반영.
+  // 쿨감 효과 제외 체크 시 끝마/무마/최적화 훈련 등 모든 cooldownReduction은 점수에서 0으로 처리.
+  const cooldownExcluded = Boolean($('excludeCooldown')?.checked);
+  const cooldownReduction = cooldownExcluded ? 0 : Math.max(0, Math.min(Number(stats.cooldownReduction || 0), 95));
+  const mainSkillDamageSharePct = cooldownExcluded ? 0 : Math.max(0, Math.min(Number($('mainSkillDamageShare')?.value ?? 60), 100));
   const cooldownRatio = mainSkillDamageSharePct / 100;
   const theoreticalCooldownGain = cooldownReduction > 0 ? (1 / (1 - cooldownReduction / 100) - 1) : 0;
   const cooldownMultiplier = 1 + theoreticalCooldownGain * cooldownRatio;
@@ -878,6 +880,7 @@ function candidateMemo(fourNames, fiveName, calc, singleHitPenalty = false, crit
   else bits.push(`${tier4PairLabel(fourNames)} / ${fiveName}`);
   if (calc?.result?.convertedEvolutionDamage > 0) bits.push(`뭉가 전환 ${fmt(calc.result.convertedEvolutionDamage)}%(기본 포함 총 ${fmt(calc.result.convertedEvolutionDamage + 15)}%)`);
   if (singleHitPenalty) bits.push('주력기 단타 보정 -2.5%(추천만)');
+  if (Boolean($('excludeCooldown')?.checked) && (stats.result?.cooldownReduction || 0) === 0) bits.push('쿨감 제외');
   if (critOverPenalty > 0) bits.push(`치적 초과 보정 -${fmt(critOverPenalty)}%(추천만)`);
   if (calc?.result?.sonicBreakEvolutionDamage > 0) bits.push(`음속 ${fmt(calc.result.sonicBreakEvolutionDamage)}%`);
   return bits.join(' / ');
@@ -960,12 +963,14 @@ function calculateAndRender() {
   const candidates = [];
   const noManaMainSkill = Boolean($('noManaMainSkill')?.checked);
   const excludeCooldown = Boolean($('excludeCooldown')?.checked);
+  const shareInput = $('mainSkillDamageShare');
+  if (shareInput) shareInput.disabled = excludeCooldown;
   const singleHitPenaltyEnabled = Boolean($('singleHitMainSkill')?.checked);
 
   // 딜러 추천 규칙: 축복의 여신은 항상 제외. 한계 돌파만 Lv.3 가능하며 DB maxLevel을 그대로 사용.
   const tier2Options = allOptions(2).filter(name => {
     if (!getNode(name) || name === '축복의 여신') return false;
-    if (excludeCooldown && name === '최적화 훈련') return false;
+    if (excludeCooldown && COOLDOWN_NODE_NAMES.includes(name)) return false;
     if (noManaMainSkill && ['끝없는 마나', '금단의 주문', '무한한 마력'].includes(name)) return false;
     return true;
   });
