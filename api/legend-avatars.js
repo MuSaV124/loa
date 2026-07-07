@@ -1,4 +1,4 @@
-const API_VERSION = '5.0.7';
+const API_VERSION = '5.0.8';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 
@@ -54,7 +54,7 @@ const JOB_GROUPS = [
 ];
 
 const JOBS = JOB_GROUPS.flatMap(g => g.jobs);
-const JOB_CACHE = globalThis.__legendAvatarJobCacheV507 || (globalThis.__legendAvatarJobCacheV507 = new Map());
+const JOB_CACHE = globalThis.__legendAvatarJobCacheV508 || (globalThis.__legendAvatarJobCacheV508 = new Map());
 const CACHE_TTL_MS = 1000 * 60 * 5;
 
 export default async function handler(req, res) {
@@ -101,7 +101,7 @@ export default async function handler(req, res) {
         ok: true,
         apiVersion: API_VERSION,
         source: 'markets/items',
-        strategy: 'direct-category+characterClass',
+        strategy: 'direct-part-category+official-characterClass',
         mode: 'single-job-part',
         job,
         part,
@@ -122,7 +122,7 @@ export default async function handler(req, res) {
         ok: true,
         apiVersion: API_VERSION,
         source: 'markets/items',
-        strategy: 'direct-category+characterClass',
+        strategy: 'direct-part-category+official-characterClass',
         mode: 'single-job-set',
         job,
         jobClassId: JOB_CLASS_IDS[job],
@@ -150,22 +150,27 @@ async function fetchLegendAvatarPart(apiKey, job, part) {
   const categoryCode = PART_CATEGORY_CODES[part];
   const tried = [];
 
+  // 5.0.8: 공식 홈페이지 Form Data에서 확인한 구조를 Open API 형식에 맞춰 적용한다.
+  // 홈페이지: firstCategory=20000, secondCategory=부위코드, characterClass=직업ID, grade=4, tier=0, sortType=7
+  // Open API: CategoryCode=secondCategory, CharacterClass=직업명 우선, ItemGrade='전설', ItemTier=0/null, Sort='CURRENT_MIN_PRICE'
+  // 핵심 변경점: 부위별 CategoryCode를 이미 신뢰하므로 결과명/Tooltip 부위 정규식으로 다시 걸러내지 않는다.
   const payloads = [
-    makePayload(categoryCode, jobClassId),
-    makePayload(categoryCode, String(jobClassId)),
-    makePayload(categoryCode, job),
-    makePayload(categoryCode, undefined),
-    makePayload(20000, jobClassId, part),
-    makePayload(20000, String(jobClassId), part),
-    makePayload(20000, job, part)
+    makePayload(categoryCode, job, '', 0),
+    makePayload(categoryCode, job, '', null),
+    makePayload(categoryCode, jobClassId, '', 0),
+    makePayload(categoryCode, String(jobClassId), '', 0),
+    makePayload(categoryCode, undefined, '', 0),
+    makePayload(20000, job, part, 0),
+    makePayload(20000, jobClassId, part, 0),
+    makePayload(20000, String(jobClassId), part, 0)
   ];
 
   for (const payload of payloads) {
     const result = await fetchMarketPage(apiKey, payload);
-    tried.push({ part, categoryCode: payload.CategoryCode, characterClass: payload.CharacterClass ?? null, itemName: payload.ItemName || '', count: result.items.length, totalCount: result.totalCount, error: result.error || null });
+    tried.push({ part, categoryCode: payload.CategoryCode, characterClass: payload.CharacterClass ?? null, itemTier: payload.ItemTier ?? null, itemName: payload.ItemName || '', count: result.items.length, totalCount: result.totalCount, error: result.error || null });
     if (result.error || !result.items.length) continue;
 
-    const picked = pickLowestPartItem(result.items, job, part, payload.CharacterClass != null);
+    const picked = pickLowestPartItem(result.items, job, part, payload.CharacterClass != null, payload.CategoryCode === categoryCode);
     if (picked) {
       return {
         item: normalizeAvatarItem(picked, part),
@@ -198,12 +203,12 @@ async function fetchLegendAvatarPart(apiKey, job, part) {
   };
 }
 
-function makePayload(categoryCode, characterClass, itemName = '') {
+function makePayload(categoryCode, characterClass, itemName = '', itemTier = 0) {
   const payload = {
     Sort: 'CURRENT_MIN_PRICE',
     SortCondition: 'ASC',
     CategoryCode: categoryCode,
-    ItemTier: null,
+    ItemTier: itemTier,
     ItemGrade: '전설',
     ItemName: itemName,
     PageNo: 1
@@ -225,11 +230,13 @@ async function fetchMarketPage(apiKey, payload) {
   }
 }
 
-function pickLowestPartItem(items, job, part, trustedClassFilter) {
+function pickLowestPartItem(items, job, part, trustedClassFilter, trustedPartCategory) {
   const filtered = (items || [])
     .filter(item => marketPrice(item) > 0)
     .filter(item => item.Grade ? item.Grade === '전설' : true)
-    .filter(item => isAvatarPart(item, part))
+    // 부위 전용 CategoryCode(20005/20010/20050/20060)로 조회한 결과는 부위가 이미 확정된 것으로 본다.
+    // 일부 무기명(건, 랜스, 장검 등)과 방어구 Tooltip 누락 때문에 여기서 다시 정규식 필터링하면 정상 매물이 빠진다.
+    .filter(item => trustedPartCategory || isAvatarPart(item, part))
     .filter(item => trustedClassFilter || isJobOnly(itemFullText(item), job));
 
   filtered.sort((a, b) => marketPrice(a) - marketPrice(b));
