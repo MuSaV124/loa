@@ -1,4 +1,4 @@
-const VERSION = '5.0.4';
+const VERSION = '5.0.7';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -1207,7 +1207,7 @@ $('mainSkillDamageShare')?.addEventListener('input', calculateAndRender);
 
 
 const LOSTARK_JOBS = [
-  '버서커','디스트로이어','워로드','홀리나이트','슬레이어',
+  '버서커','디스트로이어','워로드','홀리나이트','슬레이어','발키리',
   '배틀마스터','인파이터','기공사','창술사','스트라이커','브레이커',
   '데빌헌터','블래스터','호크아이','스카우터','건슬링어',
   '바드','서머너','아르카나','소서리스',
@@ -1217,7 +1217,7 @@ const LOSTARK_JOBS = [
 ];
 
 const LOSTARK_JOB_GROUPS = [
-  { group: '전사', jobs: ['버서커','디스트로이어','워로드','홀리나이트','슬레이어'] },
+  { group: '전사', jobs: ['디스트로이어','발키리','버서커','슬레이어','워로드','홀리나이트'] },
   { group: '무도가', jobs: ['배틀마스터','인파이터','기공사','창술사','스트라이커','브레이커'] },
   { group: '헌터', jobs: ['데빌헌터','블래스터','호크아이','스카우터','건슬링어'] },
   { group: '마법사', jobs: ['바드','서머너','아르카나','소서리스'] },
@@ -1354,7 +1354,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.0.6',
+    apiVersion: '5.0.7',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1370,7 +1370,7 @@ async function loadLegendAvatarSet(job, force = false) {
 
   try {
     const settled = await Promise.allSettled(order.map(async (part) => {
-      const url = `/api/legend-avatars?job=${encodeURIComponent(job)}&part=${encodeURIComponent(part)}&pageLimit=6&detailLimit=40${force ? '&force=1' : ''}&_=${Date.now()}`;
+      const url = `/api/legend-avatars?job=${encodeURIComponent(job)}&part=${encodeURIComponent(part)}${force ? '&force=1' : ''}&_=${Date.now()}`;
       const res = await fetch(url, { cache: 'no-store' });
       const data = await readJsonSafely(res);
       if (!res.ok || !data?.ok) throw new Error(data?.error || data?.message || `${part} 조회 실패`);
