@@ -1,4 +1,4 @@
-const VERSION = '4.9.4';
+const VERSION = '4.9.5';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -1205,4 +1205,97 @@ $('manaShortageClass')?.addEventListener('change', calculateAndRender);
 $('singleHitMainSkill')?.addEventListener('change', calculateAndRender);
 $('mainSkillDamageShare')?.addEventListener('input', calculateAndRender);
 
+
+const LOSTARK_JOBS = [
+  '버서커','디스트로이어','워로드','홀리나이트','슬레이어',
+  '배틀마스터','인파이터','기공사','창술사','스트라이커','브레이커',
+  '데빌헌터','블래스터','호크아이','스카우터','건슬링어',
+  '바드','서머너','아르카나','소서리스',
+  '블레이드','데모닉','리퍼','소울이터',
+  '도화가','기상술사','환수사'
+];
+
+function formatGold(value) {
+  const n = Number(value || 0);
+  return Number.isFinite(n) && n > 0 ? `${n.toLocaleString('ko-KR')}G` : '-';
+}
+
+function setActiveTab(tabName) {
+  document.querySelectorAll('.tabButton').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
+  const isAvatar = tabName === 'legendAvatar';
+  document.querySelectorAll('.calcTabPanel').forEach(el => el.classList.toggle('hiddenByTab', isAvatar));
+  $('legendAvatarPanel')?.classList.toggle('hidden', !isAvatar);
+}
+
+function initLegendAvatarTab() {
+  const select = $('avatarJobSelect');
+  if (select && !select.options.length) {
+    select.innerHTML = LOSTARK_JOBS.map(job => `<option value="${escapeHtml(job)}" ${job === '브레이커' ? 'selected' : ''}>${escapeHtml(job)}</option>`).join('');
+  }
+  document.querySelectorAll('.tabButton').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
+  $('avatarSearchButton')?.addEventListener('click', () => searchLegendAvatarSet(select?.value || '브레이커'));
+}
+
+function setAvatarMessage(text, isError = false) {
+  const el = $('avatarMessage');
+  if (!el) return;
+  if (!text) { el.classList.add('hidden'); el.textContent = ''; return; }
+  el.classList.remove('hidden');
+  el.classList.toggle('error', !!isError);
+  el.textContent = text;
+}
+
+function avatarPartCard(part, item) {
+  if (!item) {
+    return `<article class="avatarPart missing"><div class="avatarThumb empty">?</div><div><b>${escapeHtml(part)}</b><span>매물 없음</span><small>현재 조회 범위에서 ${escapeHtml(part)} 부위를 찾지 못했습니다.</small></div></article>`;
+  }
+  const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="" loading="lazy" />` : `<span>${escapeHtml(part.slice(0, 1))}</span>`;
+  return `<article class="avatarPart">
+    <div class="avatarThumb">${icon}</div>
+    <div class="avatarPartInfo">
+      <b>${escapeHtml(part)}</b>
+      <span>${formatGold(item.price)}</span>
+      <small>${escapeHtml(item.name || '-')}</small>
+    </div>
+  </article>`;
+}
+
+function renderLegendAvatarResult(data) {
+  const parts = data.parts || {};
+  const order = ['머리', '상의', '하의', '무기'];
+  const missing = order.filter(part => !parts[part]);
+  $('avatarResult').innerHTML = `<div class="avatarTotalBox">
+    <div>
+      <span>${escapeHtml(data.job)} 전설 아바타 한 벌 최저가</span>
+      <strong>${formatGold(data.totalPrice)}</strong>
+      <small>${data.complete ? '머리/상의/하의/무기 모두 확인됨' : `미확인 부위: ${escapeHtml(missing.join(', '))}`}</small>
+    </div>
+    <div class="avatarScanInfo">조회 매물 ${Number(data.scanned || 0).toLocaleString('ko-KR')}개 · 직업 매칭 ${Number(data.matchedCount || 0).toLocaleString('ko-KR')}개</div>
+  </div>
+  <div class="avatarPartGrid">${order.map(part => avatarPartCard(part, parts[part])).join('')}</div>
+  <p class="avatarNotice">현재 경매장에 등록된 즉시구매가 기준입니다. 공식 API 응답에 아이콘 URL이 있으면 이미지가 표시되고, 없으면 부위 글자로 대체됩니다.</p>`;
+}
+
+async function searchLegendAvatarSet(job) {
+  const button = $('avatarSearchButton');
+  if (!job) return setAvatarMessage('직업을 선택하세요.', true);
+  button.disabled = true;
+  button.textContent = '조회...';
+  setAvatarMessage('경매장 현재 매물을 조회 중입니다.');
+  $('avatarResult').innerHTML = '';
+  try {
+    const res = await fetch(`/api/legend-avatars?job=${encodeURIComponent(job)}&_=${Date.now()}`, { cache: 'no-store' });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || data.message || '전설 아바타 조회 실패');
+    setAvatarMessage('');
+    renderLegendAvatarResult(data);
+  } catch (error) {
+    setAvatarMessage(error.message, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = '시세 조회';
+  }
+}
+
+initLegendAvatarTab();
 await loadDb();
