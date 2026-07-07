@@ -1,4 +1,4 @@
-const API_VERSION = '4.9.8';
+const API_VERSION = '4.9.9';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const PARTS = ['머리', '상의', '하의', '무기'];
@@ -22,7 +22,8 @@ export default async function handler(req, res) {
 
     const pageLimit = Math.max(1, Math.min(30, Number(req.query.pageLimit || 12)));
     const { items, totalCount, categoryCode, strategy } = await fetchLegendAvatarMarketItems(apiKey, job, pageLimit);
-    const result = await buildLegendAvatarSet(apiKey, items, job);
+    const jobFilterTrusted = String(strategy || '').includes('+class');
+    const result = await buildLegendAvatarSet(apiKey, items, job, jobFilterTrusted);
 
     return res.status(200).json({
       ok: true,
@@ -34,6 +35,7 @@ export default async function handler(req, res) {
       pageLimit,
       categoryCode,
       strategy,
+      jobFilterTrusted,
       ...result
     });
   } catch (error) {
@@ -193,7 +195,7 @@ function cleanPayload(payload) {
   return out;
 }
 
-async function buildLegendAvatarSet(apiKey, items, job) {
+async function buildLegendAvatarSet(apiKey, items, job, jobFilterTrusted = false) {
   const parts = { 머리: null, 상의: null, 하의: null, 무기: null };
   const matched = [];
   const detailCache = new Map();
@@ -205,7 +207,9 @@ async function buildLegendAvatarSet(apiKey, items, job) {
     if (!price) continue;
 
     const text = itemFullText(item);
-    if (!isJobOnly(text, job)) continue;
+    // markets/items에서 CharacterClass 필터가 성공한 전략이면 이미 직업별 결과이므로
+    // 상세 Tooltip에 '브레이커 전용' 문구가 없어도 제외하지 않는다.
+    if (!jobFilterTrusted && !isJobOnly(text, job)) continue;
 
     const part = detectPart(item, text);
     if (!part || !(part in parts)) continue;
