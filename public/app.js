@@ -1,4 +1,4 @@
-const VERSION = '5.0.3';
+const VERSION = '5.0.4';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -1235,8 +1235,10 @@ function formatGold(value) {
 function setActiveTab(tabName) {
   document.querySelectorAll('.tabButton').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
   const isAvatar = tabName === 'legendAvatar';
+  document.body.classList.toggle('avatarMode', isAvatar);
   document.querySelectorAll('.calcTabPanel').forEach(el => el.classList.toggle('hiddenByTab', isAvatar));
   $('legendAvatarPanel')?.classList.toggle('hidden', !isAvatar);
+  if (isAvatar) prepareLegendAvatarTab();
 }
 
 let legendAvatarCache = new Map();
@@ -1281,7 +1283,7 @@ function setAvatarMessage(text, isError = false) {
 }
 
 function prepareLegendAvatarTab() {
-  setAvatarMessage('직업을 선택하면 해당 직업의 머리/상의/하의/무기 최저가를 조회합니다.');
+  setAvatarMessage('직업을 선택하면 해당 직업의 머리/상의/하의/무기 최저가를 조회합니다. 계산기 화면은 숨긴 상태로 분리 표시됩니다.');
   if ($('avatarResult')) $('avatarResult').innerHTML = `<div class="avatarEmptyBox">직업 버튼을 선택하세요.</div>`;
 }
 
@@ -1333,20 +1335,56 @@ async function loadLegendAvatarSet(job, force = false) {
     setAvatarMessage(`${job} 전설 아바타 시세를 캐시에서 표시했습니다.`);
     return;
   }
+  if (legendAvatarLoading) return;
   const mainButton = $('avatarSearchAllButton');
   const refreshButton = $('avatarRefreshButton');
   if (mainButton) mainButton.disabled = true;
   if (refreshButton) refreshButton.disabled = true;
   legendAvatarLoading = true;
-  setAvatarMessage(`${job} 전설 아바타 시세를 조회하는 중입니다.`);
-  $('avatarResult').innerHTML = `<div class="avatarEmptyBox">${escapeHtml(job)} 거래소 API 조회 중...</div>`;
+  setAvatarMessage(`${job} 전설 아바타 시세를 부위별로 조회하는 중입니다.`);
+
+  const order = ['머리', '상의', '하의', '무기'];
+  const partial = {
+    ok: true,
+    apiVersion: '5.0.4',
+    source: 'markets/items',
+    mode: 'part-split',
+    job,
+    parts: { 머리: null, 상의: null, 하의: null, 무기: null },
+    totalPrice: 0,
+    complete: false,
+    scanned: 0,
+    detailScanned: 0,
+    matchedCount: 0,
+    matched: []
+  };
+  renderLegendAvatarResult(partial);
+
   try {
-    const res = await fetch(`/api/legend-avatars?job=${encodeURIComponent(job)}&pageLimit=6&detailLimit=48${force ? '&force=1' : ''}&_=${Date.now()}`, { cache: 'no-store' });
-    const data = await readJsonSafely(res);
-    if (!res.ok || !data?.ok) throw new Error(data?.error || data?.message || '전설 아바타 조회 실패');
-    legendAvatarCache.set(job, data);
-    renderLegendAvatarResult(data);
-    setAvatarMessage(`${job} 조회 완료${data.complete ? '' : ' · 일부 부위는 조회 범위에서 찾지 못했습니다.'}`);
+    const settled = await Promise.allSettled(order.map(async (part) => {
+      const url = `/api/legend-avatars?job=${encodeURIComponent(job)}&part=${encodeURIComponent(part)}&pageLimit=3&detailLimit=24${force ? '&force=1' : ''}&_=${Date.now()}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      const data = await readJsonSafely(res);
+      if (!res.ok || !data?.ok) throw new Error(data?.error || data?.message || `${part} 조회 실패`);
+      return { part, data };
+    }));
+
+    for (const row of settled) {
+      if (row.status !== 'fulfilled') continue;
+      const { part, data } = row.value;
+      partial.parts[part] = data.item || data.parts?.[part] || null;
+      partial.scanned += Number(data.scanned || 0);
+      partial.detailScanned += Number(data.detailScanned || 0);
+    }
+    partial.totalPrice = Object.values(partial.parts).reduce((sum, item) => sum + Number(item?.price || 0), 0);
+    partial.complete = order.every(part => !!partial.parts[part]);
+    partial.matched = Object.values(partial.parts).filter(Boolean);
+    partial.matchedCount = partial.matched.length;
+    legendAvatarCache.set(job, partial);
+    renderLegendAvatarResult(partial);
+
+    const failed = settled.filter(x => x.status === 'rejected').length;
+    setAvatarMessage(`${job} 조회 완료${partial.complete ? '' : ' · 일부 부위는 조회 범위에서 찾지 못했습니다.'}${failed ? ` · ${failed}개 부위 조회 실패` : ''}`, failed > 0);
   } catch (error) {
     setAvatarMessage(error.message, true);
   } finally {
@@ -1367,7 +1405,7 @@ async function searchLegendAvatarSet(job) {
 
 
 
-// v5.0.3 boot fix: 5.0.2에서 전설 아바타 코드가 뒤에 붙으면서 초기화 호출이 빠져
+// v5.0.4 boot fix: 5.0.2에서 전설 아바타 코드가 뒤에 붙으면서 초기화 호출이 빠져
 // 진화 DB가 로드되지 않고, 탭 버튼 이벤트도 연결되지 않았습니다.
 // DOM 요소와 모든 함수가 정의된 뒤 한 번만 초기화합니다.
 if (!window.__lostarkCalculatorBootedV503) {

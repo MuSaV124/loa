@@ -1237,3 +1237,29 @@ select {
   .avatarJobGroupName { padding-top: 0; }
   .avatarJobButton { flex: 1 1 auto; }
 }
+
+/* v5.0.4 tab isolation / avatar layout fix */
+body.avatarMode .hero,
+body.avatarMode .calcTabPanel {
+  display: none !important;
+}
+body.avatarMode .wrap {
+  grid-template-columns: 1fr;
+  width: min(1180px, calc(100vw - 28px));
+}
+body.avatarMode .tabNav,
+body.avatarMode #legendAvatarPanel {
+  grid-column: 1 / -1;
+}
+body.avatarMode #legendAvatarPanel {
+  margin-top: 0;
+}
+body.avatarMode .avatarPartGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 980px) {
+  body.avatarMode .avatarPartGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  body.avatarMode .avatarPartGrid { grid-template-columns: 1fr; }
+}
