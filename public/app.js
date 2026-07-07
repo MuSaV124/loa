@@ -1,4 +1,4 @@
-const VERSION = '5.0.0';
+const VERSION = '5.0.3';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -1365,3 +1365,14 @@ async function searchLegendAvatarSet(job) {
   return loadLegendAvatarSet(selectedAvatarJob, false);
 }
 
+
+
+// v5.0.3 boot fix: 5.0.2에서 전설 아바타 코드가 뒤에 붙으면서 초기화 호출이 빠져
+// 진화 DB가 로드되지 않고, 탭 버튼 이벤트도 연결되지 않았습니다.
+// DOM 요소와 모든 함수가 정의된 뒤 한 번만 초기화합니다.
+if (!window.__lostarkCalculatorBootedV503) {
+  window.__lostarkCalculatorBootedV503 = true;
+  initLegendAvatarTab();
+  prepareLegendAvatarTab();
+  loadDb().catch((error) => setMessage(error.message || '진화 노드 데이터를 불러오지 못했습니다.'));
+}
