@@ -1,9 +1,10 @@
-const API_VERSION = '4.9.6';
+const API_VERSION = '4.9.7';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const PARTS = ['머리', '상의', '하의', '무기'];
 const LEGEND_NAMES = ['영원', '도약', '결속', '약속'];
-const MARKET_AVATAR_CATEGORY_CANDIDATES = [20000, 200000, null];
+const MARKET_OPTIONS_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/options';
+const FALLBACK_MARKET_AVATAR_CATEGORY_CANDIDATES = [90000, 90100, 90200, 90300, 90400, 20000, 200000, null];
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -41,50 +42,93 @@ export default async function handler(req, res) {
 
 async function fetchLegendAvatarMarketItems(apiKey, job, pageLimit) {
   const tried = [];
+  const categoryCandidates = await getMarketAvatarCategoryCandidates(apiKey);
 
-  for (const categoryCode of MARKET_AVATAR_CATEGORY_CANDIDATES) {
-    const basePayload = {
-      Sort: 'CURRENT_MIN_PRICE',
-      SortCondition: 'ASC',
-      CharacterClass: job,
-      ItemTier: null,
-      ItemGrade: '전설',
-      ItemName: '',
-      PageNo: 1
-    };
-    if (categoryCode) basePayload.CategoryCode = categoryCode;
+  // 1차: /markets/options에서 찾은 아바타 카테고리 + 직업 필터.
+  for (const categoryCode of categoryCandidates) {
+    for (const useClassFilter of [true, false]) {
+      const basePayload = {
+        Sort: 'CURRENT_MIN_PRICE',
+        SortCondition: 'ASC',
+        ItemTier: null,
+        ItemGrade: '전설',
+        ItemName: '',
+        PageNo: 1
+      };
+      if (categoryCode) basePayload.CategoryCode = categoryCode;
+      if (useClassFilter) basePayload.CharacterClass = job;
 
-    const result = await fetchMarketPages(apiKey, basePayload, pageLimit);
-    tried.push({ categoryCode, count: result.items.length, totalCount: result.totalCount });
-    const avatarItems = result.items.filter(isLikelyLegendAvatarListItem);
-    if (avatarItems.length) {
-      return { ...result, items: avatarItems, categoryCode, strategy: 'category+class+grade', tried };
+      const result = await fetchMarketPages(apiKey, basePayload, pageLimit);
+      tried.push({ categoryCode, classFilter: useClassFilter, count: result.items.length, totalCount: result.totalCount });
+      const avatarItems = result.items.filter(isLikelyLegendAvatarListItem);
+      if (avatarItems.length) {
+        return { ...result, items: avatarItems, categoryCode, strategy: useClassFilter ? 'options-category+class+grade' : 'options-category+grade', tried };
+      }
     }
   }
 
-  // 일부 API 환경에서 CharacterClass/CategoryCode 조합이 아바타를 제대로 좁히지 못할 때를 대비한 보강 검색.
+  // 2차: 전설 아바타 시즌/접두 키워드로 보강 검색. Tooltip의 "직업 전용"은 리스트가 아니라 상세에서 판별한다.
   const merged = new Map();
   let totalCount = 0;
-  let categoryCode = MARKET_AVATAR_CATEGORY_CANDIDATES[0];
+  let categoryCode = categoryCandidates[0] ?? null;
   for (const keyword of LEGEND_NAMES) {
-    const payload = {
-      CategoryCode: categoryCode,
-      Sort: 'CURRENT_MIN_PRICE',
-      SortCondition: 'ASC',
-      CharacterClass: job,
-      ItemTier: null,
-      ItemGrade: '전설',
-      ItemName: keyword,
-      PageNo: 1
-    };
-    const result = await fetchMarketPages(apiKey, payload, Math.min(pageLimit, 4));
-    totalCount += result.totalCount || 0;
-    for (const item of result.items.filter(isLikelyLegendAvatarListItem)) {
-      merged.set(String(item.Id || item.ItemId || item.Name), item);
+    for (const useClassFilter of [true, false]) {
+      const payload = {
+        Sort: 'CURRENT_MIN_PRICE',
+        SortCondition: 'ASC',
+        ItemTier: null,
+        ItemGrade: '전설',
+        ItemName: keyword,
+        PageNo: 1
+      };
+      if (categoryCode) payload.CategoryCode = categoryCode;
+      if (useClassFilter) payload.CharacterClass = job;
+
+      const result = await fetchMarketPages(apiKey, payload, Math.min(pageLimit, 5));
+      tried.push({ keyword, categoryCode, classFilter: useClassFilter, count: result.items.length, totalCount: result.totalCount });
+      totalCount += result.totalCount || 0;
+      for (const item of result.items.filter(isLikelyLegendAvatarListItem)) {
+        merged.set(String(item.Id || item.ItemId || item.Name), item);
+      }
+      if (merged.size >= 20) break;
     }
   }
 
   return { items: [...merged.values()], totalCount, categoryCode, strategy: 'keyword-fallback', tried };
+}
+
+async function getMarketAvatarCategoryCandidates(apiKey) {
+  const candidates = [];
+  try {
+    const options = await requestLostArk(apiKey, MARKET_OPTIONS_ENDPOINT, { method: 'GET' });
+    collectAvatarCategoryCodes(options, candidates);
+  } catch {
+    // 옵션 API가 실패해도 하드코딩 후보로 계속 진행한다.
+  }
+
+  for (const code of FALLBACK_MARKET_AVATAR_CATEGORY_CANDIDATES) {
+    if (!candidates.includes(code)) candidates.push(code);
+  }
+  return candidates;
+}
+
+function collectAvatarCategoryCodes(node, output) {
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node)) {
+    for (const child of node) collectAvatarCategoryCodes(child, output);
+    return;
+  }
+
+  const name = normalizeText(node.CategoryName || node.Name || node.DisplayName || node.Text || '');
+  const code = node.CategoryCode ?? node.Code ?? node.Id ?? node.Value;
+  if (name.includes('아바타') && Number.isFinite(Number(code))) {
+    const n = Number(code);
+    if (!output.includes(n)) output.push(n);
+  }
+
+  for (const key of ['Categories', 'SubCategories', 'Children', 'Items']) {
+    if (node[key]) collectAvatarCategoryCodes(node[key], output);
+  }
 }
 
 async function fetchMarketPages(apiKey, basePayload, pageLimit) {
