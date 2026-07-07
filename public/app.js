@@ -1236,8 +1236,16 @@ function setActiveTab(tabName) {
   document.querySelectorAll('.tabButton').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
   const isAvatar = tabName === 'legendAvatar';
   document.body.classList.toggle('avatarMode', isAvatar);
-  document.querySelectorAll('.calcTabPanel').forEach(el => el.classList.toggle('hiddenByTab', isAvatar));
-  $('legendAvatarPanel')?.classList.toggle('hidden', !isAvatar);
+  document.querySelectorAll('.calcTabPanel').forEach(el => {
+    el.classList.toggle('hiddenByTab', isAvatar);
+    el.style.display = isAvatar ? 'none' : '';
+  });
+  const avatarPanel = $('legendAvatarPanel');
+  if (avatarPanel) {
+    avatarPanel.classList.toggle('hidden', !isAvatar);
+    avatarPanel.classList.toggle('hiddenByTab', !isAvatar);
+    avatarPanel.style.display = isAvatar ? '' : 'none';
+  }
   if (isAvatar) prepareLegendAvatarTab();
 }
 
@@ -1346,7 +1354,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.0.4',
+    apiVersion: '5.0.5',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1411,6 +1419,6 @@ async function searchLegendAvatarSet(job) {
 if (!window.__lostarkCalculatorBootedV503) {
   window.__lostarkCalculatorBootedV503 = true;
   initLegendAvatarTab();
-  prepareLegendAvatarTab();
+  setActiveTab('calculator');
   loadDb().catch((error) => setMessage(error.message || '진화 노드 데이터를 불러오지 못했습니다.'));
 }

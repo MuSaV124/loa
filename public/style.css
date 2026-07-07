@@ -1238,7 +1238,18 @@ select {
   .avatarJobButton { flex: 1 1 auto; }
 }
 
-/* v5.0.4 tab isolation / avatar layout fix */
+/* v5.0.5 tab isolation / avatar layout fix */
+
+#legendAvatarPanel {
+  display: none !important;
+}
+body.avatarMode #legendAvatarPanel {
+  display: block !important;
+}
+body:not(.avatarMode) #legendAvatarPanel {
+  display: none !important;
+}
+
 body.avatarMode .hero,
 body.avatarMode .calcTabPanel {
   display: none !important;

@@ -1,4 +1,4 @@
-const API_VERSION = '5.0.4';
+const API_VERSION = '5.0.5';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const PARTS = ['머리', '상의', '하의', '무기'];
@@ -18,7 +18,7 @@ const MARKET_OPTIONS_ENDPOINT = 'https://developer-lostark.game.onstove.com/mark
 // 잘못된 후보가 섞여도 개별 호출 실패는 무시하고 다음 후보를 시도한다.
 const FALLBACK_MARKET_AVATAR_CATEGORY_CANDIDATES = [20000, 20005, 20010, 20015, 20020, null];
 
-const JOB_CACHE = globalThis.__legendAvatarJobCacheV502 || (globalThis.__legendAvatarJobCacheV502 = new Map());
+const JOB_CACHE = globalThis.__legendAvatarJobCacheV505 || (globalThis.__legendAvatarJobCacheV505 = new Map());
 const CACHE_TTL_MS = 1000 * 60 * 5;
 
 export default async function handler(req, res) {
@@ -52,8 +52,8 @@ export default async function handler(req, res) {
     }
 
     const force = String(req.query.force || '') === '1';
-    const pageLimit = Math.max(1, Math.min(12, Number(req.query.pageLimit || 6)));
-    const detailLimit = Math.max(8, Math.min(80, Number(req.query.detailLimit || 48)));
+    const pageLimit = Math.max(1, Math.min(6, Number(req.query.pageLimit || 2)));
+    const detailLimit = Math.max(4, Math.min(40, Number(req.query.detailLimit || 16)));
     const cacheKey = `${job}:${part || 'set'}:${pageLimit}:${detailLimit}`;
     const cached = JOB_CACHE.get(cacheKey);
     if (!force && cached && Date.now() - cached.createdAt < CACHE_TTL_MS) {
@@ -88,11 +88,11 @@ export default async function handler(req, res) {
 
 
 async function buildSingleJobLegendAvatarPart(apiKey, job, part, pageLimit, detailLimit) {
-  const categoryCandidates = await getMarketAvatarCategoryCandidates(apiKey);
+  const categoryCandidates = await getPartCategoryCandidates(apiKey, part);
   const categoryCode = categoryCandidates[0] || 20000;
   const tried = [];
   const detailCache = new Map();
-  const candidates = await fetchPartCandidates(apiKey, job, part, categoryCode, pageLimit, tried);
+  const candidates = await fetchPartCandidates(apiKey, job, part, categoryCandidates, pageLimit, tried);
   const sorted = uniqueMarketItems(candidates).sort((a, b) => marketPrice(a) - marketPrice(b));
   let detailScanned = 0;
 
@@ -106,7 +106,7 @@ async function buildSingleJobLegendAvatarPart(apiKey, job, part, pageLimit, deta
     if (!price || detectedPart !== part) continue;
 
     const jobMatchedByTooltip = isJobOnly(text, job) || detectJobsFromText(text).includes(job);
-    const jobMatchedByClassSearch = candidate.__classMatched === true && (part === '무기' || jobMatchedByTooltip);
+    const jobMatchedByClassSearch = candidate.__classMatched === true;
     if (!jobMatchedByTooltip && !jobMatchedByClassSearch) continue;
 
     const normalized = normalizeAvatarItem(item, part, price);
@@ -155,7 +155,8 @@ async function buildSingleJobLegendAvatarSet(apiKey, job, pageLimit, detailLimit
   let detailScanned = 0;
 
   for (const part of PARTS) {
-    const candidates = await fetchPartCandidates(apiKey, job, part, categoryCode, pageLimit, tried);
+    const partCategoryCandidates = await getPartCategoryCandidates(apiKey, part);
+    const candidates = await fetchPartCandidates(apiKey, job, part, partCategoryCandidates, pageLimit, tried);
     scanned += candidates.length;
     const sorted = uniqueMarketItems(candidates).sort((a, b) => marketPrice(a) - marketPrice(b));
 
@@ -169,7 +170,7 @@ async function buildSingleJobLegendAvatarSet(apiKey, job, pageLimit, detailLimit
       if (!price || detectedPart !== part) continue;
 
       const jobMatchedByTooltip = isJobOnly(text, job) || detectJobsFromText(text).includes(job);
-      const jobMatchedByClassSearch = candidate.__classMatched === true && (part === '무기' || jobMatchedByTooltip);
+      const jobMatchedByClassSearch = candidate.__classMatched === true;
       if (!jobMatchedByTooltip && !jobMatchedByClassSearch) continue;
 
       const normalized = normalizeAvatarItem(item, part, price);
@@ -191,37 +192,45 @@ async function buildSingleJobLegendAvatarSet(apiKey, job, pageLimit, detailLimit
   };
 }
 
-async function fetchPartCandidates(apiKey, job, part, categoryCode, pageLimit, tried) {
+async function fetchPartCandidates(apiKey, job, part, categoryCodes, pageLimit, tried) {
+  const categoryList = Array.isArray(categoryCodes) && categoryCodes.length ? categoryCodes.slice(0, 6) : [20000];
   const queries = [];
   const partKeywords = part === '무기'
     ? ['', '무기', '무기 아바타', ...LEGEND_NAMES]
     : [`${part} 아바타`, part, ...LEGEND_NAMES.map(name => `${name} ${part}`)];
 
-  // 무기는 CharacterClass 조건이 잘 맞는 편이라 우선 조회한다.
-  if (part === '무기') {
-    for (const keyword of partKeywords) {
-      queries.push({ classFilter: true, payload: {
-        Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode,
-        CharacterClass: job, ItemTier: null, ItemGrade: '전설', ItemName: keyword, PageNo: 1
-      }});
-    }
+  // 먼저 CharacterClass 조건으로 조회한다. 부위 카테고리와 같이 쓰면 방어구도 잡히는 경우가 있어
+  // 결과가 나오면 직업 매칭으로 신뢰한다.
+  for (const keyword of partKeywords) {
+    queries.push({ classFilter: true, payload: {
+      Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: null,
+      CharacterClass: job, ItemTier: null, ItemGrade: '전설', ItemName: keyword, PageNo: 1
+    }});
   }
 
-  // 방어구는 CharacterClass 조건에서 누락되는 경우가 있어 넓게 검색 후 Tooltip의 "직업 전용"으로 판별한다.
+  // CharacterClass에서 누락되는 경우가 있어 넓게 검색 후 Tooltip의 "직업 전용"으로 판별한다.
   for (const keyword of partKeywords) {
     queries.push({ classFilter: false, payload: {
-      Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode,
+      Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: null,
       ItemTier: null, ItemGrade: '전설', ItemName: keyword, PageNo: 1
     }});
   }
 
   const out = [];
-  for (const q of queries) {
-    const result = await fetchMarketPages(apiKey, q.payload, pageLimit);
-    tried.push({ part, keyword: q.payload.ItemName, categoryCode, classFilter: q.classFilter, count: result.items.length, totalCount: result.totalCount, errors: result.errors?.slice(0, 1) });
-    for (const item of result.items.filter(isLikelyLegendAvatarListItem)) {
-      out.push({ ...item, __classMatched: q.classFilter });
+  for (const categoryCode of categoryList) {
+    for (const q of queries) {
+      const payload = { ...q.payload };
+      if (categoryCode) payload.CategoryCode = categoryCode;
+      else delete payload.CategoryCode;
+      const result = await fetchMarketPages(apiKey, payload, pageLimit);
+      tried.push({ part, keyword: payload.ItemName, categoryCode: payload.CategoryCode || null, classFilter: q.classFilter, count: result.items.length, totalCount: result.totalCount, errors: result.errors?.slice(0, 1) });
+      for (const item of result.items.filter(isLikelyLegendAvatarListItem)) {
+        out.push({ ...item, __classMatched: q.classFilter, __categoryCode: payload.CategoryCode || null });
+      }
+      // 직업 필터 + 부위 카테고리에서 결과가 있으면 넓은 검색보다 정확하므로 우선 사용한다.
+      if (q.classFilter && out.length >= 3) return out;
     }
+    if (out.length >= 12) break;
   }
   return out;
 }
@@ -324,25 +333,49 @@ async function fetchBroadLegendAvatarMarketItems(apiKey, pageLimit) {
   return { items: [...merged.values()], totalCount, categoryCode: selectedCategory, strategy: 'broad-tooltip-scan', tried };
 }
 
-async function getMarketAvatarCategoryCandidates(apiKey) {
+
+async function getPartCategoryCandidates(apiKey, part) {
+  const all = await getMarketAvatarCategoryCandidates(apiKey, true);
+  const scored = [];
+  for (const row of all) {
+    const name = normalizeText(row.name || '');
+    const code = Number(row.code ?? row);
+    if (!Number.isFinite(code)) continue;
+    let score = 0;
+    if (name.includes(part)) score += 100;
+    if (name.includes('아바타')) score += 20;
+    if (part === '무기' && name.includes('무기')) score += 100;
+    if (part !== '무기' && name.includes(part)) score += 80;
+    if (!name) score += 1;
+    scored.push({ code, score });
+  }
+  for (const code of FALLBACK_MARKET_AVATAR_CATEGORY_CANDIDATES) {
+    if (code != null) scored.push({ code: Number(code), score: code === 20000 ? 5 : 2 });
+  }
+  return [...new Map(scored.sort((a,b)=>b.score-a.score).map(x=>[x.code,x.code])).values()].slice(0, 6);
+}
+
+async function getMarketAvatarCategoryCandidates(apiKey, withNames = false) {
   const candidates = [];
   try {
     const options = await requestLostArk(apiKey, MARKET_OPTIONS_ENDPOINT, { method: 'GET' });
-    collectAvatarCategoryCodes(options, candidates);
+    collectAvatarCategoryCodes(options, candidates, withNames);
   } catch {
     // 옵션 API가 실패해도 하드코딩 후보로 계속 진행한다.
   }
 
   for (const code of FALLBACK_MARKET_AVATAR_CATEGORY_CANDIDATES) {
-    if (!candidates.includes(code)) candidates.push(code);
+    if (withNames) {
+      if (!candidates.some(x => Number(x.code) === Number(code))) candidates.push({ code, name: '' });
+    } else if (!candidates.includes(code)) candidates.push(code);
   }
   return candidates;
 }
 
-function collectAvatarCategoryCodes(node, output) {
+function collectAvatarCategoryCodes(node, output, withNames = false) {
   if (!node || typeof node !== 'object') return;
   if (Array.isArray(node)) {
-    for (const child of node) collectAvatarCategoryCodes(child, output);
+    for (const child of node) collectAvatarCategoryCodes(child, output, withNames);
     return;
   }
 
@@ -350,11 +383,12 @@ function collectAvatarCategoryCodes(node, output) {
   const code = node.CategoryCode ?? node.Code ?? node.Id ?? node.Value;
   if (name.includes('아바타') && Number.isFinite(Number(code))) {
     const n = Number(code);
-    if (!output.includes(n)) output.push(n);
+    if (withNames) { if (!output.some(x => Number(x.code) === n)) output.push({ code: n, name }); }
+    else if (!output.includes(n)) output.push(n);
   }
 
   for (const key of ['Categories', 'SubCategories', 'Children', 'Items']) {
-    if (node[key]) collectAvatarCategoryCodes(node[key], output);
+    if (node[key]) collectAvatarCategoryCodes(node[key], output, withNames);
   }
 }
 
@@ -510,7 +544,7 @@ async function getMarketDetail(apiKey, item, cache) {
 
 async function requestLostArk(apiKey, url, options = {}) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5500);
+  const timeout = setTimeout(() => controller.abort(), 4200);
   const init = {
     method: options.method || 'GET',
     headers: {
