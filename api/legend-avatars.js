@@ -1,10 +1,12 @@
-const API_VERSION = '4.9.7';
+const API_VERSION = '4.9.8';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const PARTS = ['머리', '상의', '하의', '무기'];
 const LEGEND_NAMES = ['영원', '도약', '결속', '약속'];
 const MARKET_OPTIONS_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/options';
-const FALLBACK_MARKET_AVATAR_CATEGORY_CANDIDATES = [90000, 90100, 90200, 90300, 90400, 20000, 200000, null];
+// 거래소 아바타는 공식 예시에서 자주 쓰이는 20000 계열이 우선이다.
+// 잘못된 후보가 섞여도 개별 호출 실패는 무시하고 다음 후보를 시도한다.
+const FALLBACK_MARKET_AVATAR_CATEGORY_CANDIDATES = [20000, 20005, 20010, 20015, 20020, null];
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -18,7 +20,7 @@ export default async function handler(req, res) {
     const apiKey = process.env.LOSTARK_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'Vercel 환경변수 LOSTARK_API_KEY가 없습니다.' });
 
-    const pageLimit = Math.max(1, Math.min(30, Number(req.query.pageLimit || 8)));
+    const pageLimit = Math.max(1, Math.min(30, Number(req.query.pageLimit || 12)));
     const { items, totalCount, categoryCode, strategy } = await fetchLegendAvatarMarketItems(apiKey, job, pageLimit);
     const result = await buildLegendAvatarSet(apiKey, items, job);
 
@@ -59,7 +61,7 @@ async function fetchLegendAvatarMarketItems(apiKey, job, pageLimit) {
       if (useClassFilter) basePayload.CharacterClass = job;
 
       const result = await fetchMarketPages(apiKey, basePayload, pageLimit);
-      tried.push({ categoryCode, classFilter: useClassFilter, count: result.items.length, totalCount: result.totalCount });
+      tried.push({ categoryCode, classFilter: useClassFilter, count: result.items.length, totalCount: result.totalCount, errors: result.errors?.slice(0, 2) });
       const avatarItems = result.items.filter(isLikelyLegendAvatarListItem);
       if (avatarItems.length) {
         return { ...result, items: avatarItems, categoryCode, strategy: useClassFilter ? 'options-category+class+grade' : 'options-category+grade', tried };
@@ -85,12 +87,34 @@ async function fetchLegendAvatarMarketItems(apiKey, job, pageLimit) {
       if (useClassFilter) payload.CharacterClass = job;
 
       const result = await fetchMarketPages(apiKey, payload, Math.min(pageLimit, 5));
-      tried.push({ keyword, categoryCode, classFilter: useClassFilter, count: result.items.length, totalCount: result.totalCount });
+      tried.push({ keyword, categoryCode, classFilter: useClassFilter, count: result.items.length, totalCount: result.totalCount, errors: result.errors?.slice(0, 2) });
       totalCount += result.totalCount || 0;
       for (const item of result.items.filter(isLikelyLegendAvatarListItem)) {
         merged.set(String(item.Id || item.ItemId || item.Name), item);
       }
       if (merged.size >= 20) break;
+    }
+  }
+
+  // 3차: 직업명 자체로 검색. 일부 전설 아바타는 이름에 직업명이 없지만, 공식 거래소 검색 동작 확인용/예외 대응용이다.
+  if (!merged.size) {
+    for (const keyword of [job, `${job} 전용`, '전설']) {
+      const payload = {
+        Sort: 'CURRENT_MIN_PRICE',
+        SortCondition: 'ASC',
+        CategoryCode: categoryCode || 20000,
+        CharacterClass: job,
+        ItemTier: null,
+        ItemGrade: '전설',
+        ItemName: keyword,
+        PageNo: 1
+      };
+      const result = await fetchMarketPages(apiKey, payload, Math.min(pageLimit, 5));
+      tried.push({ keyword, categoryCode: payload.CategoryCode, classFilter: true, count: result.items.length, totalCount: result.totalCount, errors: result.errors?.slice(0, 2) });
+      for (const item of result.items.filter(isLikelyLegendAvatarListItem)) {
+        merged.set(String(item.Id || item.ItemId || item.Name), item);
+      }
+      if (merged.size) break;
     }
   }
 
@@ -135,10 +159,20 @@ async function fetchMarketPages(apiKey, basePayload, pageLimit) {
   const items = [];
   let totalCount = 0;
   let pageSize = 0;
+  const errors = [];
 
   for (let page = 1; page <= pageLimit; page += 1) {
-    const payload = { ...basePayload, PageNo: page };
-    const data = await requestLostArk(apiKey, MARKET_ENDPOINT, { method: 'POST', body: payload });
+    const payload = cleanPayload({ ...basePayload, PageNo: page });
+    let data;
+    try {
+      data = await requestLostArk(apiKey, MARKET_ENDPOINT, { method: 'POST', body: payload });
+    } catch (error) {
+      // 후보 카테고리/직업 필터/정렬값 중 하나가 API에서 거절될 수 있으므로
+      // 전체 서버 함수 오류로 중단하지 않고 다음 전략을 계속 시도한다.
+      errors.push({ page, payload, message: error.message });
+      break;
+    }
+
     const pageItems = Array.isArray(data?.Items) ? data.Items : [];
     totalCount = Number(data?.TotalCount || totalCount || 0);
     pageSize = Number(data?.PageSize || pageSize || pageItems.length || 10);
@@ -146,7 +180,17 @@ async function fetchMarketPages(apiKey, basePayload, pageLimit) {
     if (!pageItems.length || (totalCount > 0 && page * pageSize >= totalCount)) break;
   }
 
-  return { items, totalCount, pageSize };
+  return { items, totalCount, pageSize, errors };
+}
+
+function cleanPayload(payload) {
+  const out = {};
+  for (const [key, value] of Object.entries(payload || {})) {
+    if (value === undefined) continue;
+    if (value === '') { out[key] = value; continue; }
+    out[key] = value;
+  }
+  return out;
 }
 
 async function buildLegendAvatarSet(apiKey, items, job) {
