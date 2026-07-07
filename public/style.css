@@ -1143,7 +1143,7 @@ select {
 .shareControl.disabled { opacity: 0.55; }
 .shareControl.disabled::after { content: '적용값 0%'; margin-left: 8px; color: #fbbf24; font-size: 12px; font-weight: 700; }
 
-/* v4.9.5 legendary avatar price tab */
+/* v4.9.6 legendary avatar market price tab */
 .tabNav { grid-column: 1 / -1; display: flex; gap: 8px; margin: -4px 0 0; }
 .tabButton { border: 1px solid var(--softLine); background: rgba(15,23,42,.72); color: var(--muted); border-radius: 999px; padding: 10px 16px; font-weight: 950; cursor: pointer; }
 .tabButton.active { color: #111827; background: var(--amber); border-color: rgba(245,182,66,.65); }

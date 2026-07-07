@@ -1,4 +1,4 @@
-const VERSION = '4.9.5';
+const VERSION = '4.9.6';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -1273,7 +1273,7 @@ function renderLegendAvatarResult(data) {
     <div class="avatarScanInfo">조회 매물 ${Number(data.scanned || 0).toLocaleString('ko-KR')}개 · 직업 매칭 ${Number(data.matchedCount || 0).toLocaleString('ko-KR')}개</div>
   </div>
   <div class="avatarPartGrid">${order.map(part => avatarPartCard(part, parts[part])).join('')}</div>
-  <p class="avatarNotice">현재 경매장에 등록된 즉시구매가 기준입니다. 공식 API 응답에 아이콘 URL이 있으면 이미지가 표시되고, 없으면 부위 글자로 대체됩니다.</p>`;
+  <p class="avatarNotice">현재 거래소에 등록된 최저가 기준입니다. 공식 API 응답 또는 툴팁에 아이콘 경로가 있으면 이미지가 표시되고, 없으면 부위 글자로 대체됩니다.</p>`;
 }
 
 async function searchLegendAvatarSet(job) {
@@ -1281,7 +1281,7 @@ async function searchLegendAvatarSet(job) {
   if (!job) return setAvatarMessage('직업을 선택하세요.', true);
   button.disabled = true;
   button.textContent = '조회...';
-  setAvatarMessage('경매장 현재 매물을 조회 중입니다.');
+  setAvatarMessage('거래소 현재 매물을 조회 중입니다.');
   $('avatarResult').innerHTML = '';
   try {
     const res = await fetch(`/api/legend-avatars?job=${encodeURIComponent(job)}&_=${Date.now()}`, { cache: 'no-store' });
