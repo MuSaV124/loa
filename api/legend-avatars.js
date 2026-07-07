@@ -1,4 +1,4 @@
-const API_VERSION = '5.0.1';
+const API_VERSION = '5.0.2';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const PARTS = ['머리', '상의', '하의', '무기'];
@@ -8,7 +8,8 @@ const LOSTARK_JOBS = [
   '데빌헌터','블래스터','호크아이','스카우터','건슬링어',
   '바드','서머너','아르카나','소서리스',
   '블레이드','데모닉','리퍼','소울이터',
-  '도화가','기상술사','환수사','차원술사'
+  '도화가','기상술사','환수사','차원술사',
+  '가디언나이트'
 ];
 const LEGEND_NAMES = ['영원', '도약', '결속', '약속'];
 const ARMOR_KEYWORDS = ['머리', '상의', '하의', '무기', '머리 아바타', '상의 아바타', '하의 아바타', '무기 아바타'];
@@ -17,6 +18,9 @@ const MARKET_OPTIONS_ENDPOINT = 'https://developer-lostark.game.onstove.com/mark
 // 잘못된 후보가 섞여도 개별 호출 실패는 무시하고 다음 후보를 시도한다.
 const FALLBACK_MARKET_AVATAR_CATEGORY_CANDIDATES = [20000, 20005, 20010, 20015, 20020, null];
 
+const JOB_CACHE = globalThis.__legendAvatarJobCacheV502 || (globalThis.__legendAvatarJobCacheV502 = new Map());
+const CACHE_TTL_MS = 1000 * 60 * 5;
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -24,52 +28,144 @@ export default async function handler(req, res) {
 
   try {
     const job = String(req.query.job || '').trim();
-    const all = String(req.query.all || '').trim() === '1' || !job;
+    const all = String(req.query.all || '').trim() === '1';
 
     const apiKey = process.env.LOSTARK_API_KEY;
-    if (!apiKey) return res.status(500).json({ error: 'Vercel 환경변수 LOSTARK_API_KEY가 없습니다.' });
+    if (!apiKey) return res.status(500).json({ ok: false, error: 'Vercel 환경변수 LOSTARK_API_KEY가 없습니다.' });
 
-    const pageLimit = Math.max(1, Math.min(50, Number(req.query.pageLimit || 30)));
-
-    if (all) {
-      const scan = await fetchBroadLegendAvatarMarketItems(apiKey, pageLimit);
-      const jobs = await buildAllLegendAvatarSets(apiKey, scan.items);
+    // 5.0.2부터 전체 직업 일괄 상세 조회는 Vercel 함수 타임아웃 위험이 커서 수행하지 않는다.
+    // 탭 진입 시에는 UI만 준비하고, 직업 클릭 시 해당 직업만 조회한다.
+    if (all && !job) {
       return res.status(200).json({
         ok: true,
         apiVersion: API_VERSION,
         source: 'markets/items',
-        mode: 'all-jobs',
-        scanned: scan.items.length,
-        totalCount: scan.totalCount,
-        pageLimit,
-        categoryCode: scan.categoryCode,
-        strategy: scan.strategy,
-        tried: scan.tried,
-        jobs
+        mode: 'ready',
+        message: '직업을 선택하면 해당 직업의 전설 아바타 최저가를 조회합니다.',
+        jobs: LOSTARK_JOBS
       });
     }
 
-    const scan = await fetchLegendAvatarMarketItems(apiKey, job, pageLimit);
-    const result = await buildLegendAvatarSet(apiKey, scan.items, job, false);
+    if (!job) {
+      return res.status(400).json({ ok: false, error: '조회할 직업을 선택하세요.' });
+    }
 
-    return res.status(200).json({
+    const force = String(req.query.force || '') === '1';
+    const pageLimit = Math.max(1, Math.min(12, Number(req.query.pageLimit || 6)));
+    const detailLimit = Math.max(8, Math.min(80, Number(req.query.detailLimit || 48)));
+    const cacheKey = `${job}:${pageLimit}:${detailLimit}`;
+    const cached = JOB_CACHE.get(cacheKey);
+    if (!force && cached && Date.now() - cached.createdAt < CACHE_TTL_MS) {
+      return res.status(200).json({ ...cached.data, cached: true });
+    }
+
+    const result = await buildSingleJobLegendAvatarSet(apiKey, job, pageLimit, detailLimit);
+    const body = {
       ok: true,
       apiVersion: API_VERSION,
       source: 'markets/items',
       mode: 'single-job',
       job,
-      scanned: scan.items.length,
-      totalCount: scan.totalCount,
-      pageLimit,
-      categoryCode: scan.categoryCode,
-      strategy: scan.strategy,
-      tried: scan.tried,
       ...result
-    });
+    };
+    JOB_CACHE.set(cacheKey, { createdAt: Date.now(), data: body });
+    return res.status(200).json(body);
   } catch (error) {
     const message = error.name === 'AbortError' ? '거래소 API 응답 시간이 길어서 중단했습니다.' : error.message;
-    return res.status(500).json({ error: '서버 함수 오류', message });
+    return res.status(500).json({ ok: false, error: '서버 함수 오류', message });
   }
+}
+
+
+async function buildSingleJobLegendAvatarSet(apiKey, job, pageLimit, detailLimit) {
+  const categoryCandidates = await getMarketAvatarCategoryCandidates(apiKey);
+  const categoryCode = categoryCandidates[0] || 20000;
+  const detailCache = new Map();
+  const tried = [];
+  const parts = { 머리: null, 상의: null, 하의: null, 무기: null };
+  const matched = [];
+  let scanned = 0;
+  let detailScanned = 0;
+
+  for (const part of PARTS) {
+    const candidates = await fetchPartCandidates(apiKey, job, part, categoryCode, pageLimit, tried);
+    scanned += candidates.length;
+    const sorted = uniqueMarketItems(candidates).sort((a, b) => marketPrice(a) - marketPrice(b));
+
+    for (const candidate of sorted.slice(0, detailLimit)) {
+      detailScanned += 1;
+      const detail = await getMarketDetail(apiKey, candidate, detailCache);
+      const item = mergeMarketItem(candidate, detail);
+      const text = itemFullText(item);
+      const detectedPart = detectPart(item, text);
+      const price = marketPrice(item);
+      if (!price || detectedPart !== part) continue;
+
+      const jobMatchedByTooltip = isJobOnly(text, job) || detectJobsFromText(text).includes(job);
+      const jobMatchedByClassSearch = candidate.__classMatched === true && (part === '무기' || jobMatchedByTooltip);
+      if (!jobMatchedByTooltip && !jobMatchedByClassSearch) continue;
+
+      const normalized = normalizeAvatarItem(item, part, price);
+      parts[part] = normalized;
+      matched.push(normalized);
+      break;
+    }
+  }
+
+  return {
+    categoryCode,
+    strategy: 'single-job-click+part-search+tooltip',
+    pageLimit,
+    detailLimit,
+    scanned,
+    detailScanned,
+    tried,
+    ...finalizeJobSet({ job, parts, matched })
+  };
+}
+
+async function fetchPartCandidates(apiKey, job, part, categoryCode, pageLimit, tried) {
+  const queries = [];
+  const partKeywords = part === '무기'
+    ? ['', '무기', '무기 아바타', ...LEGEND_NAMES]
+    : [part, `${part} 아바타`, ...LEGEND_NAMES.map(name => `${name} ${part}`), ...LEGEND_NAMES];
+
+  // 무기는 CharacterClass 조건이 잘 맞는 편이라 우선 조회한다.
+  if (part === '무기') {
+    for (const keyword of partKeywords) {
+      queries.push({ classFilter: true, payload: {
+        Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode,
+        CharacterClass: job, ItemTier: null, ItemGrade: '전설', ItemName: keyword, PageNo: 1
+      }});
+    }
+  }
+
+  // 방어구는 CharacterClass 조건에서 누락되는 경우가 있어 넓게 검색 후 Tooltip의 "직업 전용"으로 판별한다.
+  for (const keyword of partKeywords) {
+    queries.push({ classFilter: false, payload: {
+      Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode,
+      ItemTier: null, ItemGrade: '전설', ItemName: keyword, PageNo: 1
+    }});
+  }
+
+  const out = [];
+  for (const q of queries) {
+    const result = await fetchMarketPages(apiKey, q.payload, pageLimit);
+    tried.push({ part, keyword: q.payload.ItemName, categoryCode, classFilter: q.classFilter, count: result.items.length, totalCount: result.totalCount, errors: result.errors?.slice(0, 1) });
+    for (const item of result.items.filter(isLikelyLegendAvatarListItem)) {
+      out.push({ ...item, __classMatched: q.classFilter });
+    }
+  }
+  return out;
+}
+
+function uniqueMarketItems(items) {
+  const map = new Map();
+  for (const item of items || []) {
+    const key = marketItemKey(item);
+    if (!map.has(key)) map.set(key, item);
+  }
+  return [...map.values()];
 }
 
 async function fetchLegendAvatarMarketItems(apiKey, job, pageLimit) {

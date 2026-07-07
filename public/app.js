@@ -1212,7 +1212,8 @@ const LOSTARK_JOBS = [
   '데빌헌터','블래스터','호크아이','스카우터','건슬링어',
   '바드','서머너','아르카나','소서리스',
   '블레이드','데모닉','리퍼','소울이터',
-  '도화가','기상술사','환수사','차원술사'
+  '도화가','기상술사','환수사','차원술사',
+  '가디언나이트'
 ];
 
 const LOSTARK_JOB_GROUPS = [
@@ -1221,7 +1222,8 @@ const LOSTARK_JOB_GROUPS = [
   { group: '헌터', jobs: ['데빌헌터','블래스터','호크아이','스카우터','건슬링어'] },
   { group: '마법사', jobs: ['바드','서머너','아르카나','소서리스'] },
   { group: '암살자', jobs: ['블레이드','데모닉','리퍼','소울이터'] },
-  { group: '스페셜리스트', jobs: ['도화가','기상술사','환수사','차원술사'] }
+  { group: '스페셜리스트', jobs: ['도화가','기상술사','환수사','차원술사'] },
+  { group: '오리지널', jobs: ['가디언나이트'] }
 ];
 
 
@@ -1237,15 +1239,15 @@ function setActiveTab(tabName) {
   $('legendAvatarPanel')?.classList.toggle('hidden', !isAvatar);
 }
 
-let legendAvatarCache = null;
-let selectedAvatarJob = '브레이커';
+let legendAvatarCache = new Map();
+let selectedAvatarJob = null;
 let legendAvatarLoading = false;
 
 function initLegendAvatarTab() {
   renderAvatarJobPicker();
   document.querySelectorAll('.tabButton').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
-  $('avatarSearchAllButton')?.addEventListener('click', () => loadAllLegendAvatarSets(false));
-  $('avatarRefreshButton')?.addEventListener('click', () => loadAllLegendAvatarSets(true));
+  $('avatarSearchAllButton')?.addEventListener('click', () => prepareLegendAvatarTab());
+  $('avatarRefreshButton')?.addEventListener('click', () => { if (selectedAvatarJob) loadLegendAvatarSet(selectedAvatarJob, true); });
 }
 
 function renderAvatarJobPicker() {
@@ -1263,13 +1265,10 @@ function renderAvatarJobPicker() {
 }
 
 function selectAvatarJob(job) {
-  selectedAvatarJob = job || selectedAvatarJob;
+  selectedAvatarJob = job || null;
   renderAvatarJobPicker();
-  if (!legendAvatarCache && !legendAvatarLoading) {
-    loadAllLegendAvatarSets(false, selectedAvatarJob);
-    return;
-  }
-  renderSelectedAvatarJob(selectedAvatarJob);
+  if (!selectedAvatarJob) return;
+  loadLegendAvatarSet(selectedAvatarJob, false);
 }
 
 function setAvatarMessage(text, isError = false) {
@@ -1279,6 +1278,11 @@ function setAvatarMessage(text, isError = false) {
   el.classList.remove('hidden');
   el.classList.toggle('error', !!isError);
   el.textContent = text;
+}
+
+function prepareLegendAvatarTab() {
+  setAvatarMessage('직업을 선택하면 해당 직업의 머리/상의/하의/무기 최저가를 조회합니다.');
+  if ($('avatarResult')) $('avatarResult').innerHTML = `<div class="avatarEmptyBox">직업 버튼을 선택하세요.</div>`;
 }
 
 async function readJsonSafely(res) {
@@ -1306,20 +1310,6 @@ function avatarPartCard(part, item) {
   </article>`;
 }
 
-function renderSelectedAvatarJob(job) {
-  const row = findAvatarRow(job);
-  if (!row) {
-    $('avatarResult').innerHTML = `<div class="avatarEmptyBox">${escapeHtml(job)} 시세를 아직 불러오지 않았습니다.</div>`;
-    return;
-  }
-  renderLegendAvatarResult(row);
-}
-
-function findAvatarRow(job) {
-  const jobs = Array.isArray(legendAvatarCache?.jobs) ? legendAvatarCache.jobs : [];
-  return jobs.find(row => row.job === job) || null;
-}
-
 function renderLegendAvatarResult(data) {
   const parts = data.parts || {};
   const order = ['머리', '상의', '하의', '무기'];
@@ -1330,68 +1320,48 @@ function renderLegendAvatarResult(data) {
       <strong>${formatGold(data.totalPrice)}</strong>
       <small>${data.complete ? '머리/상의/하의/무기 모두 확인됨' : `미확인 부위: ${escapeHtml(missing.join(', '))}`}</small>
     </div>
-    <div class="avatarScanInfo">${legendAvatarCache ? `전체 조회 매물 ${Number(legendAvatarCache.scanned || 0).toLocaleString('ko-KR')}개` : ''}</div>
+    <div class="avatarScanInfo">조회 매물 ${Number(data.scanned || 0).toLocaleString('ko-KR')}개 · 상세 확인 ${Number(data.detailScanned || 0).toLocaleString('ko-KR')}개${data.cached ? ' · 캐시' : ''}</div>
   </div>
   <div class="avatarPartGrid">${order.map(part => avatarPartCard(part, parts[part])).join('')}</div>
   <p class="avatarNotice">현재 거래소 등록 매물의 최저가 기준입니다. 세트명은 섞일 수 있고, 각 부위별 최저가만 합산합니다.</p>`;
 }
 
-function avatarMiniPart(item, part) {
-  if (!item) return `<span class="avatarMiniPart missing" title="${escapeHtml(part)} 없음">-</span>`;
-  const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="" loading="lazy" />` : '';
-  return `<span class="avatarMiniPart" title="${escapeHtml(part)} · ${escapeHtml(item.name || '')} · ${formatGold(item.price)}">${icon}<b>${formatGold(item.price)}</b></span>`;
-}
-
-function renderLegendAvatarAllResult(data) {
-  const jobs = Array.isArray(data.jobs) ? data.jobs : [];
-  const byJob = new Map(jobs.map(row => [row.job, row]));
-  const completeCount = jobs.filter(row => row.complete).length;
-  const selected = byJob.get(selectedAvatarJob);
-  if (selected) renderLegendAvatarResult(selected);
-  else $('avatarResult').innerHTML = `<div class="avatarEmptyBox">직업을 선택하면 머리/상의/하의/무기 최저가가 표시됩니다.</div>`;
-  setAvatarMessage(`전체 직업 조회 완료: ${completeCount}/${LOSTARK_JOBS.length} 직업 완성 · 조회 매물 ${Number(data.scanned || 0).toLocaleString('ko-KR')}개`);
-}
-
-async function loadAllLegendAvatarSets(force = false, showJob = selectedAvatarJob) {
-  if (legendAvatarCache && !force) {
-    selectedAvatarJob = showJob || selectedAvatarJob;
-    renderAvatarJobPicker();
-    renderSelectedAvatarJob(selectedAvatarJob);
+async function loadLegendAvatarSet(job, force = false) {
+  if (!job) return prepareLegendAvatarTab();
+  if (!force && legendAvatarCache.has(job)) {
+    renderLegendAvatarResult(legendAvatarCache.get(job));
+    setAvatarMessage(`${job} 전설 아바타 시세를 캐시에서 표시했습니다.`);
     return;
   }
   const mainButton = $('avatarSearchAllButton');
   const refreshButton = $('avatarRefreshButton');
-  if (mainButton) { mainButton.disabled = true; mainButton.textContent = '조회 중...'; }
+  if (mainButton) mainButton.disabled = true;
   if (refreshButton) refreshButton.disabled = true;
   legendAvatarLoading = true;
-  selectedAvatarJob = showJob || selectedAvatarJob;
-  renderAvatarJobPicker();
-  setAvatarMessage('전체 직업 전설 아바타 시세를 한 번에 불러오는 중입니다.');
-  $('avatarResult').innerHTML = `<div class="avatarEmptyBox">거래소 API 조회 중...</div>`;
+  setAvatarMessage(`${job} 전설 아바타 시세를 조회하는 중입니다.`);
+  $('avatarResult').innerHTML = `<div class="avatarEmptyBox">${escapeHtml(job)} 거래소 API 조회 중...</div>`;
   try {
-    const res = await fetch(`/api/legend-avatars?all=1&pageLimit=40&_=${Date.now()}`, { cache: 'no-store' });
+    const res = await fetch(`/api/legend-avatars?job=${encodeURIComponent(job)}&pageLimit=6&detailLimit=48${force ? '&force=1' : ''}&_=${Date.now()}`, { cache: 'no-store' });
     const data = await readJsonSafely(res);
     if (!res.ok || !data?.ok) throw new Error(data?.error || data?.message || '전설 아바타 조회 실패');
-    legendAvatarCache = data;
-    renderLegendAvatarAllResult(data);
+    legendAvatarCache.set(job, data);
+    renderLegendAvatarResult(data);
+    setAvatarMessage(`${job} 조회 완료${data.complete ? '' : ' · 일부 부위는 조회 범위에서 찾지 못했습니다.'}`);
   } catch (error) {
     setAvatarMessage(error.message, true);
   } finally {
     legendAvatarLoading = false;
-    if (mainButton) { mainButton.disabled = false; mainButton.textContent = '전체 직업 시세 불러오기'; }
+    if (mainButton) mainButton.disabled = false;
     if (refreshButton) refreshButton.disabled = false;
   }
 }
 
+async function loadAllLegendAvatarSets(force = false, showJob = selectedAvatarJob) {
+  return loadLegendAvatarSet(showJob, force);
+}
+
 async function searchLegendAvatarSet(job) {
   selectedAvatarJob = job || selectedAvatarJob;
-  return loadAllLegendAvatarSets(false, selectedAvatarJob);
+  return loadLegendAvatarSet(selectedAvatarJob, false);
 }
 
-function mergeAvatarRows(rows) {
-  const byJob = new Map(rows.map(row => [row.job, row]));
-  return LOSTARK_JOBS.map(job => byJob.get(job) || { job, parts: {}, totalPrice: 0, complete: false, loading: true });
-}
-
-initLegendAvatarTab();
-await loadDb();
