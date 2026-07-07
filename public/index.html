@@ -105,19 +105,17 @@
         </div>
       </div>
       <div class="avatarControls">
-        <label>직업 선택
-          <select id="avatarJobSelect"></select>
-        </label>
-        <button id="avatarSearchButton" type="button">선택 직업 조회</button>
-        <button id="avatarSearchAllButton" type="button" class="secondary">전체 직업 조회</button>
+        <button id="avatarSearchAllButton" type="button">전체 직업 시세 불러오기</button>
+        <button id="avatarRefreshButton" type="button" class="secondary">새로고침</button>
       </div>
+      <div id="avatarJobPicker" class="avatarJobPicker"></div>
       <div id="avatarMessage" class="avatarMessage hidden"></div>
       <div id="avatarResult" class="avatarResult"></div>
     </section>
 
   </main>
 
-  <div class="version">Version 5.0.0</div>
+  <div class="version">Version 5.0.1</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

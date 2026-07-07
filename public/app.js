@@ -1237,14 +1237,39 @@ function setActiveTab(tabName) {
   $('legendAvatarPanel')?.classList.toggle('hidden', !isAvatar);
 }
 
+let legendAvatarCache = null;
+let selectedAvatarJob = '브레이커';
+let legendAvatarLoading = false;
+
 function initLegendAvatarTab() {
-  const select = $('avatarJobSelect');
-  if (select && !select.options.length) {
-    select.innerHTML = LOSTARK_JOBS.map(job => `<option value="${escapeHtml(job)}" ${job === '브레이커' ? 'selected' : ''}>${escapeHtml(job)}</option>`).join('');
-  }
+  renderAvatarJobPicker();
   document.querySelectorAll('.tabButton').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
-  $('avatarSearchButton')?.addEventListener('click', () => searchLegendAvatarSet(select?.value || '브레이커'));
-  $('avatarSearchAllButton')?.addEventListener('click', () => searchAllLegendAvatarSets());
+  $('avatarSearchAllButton')?.addEventListener('click', () => loadAllLegendAvatarSets(false));
+  $('avatarRefreshButton')?.addEventListener('click', () => loadAllLegendAvatarSets(true));
+}
+
+function renderAvatarJobPicker() {
+  const wrap = $('avatarJobPicker');
+  if (!wrap) return;
+  wrap.innerHTML = LOSTARK_JOB_GROUPS.map(group => `
+    <div class="avatarJobRow">
+      <div class="avatarJobGroupName">${escapeHtml(group.group)}</div>
+      <div class="avatarJobButtonList">
+        ${group.jobs.map(job => `<button type="button" class="avatarJobButton ${job === selectedAvatarJob ? 'active' : ''}" data-avatar-job="${escapeHtml(job)}">${escapeHtml(job)}</button>`).join('')}
+      </div>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('[data-avatar-job]').forEach(btn => btn.addEventListener('click', () => selectAvatarJob(btn.dataset.avatarJob)));
+}
+
+function selectAvatarJob(job) {
+  selectedAvatarJob = job || selectedAvatarJob;
+  renderAvatarJobPicker();
+  if (!legendAvatarCache && !legendAvatarLoading) {
+    loadAllLegendAvatarSets(false, selectedAvatarJob);
+    return;
+  }
+  renderSelectedAvatarJob(selectedAvatarJob);
 }
 
 function setAvatarMessage(text, isError = false) {
@@ -1254,6 +1279,16 @@ function setAvatarMessage(text, isError = false) {
   el.classList.remove('hidden');
   el.classList.toggle('error', !!isError);
   el.textContent = text;
+}
+
+async function readJsonSafely(res) {
+  const text = await res.text();
+  if (!text) return null;
+  try { return JSON.parse(text); }
+  catch {
+    const preview = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 240);
+    throw new Error(preview || `서버 응답이 JSON 형식이 아닙니다. HTTP ${res.status}`);
+  }
 }
 
 function avatarPartCard(part, item) {
@@ -1271,6 +1306,20 @@ function avatarPartCard(part, item) {
   </article>`;
 }
 
+function renderSelectedAvatarJob(job) {
+  const row = findAvatarRow(job);
+  if (!row) {
+    $('avatarResult').innerHTML = `<div class="avatarEmptyBox">${escapeHtml(job)} 시세를 아직 불러오지 않았습니다.</div>`;
+    return;
+  }
+  renderLegendAvatarResult(row);
+}
+
+function findAvatarRow(job) {
+  const jobs = Array.isArray(legendAvatarCache?.jobs) ? legendAvatarCache.jobs : [];
+  return jobs.find(row => row.job === job) || null;
+}
+
 function renderLegendAvatarResult(data) {
   const parts = data.parts || {};
   const order = ['머리', '상의', '하의', '무기'];
@@ -1281,10 +1330,10 @@ function renderLegendAvatarResult(data) {
       <strong>${formatGold(data.totalPrice)}</strong>
       <small>${data.complete ? '머리/상의/하의/무기 모두 확인됨' : `미확인 부위: ${escapeHtml(missing.join(', '))}`}</small>
     </div>
-    <div class="avatarScanInfo">조회 매물 ${Number(data.scanned || 0).toLocaleString('ko-KR')}개 · 직업 매칭 ${Number(data.matchedCount || 0).toLocaleString('ko-KR')}개</div>
+    <div class="avatarScanInfo">${legendAvatarCache ? `전체 조회 매물 ${Number(legendAvatarCache.scanned || 0).toLocaleString('ko-KR')}개` : ''}</div>
   </div>
   <div class="avatarPartGrid">${order.map(part => avatarPartCard(part, parts[part])).join('')}</div>
-  <p class="avatarNotice">현재 거래소에 등록된 최저가 기준입니다. 공식 API 응답 또는 툴팁에 아이콘 경로가 있으면 이미지가 표시되고, 없으면 부위 글자로 대체됩니다.</p>`;
+  <p class="avatarNotice">현재 거래소 등록 매물의 최저가 기준입니다. 세트명은 섞일 수 있고, 각 부위별 최저가만 합산합니다.</p>`;
 }
 
 function avatarMiniPart(item, part) {
@@ -1297,95 +1346,46 @@ function renderLegendAvatarAllResult(data) {
   const jobs = Array.isArray(data.jobs) ? data.jobs : [];
   const byJob = new Map(jobs.map(row => [row.job, row]));
   const completeCount = jobs.filter(row => row.complete).length;
-  const groupSections = LOSTARK_JOB_GROUPS.map(group => {
-    const rows = group.jobs.map(job => byJob.get(job) || { job, parts: {}, totalPrice: 0, complete: false, loading: data.loading });
-    return `<section class="avatarClassGroup">
-      <div class="avatarClassGroupHead"><b>${escapeHtml(group.group)}</b><span>${rows.filter(r => r.complete).length}/${rows.length}</span></div>
-      <div class="avatarJobCards">${rows.map(row => avatarJobCard(row)).join('')}</div>
-    </section>`;
-  }).join('');
-
-  $('avatarResult').innerHTML = `<div class="avatarTotalBox">
-    <div>
-      <span>전체 직업 전설 아바타 한 벌 최저가</span>
-      <strong>${completeCount}/${LOSTARK_JOBS.length} 직업 확인</strong>
-      <small>머리/상의/하의/무기 최저가 합산 · 스페셜리스트 차원술사 포함</small>
-    </div>
-    <div class="avatarScanInfo">${data.loading ? '조회 진행 중' : `조회 완료 ${Number(data.scanned || 0).toLocaleString('ko-KR')}건`}</div>
-  </div>
-  <div class="avatarGroupWrap">${groupSections}</div>
-  <p class="avatarNotice">각 직업을 개별 조회해서 무기만 잡히는 문제를 줄였습니다. 아이콘은 공식 거래소 응답/툴팁의 이미지 경로를 사용합니다.</p>`;
+  const selected = byJob.get(selectedAvatarJob);
+  if (selected) renderLegendAvatarResult(selected);
+  else $('avatarResult').innerHTML = `<div class="avatarEmptyBox">직업을 선택하면 머리/상의/하의/무기 최저가가 표시됩니다.</div>`;
+  setAvatarMessage(`전체 직업 조회 완료: ${completeCount}/${LOSTARK_JOBS.length} 직업 완성 · 조회 매물 ${Number(data.scanned || 0).toLocaleString('ko-KR')}개`);
 }
 
-function avatarJobCard(row) {
-  const parts = row.parts || {};
-  const status = row.loading ? '조회 중' : (row.complete ? '완성' : '부족');
-  return `<article class="avatarJobCard ${row.complete ? 'complete' : 'incomplete'} ${row.loading ? 'loading' : ''}">
-    <div class="avatarJobHead"><b>${escapeHtml(row.job)}</b><span>${status}</span></div>
-    <div class="avatarJobPartGrid">
-      <div><em>머리</em>${avatarMiniPart(parts['머리'], '머리')}</div>
-      <div><em>상의</em>${avatarMiniPart(parts['상의'], '상의')}</div>
-      <div><em>하의</em>${avatarMiniPart(parts['하의'], '하의')}</div>
-      <div><em>무기</em>${avatarMiniPart(parts['무기'], '무기')}</div>
-    </div>
-    <div class="avatarJobTotal"><span>합계</span><strong>${formatGold(row.totalPrice)}</strong></div>
-  </article>`;
+async function loadAllLegendAvatarSets(force = false, showJob = selectedAvatarJob) {
+  if (legendAvatarCache && !force) {
+    selectedAvatarJob = showJob || selectedAvatarJob;
+    renderAvatarJobPicker();
+    renderSelectedAvatarJob(selectedAvatarJob);
+    return;
+  }
+  const mainButton = $('avatarSearchAllButton');
+  const refreshButton = $('avatarRefreshButton');
+  if (mainButton) { mainButton.disabled = true; mainButton.textContent = '조회 중...'; }
+  if (refreshButton) refreshButton.disabled = true;
+  legendAvatarLoading = true;
+  selectedAvatarJob = showJob || selectedAvatarJob;
+  renderAvatarJobPicker();
+  setAvatarMessage('전체 직업 전설 아바타 시세를 한 번에 불러오는 중입니다.');
+  $('avatarResult').innerHTML = `<div class="avatarEmptyBox">거래소 API 조회 중...</div>`;
+  try {
+    const res = await fetch(`/api/legend-avatars?all=1&pageLimit=40&_=${Date.now()}`, { cache: 'no-store' });
+    const data = await readJsonSafely(res);
+    if (!res.ok || !data?.ok) throw new Error(data?.error || data?.message || '전설 아바타 조회 실패');
+    legendAvatarCache = data;
+    renderLegendAvatarAllResult(data);
+  } catch (error) {
+    setAvatarMessage(error.message, true);
+  } finally {
+    legendAvatarLoading = false;
+    if (mainButton) { mainButton.disabled = false; mainButton.textContent = '전체 직업 시세 불러오기'; }
+    if (refreshButton) refreshButton.disabled = false;
+  }
 }
 
 async function searchLegendAvatarSet(job) {
-  const button = $('avatarSearchButton');
-  if (!job) return setAvatarMessage('직업을 선택하세요.', true);
-  button.disabled = true;
-  button.textContent = '조회...';
-  setAvatarMessage('거래소 현재 매물을 조회 중입니다.');
-  $('avatarResult').innerHTML = '';
-  try {
-    const res = await fetch(`/api/legend-avatars?job=${encodeURIComponent(job)}&_=${Date.now()}`, { cache: 'no-store' });
-    const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.error || data.message || '전설 아바타 조회 실패');
-    setAvatarMessage('');
-    renderLegendAvatarResult(data);
-  } catch (error) {
-    setAvatarMessage(error.message, true);
-  } finally {
-    button.disabled = false;
-    button.textContent = '선택 직업 조회';
-  }
-}
-
-async function searchAllLegendAvatarSets() {
-  const button = $('avatarSearchAllButton');
-  if (button) { button.disabled = true; button.textContent = '전체 조회...'; }
-  const results = [];
-  let scanned = 0;
-  setAvatarMessage('전체 직업을 개별 조회 중입니다. 먼저 조회된 직업부터 바로 표시됩니다.');
-  renderLegendAvatarAllResult({ jobs: LOSTARK_JOBS.map(job => ({ job, parts: {}, totalPrice: 0, complete: false, loading: true })), loading: true, scanned: 0 });
-  try {
-    const queue = [...LOSTARK_JOBS];
-    const workers = Array.from({ length: 3 }, async () => {
-      while (queue.length) {
-        const job = queue.shift();
-        try {
-          const res = await fetch(`/api/legend-avatars?job=${encodeURIComponent(job)}&pageLimit=18&_=${Date.now()}`, { cache: 'no-store' });
-          const data = await res.json();
-          if (!res.ok || !data.ok) throw new Error(data.error || data.message || `${job} 조회 실패`);
-          results.push(data);
-          scanned += Number(data.scanned || 0);
-        } catch (error) {
-          results.push({ job, parts: {}, totalPrice: 0, complete: false, error: error.message });
-        }
-        renderLegendAvatarAllResult({ jobs: mergeAvatarRows(results), loading: queue.length > 0, scanned });
-      }
-    });
-    await Promise.all(workers);
-    const finalRows = mergeAvatarRows(results);
-    setAvatarMessage('');
-    renderLegendAvatarAllResult({ jobs: finalRows, loading: false, scanned });
-  } catch (error) {
-    setAvatarMessage(error.message, true);
-  } finally {
-    if (button) { button.disabled = false; button.textContent = '전체 직업 조회'; }
-  }
+  selectedAvatarJob = job || selectedAvatarJob;
+  return loadAllLegendAvatarSets(false, selectedAvatarJob);
 }
 
 function mergeAvatarRows(rows) {

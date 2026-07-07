@@ -1,4 +1,4 @@
-const API_VERSION = '5.0.0';
+const API_VERSION = '5.0.1';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const PARTS = ['머리', '상의', '하의', '무기'];
