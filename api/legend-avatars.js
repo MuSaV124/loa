@@ -1,8 +1,17 @@
-const API_VERSION = '4.9.9';
+const API_VERSION = '5.0.0';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const PARTS = ['머리', '상의', '하의', '무기'];
+const LOSTARK_JOBS = [
+  '버서커','디스트로이어','워로드','홀리나이트','슬레이어',
+  '배틀마스터','인파이터','기공사','창술사','스트라이커','브레이커',
+  '데빌헌터','블래스터','호크아이','스카우터','건슬링어',
+  '바드','서머너','아르카나','소서리스',
+  '블레이드','데모닉','리퍼','소울이터',
+  '도화가','기상술사','환수사','차원술사'
+];
 const LEGEND_NAMES = ['영원', '도약', '결속', '약속'];
+const ARMOR_KEYWORDS = ['머리', '상의', '하의', '무기', '머리 아바타', '상의 아바타', '하의 아바타', '무기 아바타'];
 const MARKET_OPTIONS_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/options';
 // 거래소 아바타는 공식 예시에서 자주 쓰이는 20000 계열이 우선이다.
 // 잘못된 후보가 섞여도 개별 호출 실패는 무시하고 다음 후보를 시도한다.
@@ -15,27 +24,46 @@ export default async function handler(req, res) {
 
   try {
     const job = String(req.query.job || '').trim();
-    if (!job) return res.status(400).json({ error: '직업을 선택하세요.' });
+    const all = String(req.query.all || '').trim() === '1' || !job;
 
     const apiKey = process.env.LOSTARK_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'Vercel 환경변수 LOSTARK_API_KEY가 없습니다.' });
 
-    const pageLimit = Math.max(1, Math.min(30, Number(req.query.pageLimit || 12)));
-    const { items, totalCount, categoryCode, strategy } = await fetchLegendAvatarMarketItems(apiKey, job, pageLimit);
-    const jobFilterTrusted = String(strategy || '').includes('+class');
-    const result = await buildLegendAvatarSet(apiKey, items, job, jobFilterTrusted);
+    const pageLimit = Math.max(1, Math.min(50, Number(req.query.pageLimit || 30)));
+
+    if (all) {
+      const scan = await fetchBroadLegendAvatarMarketItems(apiKey, pageLimit);
+      const jobs = await buildAllLegendAvatarSets(apiKey, scan.items);
+      return res.status(200).json({
+        ok: true,
+        apiVersion: API_VERSION,
+        source: 'markets/items',
+        mode: 'all-jobs',
+        scanned: scan.items.length,
+        totalCount: scan.totalCount,
+        pageLimit,
+        categoryCode: scan.categoryCode,
+        strategy: scan.strategy,
+        tried: scan.tried,
+        jobs
+      });
+    }
+
+    const scan = await fetchLegendAvatarMarketItems(apiKey, job, pageLimit);
+    const result = await buildLegendAvatarSet(apiKey, scan.items, job, false);
 
     return res.status(200).json({
       ok: true,
       apiVersion: API_VERSION,
       source: 'markets/items',
+      mode: 'single-job',
       job,
-      scanned: items.length,
-      totalCount,
+      scanned: scan.items.length,
+      totalCount: scan.totalCount,
       pageLimit,
-      categoryCode,
-      strategy,
-      jobFilterTrusted,
+      categoryCode: scan.categoryCode,
+      strategy: scan.strategy,
+      tried: scan.tried,
       ...result
     });
   } catch (error) {
@@ -45,82 +73,92 @@ export default async function handler(req, res) {
 }
 
 async function fetchLegendAvatarMarketItems(apiKey, job, pageLimit) {
+  // 무기는 CharacterClass 검색에서 잘 잡히지만, 머리/상의/하의는 CharacterClass 조건에서 빠지는 경우가 있어
+  // 직업 검색 결과와 전체 전설 아바타 스캔 결과를 합쳐서 상세 Tooltip의 "직업 전용" 문구로 최종 판별한다.
+  const broad = await fetchBroadLegendAvatarMarketItems(apiKey, pageLimit);
+  const merged = new Map();
+  for (const item of broad.items) merged.set(marketItemKey(item), item);
+
+  const categoryCode = broad.categoryCode || 20000;
+  const classKeywords = new Set(['', ...LEGEND_NAMES, ...ARMOR_KEYWORDS]);
+  for (const keyword of classKeywords) {
+    const payload = {
+      Sort: 'CURRENT_MIN_PRICE',
+      SortCondition: 'ASC',
+      CategoryCode: categoryCode,
+      CharacterClass: job,
+      ItemTier: null,
+      ItemGrade: '전설',
+      ItemName: keyword,
+      PageNo: 1
+    };
+    const result = await fetchMarketPages(apiKey, payload, Math.min(pageLimit, 6));
+    broad.tried.push({ job, keyword, categoryCode, classFilter: true, count: result.items.length, totalCount: result.totalCount, errors: result.errors?.slice(0, 2) });
+    for (const item of result.items.filter(isLikelyLegendAvatarListItem)) merged.set(marketItemKey(item), item);
+  }
+
+  return {
+    items: [...merged.values()],
+    totalCount: Math.max(Number(broad.totalCount || 0), merged.size),
+    categoryCode,
+    strategy: 'broad-tooltip+class-weapon-supplement',
+    tried: broad.tried
+  };
+}
+
+async function fetchBroadLegendAvatarMarketItems(apiKey, pageLimit) {
   const tried = [];
   const categoryCandidates = await getMarketAvatarCategoryCandidates(apiKey);
-
-  // 1차: /markets/options에서 찾은 아바타 카테고리 + 직업 필터.
-  for (const categoryCode of categoryCandidates) {
-    for (const useClassFilter of [true, false]) {
-      const basePayload = {
-        Sort: 'CURRENT_MIN_PRICE',
-        SortCondition: 'ASC',
-        ItemTier: null,
-        ItemGrade: '전설',
-        ItemName: '',
-        PageNo: 1
-      };
-      if (categoryCode) basePayload.CategoryCode = categoryCode;
-      if (useClassFilter) basePayload.CharacterClass = job;
-
-      const result = await fetchMarketPages(apiKey, basePayload, pageLimit);
-      tried.push({ categoryCode, classFilter: useClassFilter, count: result.items.length, totalCount: result.totalCount, errors: result.errors?.slice(0, 2) });
-      const avatarItems = result.items.filter(isLikelyLegendAvatarListItem);
-      if (avatarItems.length) {
-        return { ...result, items: avatarItems, categoryCode, strategy: useClassFilter ? 'options-category+class+grade' : 'options-category+grade', tried };
-      }
-    }
-  }
-
-  // 2차: 전설 아바타 시즌/접두 키워드로 보강 검색. Tooltip의 "직업 전용"은 리스트가 아니라 상세에서 판별한다.
   const merged = new Map();
+  let selectedCategory = categoryCandidates[0] ?? 20000;
   let totalCount = 0;
-  let categoryCode = categoryCandidates[0] ?? null;
-  for (const keyword of LEGEND_NAMES) {
-    for (const useClassFilter of [true, false]) {
-      const payload = {
-        Sort: 'CURRENT_MIN_PRICE',
-        SortCondition: 'ASC',
-        ItemTier: null,
-        ItemGrade: '전설',
-        ItemName: keyword,
-        PageNo: 1
-      };
-      if (categoryCode) payload.CategoryCode = categoryCode;
-      if (useClassFilter) payload.CharacterClass = job;
 
-      const result = await fetchMarketPages(apiKey, payload, Math.min(pageLimit, 5));
-      tried.push({ keyword, categoryCode, classFilter: useClassFilter, count: result.items.length, totalCount: result.totalCount, errors: result.errors?.slice(0, 2) });
-      totalCount += result.totalCount || 0;
-      for (const item of result.items.filter(isLikelyLegendAvatarListItem)) {
-        merged.set(String(item.Id || item.ItemId || item.Name), item);
-      }
-      if (merged.size >= 20) break;
+  for (const categoryCode of categoryCandidates) {
+    const payload = {
+      Sort: 'CURRENT_MIN_PRICE',
+      SortCondition: 'ASC',
+      ItemTier: null,
+      ItemGrade: '전설',
+      ItemName: '',
+      PageNo: 1
+    };
+    if (categoryCode) payload.CategoryCode = categoryCode;
+    const result = await fetchMarketPages(apiKey, payload, pageLimit);
+    tried.push({ categoryCode, classFilter: false, count: result.items.length, totalCount: result.totalCount, errors: result.errors?.slice(0, 2) });
+    const avatarItems = result.items.filter(isLikelyLegendAvatarListItem);
+    if (avatarItems.length) {
+      selectedCategory = categoryCode;
+      totalCount = Math.max(totalCount, Number(result.totalCount || 0));
+      for (const item of avatarItems) merged.set(marketItemKey(item), item);
+      // 첫 아바타 카테고리에서 충분히 가져왔으면 다른 후보는 중복/오류 가능성이 높으므로 멈춘다.
+      if (merged.size >= Math.min(Number(result.totalCount || merged.size), pageLimit * Math.max(Number(result.pageSize || 10), 10))) break;
     }
   }
 
-  // 3차: 직업명 자체로 검색. 일부 전설 아바타는 이름에 직업명이 없지만, 공식 거래소 검색 동작 확인용/예외 대응용이다.
-  if (!merged.size) {
-    for (const keyword of [job, `${job} 전용`, '전설']) {
-      const payload = {
-        Sort: 'CURRENT_MIN_PRICE',
-        SortCondition: 'ASC',
-        CategoryCode: categoryCode || 20000,
-        CharacterClass: job,
-        ItemTier: null,
-        ItemGrade: '전설',
-        ItemName: keyword,
-        PageNo: 1
-      };
-      const result = await fetchMarketPages(apiKey, payload, Math.min(pageLimit, 5));
-      tried.push({ keyword, categoryCode: payload.CategoryCode, classFilter: true, count: result.items.length, totalCount: result.totalCount, errors: result.errors?.slice(0, 2) });
-      for (const item of result.items.filter(isLikelyLegendAvatarListItem)) {
-        merged.set(String(item.Id || item.ItemId || item.Name), item);
-      }
-      if (merged.size) break;
-    }
+  // 시즌/부위 키워드 보강. 최저가 정렬 첫 페이지에 무기만 몰리는 경우가 있어
+  // 머리/상의/하의/무기 키워드를 별도로 검색한다.
+  const keywordSet = new Set([
+    ...LEGEND_NAMES,
+    ...ARMOR_KEYWORDS,
+    ...LEGEND_NAMES.flatMap(name => ARMOR_KEYWORDS.map(part => `${name} ${part}`))
+  ]);
+  for (const keyword of keywordSet) {
+    const payload = {
+      Sort: 'CURRENT_MIN_PRICE',
+      SortCondition: 'ASC',
+      CategoryCode: selectedCategory || 20000,
+      ItemTier: null,
+      ItemGrade: '전설',
+      ItemName: keyword,
+      PageNo: 1
+    };
+    const result = await fetchMarketPages(apiKey, payload, Math.min(pageLimit, 8));
+    tried.push({ keyword, categoryCode: payload.CategoryCode, classFilter: false, count: result.items.length, totalCount: result.totalCount, errors: result.errors?.slice(0, 2) });
+    totalCount = Math.max(totalCount, Number(result.totalCount || 0));
+    for (const item of result.items.filter(isLikelyLegendAvatarListItem)) merged.set(marketItemKey(item), item);
   }
 
-  return { items: [...merged.values()], totalCount, categoryCode, strategy: 'keyword-fallback', tried };
+  return { items: [...merged.values()], totalCount, categoryCode: selectedCategory, strategy: 'broad-tooltip-scan', tried };
 }
 
 async function getMarketAvatarCategoryCandidates(apiKey) {
@@ -195,46 +233,101 @@ function cleanPayload(payload) {
   return out;
 }
 
-async function buildLegendAvatarSet(apiKey, items, job, jobFilterTrusted = false) {
-  const parts = { 머리: null, 상의: null, 하의: null, 무기: null };
-  const matched = [];
+async function buildAllLegendAvatarSets(apiKey, items) {
   const detailCache = new Map();
-
-  for (const listItem of items) {
+  const detailed = await mapWithConcurrency(items, 8, async (listItem) => {
     const detail = await getMarketDetail(apiKey, listItem, detailCache);
-    const item = mergeMarketItem(listItem, detail);
-    const price = Number(item.CurrentMinPrice || item.MinPrice || item.LowestPrice || item?.AuctionInfo?.BuyPrice || 0);
+    return mergeMarketItem(listItem, detail);
+  });
+
+  const results = {};
+  for (const job of LOSTARK_JOBS) results[job] = emptyJobSet(job);
+
+  for (const item of detailed) {
+    const price = marketPrice(item);
     if (!price) continue;
-
     const text = itemFullText(item);
-    // markets/items에서 CharacterClass 필터가 성공한 전략이면 이미 직업별 결과이므로
-    // 상세 Tooltip에 '브레이커 전용' 문구가 없어도 제외하지 않는다.
-    if (!jobFilterTrusted && !isJobOnly(text, job)) continue;
-
     const part = detectPart(item, text);
-    if (!part || !(part in parts)) continue;
-
-    const normalized = {
-      id: item.Id || item.ItemId || null,
-      name: item.Name || '',
-      grade: item.Grade || '전설',
-      part,
-      price,
-      icon: normalizeIconUrl(item.Icon || item.IconPath || item.Image || findIconPath(item.Tooltip) || ''),
-      yDayAvgPrice: Number(item.YDayAvgPrice || item.YesterdayAvgPrice || 0),
-      recentPrice: Number(item.RecentPrice || 0),
-      bundleCount: Number(item.BundleCount || 1),
-      tradeRemainCount: Number(item.TradeRemainCount ?? item.TradeCount ?? 0),
-      rawType: item.Type || findTitleText(item.Tooltip) || ''
-    };
-    matched.push(normalized);
-
-    if (!parts[part] || price < parts[part].price) parts[part] = normalized;
+    if (!part || !PARTS.includes(part)) continue;
+    const jobs = detectJobsFromText(text);
+    for (const job of jobs) {
+      const normalized = normalizeAvatarItem(item, part, price);
+      const current = results[job]?.parts?.[part];
+      if (!current || price < current.price) results[job].parts[part] = normalized;
+      results[job].matched.push(normalized);
+    }
   }
 
-  const complete = Object.values(parts).every(Boolean);
+  return LOSTARK_JOBS.map((job) => finalizeJobSet(results[job] || emptyJobSet(job)));
+}
+
+async function buildLegendAvatarSet(apiKey, items, job) {
+  const all = await buildAllLegendAvatarSets(apiKey, items);
+  const found = all.find(row => row.job === job) || emptyJobSet(job);
+  return finalizeJobSet(found);
+}
+
+function emptyJobSet(job) {
+  return { job, parts: { 머리: null, 상의: null, 하의: null, 무기: null }, matched: [] };
+}
+
+function finalizeJobSet(row) {
+  const parts = row.parts || { 머리: null, 상의: null, 하의: null, 무기: null };
   const totalPrice = Object.values(parts).reduce((sum, item) => sum + Number(item?.price || 0), 0);
-  return { parts, totalPrice, complete, matchedCount: matched.length, matched };
+  const complete = PARTS.every(part => !!parts[part]);
+  return {
+    job: row.job,
+    parts,
+    totalPrice,
+    complete,
+    matchedCount: Array.isArray(row.matched) ? row.matched.length : 0,
+    matched: row.matched || []
+  };
+}
+
+function normalizeAvatarItem(item, part, price) {
+  return {
+    id: item.Id || item.ItemId || null,
+    name: item.Name || '',
+    grade: item.Grade || '전설',
+    part,
+    price,
+    icon: normalizeIconUrl(item.Icon || item.IconPath || item.Image || findIconPath(item.Tooltip) || ''),
+    yDayAvgPrice: Number(item.YDayAvgPrice || item.YesterdayAvgPrice || 0),
+    recentPrice: Number(item.RecentPrice || 0),
+    bundleCount: Number(item.BundleCount || 1),
+    tradeRemainCount: Number(item.TradeRemainCount ?? item.TradeCount ?? 0),
+    rawType: item.Type || findTitleText(item.Tooltip) || ''
+  };
+}
+
+function detectJobsFromText(text) {
+  const compact = normalizeText(text).replace(/\s+/g, '');
+  return LOSTARK_JOBS.filter(job => {
+    const j = normalizeText(job).replace(/\s+/g, '');
+    return compact.includes(`${j}전용`) || compact.includes(`CharacterClass:${j}`) || compact.includes(`\"CharacterClass\":\"${j}\"`);
+  });
+}
+
+function marketPrice(item) {
+  return Number(item.CurrentMinPrice || item.MinPrice || item.LowestPrice || item?.AuctionInfo?.BuyPrice || 0);
+}
+
+function marketItemKey(item) {
+  return String(item?.Id || item?.ItemId || item?.Name || '') + ':' + String(item?.CurrentMinPrice || item?.MinPrice || '');
+}
+
+async function mapWithConcurrency(list, limit, mapper) {
+  const results = new Array(list.length);
+  let index = 0;
+  async function worker() {
+    while (index < list.length) {
+      const current = index++;
+      results[current] = await mapper(list[current], current);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, list.length) }, worker));
+  return results;
 }
 
 async function getMarketDetail(apiKey, item, cache) {
@@ -285,7 +378,7 @@ function mergeMarketItem(listItem, detail) {
 function isLikelyLegendAvatarListItem(item) {
   const text = normalizeText([item?.Name, item?.Grade, item?.Type, item?.ItemType, item?.Icon].join(' '));
   if (item?.Grade && item.Grade !== '전설') return false;
-  return /아바타|avatar|shop_icon|영원|도약|결속|약속|냉혹한|고요한/.test(text);
+  return /아바타|avatar|shop_icon|영원|도약|결속|약속|냉혹한|고요한|머리|상의|하의/.test(text);
 }
 
 function isJobOnly(text, job) {
@@ -299,8 +392,8 @@ function detectPart(item, text) {
   const name = normalizeText(item?.Name || '');
   const all = normalizeText(`${type} ${name} ${text}`);
 
-  if (/전설\s*(무기|건랜스|대검|해머|창|한손검|건틀릿|헤비\s*건틀릿|엘리멘탈\s*건틀릿|기공패|창|할버드|데빌헌터|총|핸드건|런처|활|드론|마법덱|하프|스태프|마법봉|우산|붓|데스사이드|블레이드|대거|데모닉웨폰)\s*아바타/.test(all)) return '무기';
-  if (/무기\s*아바타|할버드|건틀릿|기공패|건랜스|런처|마법덱|하프|스태프|마법봉|우산|붓|데스사이드/.test(all)) return '무기';
+  if (/전설\s*(무기|건랜스|대검|해머|창|한손검|건틀릿|헤비\s*건틀릿|엘리멘탈\s*건틀릿|기공패|창|할버드|데빌헌터|총|핸드건|런처|활|드론|마법덱|하프|스태프|마법봉|우산|붓|데스사이드|블레이드|대거|데모닉웨폰|차원패|오브|마법구)\s*아바타/.test(all)) return '무기';
+  if (/무기\s*아바타|할버드|건틀릿|기공패|건랜스|런처|마법덱|하프|스태프|마법봉|우산|붓|데스사이드|차원패|오브|마법구/.test(all)) return '무기';
   if (/머리\s*아바타|전설\s*머리/.test(all)) return '머리';
   if (/상의\s*아바타|전설\s*상의/.test(all)) return '상의';
   if (/하의\s*아바타|전설\s*하의/.test(all)) return '하의';
