@@ -1354,7 +1354,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.0.5',
+    apiVersion: '5.0.6',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1370,7 +1370,7 @@ async function loadLegendAvatarSet(job, force = false) {
 
   try {
     const settled = await Promise.allSettled(order.map(async (part) => {
-      const url = `/api/legend-avatars?job=${encodeURIComponent(job)}&part=${encodeURIComponent(part)}&pageLimit=3&detailLimit=24${force ? '&force=1' : ''}&_=${Date.now()}`;
+      const url = `/api/legend-avatars?job=${encodeURIComponent(job)}&part=${encodeURIComponent(part)}&pageLimit=6&detailLimit=40${force ? '&force=1' : ''}&_=${Date.now()}`;
       const res = await fetch(url, { cache: 'no-store' });
       const data = await readJsonSafely(res);
       if (!res.ok || !data?.ok) throw new Error(data?.error || data?.message || `${part} 조회 실패`);
@@ -1416,8 +1416,8 @@ async function searchLegendAvatarSet(job) {
 // v5.0.4 boot fix: 5.0.2에서 전설 아바타 코드가 뒤에 붙으면서 초기화 호출이 빠져
 // 진화 DB가 로드되지 않고, 탭 버튼 이벤트도 연결되지 않았습니다.
 // DOM 요소와 모든 함수가 정의된 뒤 한 번만 초기화합니다.
-if (!window.__lostarkCalculatorBootedV503) {
-  window.__lostarkCalculatorBootedV503 = true;
+if (!window.__lostarkCalculatorBootedV506) {
+  window.__lostarkCalculatorBootedV506 = true;
   initLegendAvatarTab();
   setActiveTab('calculator');
   loadDb().catch((error) => setMessage(error.message || '진화 노드 데이터를 불러오지 못했습니다.'));

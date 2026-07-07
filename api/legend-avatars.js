@@ -1,4 +1,4 @@
-const API_VERSION = '5.0.5';
+const API_VERSION = '5.0.6';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const PARTS = ['머리', '상의', '하의', '무기'];
@@ -11,14 +11,14 @@ const LOSTARK_JOBS = [
   '도화가','기상술사','환수사','차원술사',
   '가디언나이트'
 ];
-const LEGEND_NAMES = ['영원', '도약', '결속', '약속'];
+const LEGEND_NAMES = ['영원', '도약', '결속', '약속', '냉혹한', '고요한'];
 const ARMOR_KEYWORDS = ['머리', '상의', '하의', '무기', '머리 아바타', '상의 아바타', '하의 아바타', '무기 아바타'];
 const MARKET_OPTIONS_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/options';
 // 거래소 아바타는 공식 예시에서 자주 쓰이는 20000 계열이 우선이다.
 // 잘못된 후보가 섞여도 개별 호출 실패는 무시하고 다음 후보를 시도한다.
 const FALLBACK_MARKET_AVATAR_CATEGORY_CANDIDATES = [20000, 20005, 20010, 20015, 20020, null];
 
-const JOB_CACHE = globalThis.__legendAvatarJobCacheV505 || (globalThis.__legendAvatarJobCacheV505 = new Map());
+const JOB_CACHE = globalThis.__legendAvatarJobCacheV506 || (globalThis.__legendAvatarJobCacheV506 = new Map());
 const CACHE_TTL_MS = 1000 * 60 * 5;
 
 export default async function handler(req, res) {
@@ -106,7 +106,7 @@ async function buildSingleJobLegendAvatarPart(apiKey, job, part, pageLimit, deta
     if (!price || detectedPart !== part) continue;
 
     const jobMatchedByTooltip = isJobOnly(text, job) || detectJobsFromText(text).includes(job);
-    const jobMatchedByClassSearch = candidate.__classMatched === true;
+    const jobMatchedByClassSearch = candidate.__classMatched === true && part === '무기';
     if (!jobMatchedByTooltip && !jobMatchedByClassSearch) continue;
 
     const normalized = normalizeAvatarItem(item, part, price);
@@ -170,7 +170,7 @@ async function buildSingleJobLegendAvatarSet(apiKey, job, pageLimit, detailLimit
       if (!price || detectedPart !== part) continue;
 
       const jobMatchedByTooltip = isJobOnly(text, job) || detectJobsFromText(text).includes(job);
-      const jobMatchedByClassSearch = candidate.__classMatched === true;
+      const jobMatchedByClassSearch = candidate.__classMatched === true && part === '무기';
       if (!jobMatchedByTooltip && !jobMatchedByClassSearch) continue;
 
       const normalized = normalizeAvatarItem(item, part, price);
@@ -194,29 +194,50 @@ async function buildSingleJobLegendAvatarSet(apiKey, job, pageLimit, detailLimit
 
 async function fetchPartCandidates(apiKey, job, part, categoryCodes, pageLimit, tried) {
   const categoryList = Array.isArray(categoryCodes) && categoryCodes.length ? categoryCodes.slice(0, 6) : [20000];
-  const queries = [];
-  const partKeywords = part === '무기'
-    ? ['', '무기', '무기 아바타', ...LEGEND_NAMES]
-    : [`${part} 아바타`, part, ...LEGEND_NAMES.map(name => `${name} ${part}`)];
-
-  // 먼저 CharacterClass 조건으로 조회한다. 부위 카테고리와 같이 쓰면 방어구도 잡히는 경우가 있어
-  // 결과가 나오면 직업 매칭으로 신뢰한다.
-  for (const keyword of partKeywords) {
-    queries.push({ classFilter: true, payload: {
-      Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: null,
-      CharacterClass: job, ItemTier: null, ItemGrade: '전설', ItemName: keyword, PageNo: 1
-    }});
-  }
-
-  // CharacterClass에서 누락되는 경우가 있어 넓게 검색 후 Tooltip의 "직업 전용"으로 판별한다.
-  for (const keyword of partKeywords) {
-    queries.push({ classFilter: false, payload: {
-      Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: null,
-      ItemTier: null, ItemGrade: '전설', ItemName: keyword, PageNo: 1
-    }});
-  }
-
   const out = [];
+
+  // v5.0.6
+  // 거래소 CharacterClass 검색은 무기 아바타에는 잘 맞지만, 머리/상의/하의는 누락되는 경우가 많다.
+  // 그래서 무기는 직업 필터를 우선 신뢰하고, 방어구는 넓게 검색한 뒤 상세 Tooltip의 "직업 전용" 문구로 판별한다.
+  const weaponKeywords = ['', '무기', '무기 아바타', ...LEGEND_NAMES];
+  const armorKeywords = [
+    '',
+    ...LEGEND_NAMES,
+    ...LEGEND_NAMES.map(name => `${name} 아바타`),
+    '아바타'
+  ];
+
+  const queries = [];
+  if (part === '무기') {
+    for (const keyword of weaponKeywords) {
+      queries.push({ classFilter: true, payload: {
+        Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: null,
+        CharacterClass: job, ItemTier: null, ItemGrade: '전설', ItemName: keyword, PageNo: 1
+      }});
+    }
+    for (const keyword of weaponKeywords) {
+      queries.push({ classFilter: false, payload: {
+        Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: null,
+        ItemTier: null, ItemGrade: '전설', ItemName: keyword, PageNo: 1
+      }});
+    }
+  } else {
+    for (const keyword of armorKeywords) {
+      queries.push({ classFilter: false, payload: {
+        Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: null,
+        ItemTier: null, ItemGrade: '전설', ItemName: keyword, PageNo: 1
+      }});
+    }
+    // 보조: 직업 필터도 뒤에서 한 번만 섞되, 방어구에서는 이것만으로 성공 처리하지 않는다.
+    for (const keyword of LEGEND_NAMES) {
+      queries.push({ classFilter: true, payload: {
+        Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: null,
+        CharacterClass: job, ItemTier: null, ItemGrade: '전설', ItemName: keyword, PageNo: 1
+      }});
+    }
+  }
+
+  const seen = new Set();
   for (const categoryCode of categoryList) {
     for (const q of queries) {
       const payload = { ...q.payload };
@@ -225,12 +246,16 @@ async function fetchPartCandidates(apiKey, job, part, categoryCodes, pageLimit, 
       const result = await fetchMarketPages(apiKey, payload, pageLimit);
       tried.push({ part, keyword: payload.ItemName, categoryCode: payload.CategoryCode || null, classFilter: q.classFilter, count: result.items.length, totalCount: result.totalCount, errors: result.errors?.slice(0, 1) });
       for (const item of result.items.filter(isLikelyLegendAvatarListItem)) {
-        out.push({ ...item, __classMatched: q.classFilter, __categoryCode: payload.CategoryCode || null });
+        const key = marketItemKey(item);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ ...item, __classMatched: q.classFilter && part === '무기', __categoryCode: payload.CategoryCode || null });
       }
-      // 직업 필터 + 부위 카테고리에서 결과가 있으면 넓은 검색보다 정확하므로 우선 사용한다.
-      if (q.classFilter && out.length >= 3) return out;
+      if (part === '무기' && q.classFilter && out.length >= 3) return out;
+      if (part !== '무기' && out.length >= 80) return out;
     }
-    if (out.length >= 12) break;
+    if (part === '무기' && out.length >= 12) break;
+    if (part !== '무기' && out.length >= 80) break;
   }
   return out;
 }
@@ -591,9 +616,9 @@ function detectPart(item, text) {
 
   if (/전설\s*(무기|건랜스|대검|해머|창|한손검|건틀릿|헤비\s*건틀릿|엘리멘탈\s*건틀릿|기공패|창|할버드|데빌헌터|총|핸드건|런처|활|드론|마법덱|하프|스태프|마법봉|우산|붓|데스사이드|블레이드|대거|데모닉웨폰|차원패|오브|마법구)\s*아바타/.test(all)) return '무기';
   if (/무기\s*아바타|할버드|건틀릿|기공패|건랜스|런처|마법덱|하프|스태프|마법봉|우산|붓|데스사이드|차원패|오브|마법구/.test(all)) return '무기';
-  if (/머리\s*아바타|전설\s*머리/.test(all)) return '머리';
-  if (/상의\s*아바타|전설\s*상의/.test(all)) return '상의';
-  if (/하의\s*아바타|전설\s*하의/.test(all)) return '하의';
+  if (/머리\s*아바타|전설\s*머리|머리장식|투구|모자/.test(all)) return '머리';
+  if (/상의\s*아바타|전설\s*상의|갑옷|상의/.test(all)) return '상의';
+  if (/하의\s*아바타|전설\s*하의|하의|바지/.test(all)) return '하의';
   return null;
 }
 

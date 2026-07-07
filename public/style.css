@@ -1274,3 +1274,42 @@ body.avatarMode .avatarPartGrid {
 @media (max-width: 560px) {
   body.avatarMode .avatarPartGrid { grid-template-columns: 1fr; }
 }
+
+
+/* v5.0.6 calculator layout restore */
+body:not(.avatarMode) .wrap {
+  width: min(1440px, calc(100vw - 28px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  gap: 14px;
+  align-items: start;
+}
+body:not(.avatarMode) .hero,
+body:not(.avatarMode) .character,
+body:not(.avatarMode) .tabNav {
+  grid-column: 1 / -1;
+}
+body:not(.avatarMode) #summaryPanel {
+  grid-column: 2;
+  grid-row: 4 / span 4;
+  position: sticky;
+  top: 14px;
+}
+body:not(.avatarMode) #inputPanel,
+body:not(.avatarMode) #evolutionPanel,
+body:not(.avatarMode) #recommendPanel,
+body:not(.avatarMode) #keenPanel {
+  grid-column: 1;
+}
+body:not(.avatarMode) #legendAvatarPanel {
+  display: none !important;
+}
+@media (max-width: 980px) {
+  body:not(.avatarMode) .wrap { grid-template-columns: 1fr; }
+  body:not(.avatarMode) #summaryPanel,
+  body:not(.avatarMode) #inputPanel,
+  body:not(.avatarMode) #evolutionPanel,
+  body:not(.avatarMode) #recommendPanel,
+  body:not(.avatarMode) #keenPanel { grid-column: 1 / -1; grid-row: auto; }
+  body:not(.avatarMode) #summaryPanel { position: static; max-height: none; }
+}
