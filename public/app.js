@@ -1,4 +1,4 @@
-const VERSION = '5.0.8';
+const VERSION = '5.0.9';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -20,7 +20,7 @@ function emptyEngravingState() {
 
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
-const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
+const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] }, arkGrid: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [], rawText: '' } };
 
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
 function escapeRegExp(v) { return String(v || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -127,6 +127,97 @@ function addMatchesTo(out, key, text, regexList) {
   }
   if (best > 0) out[key] += best;
 }
+
+function emptyArkGridState() {
+  return { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [], rawText: '' };
+}
+function arkGridCandidateTexts(value, path = '', out = []) {
+  if (value == null) return out;
+  const pathHit = /ark\s*grid|arkgrid|아크\s*그리드|아크그리드/i.test(path);
+  if (typeof value === 'string') {
+    const cleaned = stripHtml(value);
+    if (pathHit || /아크\s*그리드|아크그리드|ark\s*grid|arkgrid/i.test(cleaned)) out.push(cleaned);
+    const t = value.trim();
+    if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+      try { arkGridCandidateTexts(JSON.parse(t), path, out); } catch {}
+    }
+    return out;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, i) => arkGridCandidateTexts(item, `${path}.${i}`, out));
+    return out;
+  }
+  if (typeof value === 'object') {
+    for (const [k, v] of Object.entries(value)) arkGridCandidateTexts(v, path ? `${path}.${k}` : k, out);
+  }
+  return out;
+}
+function addArkGridMatches(out, key, text, regexList) {
+  const seen = out.__seen || (out.__seen = new Set());
+  for (const re of regexList) {
+    re.lastIndex = 0;
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      const value = Number(match[1] || 0);
+      if (!Number.isFinite(value)) continue;
+      const token = `${key}:${value}:${normalizeMatchToken(match[0])}`;
+      if (seen.has(token)) continue;
+      seen.add(token);
+      out[key] += value;
+    }
+  }
+}
+function parseArkGridEffectText(text) {
+  const out = { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackSpeed: 0, moveSpeed: 0 };
+  const source = stripHtml(text);
+  addArkGridMatches(out, 'critRate', source, [
+    /치명타\s*적중률(?:이|이\s*)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:만큼)?\s*(?:증가|상승)?/g,
+    /치명타\s*확률(?:이|이\s*)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:만큼)?\s*(?:증가|상승)?/g,
+    /치적\s*(?:\+)?(\d+(?:\.\d+)?)%/g
+  ]);
+  addArkGridMatches(out, 'critDamage', source, [
+    /치명타\s*피해(?:량)?(?:이|가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:만큼)?\s*(?:증가|상승)?/g,
+    /치피\s*(?:\+)?(\d+(?:\.\d+)?)%/g
+  ]);
+  addArkGridMatches(out, 'additionalDamage', source, [
+    /추가\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:만큼)?\s*(?:증가|상승)?/g,
+    /추피\s*(?:\+)?(\d+(?:\.\d+)?)%/g
+  ]);
+  addArkGridMatches(out, 'enemyDamage', source, [
+    /(?<!무력화\s*상태의\s*)(?<!치명타로\s*적중\s*시\s*)적에게\s*주는\s*(?:모든\s*)?피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:만큼)?\s*(?:증가|상승)?/g,
+    /적주피\s*(?:\+)?(\d+(?:\.\d+)?)%/g
+  ]);
+  addArkGridMatches(out, 'attackSpeed', source, [
+    /공격\s*속도(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:만큼)?\s*(?:증가|상승)?/g,
+    /공속\s*(?:\+)?(\d+(?:\.\d+)?)%/g
+  ]);
+  addArkGridMatches(out, 'moveSpeed', source, [
+    /이동\s*속도(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:만큼)?\s*(?:증가|상승)?/g,
+    /이속\s*(?:\+)?(\d+(?:\.\d+)?)%/g
+  ]);
+  delete out.__seen;
+  for (const key of Object.keys(out)) out[key] = Math.round(out[key] * 100) / 100;
+  return out;
+}
+function extractArkGridEffects(arkPassive) {
+  const result = emptyArkGridState();
+  const candidates = [...new Set(arkGridCandidateTexts(arkPassive).filter(Boolean))];
+  result.rawText = candidates.join(' ').slice(0, 8000);
+  const applied = new Set();
+  candidates.forEach((text, index) => {
+    const effects = parseArkGridEffectText(text);
+    const hasValue = ['critRate','critDamage','additionalDamage','enemyDamage','attackSpeed','moveSpeed'].some(k => Math.abs(Number(effects[k] || 0)) > 0.0001);
+    if (!hasValue) return;
+    const sig = ['critRate','critDamage','additionalDamage','enemyDamage','attackSpeed','moveSpeed'].map(k => `${k}:${Number(effects[k] || 0).toFixed(3)}`).join('|');
+    if (applied.has(sig)) return;
+    applied.add(sig);
+    for (const key of ['critRate','critDamage','additionalDamage','enemyDamage','attackSpeed','moveSpeed']) result[key] += Number(effects[key] || 0);
+    result.items.push({ name: `아크그리드 ${index + 1}`, effects, text: text.slice(0, 500) });
+  });
+  for (const key of ['critRate','critDamage','additionalDamage','enemyDamage','attackSpeed','moveSpeed']) result[key] = Math.round(result[key] * 100) / 100;
+  return result;
+}
+
 function parsePercentEffectText(text) {
   const out = { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0 };
   const source = stripHtml(text);
@@ -430,8 +521,10 @@ function getBaseStats(selection = state.selected) {
   const baseSpeed = 114;
   const enlightenmentAttackSpeed = num(state.enlightenment.attackSpeed);
   const enlightenmentMoveSpeed = num(state.enlightenment.moveSpeed);
-  const attackSpeed = baseSpeed + swiftSpeedBonus + enlightenmentAttackSpeed + extraAttackSpeed;
-  const moveSpeed = baseSpeed + swiftSpeedBonus + enlightenmentMoveSpeed + extraMoveSpeed;
+  const arkGridAttackSpeed = num(state.arkGrid.attackSpeed);
+  const arkGridMoveSpeed = num(state.arkGrid.moveSpeed);
+  const attackSpeed = baseSpeed + swiftSpeedBonus + enlightenmentAttackSpeed + arkGridAttackSpeed + extraAttackSpeed;
+  const moveSpeed = baseSpeed + swiftSpeedBonus + enlightenmentMoveSpeed + arkGridMoveSpeed + extraMoveSpeed;
   let dynamicEnlightenmentCritRate = 0;
   let dynamicEnlightenmentCritDamage = 0;
   for (const item of state.enlightenment.items || []) {
@@ -453,6 +546,7 @@ function getBaseStats(selection = state.selected) {
     ...collectItemDamageSources(state.bracelet, 'enemyDamage', '팔찌')
   ];
   pushDamageSource(enemyDamageSources, '깨달음', state.enlightenment.enemyDamage);
+  pushDamageSource(enemyDamageSources, '아크그리드', state.arkGrid.enemyDamage);
   pushDamageSource(enemyDamageSources, '각인서/API', state.engraving?.effects?.enemyDamage);
   pushDamageSource(enemyDamageSources, '어빌리티 스톤 각인 보너스', state.abilityStone?.effects?.enemyDamage);
   pushDamageSource(enemyDamageSources, '추가 입력', extraEnemyDamage);
@@ -471,12 +565,12 @@ function getBaseStats(selection = state.selected) {
     critStat,
     swiftStat,
     statCritRate,
-    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.engraving?.effects?.critRate) + num(state.abilityStone?.effects?.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate,
-    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.engraving?.effects?.critDamage) + num(state.abilityStone?.effects?.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage,
+    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.arkGrid.critRate) + num(state.engraving?.effects?.critRate) + num(state.abilityStone?.effects?.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate,
+    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.arkGrid.critDamage) + num(state.engraving?.effects?.critDamage) + num(state.abilityStone?.effects?.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage,
     critHitDamage: num(state.accessory.critHitDamage) + num(state.bracelet.critHitDamage) + num(state.enlightenment.critHitDamage) + num(state.engraving?.effects?.critHitDamage) + num(state.abilityStone?.effects?.critHitDamage),
     critHitDamageSources,
     evolutionDamage: num(state.enlightenment.evolutionDamage) + extraEvolutionDamage,
-    additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + num(state.engraving?.effects?.additionalDamage) + num(state.abilityStone?.effects?.additionalDamage) + extraAdditionalDamage,
+    additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + num(state.arkGrid.additionalDamage) + num(state.engraving?.effects?.additionalDamage) + num(state.abilityStone?.effects?.additionalDamage) + extraAdditionalDamage,
     enemyDamage: effectivePercentFromSources(enemyDamageSources),
     enemyDamageSources,
     skillCritBonus: 0,
@@ -488,6 +582,8 @@ function getBaseStats(selection = state.selected) {
     swiftSpeedBonus,
     enlightenmentAttackSpeed,
     enlightenmentMoveSpeed,
+    arkGridAttackSpeed,
+    arkGridMoveSpeed,
     dynamicEnlightenmentCritRate,
     dynamicEnlightenmentCritDamage,
     baseMoveAttackSpeed: baseSpeed,
@@ -507,7 +603,7 @@ function getBaseStats(selection = state.selected) {
 function applyEffect(stats, effect, sourceLabel = '진화') {
   const out = { ...stats };
   if (effect.critStat) { out.critStat = (out.critStat || 0) + effect.critStat; out.statCritRate = critRateFromStat(out.critStat); out.critRate += critRateFromStat(effect.critStat); }
-  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.attackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentAttackSpeed || 0) + (out.extraAttackSpeed || 0); out.moveSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentMoveSpeed || 0) + (out.extraMoveSpeed || 0); out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
+  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.attackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentAttackSpeed || 0) + (out.arkGridAttackSpeed || 0) + (out.extraAttackSpeed || 0); out.moveSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentMoveSpeed || 0) + (out.arkGridMoveSpeed || 0) + (out.extraMoveSpeed || 0); out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
   if (effect.critRate) out.critRate += effect.critRate;
   if (effect.critDamage) out.critDamage += effect.critDamage;
   if (effect.critHitDamage) {
@@ -674,6 +770,27 @@ function enlightenmentAppliedDetailHtml(base) {
 }
 
 
+
+function arkGridAppliedDetailHtml() {
+  const rows = [];
+  for (const item of state.arkGrid.items || []) {
+    const eff = item?.effects || {};
+    const parts = [];
+    const push = (label, key) => {
+      const value = Number(eff?.[key] || 0);
+      if (Number.isFinite(value) && Math.abs(value) > 0.0001) parts.push(`${label} ${pct(value)}`);
+    };
+    push('치적', 'critRate');
+    push('치피', 'critDamage');
+    push('추피', 'additionalDamage');
+    push('적주피', 'enemyDamage');
+    push('공속', 'attackSpeed');
+    push('이속', 'moveSpeed');
+    if (parts.length) rows.push(`<div class="appliedItem"><b>${escapeHtml(item.name || '아크그리드')}</b><span>${escapeHtml(parts.join(' · '))}</span></div>`);
+  }
+  return rows.length ? `<div class="appliedDetail"><h4>아크그리드 API 적용값</h4>${rows.join('')}</div>` : '';
+}
+
 function engravingAppliedDetailHtml() {
   const stoneItems = state.abilityStone?.items || [];
   const engravingItems = state.engraving?.items || [];
@@ -748,6 +865,7 @@ function buildSourceSummary(current) {
   if (state.accessory.critRate) critLines.push(sourceLine('악세', state.accessory.critRate));
   if (state.bracelet.critRate) critLines.push(sourceLine('팔찌', state.bracelet.critRate));
   if (state.enlightenment.critRate) critLines.push(sourceLine('깨달음', state.enlightenment.critRate));
+  if (state.arkGrid.critRate) critLines.push(sourceLine('아크그리드', state.arkGrid.critRate));
   if (state.engraving?.effects?.critRate) critLines.push(sourceLine('각인서/API', state.engraving.effects.critRate));
   if (state.abilityStone?.effects?.critRate) critLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critRate));
   if (base.dynamicEnlightenmentCritRate) critLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritRate));
@@ -758,6 +876,7 @@ function buildSourceSummary(current) {
   if (state.accessory.critDamage) critDamageLines.push(sourceLine('악세', state.accessory.critDamage));
   if (state.bracelet.critDamage) critDamageLines.push(sourceLine('팔찌', state.bracelet.critDamage));
   if (state.enlightenment.critDamage) critDamageLines.push(sourceLine('깨달음', state.enlightenment.critDamage));
+  if (state.arkGrid.critDamage) critDamageLines.push(sourceLine('아크그리드', state.arkGrid.critDamage));
   if (state.engraving?.effects?.critDamage) critDamageLines.push(sourceLine('각인서/API', state.engraving.effects.critDamage));
   if (state.abilityStone?.effects?.critDamage) critDamageLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critDamage));
   if (base.dynamicEnlightenmentCritDamage) critDamageLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritDamage));
@@ -778,6 +897,7 @@ function buildSourceSummary(current) {
   if (state.accessory.additionalDamage) addLines.push(sourceLine('악세', state.accessory.additionalDamage));
   if (state.bracelet.additionalDamage) addLines.push(sourceLine('팔찌', state.bracelet.additionalDamage));
   if (state.enlightenment.additionalDamage) addLines.push(sourceLine('깨달음', state.enlightenment.additionalDamage));
+  if (state.arkGrid.additionalDamage) addLines.push(sourceLine('아크그리드', state.arkGrid.additionalDamage));
   if (state.engraving?.effects?.additionalDamage) addLines.push(sourceLine('각인서/API', state.engraving.effects.additionalDamage));
   if (state.abilityStone?.effects?.additionalDamage) addLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.additionalDamage));
   if (base.extraAdditionalDamage) addLines.push(sourceLine('추가 입력', base.extraAdditionalDamage));
@@ -792,6 +912,8 @@ function buildSourceSummary(current) {
   }
   if (base.enlightenmentAttackSpeed) attackSpeedLines.push(sourceLine('깨달음', base.enlightenmentAttackSpeed));
   if (base.enlightenmentMoveSpeed) moveSpeedLines.push(sourceLine('깨달음', base.enlightenmentMoveSpeed));
+  if (base.arkGridAttackSpeed) attackSpeedLines.push(sourceLine('아크그리드', base.arkGridAttackSpeed));
+  if (base.arkGridMoveSpeed) moveSpeedLines.push(sourceLine('아크그리드', base.arkGridMoveSpeed));
   if (base.extraAttackSpeed) attackSpeedLines.push(sourceLine('추가 입력', base.extraAttackSpeed));
   if (base.extraMoveSpeed) moveSpeedLines.push(sourceLine('추가 입력', base.extraMoveSpeed));
 
@@ -799,6 +921,7 @@ function buildSourceSummary(current) {
   if (state.accessory.enemyDamage) enemyLines.push(sourceLine('악세', state.accessory.enemyDamage));
   if (state.bracelet.enemyDamage) enemyLines.push(sourceLine('팔찌', state.bracelet.enemyDamage));
   if (state.enlightenment.enemyDamage) enemyLines.push(sourceLine('깨달음', state.enlightenment.enemyDamage));
+  if (state.arkGrid.enemyDamage) enemyLines.push(sourceLine('아크그리드', state.arkGrid.enemyDamage));
   if (state.engraving?.effects?.enemyDamage) enemyLines.push(sourceLine('각인서/API', state.engraving.effects.enemyDamage));
   if (state.abilityStone?.effects?.enemyDamage) enemyLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.enemyDamage));
   if (base.extraEnemyDamage) enemyLines.push(sourceLine('추가 입력', base.extraEnemyDamage));
@@ -823,6 +946,7 @@ function buildSourceSummary(current) {
     ${sourceGroup('공격 속도', 'cyan', attackSpeedLines, current.result.attackSpeed)}
     ${sourceGroup('이동 속도', 'cyan', moveSpeedLines, current.result.moveSpeed)}
     ${enlightenmentAppliedDetailHtml(base)}
+    ${arkGridAppliedDetailHtml()}
     ${engravingAppliedDetailHtml()}
     <div class="sourceFoot">UI의 치피·진피·추피는 합산 표시이며, 적주피·치명타 적중 주피는 내부 기대값에서 출처별 곱연산으로 적용됩니다. 뭉가 Lv.2는 <b>기본 진피 15% + 초과 치적 전환 최대 60% = 총 75%</b> 기준입니다.</div>
   `;
@@ -1163,6 +1287,7 @@ async function searchCharacter(name) {
   state.abilityStone = { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
   state.engraving = emptyEngravingState();
   state.enlightenment = { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
+  state.arkGrid = emptyArkGridState();
   renderEvolutionTiers();
   calculateAndRender();
   try {
@@ -1178,6 +1303,7 @@ async function searchCharacter(name) {
     renderCharacter(data.profile);
     state.foundEffects = readEffects(data.arkPassive);
     state.enlightenment = extractEnlightenmentEffects(state.foundEffects);
+    state.arkGrid = extractArkGridEffects(data.arkPassive);
     state.selected = classifyEvolution(state.foundEffects);
     state.apiSelected = JSON.parse(JSON.stringify(state.selected));
     applyProfileDefaults(data.profile, state.selected);
