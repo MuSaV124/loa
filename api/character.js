@@ -13,6 +13,7 @@ export default async function handler(req, res) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 9000);
     const url = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}?filters=profiles+equipment+arkpassive+engravings`;
+    const arkGridUrl = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}/arkgrid`;
 
     const response = await fetch(url, {
       headers: { Authorization: `bearer ${apiKey}`, Accept: 'application/json' },
@@ -34,11 +35,33 @@ export default async function handler(req, res) {
     const braceletEffects = extractBraceletEffects(equipment);
     const abilityStoneEffects = extractAbilityStoneEffects(equipment);
     const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
+    const arkGrid = await fetchOptionalJson(arkGridUrl, apiKey, 9000);
+    const arkGridEffects = extractArkGridEffects(arkGrid.data);
 
-    return res.status(200).json({ ok: true, apiVersion: '5.0.9', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, raw: data });
+    return res.status(200).json({ ok: true, apiVersion: '5.1.0', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, raw: data });
   } catch (error) {
     const message = error.name === 'AbortError' ? 'Open API 응답 시간이 길어서 중단했습니다.' : error.message;
     return res.status(500).json({ error: '서버 함수 오류', message });
+  }
+}
+
+
+async function fetchOptionalJson(url, apiKey, timeoutMs = 9000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers: { Authorization: `bearer ${apiKey}`, Accept: 'application/json' },
+      signal: controller.signal
+    });
+    const text = await response.text();
+    if (!response.ok) return { data: null, error: { status: response.status, body: text.slice(0, 500) } };
+    try { return { data: text ? JSON.parse(text) : null, error: null }; }
+    catch { return { data: null, error: { status: 502, body: text.slice(0, 500) } }; }
+  } catch (error) {
+    return { data: null, error: { status: 500, body: error?.name === 'AbortError' ? 'arkgrid timeout' : String(error?.message || error) } };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -370,6 +393,113 @@ function addMatches(out, key, text, regexList) {
       // 팔찌는 서로 다른 옵션 슬롯에 같은 문구가 반복될 수 있으므로
       // 문구 내용만으로 dedupe하면 정상 옵션이 누락됩니다.
       const token = `${key}:${match.index}:${String(match[0]).replace(/\s+/g, ' ').trim()}`;
+      if (seen.has(token)) continue;
+      seen.add(token);
+      out[key] += value;
+    }
+  }
+}
+
+function extractArkGridEffects(arkGrid) {
+  const result = { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+  const slots = Array.isArray(arkGrid?.Slots) ? arkGrid.Slots : [];
+  for (const slot of slots) {
+    const point = Number(slot?.Point || 0);
+    if (!Number.isFinite(point) || point <= 0) continue;
+    const text = arkGridTooltipText(slot?.Tooltip);
+    const activeTexts = activeArkGridOptionTexts(text, point);
+    const effects = { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0 };
+    for (const activeText of activeTexts) {
+      const parsed = parseArkGridOptionText(activeText);
+      for (const key of Object.keys(effects)) effects[key] += Number(parsed[key] || 0);
+    }
+    for (const key of Object.keys(effects)) effects[key] = round2(effects[key]);
+    if (Object.values(effects).some(v => Math.abs(Number(v || 0)) > 0.0001)) {
+      for (const key of Object.keys(effects)) result[key] += effects[key];
+      result.items.push({ index: slot.Index, name: slot.Name, grade: slot.Grade, point, effects, activeTexts });
+    }
+  }
+  for (const key of ['critRate', 'critDamage', 'attackSpeed', 'moveSpeed', 'enemyDamage', 'additionalDamage']) result[key] = round2(result[key]);
+  return result;
+}
+
+function arkGridTooltipText(tooltip) {
+  if (!tooltip) return '';
+  try {
+    const parsed = typeof tooltip === 'string' ? JSON.parse(tooltip) : tooltip;
+    const parts = [];
+    collectArkGridText(parsed, parts);
+    return stripHtml(parts.join('\n'));
+  } catch {
+    return stripHtml(String(tooltip));
+  }
+}
+
+function collectArkGridText(value, parts) {
+  if (value == null) return;
+  if (typeof value === 'string') {
+    if (value.includes('[10P]') || value.includes('[14P]') || /코어 옵션|젬 효과/.test(value)) parts.push(value);
+    return;
+  }
+  if (Array.isArray(value)) { for (const item of value) collectArkGridText(item, parts); return; }
+  if (typeof value === 'object') { for (const item of Object.values(value)) collectArkGridText(item, parts); }
+}
+
+function activeArkGridOptionTexts(text, point) {
+  const source = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!source) return [];
+  const re = /\[(\d+)P\]/g;
+  const marks = [];
+  let match;
+  while ((match = re.exec(source)) !== null) marks.push({ point: Number(match[1]), index: match.index, tokenEnd: re.lastIndex });
+  if (!marks.length) return point > 0 ? [source] : [];
+  const active = [];
+  for (let i = 0; i < marks.length; i++) {
+    const current = marks[i];
+    const next = marks[i + 1];
+    if (point < current.point) continue;
+    active.push(source.slice(current.tokenEnd, next ? next.index : source.length).trim());
+  }
+  return active;
+}
+
+function parseArkGridOptionText(text) {
+  const source = stripHtml(text);
+  const out = { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0 };
+  addAllMatches(out, 'critRate', source, [
+    /치명타\s*적중률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가|상승)?/g,
+    /치명타\s*확률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가|상승)?/g
+  ]);
+  addAllMatches(out, 'critDamage', source, [
+    /치명타\s*피해(?:량)?(?:이|가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가|상승)?/g
+  ]);
+  addAllMatches(out, 'attackSpeed', source, [
+    /공격\s*속도(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가|상승)?/g,
+    /공속\s*(?:\+)?(\d+(?:\.\d+)?)%/g
+  ]);
+  addAllMatches(out, 'moveSpeed', source, [
+    /이동\s*속도(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가|상승)?/g,
+    /이속\s*(?:\+)?(\d+(?:\.\d+)?)%/g
+  ]);
+  addAllMatches(out, 'enemyDamage', source, [
+    /적에게\s*주는\s*(?:모든\s*)?피해(?:량)?(?:이|가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가|상승)?/g
+  ]);
+  addAllMatches(out, 'additionalDamage', source, [
+    /추가\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가|상승)?/g
+  ]);
+  for (const key of Object.keys(out)) out[key] = round2(out[key]);
+  return out;
+}
+
+function addAllMatches(out, key, text, regexList) {
+  const seen = new Set();
+  for (const re of regexList) {
+    re.lastIndex = 0;
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      const value = Number(match[1] || 0);
+      if (!Number.isFinite(value)) continue;
+      const token = `${key}:${value}:${match.index}:${match[0]}`;
       if (seen.has(token)) continue;
       seen.add(token);
       out[key] += value;

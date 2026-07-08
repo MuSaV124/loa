@@ -1,4 +1,4 @@
-const API_VERSION = '5.0.9';
+const API_VERSION = '5.0.8';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 
@@ -150,7 +150,7 @@ async function fetchLegendAvatarPart(apiKey, job, part) {
   const categoryCode = PART_CATEGORY_CODES[part];
   const tried = [];
 
-  // 5.0.9: 공식 홈페이지 Form Data에서 확인한 구조를 Open API 형식에 맞춰 적용한다.
+  // 5.0.8: 공식 홈페이지 Form Data에서 확인한 구조를 Open API 형식에 맞춰 적용한다.
   // 홈페이지: firstCategory=20000, secondCategory=부위코드, characterClass=직업ID, grade=4, tier=0, sortType=7
   // Open API: CategoryCode=secondCategory, CharacterClass=직업명 우선, ItemGrade='전설', ItemTier=0/null, Sort='CURRENT_MIN_PRICE'
   // 핵심 변경점: 부위별 CategoryCode를 이미 신뢰하므로 결과명/Tooltip 부위 정규식으로 다시 걸러내지 않는다.
