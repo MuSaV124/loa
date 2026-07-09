@@ -1,4 +1,4 @@
-const API_VERSION = '5.3.8';
+const API_VERSION = '5.3.9';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -77,10 +77,11 @@ async function getAuctionOptionDataCached(apiKey) {
 }
 
 async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey = 'necklace') {
-  // v5.3.8:
-  // 3연마/STAT를 최종 판정 조건으로 쓰지 않는다.
-  // 다만 공식 API가 저가 1~2연마 매물을 과도하게 반환하므로, 후보 수집 단계에서는 ItemUpgradeLevel: 3을 우선 사용한다.
-  // 최종 통과 여부는 ACCESSORY_UPGRADE에 선택한 두 옵션 값이 실제로 존재하는지만 본다.
+  // v5.3.9:
+  // 3연마/힘민지 판정은 완전히 포기한다.
+  // 공식 API에는 선택한 두 옵션값을 동시에 후보 조건으로만 넣고,
+  // 실제 통과 여부는 Options.ACCESSORY_UPGRADE의 두 옵션값만 직접 비교한다.
+  // 가격 오름차순으로 보다가 첫 일치 매물이 나온 페이지와 바로 다음 페이지만 확인하고 종료한다.
   const fallback = AUCTION_ETC_OPTION_FALLBACK[partKey] || {};
   let optionData = null;
   let primaryOption = fallback.primary || null;
@@ -101,37 +102,21 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
     MaxValue: Number(targetOption.value)
   } : null;
 
-  const addPlan = (categoryCode, type, sortCondition, etcOptions, optionSearch, maxPages = 8, itemUpgradeLevel = 3) => {
-    const clean = (etcOptions || []).filter(Boolean);
-    if (!clean.length) return;
-    plans.push({ type, categoryCode, sortCondition, etcOptions: clean, optionSearch, maxPages, itemUpgradeLevel });
-  };
-
   for (const categoryCode of categoryList) {
     const primaryExact = exactEtc(primaryOption, target.primary);
     const secondaryExact = exactEtc(secondaryOption, target.secondary);
-    if (!primaryExact && !secondaryExact) continue;
+    if (!primaryExact || !secondaryExact) continue;
 
-    // 1순위: 3연마 후보 + 선택 두 옵션 exact. 공식 API가 AND로 완벽하진 않지만 가장 빠른 후보다.
-    if (primaryExact && secondaryExact) {
-      addPlan(categoryCode, `accessory-${comboKey}-both-u3-asc`, 'ASC', [primaryExact, secondaryExact], `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보`, 6, 3);
-      addPlan(categoryCode, `accessory-${comboKey}-both-u3-desc`, 'DESC', [primaryExact, secondaryExact], `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보 DESC`, 2, 3);
-    }
-
-    // 2순위: 3연마 후보 + 한쪽 옵션 exact. 나머지 옵션은 우리 코드가 Options 실제값으로 직접 판정한다.
-    if (primaryExact) {
-      addPlan(categoryCode, `accessory-${comboKey}-primary-u3-asc`, 'ASC', [primaryExact], `${target.primary.label} ${target.primary.value}% 후보 후 직접 판정`, 10, 3);
-      addPlan(categoryCode, `accessory-${comboKey}-primary-u3-desc`, 'DESC', [primaryExact], `${target.primary.label} ${target.primary.value}% 후보 DESC 후 직접 판정`, 3, 3);
-    }
-    if (secondaryExact) {
-      addPlan(categoryCode, `accessory-${comboKey}-secondary-u3-asc`, 'ASC', [secondaryExact], `${target.secondary.label} ${target.secondary.value}% 후보 후 직접 판정`, 10, 3);
-      addPlan(categoryCode, `accessory-${comboKey}-secondary-u3-desc`, 'DESC', [secondaryExact], `${target.secondary.label} ${target.secondary.value}% 후보 DESC 후 직접 판정`, 3, 3);
-    }
-
-    // 3순위 fallback: ItemUpgradeLevel 없이 짧게만 확인. 최종 판정은 여전히 두 옵션 actual value만 사용한다.
-    if (primaryExact && secondaryExact) {
-      addPlan(categoryCode, `accessory-${comboKey}-both-raw-asc`, 'ASC', [primaryExact, secondaryExact], `${target.primary.label}/${target.secondary.label} raw 후보`, 2, null);
-    }
+    plans.push({
+      type: `accessory-${comboKey}-both-direct-asc`,
+      categoryCode,
+      sortCondition: 'ASC',
+      etcOptions: [primaryExact, secondaryExact],
+      optionSearch: `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보`,
+      maxPages: 30,
+      itemUpgradeLevel: null,
+      stopAfterFirstMatchNextPage: true
+    });
   }
   return plans;
 }
@@ -178,13 +163,17 @@ async function searchAccessory(apiKey, query) {
   const startedAt = Date.now();
   const timeBudgetMs = 10500;
 
-  // v5.3.8: 3연마 판정은 포기하고, 공식 API에서 옵션 후보를 받은 뒤 ACCESSORY_UPGRADE 실제 Value 두 개만 최종 판정한다.
+  // v5.3.9: 가격 오름차순으로 양옵션 후보를 조회한다.
+  // 첫 일치 매물이 나온 페이지를 찾으면, 그 페이지 전체와 다음 1페이지만 더 확인한 뒤 종료한다.
   const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target, combo, part);
+  let globalFirstMatchPage = null;
   for (const plan of searchPlans) {
-    if (Date.now() - startedAt > timeBudgetMs) break;
-    const pagesForPlan = Math.min(maxPages, Number(plan.maxPages || maxPages));
+    if (Date.now() - startedAt > timeBudgetMs || globalFirstMatchPage !== null) break;
+    const pagesForPlan = Math.min(Number(plan.maxPages || maxPages), 30);
+    let firstMatchPageForPlan = null;
     for (let pageNo = 1; pageNo <= pagesForPlan; pageNo += 1) {
       if (Date.now() - startedAt > timeBudgetMs) break;
+      if (firstMatchPageForPlan !== null && pageNo > firstMatchPageForPlan + 1) break;
       const payload = {
         Sort: 'BUY_PRICE',
         SortCondition: plan.sortCondition || 'ASC',
@@ -201,26 +190,26 @@ async function searchAccessory(apiKey, query) {
       const result = await fetchAuctionPage(apiKey, payload);
       tried.push({ type: plan.type, keyword: rule.label, categoryCode: plan.categoryCode, pageNo, optionSearch: plan.optionSearch || null, count: result.items.length, totalCount: result.totalCount, error: result.error || null });
 
+      let pageMatched = false;
       for (const item of result.items) {
         const normalized = normalizeAuctionItem(item);
         const reasons = accessoryRejectReasons(normalized, rule, target);
-        if (debugSamples.length < 5) {
-          debugSamples.push(makeAccessoryDebugSample(item, normalized, reasons));
-        }
+        if (debugSamples.length < 5) debugSamples.push(makeAccessoryDebugSample(item, normalized, reasons));
         if (reasons.length) {
           for (const reason of reasons) filterStats[reason] = (filterStats[reason] || 0) + 1;
           continue;
         }
-        const key = normalized.id || `${normalized.name}-${normalized.price}-${normalized.quality}`;
+        pageMatched = true;
+        const key = normalized.id || `${normalized.name}-${normalized.price}-${normalized.quality}-${normalized.fullText.slice(0, 80)}`;
         if (!matchedMap.has(key)) matchedMap.set(key, { ...normalized, part: rule.label, combo: comboRule.label, refineCount: normalized.refineCount, targetOptions: [target.primary, target.secondary] });
       }
 
+      if (pageMatched && firstMatchPageForPlan === null) firstMatchPageForPlan = pageNo;
       const pageSize = result.pageSize || result.items.length || 10;
       const totalCount = result.totalCount || 0;
       if (!result.items.length || (totalCount && pageNo * pageSize >= totalCount)) break;
-      if (matchedMap.size >= 3 || Date.now() - startedAt > timeBudgetMs) break;
     }
-    if (matchedMap.size >= 3 || Date.now() - startedAt > timeBudgetMs) break;
+    if (firstMatchPageForPlan !== null) globalFirstMatchPage = firstMatchPageForPlan;
   }
 
   const matched = [...matchedMap.values()].sort((a, b) => a.price - b.price);
@@ -239,7 +228,7 @@ async function searchAccessory(apiKey, query) {
     tried,
     debug: summarizeTried(tried),
     accessoryDebug: {
-      note: 'v5.3.8 악세 디버그: 후보 수집에는 ItemUpgradeLevel 3을 우선 사용하지만, 최종 판정은 선택한 두 옵션의 ACCESSORY_UPGRADE 실제 Value만 봅니다.',
+      note: 'v5.3.9 악세 디버그: 3연마/힘민지 판정 없이 선택한 두 ACCESSORY_UPGRADE 실제값만 봅니다. 첫 일치 페이지와 다음 페이지만 확인합니다.',
       requestPayloads: debugPayloads.slice(0, 8),
       filterStats,
       samples: debugSamples
@@ -254,7 +243,7 @@ function accessoryRejectReasons(normalized, rule, target) {
   if (normalized.grade && normalized.grade !== '고대') reasons.push(`등급 불일치: ${normalized.grade}`);
   if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) reasons.push('부위 불일치');
 
-  // v5.3.8: 사용자가 3연마 판정을 포기하고, 선택한 두 딜러 옵션이 붙은 매물 중 최저가만 보길 원함.
+  // v5.3.9: 사용자가 3연마 판정을 포기하고, 선택한 두 딜러 옵션이 붙은 매물 중 최저가만 보길 원함.
   // 따라서 ItemUpgradeLevel, ACCESSORY_UPGRADE 개수, 힘/민첩/지능 STAT 컷은 필터에서 제외한다.
   const upgrades = normalized.upgradeOptions || [];
   if (!hasUpgradeOption(upgrades, target.primary)) reasons.push(`필수옵션 없음: ${target.primary.label} ${target.primary.value}%`);
