@@ -1,4 +1,4 @@
-const API_VERSION = '5.2.0';
+const API_VERSION = '5.2.1';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -72,11 +72,11 @@ async function getAuctionOptionDataCached(apiKey) {
 
 async function makeAccessorySearchPlans(apiKey, rule, target) {
   // v5.2.0: 경매장 API 요청에서는 연마 옵션/기본 스탯/품질 조건을 모두 제외한다.
-  // 공식 응답의 Options 배열(Type === ACCESSORY_UPGRADE)만 파싱해서 3연마 + 선택 옵션 2개 포함 여부를 순서 무관으로 필터한다.
+  // 공식 응답의 Options 배열(Type === ACCESSORY_UPGRADE)만 파싱해서 3연마 + 선택 옵션 2개를 위치 무관 + 퍼센트 값 기준으로 필터한다.
   return rule.categoryCandidates.map(categoryCode => ({
     type: 'accessory-base-only',
     categoryCode,
-    optionSearch: '응답 Options 배열에서 3연마 + 선택 옵션 2개 포함 필터',
+    optionSearch: '응답 Options 배열에서 3연마 + 선택 옵션 2개 위치 무관/퍼센트 값 필터',
     etcOptions: []
   }));
 }
@@ -122,7 +122,7 @@ async function searchAccessory(apiKey, query) {
   const filterStats = {};
 
   // v5.2.0: 요청은 부위/티어/등급만 사용한다. 연마 옵션·힘/민/지·품질은 요청/필터 조건에서 제외한다.
-  // 응답 Options 배열의 ACCESSORY_UPGRADE만 보고 3연마 + 선택 옵션 2개 포함 여부를 순서 무관으로 검사한다.
+  // 응답 Options 배열의 ACCESSORY_UPGRADE만 보고 3연마 + 선택 옵션 2개를 위치 무관 + 퍼센트 값 기준으로 검사한다.
   const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target);
   for (const plan of searchPlans) {
     for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
@@ -178,7 +178,7 @@ async function searchAccessory(apiKey, query) {
     tried,
     debug: summarizeTried(tried),
     accessoryDebug: {
-      note: 'v5.2.0 악세 디버그: 요청 조건은 부위/티어/등급만 사용, 응답 Options 배열에서 3연마 + 선택 옵션 2개 포함 여부를 순서 무관으로 필터합니다.',
+      note: 'v5.2.1 악세 디버그: 요청 조건은 부위/티어/등급만 사용, 응답 Options 배열에서 3연마 + 선택 옵션 2개를 위치 무관 + 퍼센트 값 기준으로 필터합니다.',
       requestPayloads: debugPayloads.slice(0, 8),
       filterStats,
       samples: debugSamples
@@ -192,8 +192,8 @@ function accessoryRejectReasons(normalized, rule, target) {
   if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) reasons.push('부위 불일치');
   const upgrades = normalized.upgradeOptions || [];
   if (upgrades.length !== 3) reasons.push(`3연마 아님: ${upgrades.length}개`);
-  if (!hasUpgradeOption(upgrades, target.primary.label)) reasons.push(`필수옵션 없음: ${target.primary.label}`);
-  if (!hasUpgradeOption(upgrades, target.secondary.label)) reasons.push(`필수옵션 없음: ${target.secondary.label}`);
+  if (!hasUpgradeOption(upgrades, target.primary)) reasons.push(`필수옵션 없음: ${target.primary.label} ${target.primary.value}%`);
+  if (!hasUpgradeOption(upgrades, target.secondary)) reasons.push(`필수옵션 없음: ${target.secondary.label} ${target.secondary.value}%`);
   return reasons;
 }
 
@@ -422,11 +422,20 @@ function compactOptionName(value) {
     .replace(/\s+/g, '')
     .trim();
 }
-function hasUpgradeOption(upgrades, label) {
+function hasUpgradeOption(upgrades, target) {
+  const label = typeof target === 'string' ? target : target?.label;
+  const expectedValue = typeof target === 'object' ? Number(target.value) : NaN;
   const wanted = compactOptionName(label);
   return upgrades.some(option => {
     const name = compactOptionName(option.name);
-    return name.includes(wanted) || wanted.includes(name);
+    const nameOk = name.includes(wanted) || wanted.includes(name);
+    if (!nameOk) return false;
+
+    // 악세 유효 옵션은 같은 이름의 flat 옵션(+390/+960 등)이 섞여 있으므로
+    // % 옵션만 인정하고, 상/중/하 표의 퍼센트 값과 정확히 맞는 매물만 통과시킨다.
+    if (!option.isPercentage) return false;
+    if (Number.isFinite(expectedValue)) return Math.abs(Number(option.value) - expectedValue) < 0.001;
+    return true;
   });
 }
 function countRefiningOptions(text) {
