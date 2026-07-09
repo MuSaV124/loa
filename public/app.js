@@ -1,4 +1,4 @@
-const VERSION = '5.1.0';
+const VERSION = '5.1.1';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -1245,21 +1245,61 @@ function formatGold(value) {
   return Number.isFinite(n) && n > 0 ? `${n.toLocaleString('ko-KR')}G` : '-';
 }
 
+let selectedMarketTab = 'accessory';
+
 function setActiveTab(tabName) {
   document.querySelectorAll('.tabButton').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
-  const isAvatar = tabName === 'legendAvatar';
+  const isMarket = tabName === 'market';
+  const isAvatar = isMarket && selectedMarketTab === 'avatar';
+  document.body.classList.toggle('marketMode', isMarket);
   document.body.classList.toggle('avatarMode', isAvatar);
   document.querySelectorAll('.calcTabPanel').forEach(el => {
-    el.classList.toggle('hiddenByTab', isAvatar);
-    el.style.display = isAvatar ? 'none' : '';
+    el.classList.toggle('hiddenByTab', isMarket);
+    el.style.display = isMarket ? 'none' : '';
   });
+  const marketPanel = $('marketPanel');
+  if (marketPanel) {
+    marketPanel.classList.toggle('hidden', !isMarket);
+    marketPanel.classList.toggle('hiddenByTab', !isMarket);
+    marketPanel.style.display = isMarket ? '' : 'none';
+  }
   const avatarPanel = $('legendAvatarPanel');
   if (avatarPanel) {
     avatarPanel.classList.toggle('hidden', !isAvatar);
     avatarPanel.classList.toggle('hiddenByTab', !isAvatar);
     avatarPanel.style.display = isAvatar ? '' : 'none';
   }
+  if (isMarket) renderMarketSubTab();
   if (isAvatar) prepareLegendAvatarTab();
+}
+
+function renderMarketSubTab() {
+  document.querySelectorAll('.marketSubButton').forEach(btn => btn.classList.toggle('active', btn.dataset.marketTab === selectedMarketTab));
+  const panels = {
+    accessory: $('marketAccessoryPanel'),
+    engraving: $('marketEngravingPanel'),
+    gem: $('marketGemPanel'),
+  };
+  Object.entries(panels).forEach(([key, el]) => {
+    if (!el) return;
+    el.classList.toggle('hidden', selectedMarketTab !== key);
+    el.style.display = selectedMarketTab === key ? '' : 'none';
+  });
+  const avatarPanel = $('legendAvatarPanel');
+  const isAvatar = selectedMarketTab === 'avatar' && document.body.classList.contains('marketMode');
+  document.body.classList.toggle('avatarMode', isAvatar);
+  if (avatarPanel) {
+    avatarPanel.classList.toggle('hidden', !isAvatar);
+    avatarPanel.style.display = isAvatar ? '' : 'none';
+  }
+  if (isAvatar) prepareLegendAvatarTab();
+}
+
+function initMarketTabs() {
+  document.querySelectorAll('.marketSubButton').forEach(btn => btn.addEventListener('click', () => {
+    selectedMarketTab = btn.dataset.marketTab || 'accessory';
+    renderMarketSubTab();
+  }));
 }
 
 let legendAvatarCache = new Map();
@@ -1268,6 +1308,7 @@ let legendAvatarLoading = false;
 
 function initLegendAvatarTab() {
   renderAvatarJobPicker();
+  initMarketTabs();
   document.querySelectorAll('.tabButton').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
   $('avatarSearchAllButton')?.addEventListener('click', () => prepareLegendAvatarTab());
   $('avatarRefreshButton')?.addEventListener('click', () => { if (selectedAvatarJob) loadLegendAvatarSet(selectedAvatarJob, true); });
@@ -1367,7 +1408,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.1.0',
+    apiVersion: '5.1.1',
     source: 'markets/items',
     mode: 'part-split',
     job,

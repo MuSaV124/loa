@@ -1313,3 +1313,29 @@ body:not(.avatarMode) #legendAvatarPanel {
   body:not(.avatarMode) #keenPanel { grid-column: 1 / -1; grid-row: auto; }
   body:not(.avatarMode) #summaryPanel { position: static; max-height: none; }
 }
+
+
+/* v5.1.1 market tab */
+.marketPanel { grid-column: 1 / -1; }
+.marketSubNav { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.marketSubButton { border: 1px solid rgba(148,163,184,.28); background: rgba(15,23,42,.58); color: #e5e7eb; border-radius: 999px; padding: 9px 15px; font-weight: 950; cursor: pointer; }
+.marketSubButton:hover { border-color: rgba(251,191,36,.55); background: rgba(251,191,36,.08); }
+.marketSubButton.active { color: #111827; background: var(--amber); border-color: rgba(245,182,66,.65); }
+.marketSubPanel { margin-top: 10px; }
+.marketCardGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.marketCard { display: flex; align-items: center; gap: 12px; border: 1px solid rgba(148,163,184,.14); border-radius: 14px; background: rgba(2,6,23,.38); padding: 14px; min-width: 0; }
+.marketCard img, .marketIconFallback { width: 54px; height: 54px; flex: 0 0 54px; border-radius: 12px; object-fit: contain; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.08); display: grid; place-items: center; font-weight: 1000; color: #fff; }
+.marketIconFallback.bookIcon { background: linear-gradient(135deg, rgba(180,83,9,.80), rgba(120,53,15,.60)); }
+.marketIconFallback.gemFireIcon { background: linear-gradient(135deg, rgba(190,24,93,.78), rgba(88,28,135,.60)); }
+.marketIconFallback.gemCoolIcon { background: linear-gradient(135deg, rgba(14,165,233,.70), rgba(88,28,135,.58)); }
+.marketCard b { display: block; color: #f8fafc; font-size: 16px; margin-bottom: 4px; }
+.marketCard span { display: block; color: var(--muted); font-size: 12px; font-weight: 850; line-height: 1.35; }
+.marketEmptyBox { border: 1px dashed rgba(148,163,184,.26); border-radius: 14px; padding: 18px; color: var(--muted); background: rgba(2,6,23,.35); margin-top: 12px; }
+body.marketMode .hero,
+body.marketMode .calcTabPanel { display: none !important; }
+body.marketMode .wrap { display: grid; grid-template-columns: 1fr; max-width: 1180px; }
+body.marketMode .tabNav,
+body.marketMode #marketPanel,
+body.marketMode #legendAvatarPanel { grid-column: 1 / -1; }
+body.marketMode:not(.avatarMode) #legendAvatarPanel { display: none !important; }
+@media (max-width: 760px) { .marketCardGrid { grid-template-columns: 1fr; } .marketSubNav { flex-direction: column; align-items: stretch; } }
