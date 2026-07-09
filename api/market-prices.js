@@ -1,19 +1,19 @@
-const API_VERSION = '5.1.8';
+const API_VERSION = '5.1.9';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 
 const ACCESSORY_RULES = {
   necklace: {
-    label: '목걸이', categoryCandidates: [200010, 200000, null], statRange: [17322, 17857], icon: 'https://cdn-lostark.game.onstove.com/efui_iconatlas/acc/acc_215.png',
+    label: '목걸이', categoryCandidates: [200010, 200000, null], icon: 'https://cdn-lostark.game.onstove.com/efui_iconatlas/acc/acc_215.png',
     options: { primary: { key: 'enemyDamage', label: '적에게 주는 피해', values: { high: 2.00, mid: 1.20, low: 0.55 } }, secondary: { key: 'additionalDamage', label: '추가 피해', values: { high: 2.60, mid: 1.60, low: 0.60 } } }
   },
   earring: {
-    label: '귀걸이', categoryCandidates: [200020, 200000, null], statRange: [13450, 13889], icon: 'https://cdn-lostark.game.onstove.com/efui_iconatlas/acc/acc_115.png',
+    label: '귀걸이', categoryCandidates: [200020, 200000, null], icon: 'https://cdn-lostark.game.onstove.com/efui_iconatlas/acc/acc_115.png',
     options: { primary: { key: 'attackPowerPercent', label: '공격력', values: { high: 1.55, mid: 0.95, low: 0.40 } }, secondary: { key: 'weaponPowerPercent', label: '무기 공격력', values: { high: 3.00, mid: 1.80, low: 0.80 } } }
   },
   ring: {
-    label: '반지', categoryCandidates: [200030, 200000, null], statRange: [12450, 12897], icon: 'https://cdn-lostark.game.onstove.com/efui_iconatlas/acc/acc_22.png',
+    label: '반지', categoryCandidates: [200030, 200000, null], icon: 'https://cdn-lostark.game.onstove.com/efui_iconatlas/acc/acc_22.png',
     options: { primary: { key: 'critDamage', label: '치명타 피해', values: { high: 4.00, mid: 2.40, low: 1.10 } }, secondary: { key: 'critRate', label: '치명타 적중률', values: { high: 1.55, mid: 0.95, low: 0.40 } } }
   }
 };
@@ -138,8 +138,8 @@ async function searchAccessory(apiKey, query) {
   const debugSamples = [];
   const filterStats = {};
 
-  // v5.1.8: 3연마 전체 조회를 먼저 하지 않는다. 사용자가 선택한 연마 옵션 2개로
-  // 경매장 검색 범위를 먼저 줄이고, 응답 결과에서 3연마/기본 스탯/수치 일치 여부를 필터링한다.
+  // v5.1.9: 기본 스탯(힘/민/지) 필터를 제거한다.
+  // 선택 연마 옵션 2개로 검색 범위를 줄이고, 응답 결과에서 3연마/필수옵션/수치만 필터링한다.
   const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target);
   for (const plan of searchPlans) {
     for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
@@ -190,14 +190,13 @@ async function searchAccessory(apiKey, query) {
     partLabel: rule.label,
     combo,
     comboLabel: comboRule.label,
-    statRange: rule.statRange,
     targetOptions: [target.primary, target.secondary],
     items: matched.slice(0, 10),
     lowest: matched[0] || null,
     tried,
     debug: summarizeTried(tried),
     accessoryDebug: {
-      note: 'v5.1.8 악세 디버그: 실제 요청 payload, 응답 샘플, 필터 제외 사유를 확인하세요.',
+      note: 'v5.1.9 악세 디버그: 기본 스탯 필터 제거, 요청 payload/응답 샘플/필터 제외 사유를 확인하세요.',
       requestPayloads: debugPayloads.slice(0, 8),
       filterStats,
       samples: debugSamples
@@ -209,7 +208,6 @@ function accessoryRejectReasons(normalized, rule, target) {
   const reasons = [];
   if (!normalized.price) reasons.push('가격 없음');
   if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) reasons.push('부위 불일치');
-  if (!hasStatRange(normalized.fullText, rule.statRange)) reasons.push('기본 스탯 불일치');
   if (!hasThreeRefiningOptions(normalized.fullText, [target.primary.label, target.secondary.label])) reasons.push('3연마/필수옵션 불일치');
   if (!hasOptionValue(normalized.fullText, target.primary.label, target.primary.value)) reasons.push(`옵션1 수치 불일치: ${target.primary.label} ${target.primary.value}%`);
   if (!hasOptionValue(normalized.fullText, target.secondary.label, target.secondary.value)) reasons.push(`옵션2 수치 불일치: ${target.secondary.label} ${target.secondary.value}%`);
