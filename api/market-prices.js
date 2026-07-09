@@ -1,4 +1,4 @@
-const API_VERSION = '5.3.3';
+const API_VERSION = '5.3.4';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -82,7 +82,7 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
   // 그래서 먼저 3연마 후보를 줄이기 위해 ARK_PASSIVE "깨달음 13"을 함께 걸고,
   // 상상/상중/중상은 한쪽 핵심 상옵션 또는 양옵션 후보를 받은 뒤 Options의 실제 ACCESSORY_UPGRADE 값으로만 최종 판정한다.
   const fallback = AUCTION_ETC_OPTION_FALLBACK[partKey] || {};
-  // v5.3.3: 악세 조회 타임아웃 방지. 목걸이는 검증된 fallback 코드(적주피/추피)를 우선 사용해서
+  // v5.3.4: 악세 조회 타임아웃 방지. 목걸이는 검증된 fallback 코드(적주피/추피)를 우선 사용해서
   // auctions/options 선행 호출 1회를 제거한다. 필요한 부위에서만 options 메타를 조회한다.
   let optionData = null;
   let primaryOption = fallback.primary || null;
@@ -213,7 +213,7 @@ async function searchAccessory(apiKey, query) {
   const startedAt = Date.now();
   const timeBudgetMs = 6500;
 
-  // v5.3.1: 요청은 부위/티어/등급 + 후보 축소용 EtcOptions만 사용한다. 최종 판정은 ACCESSORY_UPGRADE 실제 값으로 한다.
+  // v5.3.4: 요청은 부위/티어/등급/ItemUpgradeLevel=3 + 후보 축소용 EtcOptions만 사용한다. 최종 판정은 ACCESSORY_UPGRADE 실제 값으로 한다.
   // 응답 Options 배열의 ACCESSORY_UPGRADE만 보고 3연마 + 선택 옵션 2개를 위치 무관 + 퍼센트 값 기준으로 검사한다.
   const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target, combo, part);
   for (const plan of searchPlans) {
@@ -226,6 +226,7 @@ async function searchAccessory(apiKey, query) {
         CategoryCode: plan.categoryCode ?? undefined,
         ItemTier: 4,
         ItemGrade: '고대',
+        ItemUpgradeLevel: 3,
         ItemName: rule.label,
         PageNo: pageNo,
         EtcOptions: Array.isArray(plan.etcOptions) && plan.etcOptions.length ? plan.etcOptions : undefined
@@ -273,7 +274,7 @@ async function searchAccessory(apiKey, query) {
     tried,
     debug: summarizeTried(tried),
     accessoryDebug: {
-      note: 'v5.3.3 악세 디버그: 타임아웃 방지를 위해 검증된 옵션코드 우선 사용, 선행 options 조회 제거, 조회 페이지/시간 예산 축소. 최종 판정은 ACCESSORY_UPGRADE 실제 Value 기준입니다.',
+      note: 'v5.3.4 악세 디버그: 공식 API ItemUpgradeLevel=3으로 3연마 후보만 조회하고, 최종 판정은 ACCESSORY_UPGRADE 실제 Value 기준입니다.',
       requestPayloads: debugPayloads.slice(0, 8),
       filterStats,
       samples: debugSamples
