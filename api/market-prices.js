@@ -1,4 +1,4 @@
-const API_VERSION = '5.3.9';
+const API_VERSION = '5.4.0';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -63,6 +63,9 @@ export default async function handler(req, res) {
 
 
 let auctionOptionCache = { expiresAt: 0, data: null };
+const ACCESSORY_CACHE_TTL_MS = 90 * 1000;
+const accessoryComboCache = new Map();
+const accessoryComboInflight = new Map();
 
 async function getAuctionOptionDataCached(apiKey) {
   const now = Date.now();
@@ -77,11 +80,10 @@ async function getAuctionOptionDataCached(apiKey) {
 }
 
 async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey = 'necklace') {
-  // v5.3.9:
-  // 3연마/힘민지 판정은 완전히 포기한다.
-  // 공식 API에는 선택한 두 옵션값을 동시에 후보 조건으로만 넣고,
-  // 실제 통과 여부는 Options.ACCESSORY_UPGRADE의 두 옵션값만 직접 비교한다.
-  // 가격 오름차순으로 보다가 첫 일치 매물이 나온 페이지와 바로 다음 페이지만 확인하고 종료한다.
+  // v5.4.0:
+  // 공식 EtcOptions는 정확값 필터가 아니라 후보군 축소용으로만 사용한다.
+  // 실제 판정은 응답 Options.ACCESSORY_UPGRADE의 옵션명 + Value만 본다.
+  // 선택 조합은 캐시형 인덱스로 스캔하고, 가격 오름차순 기준 첫 일치 페이지 + 다음 페이지만 확정한다.
   const fallback = AUCTION_ETC_OPTION_FALLBACK[partKey] || {};
   let optionData = null;
   let primaryOption = fallback.primary || null;
@@ -105,17 +107,52 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
   for (const categoryCode of categoryList) {
     const primaryExact = exactEtc(primaryOption, target.primary);
     const secondaryExact = exactEtc(secondaryOption, target.secondary);
-    if (!primaryExact || !secondaryExact) continue;
+    const bothExact = primaryExact && secondaryExact ? [primaryExact, secondaryExact] : [];
 
+    if (bothExact.length === 2) {
+      plans.push({
+        type: `accessory-index-${comboKey}-both-asc`,
+        categoryCode,
+        sortCondition: 'ASC',
+        etcOptions: bothExact,
+        itemUpgradeLevel: null,
+        maxPages: 48,
+        batchSize: 8,
+        optionSearch: `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보 인덱스`
+      });
+      plans.push({
+        type: `accessory-index-${comboKey}-both-3refine-asc`,
+        categoryCode,
+        sortCondition: 'ASC',
+        etcOptions: bothExact,
+        itemUpgradeLevel: 3,
+        maxPages: 40,
+        batchSize: 8,
+        optionSearch: `3연마 후보 보강 · ${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}%`
+      });
+      plans.push({
+        type: `accessory-index-${comboKey}-both-3refine-desc-check`,
+        categoryCode,
+        sortCondition: 'DESC',
+        etcOptions: bothExact,
+        itemUpgradeLevel: 3,
+        maxPages: 4,
+        batchSize: 4,
+        optionSearch: '고가권 존재 확인용 보조 스캔'
+      });
+    }
+
+    // EtcOptions 코드 탐색이 실패했을 때도 완전히 빈 결과가 되지 않도록 마지막 보정 플랜을 둔다.
+    // 이 플랜은 넓기 때문에 페이지 수를 작게 제한하고, 최종 판정은 동일하게 Options만 사용한다.
     plans.push({
-      type: `accessory-${comboKey}-both-direct-asc`,
+      type: `accessory-index-${comboKey}-base-3refine-asc`,
       categoryCode,
       sortCondition: 'ASC',
-      etcOptions: [primaryExact, secondaryExact],
-      optionSearch: `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보`,
-      maxPages: 30,
-      itemUpgradeLevel: null,
-      stopAfterFirstMatchNextPage: true
+      etcOptions: [],
+      itemUpgradeLevel: 3,
+      maxPages: bothExact.length === 2 ? 12 : 32,
+      batchSize: 8,
+      optionSearch: 'EtcOptions 실패 보정 · 3연마 후보 직접 인덱싱'
     });
   }
   return plans;
@@ -153,48 +190,147 @@ async function searchAccessory(apiKey, query) {
   const combo = String(query.combo || 'highHigh');
   const rule = ACCESSORY_RULES[part] || ACCESSORY_RULES.necklace;
   const comboRule = COMBO_RULES[combo] || COMBO_RULES.highHigh;
-  const maxPages = clamp(Number(query.pages || 10), 1, 16);
   const target = makeAccessoryTarget(rule, comboRule);
+  const force = String(query.force || '') === '1';
+  const indexResult = await getAccessoryComboIndex(apiKey, { part, combo, rule, comboRule, target, force });
+  const matched = [...indexResult.items].sort((a, b) => a.price - b.price);
+
+  return {
+    ok: true,
+    apiVersion: API_VERSION,
+    source: 'auctions/items-index-cache',
+    mode: 'accessory',
+    part,
+    partLabel: rule.label,
+    combo,
+    comboLabel: comboRule.label,
+    targetOptions: [target.primary, target.secondary],
+    items: matched.slice(0, 10),
+    lowest: matched[0] || null,
+    tried: indexResult.tried,
+    debug: summarizeTried(indexResult.tried),
+    cached: Boolean(indexResult.cached),
+    updatedAt: indexResult.updatedAt,
+    index: indexResult.index,
+    accessoryDebug: {
+      note: 'v5.4.0 악세 디버그: 캐시형 후보 인덱스 방식입니다. 공식 API EtcOptions는 후보 축소에만 쓰고, 최종 통과는 Options.ACCESSORY_UPGRADE 실제 옵션명+Value만 봅니다. 가격 오름차순에서 첫 일치 페이지와 다음 페이지만 확정합니다.',
+      requestPayloads: indexResult.requestPayloads.slice(0, 14),
+      filterStats: indexResult.filterStats,
+      samples: indexResult.samples
+    }
+  };
+}
+
+async function getAccessoryComboIndex(apiKey, context) {
+  const cacheKey = `${context.part}:${context.combo}`;
+  const now = Date.now();
+  const cached = accessoryComboCache.get(cacheKey);
+  if (!context.force && cached && cached.expiresAt > now) return { ...cached.data, cached: true };
+  if (!context.force && accessoryComboInflight.has(cacheKey)) {
+    const data = await accessoryComboInflight.get(cacheKey);
+    return { ...data, cached: true, joinedInflight: true };
+  }
+
+  const promise = scanAccessoryComboIndex(apiKey, context).then(data => {
+    accessoryComboCache.set(cacheKey, { expiresAt: Date.now() + ACCESSORY_CACHE_TTL_MS, data });
+    return data;
+  }).finally(() => accessoryComboInflight.delete(cacheKey));
+  accessoryComboInflight.set(cacheKey, promise);
+  return promise;
+}
+
+async function scanAccessoryComboIndex(apiKey, context) {
+  const { part, combo, rule, comboRule, target } = context;
   const tried = [];
   const matchedMap = new Map();
-  const debugPayloads = [];
-  const debugSamples = [];
+  const requestPayloads = [];
+  const samples = [];
   const filterStats = {};
   const startedAt = Date.now();
-  const timeBudgetMs = 10500;
-
-  // v5.3.9: 가격 오름차순으로 양옵션 후보를 조회한다.
-  // 첫 일치 매물이 나온 페이지를 찾으면, 그 페이지 전체와 다음 1페이지만 더 확인한 뒤 종료한다.
+  const timeBudgetMs = 26000;
   const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target, combo, part);
-  let globalFirstMatchPage = null;
+  let stopReason = 'all-plans-complete';
+  let matchedPlan = null;
+  let matchedFirstPage = null;
+
   for (const plan of searchPlans) {
-    if (Date.now() - startedAt > timeBudgetMs || globalFirstMatchPage !== null) break;
-    const pagesForPlan = Math.min(Number(plan.maxPages || maxPages), 30);
-    let firstMatchPageForPlan = null;
-    for (let pageNo = 1; pageNo <= pagesForPlan; pageNo += 1) {
-      if (Date.now() - startedAt > timeBudgetMs) break;
-      if (firstMatchPageForPlan !== null && pageNo > firstMatchPageForPlan + 1) break;
-      const payload = {
-        Sort: 'BUY_PRICE',
-        SortCondition: plan.sortCondition || 'ASC',
-        CategoryCode: plan.categoryCode ?? undefined,
-        ItemTier: 4,
-        ItemGrade: '고대',
-        ItemName: rule.label,
-        PageNo: pageNo,
-        ItemUpgradeLevel: Number.isFinite(Number(plan.itemUpgradeLevel)) ? Number(plan.itemUpgradeLevel) : undefined,
-        EtcOptions: Array.isArray(plan.etcOptions) && plan.etcOptions.length ? plan.etcOptions : undefined
-      };
-      stripUndefined(payload);
-      debugPayloads.push({ ...payload });
-      const result = await fetchAuctionPage(apiKey, payload);
-      tried.push({ type: plan.type, keyword: rule.label, categoryCode: plan.categoryCode, pageNo, optionSearch: plan.optionSearch || null, count: result.items.length, totalCount: result.totalCount, error: result.error || null });
+    if (Date.now() - startedAt > timeBudgetMs) { stopReason = 'time-budget-before-plan'; break; }
+    const planResult = await scanAccessoryPlan(apiKey, plan, { rule, target, comboRule, tried, matchedMap, requestPayloads, samples, filterStats, startedAt, timeBudgetMs });
+    if (planResult.firstMatchPage !== null) {
+      matchedPlan = plan.type;
+      matchedFirstPage = planResult.firstMatchPage;
+      stopReason = 'first-match-page-plus-next-page-complete';
+      break;
+    }
+    if (planResult.stopReason && planResult.stopReason !== 'plan-complete') stopReason = planResult.stopReason;
+  }
+
+  const items = [...matchedMap.values()].sort((a, b) => a.price - b.price);
+  return {
+    items,
+    tried,
+    requestPayloads,
+    samples,
+    filterStats,
+    updatedAt: new Date().toISOString(),
+    index: {
+      cacheTtlMs: ACCESSORY_CACHE_TTL_MS,
+      scannedItems: tried.reduce((sum, row) => sum + Number(row.count || 0), 0),
+      matchedCount: items.length,
+      matchedPlan,
+      matchedFirstPage,
+      stopReason,
+      plans: searchPlans.map(plan => ({ type: plan.type, maxPages: plan.maxPages, batchSize: plan.batchSize, itemUpgradeLevel: plan.itemUpgradeLevel ?? null, hasEtcOptions: Array.isArray(plan.etcOptions) && plan.etcOptions.length > 0 }))
+    }
+  };
+}
+
+async function scanAccessoryPlan(apiKey, plan, context) {
+  const { rule, target, comboRule, tried, matchedMap, requestPayloads, samples, filterStats, startedAt, timeBudgetMs } = context;
+  const maxPages = clamp(Number(plan.maxPages || 1), 1, 100);
+  const batchSize = clamp(Number(plan.batchSize || 6), 1, 12);
+  let firstMatchPage = null;
+  let pageNo = 1;
+  let stopReason = 'plan-complete';
+
+  while (pageNo <= maxPages) {
+    if (Date.now() - startedAt > timeBudgetMs) { stopReason = 'time-budget-in-plan'; break; }
+    const pageLimit = firstMatchPage === null ? maxPages : Math.min(maxPages, firstMatchPage + 1);
+    const endPage = Math.min(pageLimit, pageNo + batchSize - 1);
+    const rows = [];
+    for (let p = pageNo; p <= endPage; p += 1) {
+      rows.push({ pageNo: p, payload: makeAccessoryPayload(rule, plan, p) });
+    }
+    if (!rows.length) break;
+    for (const row of rows) {
+      if (requestPayloads.length < 40) requestPayloads.push({ ...row.payload });
+    }
+
+    const settled = await Promise.allSettled(rows.map(row => fetchAuctionPage(apiKey, row.payload).then(result => ({ row, result }))));
+    const batchResults = settled.map((entry, index) => {
+      if (entry.status === 'fulfilled') return entry.value;
+      return { row: rows[index], result: { items: [], totalCount: 0, pageSize: 0, error: entry.reason?.message || String(entry.reason || '요청 실패') } };
+    }).sort((a, b) => a.row.pageNo - b.row.pageNo);
+
+    for (const { row, result } of batchResults) {
+      if (firstMatchPage !== null && row.pageNo > firstMatchPage + 1) continue;
+      tried.push({
+        type: plan.type,
+        keyword: rule.label,
+        categoryCode: plan.categoryCode,
+        pageNo: row.pageNo,
+        optionSearch: plan.optionSearch || null,
+        itemUpgradeLevel: plan.itemUpgradeLevel ?? null,
+        count: result.items.length,
+        totalCount: result.totalCount,
+        error: result.error || null
+      });
 
       let pageMatched = false;
       for (const item of result.items) {
         const normalized = normalizeAuctionItem(item);
         const reasons = accessoryRejectReasons(normalized, rule, target);
-        if (debugSamples.length < 5) debugSamples.push(makeAccessoryDebugSample(item, normalized, reasons));
+        if (samples.length < 8) samples.push(makeAccessoryDebugSample(item, normalized, reasons));
         if (reasons.length) {
           for (const reason of reasons) filterStats[reason] = (filterStats[reason] || 0) + 1;
           continue;
@@ -204,36 +340,34 @@ async function searchAccessory(apiKey, query) {
         if (!matchedMap.has(key)) matchedMap.set(key, { ...normalized, part: rule.label, combo: comboRule.label, refineCount: normalized.refineCount, targetOptions: [target.primary, target.secondary] });
       }
 
-      if (pageMatched && firstMatchPageForPlan === null) firstMatchPageForPlan = pageNo;
+      if (pageMatched && firstMatchPage === null) firstMatchPage = row.pageNo;
       const pageSize = result.pageSize || result.items.length || 10;
       const totalCount = result.totalCount || 0;
-      if (!result.items.length || (totalCount && pageNo * pageSize >= totalCount)) break;
+      if (!result.error && (!result.items.length || (totalCount && row.pageNo * pageSize >= totalCount))) {
+        stopReason = 'api-last-page';
+        return { firstMatchPage, stopReason };
+      }
     }
-    if (firstMatchPageForPlan !== null) globalFirstMatchPage = firstMatchPageForPlan;
-  }
 
-  const matched = [...matchedMap.values()].sort((a, b) => a.price - b.price);
-  return {
-    ok: true,
-    apiVersion: API_VERSION,
-    source: 'auctions/items',
-    mode: 'accessory',
-    part,
-    partLabel: rule.label,
-    combo,
-    comboLabel: comboRule.label,
-    targetOptions: [target.primary, target.secondary],
-    items: matched.slice(0, 10),
-    lowest: matched[0] || null,
-    tried,
-    debug: summarizeTried(tried),
-    accessoryDebug: {
-      note: 'v5.3.9 악세 디버그: 3연마/힘민지 판정 없이 선택한 두 ACCESSORY_UPGRADE 실제값만 봅니다. 첫 일치 페이지와 다음 페이지만 확인합니다.',
-      requestPayloads: debugPayloads.slice(0, 8),
-      filterStats,
-      samples: debugSamples
-    }
+    if (firstMatchPage !== null && endPage >= firstMatchPage + 1) return { firstMatchPage, stopReason: 'first-match-page-plus-next-page-complete' };
+    pageNo = endPage + 1;
+  }
+  return { firstMatchPage, stopReason };
+}
+
+function makeAccessoryPayload(rule, plan, pageNo) {
+  const payload = {
+    Sort: 'BUY_PRICE',
+    SortCondition: plan.sortCondition || 'ASC',
+    CategoryCode: plan.categoryCode ?? undefined,
+    ItemTier: 4,
+    ItemGrade: '고대',
+    ItemName: rule.label,
+    PageNo: pageNo,
+    ItemUpgradeLevel: Number.isFinite(Number(plan.itemUpgradeLevel)) ? Number(plan.itemUpgradeLevel) : undefined,
+    EtcOptions: Array.isArray(plan.etcOptions) && plan.etcOptions.length ? plan.etcOptions : undefined
   };
+  return stripUndefined(payload);
 }
 
 function accessoryRejectReasons(normalized, rule, target) {
@@ -243,7 +377,7 @@ function accessoryRejectReasons(normalized, rule, target) {
   if (normalized.grade && normalized.grade !== '고대') reasons.push(`등급 불일치: ${normalized.grade}`);
   if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) reasons.push('부위 불일치');
 
-  // v5.3.9: 사용자가 3연마 판정을 포기하고, 선택한 두 딜러 옵션이 붙은 매물 중 최저가만 보길 원함.
+  // v5.4.0: 최종 판정에서는 연마 단계/힘민지/품질을 보지 않고, 선택한 두 딜러 옵션의 실제 Value만 본다.
   // 따라서 ItemUpgradeLevel, ACCESSORY_UPGRADE 개수, 힘/민첩/지능 STAT 컷은 필터에서 제외한다.
   const upgrades = normalized.upgradeOptions || [];
   if (!hasUpgradeOption(upgrades, target.primary)) reasons.push(`필수옵션 없음: ${target.primary.label} ${target.primary.value}%`);
@@ -431,7 +565,7 @@ async function fetchMarketPage(apiKey, payload) {
 
 async function requestLostArk(apiKey, url, options = {}) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 2800);
+  const timeout = setTimeout(() => controller.abort(), 5000);
   const init = { method: options.method || 'GET', headers: { Authorization: `bearer ${apiKey}`, Accept: 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}) }, signal: controller.signal };
   if (options.body) init.body = JSON.stringify(options.body);
   const response = await fetch(url, init).finally(() => clearTimeout(timeout));

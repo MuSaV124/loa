@@ -1,4 +1,4 @@
-const VERSION = '5.3.9';
+const VERSION = '5.4.0';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -1415,7 +1415,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.3.9',
+    apiVersion: '5.4.0',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1506,7 +1506,7 @@ async function searchMarketAccessory() {
   const part = $('accPartSelect')?.value || 'necklace';
   const combo = $('accComboSelect')?.value || 'highHigh';
   if (button) { button.disabled = true; button.textContent = '검색 중'; }
-  if (resultEl) resultEl.innerHTML = '경매장에서 선택 옵션 악세 매물을 조회하는 중입니다.';
+  if (resultEl) resultEl.innerHTML = '악세 후보 인덱스를 갱신하고 선택 옵션 최저가를 확인하는 중입니다.';
   try {
     const url = `/api/market-prices?mode=accessory&part=${encodeURIComponent(part)}&combo=${encodeURIComponent(combo)}&_=${Date.now()}`;
     const data = await fetchMarketJson(url);
@@ -1550,14 +1550,14 @@ async function loadMarketEngravingList() {
 
 async function fetchMarketJson(url) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), 45000);
   try {
     const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
     const data = await readJsonSafely(res);
     if (!res.ok || !data?.ok) throw new Error(data?.error || data?.message || '시세 조회 실패');
     return data;
   } catch (error) {
-    if (error?.name === 'AbortError') throw new Error('조회 시간이 초과되었습니다. API 필터 조건 또는 조회 페이지 수를 줄여야 합니다.');
+    if (error?.name === 'AbortError') throw new Error('조회 시간이 초과되었습니다. 잠시 뒤 다시 누르면 서버 캐시 또는 다음 조회에서 더 빨리 응답할 수 있습니다.');
     throw error;
   } finally {
     clearTimeout(timeout);
@@ -1646,7 +1646,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.3.9</summary>
+      <summary>악세 디버그 보기 · v5.4.0</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>
@@ -1668,7 +1668,9 @@ function marketDebugText(data) {
   const debug = data?.debug;
   if (!debug) return '';
   const err = Array.isArray(debug.errors) && debug.errors.length ? ` · 오류 ${debug.errors.length}건` : '';
-  return ` · 응답 ${Number(debug.responseItems || 0).toLocaleString('ko-KR')}개 / 총 ${Number(debug.responseTotalCount || 0).toLocaleString('ko-KR')}개${err}`;
+  const cache = data?.cached ? ' · 캐시' : '';
+  const index = data?.index?.matchedCount !== undefined ? ` · 인덱스 매칭 ${Number(data.index.matchedCount || 0).toLocaleString('ko-KR')}개` : '';
+  return ` · 응답 ${Number(debug.responseItems || 0).toLocaleString('ko-KR')}개 / 총 ${Number(debug.responseTotalCount || 0).toLocaleString('ko-KR')}개${index}${err}${cache}`;
 }
 
 function renderMarketError(container, message) {
