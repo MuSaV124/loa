@@ -1,4 +1,4 @@
-const API_VERSION = '5.2.3';
+const API_VERSION = '5.2.4';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -71,12 +71,14 @@ async function getAuctionOptionDataCached(apiKey) {
 }
 
 async function makeAccessorySearchPlans(apiKey, rule, target) {
-  // v5.2.3: 서버리스 타임아웃 방지. 부위별 전용 카테고리와 통합 악세 카테고리만 짧게 조회한다.
-  // 가능한 경우 경매장 EtcOptions로 필요한 퍼센트 옵션 2개를 먼저 걸고 응답에서 3연마를 확인한다.
+  // v5.2.4: 공식 API EtcOptions 값/코드 매핑이 불안정해서 최종 판정에는 사용하지 않는다.
+  // 대신 빠른 후보군 확보용으로만 사용하고, 실제 통과 여부는 Options의 ACCESSORY_UPGRADE 3개를 직접 검사한다.
   const optionData = await getAuctionOptionDataCached(apiKey);
   const primaryOption = findAuctionEtcOption(optionData, target.primary.label);
   const secondaryOption = findAuctionEtcOption(optionData, target.secondary.label);
   const plans = [];
+  const categoryList = [...new Set(rule.categoryCandidates.filter(code => code !== null && code !== undefined))].slice(0, 1);
+
   const filteredEtcOptions = [primaryOption, secondaryOption].filter(Boolean).map((option, index) => {
     const targetOption = index === 0 ? target.primary : target.secondary;
     return {
@@ -87,29 +89,30 @@ async function makeAccessorySearchPlans(apiKey, rule, target) {
     };
   });
 
-  const categoryList = [...new Set(rule.categoryCandidates.filter(code => code !== null && code !== undefined))].slice(0, 2);
-
-  if (filteredEtcOptions.length === 2) {
-    for (const categoryCode of categoryList) {
+  for (const categoryCode of categoryList) {
+    if (filteredEtcOptions.length === 2) {
       plans.push({
-        type: 'accessory-etc-option-filter',
+        type: 'accessory-etc-candidate-asc',
         categoryCode,
-        optionSearch: `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% API 필터 후 3연마 확인`,
+        sortCondition: 'ASC',
+        optionSearch: `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보 검색 후 직접 판정`,
         etcOptions: filteredEtcOptions
       });
     }
-  }
-
-  // 옵션 코드 탐색 실패 시에만 fallback을 사용한다. filtered 검색 실패 후 넓은 검색을 길게 돌리면 Vercel에서 타임아웃이 난다.
-  if (!plans.length) {
-    for (const categoryCode of categoryList.slice(0, 1)) {
-      plans.push({
-        type: 'accessory-base-fast-fallback',
-        categoryCode,
-        optionSearch: '옵션 코드 탐색 실패: 짧은 fallback 검색',
-        etcOptions: []
-      });
-    }
+    plans.push({
+      type: 'accessory-base-desc',
+      categoryCode,
+      sortCondition: 'DESC',
+      optionSearch: 'EtcOptions 미신뢰 보완: 고가 3연마 후보 직접 판정',
+      etcOptions: []
+    });
+    plans.push({
+      type: 'accessory-base-asc',
+      categoryCode,
+      sortCondition: 'ASC',
+      optionSearch: 'EtcOptions 미신뢰 보완: 저가 후보 직접 판정',
+      etcOptions: []
+    });
   }
   return plans;
 }
@@ -146,7 +149,7 @@ async function searchAccessory(apiKey, query) {
   const combo = String(query.combo || 'highHigh');
   const rule = ACCESSORY_RULES[part] || ACCESSORY_RULES.necklace;
   const comboRule = COMBO_RULES[combo] || COMBO_RULES.highHigh;
-  const maxPages = clamp(Number(query.pages || 3), 1, 8);
+  const maxPages = clamp(Number(query.pages || 8), 1, 30);
   const target = makeAccessoryTarget(rule, comboRule);
   const tried = [];
   const matchedMap = new Map();
@@ -154,9 +157,9 @@ async function searchAccessory(apiKey, query) {
   const debugSamples = [];
   const filterStats = {};
   const startedAt = Date.now();
-  const timeBudgetMs = 7500;
+  const timeBudgetMs = 8500;
 
-  // v5.2.3: 요청은 부위/티어/등급만 사용한다. 연마 옵션·힘/민/지·품질은 요청/필터 조건에서 제외한다.
+  // v5.2.4: 요청은 부위/티어/등급만 사용한다. 연마 옵션·힘/민/지·품질은 요청/필터 조건에서 제외한다.
   // 응답 Options 배열의 ACCESSORY_UPGRADE만 보고 3연마 + 선택 옵션 2개를 위치 무관 + 퍼센트 값 기준으로 검사한다.
   const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target);
   for (const plan of searchPlans) {
@@ -165,7 +168,7 @@ async function searchAccessory(apiKey, query) {
       if (Date.now() - startedAt > timeBudgetMs) break;
       const payload = {
         Sort: 'BUY_PRICE',
-        SortCondition: 'ASC',
+        SortCondition: plan.sortCondition || 'ASC',
         CategoryCode: plan.categoryCode ?? undefined,
         ItemTier: 4,
         ItemGrade: '고대',
@@ -216,7 +219,7 @@ async function searchAccessory(apiKey, query) {
     tried,
     debug: summarizeTried(tried),
     accessoryDebug: {
-      note: 'v5.2.3 악세 디버그: 타임아웃 방지를 위해 API EtcOptions 필터를 우선 사용하고 조회 페이지를 기본 3페이지로 제한합니다. 응답에서 3연마 + 옵션 위치 무관 + 퍼센트 값 기준으로 최종 필터합니다.',
+      note: 'v5.2.4 악세 디버그: EtcOptions는 후보 검색에만 사용하고 최종 판정은 Options의 ACCESSORY_UPGRADE 3개 + 옵션 위치 무관 + 실제 Value 등급표로 수행합니다.',
       requestPayloads: debugPayloads.slice(0, 8),
       filterStats,
       samples: debugSamples
@@ -227,6 +230,8 @@ async function searchAccessory(apiKey, query) {
 function accessoryRejectReasons(normalized, rule, target) {
   const reasons = [];
   if (!normalized.price) reasons.push('가격 없음');
+  if (normalized.tier && Number(normalized.tier) !== 4) reasons.push(`티어 불일치: ${normalized.tier}`);
+  if (normalized.grade && normalized.grade !== '고대') reasons.push(`등급 불일치: ${normalized.grade}`);
   if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) reasons.push('부위 불일치');
   const upgrades = normalized.upgradeOptions || [];
   if (upgrades.length !== 3) reasons.push(`3연마 아님: ${upgrades.length}개`);
@@ -424,6 +429,8 @@ function normalizeAuctionItem(item) {
     id: item.Id || item.ItemId || null,
     name: item.Name || '',
     grade: item.Grade || '',
+    tier: Number(item.Tier || 0),
+    level: Number(item.Level || 0),
     icon: normalizeIconUrl(item.Icon || item.IconPath || findIconPath(item.Tooltip) || ''),
     price,
     bidStartPrice: Number(auctionInfo.BidStartPrice || 0),
@@ -488,11 +495,10 @@ function hasUpgradeOption(upgrades, target) {
     const nameOk = name.includes(wanted) || wanted.includes(name);
     if (!nameOk) return false;
 
-    // 악세 유효 옵션은 같은 이름의 flat 옵션(+390/+960 등)이 섞여 있으므로
-    // % 옵션만 인정하고, 상/중/하 표의 퍼센트 값과 정확히 맞는 매물만 통과시킨다.
-    if (!option.isPercentage) return false;
+    // 공식 API/외부 캐시 응답에 IsValuePercentage가 누락되는 경우가 있어
+    // 최종 판정은 옵션명 + 실제 Value 등급표로 한다. 공격력 +390 같은 flat 옵션은 값이 등급표와 맞지 않아 자동 제외된다.
     if (Number.isFinite(expectedValue)) return Math.abs(Number(option.value) - expectedValue) < 0.001;
-    return true;
+    return option.isPercentage !== false || Number(option.value) < 20;
   });
 }
 function countRefiningOptions(text) {
