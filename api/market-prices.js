@@ -1,4 +1,4 @@
-const API_VERSION = '5.3.1';
+const API_VERSION = '5.3.2';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -6,7 +6,7 @@ const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const ACCESSORY_RULES = {
   necklace: {
     label: '목걸이', categoryCandidates: [200010, 200000, null], icon: 'https://cdn-lostark.game.onstove.com/efui_iconatlas/acc/acc_215.png',
-    options: { primary: { key: 'enemyDamage', label: '적에게 주는 피해', values: { high: 2.00, mid: 1.20, low: 0.55 } }, secondary: { key: 'additionalDamage', label: '추가 피해', values: { high: 2.60, mid: 1.60, low: 0.60 } } }
+    options: { primary: { key: 'enemyDamage', label: '적에게 주는 피해', values: { high: 2.00, mid: 1.20, low: 0.55 } }, secondary: { key: 'additionalDamage', label: '추가 피해', values: { high: 2.60, mid: 1.60, low: 0.70 } } }
   },
   earring: {
     label: '귀걸이', categoryCandidates: [200020, 200000, null], icon: 'https://cdn-lostark.game.onstove.com/efui_iconatlas/acc/acc_115.png',
@@ -77,14 +77,15 @@ async function getAuctionOptionDataCached(apiKey) {
 }
 
 async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey = 'necklace') {
-  // v5.3.1:
-  // - 상상(highHigh)은 v5.2.4/5.2.9에서 성공하던 정확 양옵션 EtcOptions 검색을 그대로 유지한다.
-  // - 상중/리버스 상중은 중옵 값 필터가 불안정하므로, 적주피/추피 "두 옵션이 붙은 후보"만 공식 API로 모은 뒤
-  //   ACCESSORY_UPGRADE 실제 Value로 우리가 최종 필터링한다.
+  // v5.3.2:
+  // 공식 API의 ACCESSORY_UPGRADE 값 필터는 중옵 조합에서 정확히 AND로 동작하지 않는 케이스가 확인됐다.
+  // 그래서 먼저 3연마 후보를 줄이기 위해 ARK_PASSIVE "깨달음 13"을 함께 걸고,
+  // 상상/상중/중상은 한쪽 핵심 상옵션 또는 양옵션 후보를 받은 뒤 Options의 실제 ACCESSORY_UPGRADE 값으로만 최종 판정한다.
   const optionData = await getAuctionOptionDataCached(apiKey);
   const fallback = AUCTION_ETC_OPTION_FALLBACK[partKey] || {};
   const primaryOption = findAuctionEtcOption(optionData, target.primary.label) || fallback.primary || null;
   const secondaryOption = findAuctionEtcOption(optionData, target.secondary.label) || fallback.secondary || null;
+  const enlightenmentOption = findAuctionEtcOption(optionData, '깨달음') || null;
   const plans = [];
   const categoryList = [...new Set(rule.categoryCandidates.filter(code => code !== null && code !== undefined))].slice(0, 1);
 
@@ -95,8 +96,6 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
     MaxValue: Number(targetOption.value)
   } : null;
 
-  // 값 범위 필터가 아니라 "해당 옵션 종류가 붙은 후보"를 받기 위한 넓은 범위.
-  // 공식 API가 중옵의 정확 Min/Max 조합을 잘 못 거르는 케이스가 있어 최종 판정은 아래 accessoryRejectReasons에서만 한다.
   const broadEtc = (option) => option ? {
     FirstOption: option.firstOption,
     SecondOption: option.secondOption,
@@ -104,49 +103,61 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
     MaxValue: 999999
   } : null;
 
+  const enlightenmentEtc = enlightenmentOption ? {
+    FirstOption: enlightenmentOption.firstOption,
+    SecondOption: enlightenmentOption.secondOption,
+    MinValue: 13,
+    MaxValue: 13
+  } : null;
+
+  const withRefine = (arr) => [...arr.filter(Boolean), ...(enlightenmentEtc ? [enlightenmentEtc] : [])];
+  const addPlan = (categoryCode, type, sortCondition, etcOptions, optionSearch, maxPages = 30) => {
+    const clean = etcOptions.filter(Boolean);
+    if (!clean.length) return;
+    plans.push({ type, categoryCode, sortCondition, etcOptions: clean, optionSearch, maxPages });
+  };
+
   for (const categoryCode of categoryList) {
+    const primaryExact = exactEtc(primaryOption, target.primary);
+    const secondaryExact = exactEtc(secondaryOption, target.secondary);
+    const primaryBroad = broadEtc(primaryOption);
+    const secondaryBroad = broadEtc(secondaryOption);
+
     if (comboKey === 'highHigh') {
-      const bothExact = [exactEtc(primaryOption, target.primary), exactEtc(secondaryOption, target.secondary)].filter(Boolean);
-      if (bothExact.length === 2) {
-        plans.push({
-          type: 'accessory-highhigh-exact-both-asc',
-          categoryCode,
-          sortCondition: 'ASC',
-          optionSearch: `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 정확 후보 검색 후 직접 판정`,
-          etcOptions: bothExact,
-          maxPages: 8
-        });
+      // 상상은 기존 성공 케이스를 우선하되, 깨달음 13 조건을 붙일 수 있으면 붙여 저가 1~2연마 노이즈를 제거한다.
+      if (primaryExact && secondaryExact) {
+        addPlan(categoryCode, 'accessory-highhigh-exact-both-refine-asc', 'ASC', withRefine([primaryExact, secondaryExact]), `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% + 3연마 후보`, 20);
+      }
+      // API가 양옵션 AND를 흐리게 처리할 때 대비: 한쪽 상옵션 + 3연마 후보를 보고 자체 필터한다.
+      if (primaryExact) addPlan(categoryCode, 'accessory-highhigh-primary-high-refine-asc', 'ASC', withRefine([primaryExact]), `${target.primary.label} ${target.primary.value}% + 3연마 후보`, 30);
+      if (secondaryExact) addPlan(categoryCode, 'accessory-highhigh-secondary-high-refine-asc', 'ASC', withRefine([secondaryExact]), `${target.secondary.label} ${target.secondary.value}% + 3연마 후보`, 30);
+      if (primaryExact && secondaryExact) {
+        addPlan(categoryCode, 'accessory-highhigh-exact-both-refine-desc', 'DESC', withRefine([primaryExact, secondaryExact]), `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% + 3연마 후보 DESC`, 10);
       }
       continue;
     }
 
-    const broadBoth = [broadEtc(primaryOption), broadEtc(secondaryOption)].filter(Boolean);
-    if (broadBoth.length === 2) {
-      plans.push({
-        type: 'accessory-two-option-broad-asc',
-        categoryCode,
-        sortCondition: 'ASC',
-        optionSearch: `${target.primary.label}/${target.secondary.label} 두 옵션 포함 후보 검색 후 ${target.primary.value}% + ${target.secondary.value}% 직접 판정`,
-        etcOptions: broadBoth,
-        maxPages: 20
-      });
+    // 상중/중상: 상옵션 쪽을 정확히 잡고 깨달음 13으로 3연마 후보를 줄인 뒤 나머지 옵션은 직접 판정한다.
+    const highSide = target.primary.grade === 'high'
+      ? { exact: primaryExact, label: target.primary.label, value: target.primary.value, side: 'primary-high' }
+      : { exact: secondaryExact, label: target.secondary.label, value: target.secondary.value, side: 'secondary-high' };
+    const midSide = target.primary.grade === 'mid'
+      ? { exact: primaryExact, label: target.primary.label, value: target.primary.value, side: 'primary-mid' }
+      : { exact: secondaryExact, label: target.secondary.label, value: target.secondary.value, side: 'secondary-mid' };
+
+    if (highSide.exact) {
+      addPlan(categoryCode, `accessory-${comboKey}-${highSide.side}-refine-asc`, 'ASC', withRefine([highSide.exact]), `${highSide.label} ${highSide.value}% + 3연마 후보 후 직접 판정`, 35);
+      addPlan(categoryCode, `accessory-${comboKey}-${highSide.side}-refine-desc`, 'DESC', withRefine([highSide.exact]), `${highSide.label} ${highSide.value}% + 3연마 후보 DESC 후 직접 판정`, 12);
     }
 
-    // broad 양옵션 필터가 공식 API에서 무시될 경우를 대비한 마지막 보조 검색.
-    // 상중은 적주피 상, 리버스 상중은 추피 상 기준으로 넓게 모은 뒤 직접 판정한다.
-    const highSide = target.primary.grade === 'high'
-      ? { option: primaryOption, targetOption: target.primary, side: 'primary-high' }
-      : { option: secondaryOption, targetOption: target.secondary, side: 'secondary-high' };
-    const singleHigh = exactEtc(highSide.option, highSide.targetOption);
-    if (singleHigh) {
-      plans.push({
-        type: `accessory-single-high-fallback-${highSide.side}-asc`,
-        categoryCode,
-        sortCondition: 'ASC',
-        optionSearch: `보조: ${highSide.targetOption.label} ${highSide.targetOption.value}% 단일 후보 검색 후 직접 판정`,
-        etcOptions: [singleHigh],
-        maxPages: 16
-      });
+    // 중옵 쪽 정확 필터도 깨달음 13과 함께 한 번 더 시도한다. 최종 판정은 여전히 직접 한다.
+    if (midSide.exact) {
+      addPlan(categoryCode, `accessory-${comboKey}-${midSide.side}-refine-asc`, 'ASC', withRefine([midSide.exact]), `${midSide.label} ${midSide.value}% + 3연마 후보 후 직접 판정`, 25);
+    }
+
+    // 옵션 존재 범위 검색은 마지막 fallback. 깨달음 13이 잡힐 때만 사용해서 저가 1~2연마를 최대한 제거한다.
+    if (enlightenmentEtc && primaryBroad && secondaryBroad) {
+      addPlan(categoryCode, `accessory-${comboKey}-two-option-broad-refine-asc`, 'ASC', [primaryBroad, secondaryBroad, enlightenmentEtc], `${target.primary.label}/${target.secondary.label} 존재 + 3연마 후보 후 직접 판정`, 25);
     }
   }
   return plans;
@@ -184,7 +195,7 @@ async function searchAccessory(apiKey, query) {
   const combo = String(query.combo || 'highHigh');
   const rule = ACCESSORY_RULES[part] || ACCESSORY_RULES.necklace;
   const comboRule = COMBO_RULES[combo] || COMBO_RULES.highHigh;
-  const maxPages = clamp(Number(query.pages || 8), 1, 30);
+  const maxPages = clamp(Number(query.pages || 35), 1, 60);
   const target = makeAccessoryTarget(rule, comboRule);
   const tried = [];
   const matchedMap = new Map();
@@ -192,7 +203,7 @@ async function searchAccessory(apiKey, query) {
   const debugSamples = [];
   const filterStats = {};
   const startedAt = Date.now();
-  const timeBudgetMs = 8500;
+  const timeBudgetMs = 12000;
 
   // v5.3.1: 요청은 부위/티어/등급 + 후보 축소용 EtcOptions만 사용한다. 최종 판정은 ACCESSORY_UPGRADE 실제 값으로 한다.
   // 응답 Options 배열의 ACCESSORY_UPGRADE만 보고 3연마 + 선택 옵션 2개를 위치 무관 + 퍼센트 값 기준으로 검사한다.
@@ -233,9 +244,9 @@ async function searchAccessory(apiKey, query) {
       const pageSize = result.pageSize || result.items.length || 10;
       const totalCount = result.totalCount || 0;
       if (!result.items.length || (totalCount && pageNo * pageSize >= totalCount)) break;
-      if (matchedMap.size >= 5 || Date.now() - startedAt > timeBudgetMs) break;
+      if (matchedMap.size >= 3 || Date.now() - startedAt > timeBudgetMs) break;
     }
-    if (matchedMap.size >= 5 || Date.now() - startedAt > timeBudgetMs) break;
+    if (matchedMap.size >= 3 || Date.now() - startedAt > timeBudgetMs) break;
   }
 
   const matched = [...matchedMap.values()].sort((a, b) => a.price - b.price);
@@ -254,7 +265,7 @@ async function searchAccessory(apiKey, query) {
     tried,
     debug: summarizeTried(tried),
     accessoryDebug: {
-      note: 'v5.3.1 악세 디버그: 상상은 기존 정확 양옵션 검색을 유지하고, 상중/리버스상중은 적주피+추피 두 옵션 포함 후보를 넓은 범위로 수집한 뒤 ACCESSORY_UPGRADE 실제 Value로 직접 판정합니다.',
+      note: 'v5.3.2 악세 디버그: 깨달음 13으로 3연마 후보를 먼저 줄이고, 상상/상중/중상은 핵심 상옵션 후보 수집 후 ACCESSORY_UPGRADE 실제 Value로 직접 판정합니다.',
       requestPayloads: debugPayloads.slice(0, 8),
       filterStats,
       samples: debugSamples
