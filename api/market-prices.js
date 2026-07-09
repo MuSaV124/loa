@@ -1,4 +1,4 @@
-const API_VERSION = '5.3.7';
+const API_VERSION = '5.3.8';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -77,23 +77,20 @@ async function getAuctionOptionDataCached(apiKey) {
 }
 
 async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey = 'necklace') {
-  // v5.3.7:
-  // 공식 API의 ACCESSORY_UPGRADE 값 필터는 중옵 조합에서 정확히 AND로 동작하지 않는 케이스가 확인됐다.
-  // 그래서 먼저 3연마 후보를 줄이기 위해 ARK_PASSIVE "깨달음 13"을 함께 걸고,
-  // 상상/상중/중상은 한쪽 핵심 상옵션 또는 양옵션 후보를 받은 뒤 Options의 실제 ACCESSORY_UPGRADE 값으로만 최종 판정한다.
+  // v5.3.8:
+  // 3연마/STAT를 최종 판정 조건으로 쓰지 않는다.
+  // 다만 공식 API가 저가 1~2연마 매물을 과도하게 반환하므로, 후보 수집 단계에서는 ItemUpgradeLevel: 3을 우선 사용한다.
+  // 최종 통과 여부는 ACCESSORY_UPGRADE에 선택한 두 옵션 값이 실제로 존재하는지만 본다.
   const fallback = AUCTION_ETC_OPTION_FALLBACK[partKey] || {};
-  // v5.3.7: 악세 조회 타임아웃 방지. 목걸이는 검증된 fallback 코드(적주피/추피)를 우선 사용해서
-  // auctions/options 선행 호출 1회를 제거한다. 필요한 부위에서만 options 메타를 조회한다.
   let optionData = null;
   let primaryOption = fallback.primary || null;
   let secondaryOption = fallback.secondary || null;
-  let enlightenmentOption = null;
   if (!primaryOption || !secondaryOption) {
     optionData = await getAuctionOptionDataCached(apiKey);
     primaryOption = primaryOption || findAuctionEtcOption(optionData, target.primary.label) || null;
     secondaryOption = secondaryOption || findAuctionEtcOption(optionData, target.secondary.label) || null;
-    enlightenmentOption = findAuctionEtcOption(optionData, '깨달음') || null;
   }
+
   const plans = [];
   const categoryList = [...new Set(rule.categoryCandidates.filter(code => code !== null && code !== undefined))].slice(0, 1);
 
@@ -104,74 +101,36 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
     MaxValue: Number(targetOption.value)
   } : null;
 
-  const broadEtc = (option) => option ? {
-    FirstOption: option.firstOption,
-    SecondOption: option.secondOption,
-    MinValue: 0,
-    MaxValue: 999999
-  } : null;
-
-  const enlightenmentEtc = enlightenmentOption ? {
-    FirstOption: enlightenmentOption.firstOption,
-    SecondOption: enlightenmentOption.secondOption,
-    MinValue: 13,
-    MaxValue: 13
-  } : null;
-
-  const withRefine = (arr) => [...arr.filter(Boolean), ...(enlightenmentEtc ? [enlightenmentEtc] : [])];
-  const addPlan = (categoryCode, type, sortCondition, etcOptions, optionSearch, maxPages = 30) => {
-    const clean = etcOptions.filter(Boolean);
+  const addPlan = (categoryCode, type, sortCondition, etcOptions, optionSearch, maxPages = 8, itemUpgradeLevel = 3) => {
+    const clean = (etcOptions || []).filter(Boolean);
     if (!clean.length) return;
-    plans.push({ type, categoryCode, sortCondition, etcOptions: clean, optionSearch, maxPages });
+    plans.push({ type, categoryCode, sortCondition, etcOptions: clean, optionSearch, maxPages, itemUpgradeLevel });
   };
 
   for (const categoryCode of categoryList) {
     const primaryExact = exactEtc(primaryOption, target.primary);
     const secondaryExact = exactEtc(secondaryOption, target.secondary);
-    const primaryBroad = broadEtc(primaryOption);
-    const secondaryBroad = broadEtc(secondaryOption);
+    if (!primaryExact && !secondaryExact) continue;
 
-    if (comboKey === 'highHigh') {
-      // v5.3.7: 공식 API의 양옵션 EtcOptions는 AND로 안정 동작하지 않아 노이즈가 많다.
-      // 그래서 한쪽 핵심 옵션 후보를 먼저 보고, 실제 Options로 선택 옵션 보유 여부를 직접 판정한다.
-      // 양옵션 검색은 보조 fallback으로만 짧게 사용한다.
-      if (primaryExact) addPlan(categoryCode, 'accessory-highhigh-primary-high-refine-asc', 'ASC', withRefine([primaryExact]), `${target.primary.label} ${target.primary.value}% 후보 후 직접 판정`, 8);
-      if (secondaryExact) addPlan(categoryCode, 'accessory-highhigh-secondary-high-refine-asc', 'ASC', withRefine([secondaryExact]), `${target.secondary.label} ${target.secondary.value}% 후보 후 직접 판정`, 8);
-      if (primaryExact) addPlan(categoryCode, 'accessory-highhigh-primary-high-refine-desc', 'DESC', withRefine([primaryExact]), `${target.primary.label} ${target.primary.value}% 후보 DESC 후 직접 판정`, 3);
-      if (secondaryExact) addPlan(categoryCode, 'accessory-highhigh-secondary-high-refine-desc', 'DESC', withRefine([secondaryExact]), `${target.secondary.label} ${target.secondary.value}% 후보 DESC 후 직접 판정`, 3);
-      if (primaryExact && secondaryExact) {
-        addPlan(categoryCode, 'accessory-highhigh-exact-both-refine-asc-short', 'ASC', withRefine([primaryExact, secondaryExact]), `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보`, 2);
-      }
-      continue;
-    }
-
-    // 상중/중상: 3연마 여부는 보지 않고, 선택한 두 옵션 값이 같이 붙은 매물을 직접 판정한다.
-    // 양옵션 exact는 공식 API가 완전한 AND로 동작하지 않을 수 있어 짧은 우선 후보로만 사용한다.
+    // 1순위: 3연마 후보 + 선택 두 옵션 exact. 공식 API가 AND로 완벽하진 않지만 가장 빠른 후보다.
     if (primaryExact && secondaryExact) {
-      addPlan(categoryCode, `accessory-${comboKey}-exact-both-asc`, 'ASC', withRefine([primaryExact, secondaryExact]), `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보`, 4);
-      addPlan(categoryCode, `accessory-${comboKey}-exact-both-desc`, 'DESC', withRefine([primaryExact, secondaryExact]), `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보 DESC`, 2);
+      addPlan(categoryCode, `accessory-${comboKey}-both-u3-asc`, 'ASC', [primaryExact, secondaryExact], `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보`, 6, 3);
+      addPlan(categoryCode, `accessory-${comboKey}-both-u3-desc`, 'DESC', [primaryExact, secondaryExact], `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보 DESC`, 2, 3);
     }
 
-    const highSide = target.primary.grade === 'high'
-      ? { exact: primaryExact, label: target.primary.label, value: target.primary.value, side: 'primary-high' }
-      : { exact: secondaryExact, label: target.secondary.label, value: target.secondary.value, side: 'secondary-high' };
-    const midSide = target.primary.grade === 'mid'
-      ? { exact: primaryExact, label: target.primary.label, value: target.primary.value, side: 'primary-mid' }
-      : { exact: secondaryExact, label: target.secondary.label, value: target.secondary.value, side: 'secondary-mid' };
-
-    if (highSide.exact) {
-      addPlan(categoryCode, `accessory-${comboKey}-${highSide.side}-refine-asc`, 'ASC', withRefine([highSide.exact]), `${highSide.label} ${highSide.value}% 후보 후 직접 판정`, 8);
-      addPlan(categoryCode, `accessory-${comboKey}-${highSide.side}-refine-desc`, 'DESC', withRefine([highSide.exact]), `${highSide.label} ${highSide.value}% 후보 DESC 후 직접 판정`, 4);
+    // 2순위: 3연마 후보 + 한쪽 옵션 exact. 나머지 옵션은 우리 코드가 Options 실제값으로 직접 판정한다.
+    if (primaryExact) {
+      addPlan(categoryCode, `accessory-${comboKey}-primary-u3-asc`, 'ASC', [primaryExact], `${target.primary.label} ${target.primary.value}% 후보 후 직접 판정`, 10, 3);
+      addPlan(categoryCode, `accessory-${comboKey}-primary-u3-desc`, 'DESC', [primaryExact], `${target.primary.label} ${target.primary.value}% 후보 DESC 후 직접 판정`, 3, 3);
+    }
+    if (secondaryExact) {
+      addPlan(categoryCode, `accessory-${comboKey}-secondary-u3-asc`, 'ASC', [secondaryExact], `${target.secondary.label} ${target.secondary.value}% 후보 후 직접 판정`, 10, 3);
+      addPlan(categoryCode, `accessory-${comboKey}-secondary-u3-desc`, 'DESC', [secondaryExact], `${target.secondary.label} ${target.secondary.value}% 후보 DESC 후 직접 판정`, 3, 3);
     }
 
-    // 중옵 쪽 정확 필터도 깨달음 13과 함께 한 번 더 시도한다. 최종 판정은 여전히 직접 한다.
-    if (midSide.exact) {
-      addPlan(categoryCode, `accessory-${comboKey}-${midSide.side}-refine-asc`, 'ASC', withRefine([midSide.exact]), `${midSide.label} ${midSide.value}% 후보 후 직접 판정`, 6);
-    }
-
-    // 옵션 존재 범위 검색은 마지막 fallback. 깨달음 13이 잡힐 때만 사용해서 저가 1~2연마를 최대한 제거한다.
-    if (enlightenmentEtc && primaryBroad && secondaryBroad) {
-      addPlan(categoryCode, `accessory-${comboKey}-two-option-broad-refine-asc`, 'ASC', [primaryBroad, secondaryBroad, enlightenmentEtc], `${target.primary.label}/${target.secondary.label} 존재 후보 후 직접 판정`, 6);
+    // 3순위 fallback: ItemUpgradeLevel 없이 짧게만 확인. 최종 판정은 여전히 두 옵션 actual value만 사용한다.
+    if (primaryExact && secondaryExact) {
+      addPlan(categoryCode, `accessory-${comboKey}-both-raw-asc`, 'ASC', [primaryExact, secondaryExact], `${target.primary.label}/${target.secondary.label} raw 후보`, 2, null);
     }
   }
   return plans;
@@ -217,9 +176,9 @@ async function searchAccessory(apiKey, query) {
   const debugSamples = [];
   const filterStats = {};
   const startedAt = Date.now();
-  const timeBudgetMs = 8500;
+  const timeBudgetMs = 10500;
 
-  // v5.3.7: 3연마 판정은 포기하고, 공식 API에서 옵션 후보를 받은 뒤 ACCESSORY_UPGRADE 실제 Value 두 개만 최종 판정한다.
+  // v5.3.8: 3연마 판정은 포기하고, 공식 API에서 옵션 후보를 받은 뒤 ACCESSORY_UPGRADE 실제 Value 두 개만 최종 판정한다.
   const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target, combo, part);
   for (const plan of searchPlans) {
     if (Date.now() - startedAt > timeBudgetMs) break;
@@ -234,6 +193,7 @@ async function searchAccessory(apiKey, query) {
         ItemGrade: '고대',
         ItemName: rule.label,
         PageNo: pageNo,
+        ItemUpgradeLevel: Number.isFinite(Number(plan.itemUpgradeLevel)) ? Number(plan.itemUpgradeLevel) : undefined,
         EtcOptions: Array.isArray(plan.etcOptions) && plan.etcOptions.length ? plan.etcOptions : undefined
       };
       stripUndefined(payload);
@@ -279,7 +239,7 @@ async function searchAccessory(apiKey, query) {
     tried,
     debug: summarizeTried(tried),
     accessoryDebug: {
-      note: 'v5.3.7 악세 디버그: 3연마/STAT 컷을 사용하지 않고, 선택한 두 옵션이 붙은 매물 중 최저가를 ACCESSORY_UPGRADE 실제 Value 기준으로 판정합니다.',
+      note: 'v5.3.8 악세 디버그: 후보 수집에는 ItemUpgradeLevel 3을 우선 사용하지만, 최종 판정은 선택한 두 옵션의 ACCESSORY_UPGRADE 실제 Value만 봅니다.',
       requestPayloads: debugPayloads.slice(0, 8),
       filterStats,
       samples: debugSamples
@@ -294,7 +254,7 @@ function accessoryRejectReasons(normalized, rule, target) {
   if (normalized.grade && normalized.grade !== '고대') reasons.push(`등급 불일치: ${normalized.grade}`);
   if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) reasons.push('부위 불일치');
 
-  // v5.3.7: 사용자가 3연마 판정을 포기하고, 선택한 두 딜러 옵션이 붙은 매물 중 최저가만 보길 원함.
+  // v5.3.8: 사용자가 3연마 판정을 포기하고, 선택한 두 딜러 옵션이 붙은 매물 중 최저가만 보길 원함.
   // 따라서 ItemUpgradeLevel, ACCESSORY_UPGRADE 개수, 힘/민첩/지능 STAT 컷은 필터에서 제외한다.
   const upgrades = normalized.upgradeOptions || [];
   if (!hasUpgradeOption(upgrades, target.primary)) reasons.push(`필수옵션 없음: ${target.primary.label} ${target.primary.value}%`);
