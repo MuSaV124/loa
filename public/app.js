@@ -1,4 +1,4 @@
-const VERSION = '5.1.3';
+const VERSION = '5.1.5';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -1415,7 +1415,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.1.3',
+    apiVersion: '5.1.5',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1562,7 +1562,7 @@ function renderGemPriceGrid(container, data) {
   const rows = Array.isArray(data?.rows) ? data.rows : [];
   if (!rows.length) return renderMarketError(container, '보석 시세를 찾지 못했습니다.');
   container.innerHTML = `<div class="marketResultList">
-    <div class="marketRuleHint"><b>보석 전체 시세</b> · 경매장 최저가 · ${escapeHtml(formatMarketUpdatedAt(data.updatedAt))}</div>
+    <div class="marketRuleHint"><b>보석 전체 시세</b> · 경매장 최저가 · ${escapeHtml(formatMarketUpdatedAt(data.updatedAt))}${marketDebugText(data)}</div>
     <div class="gemPriceGrid">
       <div class="gemPriceHead">레벨</div><div class="gemPriceHead">겁화</div><div class="gemPriceHead">작열</div>
       ${rows.map(row => `
@@ -1593,7 +1593,7 @@ function renderEngravingPriceGrid(container, data) {
 }
 
 function engravingPriceCard(item) {
-  const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="">` : `<div class="marketIconFallback bookIcon">유</div>`;
+  const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="">` : '';
   return `<article class="engravingPriceCard">
     ${icon}
     <div><b>${escapeHtml(cleanEngravingName(item.name || '유물 각인서'))}</b><small>${escapeHtml(item.grade || '유물')}</small></div>
@@ -1616,13 +1616,14 @@ function renderMarketResults(container, data, title, subtitle) {
   if (!container) return;
   const items = Array.isArray(data?.items) ? data.items : [];
   const triedText = Array.isArray(data?.tried) ? ` · 조회시도 ${data.tried.length}회` : '';
+  const debugText = marketDebugText(data);
   if (!items.length) {
-    container.innerHTML = `<div class="marketEmptyBox">검색 조건에 맞는 매물을 찾지 못했습니다.${triedText}<br><small>공식 API 카테고리/옵션 구조가 맞지 않으면 결과가 없을 수 있습니다.</small></div>`;
+    container.innerHTML = `<div class="marketEmptyBox">검색 조건에 맞는 매물을 찾지 못했습니다.${triedText}<br><small>공식 API 응답 ${escapeHtml(debugText || '')} · 카테고리/검색어/필터 조건을 확인하세요.</small></div>`;
     return;
   }
   container.innerHTML = `
     <div class="marketResultList">
-      <div class="marketRuleHint"><b>${escapeHtml(title)}</b>${subtitle ? ` · ${escapeHtml(subtitle)}` : ''}${triedText}</div>
+      <div class="marketRuleHint"><b>${escapeHtml(title)}</b>${subtitle ? ` · ${escapeHtml(subtitle)}` : ''}${triedText}${debugText}</div>
       ${items.map(item => marketResultItemHtml(item)).join('')}
     </div>
   `;
@@ -1636,6 +1637,13 @@ function marketResultItemHtml(item) {
     <div><b>${escapeHtml(item.name || '이름 없음')}</b><small>${escapeHtml(meta || '현재 매물')}</small></div>
     <div class="marketPrice">${formatGold(item.price)}</div>
   </article>`;
+}
+
+function marketDebugText(data) {
+  const debug = data?.debug;
+  if (!debug) return '';
+  const err = Array.isArray(debug.errors) && debug.errors.length ? ` · 오류 ${debug.errors.length}건` : '';
+  return ` · 응답 ${Number(debug.responseItems || 0).toLocaleString('ko-KR')}개 / 총 ${Number(debug.responseTotalCount || 0).toLocaleString('ko-KR')}개${err}`;
 }
 
 function renderMarketError(container, message) {

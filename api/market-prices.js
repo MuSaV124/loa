@@ -1,4 +1,4 @@
-const API_VERSION = '5.1.3';
+const API_VERSION = '5.1.5';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -53,36 +53,49 @@ async function searchAccessory(apiKey, query) {
   const rule = ACCESSORY_RULES[part] || ACCESSORY_RULES.necklace;
   const comboRule = COMBO_RULES[combo] || COMBO_RULES.highHigh;
   const quality = clamp(Number(query.quality || 67), 0, 100);
-  const maxPages = clamp(Number(query.pages || 5), 1, 10);
+  const maxPages = clamp(Number(query.pages || 10), 1, 20);
   const target = makeAccessoryTarget(rule, comboRule);
   const tried = [];
-  const matched = [];
+  const matchedMap = new Map();
 
+  // v5.1.5: 경매장 API에는 옵션 조건을 직접 넣지 않고 넓게 조회한 뒤
+  // 응답 Tooltip/Options에서 품질과 목표 옵션을 직접 필터링한다.
   for (const categoryCode of rule.categoryCandidates) {
     for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
       const payload = {
-        Sort: 'BUY_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode ?? undefined, ItemTier: 4, ItemGrade: '고대', ItemName: '', PageNo: pageNo,
-        EtcOptions: [{ FirstOption: 7, SecondOption: 45, MinValue: quality, MaxValue: 100 }]
+        Sort: 'BUY_PRICE',
+        SortCondition: 'ASC',
+        CategoryCode: categoryCode ?? undefined,
+        ItemTier: 4,
+        ItemGrade: '고대',
+        ItemName: rule.label,
+        PageNo: pageNo
       };
       stripUndefined(payload);
       const result = await fetchAuctionPage(apiKey, payload);
-      tried.push({ categoryCode, pageNo, count: result.items.length, totalCount: result.totalCount, error: result.error || null });
+      tried.push({ type: 'accessory-wide', keyword: rule.label, categoryCode, pageNo, count: result.items.length, totalCount: result.totalCount, error: result.error || null });
+
       for (const item of result.items) {
-        if (matched.length >= 20) break;
         const normalized = normalizeAuctionItem(item);
         if (!normalized.price) continue;
-        if (!isAccessoryPart(normalized.fullText, rule.label)) continue;
-        if (!hasStatRange(normalized.fullText, rule.statRange)) continue;
+        if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) continue;
+        if (normalized.quality && normalized.quality < quality) continue;
         if (!hasOptionValue(normalized.fullText, target.primary.label, target.primary.value)) continue;
         if (!hasOptionValue(normalized.fullText, target.secondary.label, target.secondary.value)) continue;
-        matched.push({ ...normalized, part: rule.label, combo: comboRule.label, targetOptions: [target.primary, target.secondary] });
+        const key = normalized.id || `${normalized.name}-${normalized.price}-${normalized.quality}`;
+        if (!matchedMap.has(key)) matchedMap.set(key, { ...normalized, part: rule.label, combo: comboRule.label, targetOptions: [target.primary, target.secondary] });
       }
-      if (matched.length >= 10) break;
+
+      const pageSize = result.pageSize || result.items.length || 10;
+      const totalCount = result.totalCount || 0;
+      if (!result.items.length || (totalCount && pageNo * pageSize >= totalCount)) break;
+      if (matchedMap.size >= 20) break;
     }
-    if (matched.length) break;
+    if (matchedMap.size >= 10) break;
   }
-  matched.sort((a, b) => a.price - b.price);
-  return { ok: true, apiVersion: API_VERSION, source: 'auctions/items', mode: 'accessory', part, partLabel: rule.label, combo, comboLabel: comboRule.label, quality, statRange: rule.statRange, targetOptions: [target.primary, target.secondary], items: matched.slice(0, 10), lowest: matched[0] || null, tried };
+
+  const matched = [...matchedMap.values()].sort((a, b) => a.price - b.price);
+  return { ok: true, apiVersion: API_VERSION, source: 'auctions/items', mode: 'accessory', part, partLabel: rule.label, combo, comboLabel: comboRule.label, quality, targetOptions: [target.primary, target.secondary], items: matched.slice(0, 10), lowest: matched[0] || null, tried, debug: summarizeTried(tried) };
 }
 
 async function searchGem(apiKey, query) {
@@ -90,27 +103,39 @@ async function searchGem(apiKey, query) {
   const level = clamp(Number(query.level || 10), 1, 10);
   const rule = GEM_RULES[gem] || GEM_RULES.damage;
   const tried = [];
-  const matched = [];
-  for (const name of rule.names) {
-    for (const categoryCode of [210000, 210010, 210020, null]) {
-      const payload = { Sort: 'BUY_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode ?? undefined, ItemTier: 4, ItemName: name, PageNo: 1 };
+  const matchedMap = new Map();
+  const exactNames = [`${level}레벨 ${rule.label}의 보석`, `${level}레벨 ${rule.label}`, rule.label];
+
+  // v5.1.5: 보석은 경매장 정확 아이템명 우선 검색 후, 필요 시 카테고리 없는 검색까지 fallback.
+  for (const itemName of exactNames) {
+    for (const categoryCode of [210000, null, 210010, 210020]) {
+      const payload = {
+        Sort: 'BUY_PRICE',
+        SortCondition: 'ASC',
+        CategoryCode: categoryCode ?? undefined,
+        ItemTier: 4,
+        ItemName: itemName,
+        PageNo: 1
+      };
       stripUndefined(payload);
       const result = await fetchAuctionPage(apiKey, payload);
-      tried.push({ name, categoryCode, count: result.items.length, totalCount: result.totalCount, error: result.error || null });
+      tried.push({ type: 'gem-exact', keyword: itemName, categoryCode, count: result.items.length, totalCount: result.totalCount, error: result.error || null });
       for (const item of result.items) {
         const normalized = normalizeAuctionItem(item);
         if (!normalized.price) continue;
-        const text = normalized.fullText;
+        const text = normalizeText(`${normalized.name} ${normalized.fullText}`);
         if (!text.includes(rule.label)) continue;
-        if (!new RegExp(`${level}\\s*레벨|Lv\\.?\\s*${level}|${level}레벨`).test(text)) continue;
-        matched.push({ ...normalized, gem: rule.label, level });
+        if (!new RegExp(`${level}\s*레벨|Lv\.?\s*${level}|${level}레벨`, 'i').test(text)) continue;
+        const key = normalized.id || `${normalized.name}-${normalized.price}`;
+        if (!matchedMap.has(key)) matchedMap.set(key, { ...normalized, gem: rule.label, level });
       }
-      if (matched.length) break;
+      if (matchedMap.size) break;
     }
-    if (matched.length) break;
+    if (matchedMap.size) break;
   }
-  matched.sort((a, b) => a.price - b.price);
-  return { ok: true, apiVersion: API_VERSION, source: 'auctions/items', mode: 'gem', gem, gemLabel: rule.label, level, items: matched.slice(0, 10), lowest: matched[0] || null, tried };
+
+  const matched = [...matchedMap.values()].sort((a, b) => a.price - b.price);
+  return { ok: true, apiVersion: API_VERSION, source: 'auctions/items', mode: 'gem', gem, gemLabel: rule.label, level, items: matched.slice(0, 10), lowest: matched[0] || null, tried, debug: summarizeTried(tried) };
 }
 
 async function searchGemList(apiKey, query) {
@@ -248,4 +273,12 @@ function normalizeIconUrl(value) { const icon = String(value || '').trim(); if (
 function normalizeText(value) { return decodeEntities(String(value ?? '')).replace(/<br\s*\/?>(\n)?/gi, '\n').replace(/<[^>]*>/g, ' ').replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim(); }
 function decodeEntities(value) { return String(value ?? '').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&#40;/g, '(').replace(/&#41;/g, ')'); }
 function clamp(value, min, max) { const n = Number(value); if (!Number.isFinite(n)) return min; return Math.max(min, Math.min(max, n)); }
+function summarizeTried(tried) {
+  const rows = Array.isArray(tried) ? tried : [];
+  const totalRequests = rows.length;
+  const responseItems = rows.reduce((sum, row) => sum + Number(row.count || 0), 0);
+  const responseTotalCount = rows.reduce((sum, row) => sum + Number(row.totalCount || 0), 0);
+  const errors = rows.filter(row => row.error).map(row => row.error);
+  return { totalRequests, responseItems, responseTotalCount, errors: [...new Set(errors)].slice(0, 5) };
+}
 function stripUndefined(obj) { Object.keys(obj).forEach(key => obj[key] === undefined && delete obj[key]); return obj; }
