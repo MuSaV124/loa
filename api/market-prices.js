@@ -1,4 +1,4 @@
-const API_VERSION = '5.2.1';
+const API_VERSION = '5.2.2';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -71,14 +71,43 @@ async function getAuctionOptionDataCached(apiKey) {
 }
 
 async function makeAccessorySearchPlans(apiKey, rule, target) {
-  // v5.2.0: 경매장 API 요청에서는 연마 옵션/기본 스탯/품질 조건을 모두 제외한다.
-  // 공식 응답의 Options 배열(Type === ACCESSORY_UPGRADE)만 파싱해서 3연마 + 선택 옵션 2개를 위치 무관 + 퍼센트 값 기준으로 필터한다.
-  return rule.categoryCandidates.map(categoryCode => ({
-    type: 'accessory-base-only',
-    categoryCode,
-    optionSearch: '응답 Options 배열에서 3연마 + 선택 옵션 2개 위치 무관/퍼센트 값 필터',
-    etcOptions: []
-  }));
+  // v5.2.2: 가격 오름차순의 앞 페이지는 1골드 노연마 악세가 대부분이라,
+  // 가능한 경우 경매장 EtcOptions로 필요한 퍼센트 옵션 2개를 먼저 걸고 응답에서 3연마를 확인한다.
+  const optionData = await getAuctionOptionDataCached(apiKey);
+  const primaryOption = findAuctionEtcOption(optionData, target.primary.label);
+  const secondaryOption = findAuctionEtcOption(optionData, target.secondary.label);
+  const plans = [];
+  const filteredEtcOptions = [primaryOption, secondaryOption].filter(Boolean).map((option, index) => {
+    const targetOption = index === 0 ? target.primary : target.secondary;
+    return {
+      FirstOption: option.firstOption,
+      SecondOption: option.secondOption,
+      MinValue: Number(targetOption.value),
+      MaxValue: Number(targetOption.value)
+    };
+  });
+
+  if (filteredEtcOptions.length === 2) {
+    for (const categoryCode of rule.categoryCandidates) {
+      plans.push({
+        type: 'accessory-etc-option-filter',
+        categoryCode,
+        optionSearch: `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% API 필터 후 3연마 확인`,
+        etcOptions: filteredEtcOptions
+      });
+    }
+  }
+
+  // 옵션 코드 탐색 실패 또는 공식 API 필터 실패 대비 fallback.
+  for (const categoryCode of rule.categoryCandidates) {
+    plans.push({
+      type: 'accessory-base-wide-fallback',
+      categoryCode,
+      optionSearch: '응답 Options/Tooltip에서 3연마 + 선택 옵션 2개 위치 무관/퍼센트 값 필터',
+      etcOptions: []
+    });
+  }
+  return plans;
 }
 
 function findAuctionEtcOption(data, label) {
@@ -113,7 +142,7 @@ async function searchAccessory(apiKey, query) {
   const combo = String(query.combo || 'highHigh');
   const rule = ACCESSORY_RULES[part] || ACCESSORY_RULES.necklace;
   const comboRule = COMBO_RULES[combo] || COMBO_RULES.highHigh;
-  const maxPages = clamp(Number(query.pages || 5), 1, 15);
+  const maxPages = clamp(Number(query.pages || 25), 1, 60);
   const target = makeAccessoryTarget(rule, comboRule);
   const tried = [];
   const matchedMap = new Map();
@@ -133,7 +162,8 @@ async function searchAccessory(apiKey, query) {
         ItemTier: 4,
         ItemGrade: '고대',
         ItemName: rule.label,
-        PageNo: pageNo
+        PageNo: pageNo,
+        EtcOptions: Array.isArray(plan.etcOptions) && plan.etcOptions.length ? plan.etcOptions : undefined
       };
       stripUndefined(payload);
       debugPayloads.push({ ...payload });
@@ -178,7 +208,7 @@ async function searchAccessory(apiKey, query) {
     tried,
     debug: summarizeTried(tried),
     accessoryDebug: {
-      note: 'v5.2.1 악세 디버그: 요청 조건은 부위/티어/등급만 사용, 응답 Options 배열에서 3연마 + 선택 옵션 2개를 위치 무관 + 퍼센트 값 기준으로 필터합니다.',
+      note: 'v5.2.2 악세 디버그: 먼저 API EtcOptions로 선택 퍼센트 옵션 2개를 필터하고, 응답 Options/Tooltip에서 3연마 + 옵션 위치 무관 + 퍼센트 값 기준으로 최종 필터합니다.',
       requestPayloads: debugPayloads.slice(0, 8),
       filterStats,
       samples: debugSamples
@@ -380,8 +410,8 @@ async function requestLostArk(apiKey, url, options = {}) {
 function normalizeAuctionItem(item) {
   const auctionInfo = item.AuctionInfo || {};
   const price = Number(auctionInfo.BuyPrice || item.BuyPrice || item.CurrentMinPrice || item.LowestPrice || 0);
-  const upgradeOptions = extractAccessoryUpgradeOptions(item.Options);
   const fullText = normalizeText([item.Name, item.Grade, item.Tier, item.Level, JSON.stringify(item.Options || ''), JSON.stringify(item.EtcOptions || ''), tooltipText(item.Tooltip)].join(' '));
+  const upgradeOptions = extractAccessoryUpgradeOptions(item.Options, fullText);
   return {
     id: item.Id || item.ItemId || null,
     name: item.Name || '',
@@ -404,17 +434,36 @@ function normalizeMarketItem(item) {
 }
 
 function isAccessoryPart(text, label) { return normalizeText(text).includes(label); }
-function extractAccessoryUpgradeOptions(options) {
-  if (!Array.isArray(options)) return [];
-  return options
-    .filter(option => String(option?.Type || '').toUpperCase() === 'ACCESSORY_UPGRADE')
-    .map(option => ({
-      name: String(option?.OptionName || '').trim(),
-      value: Number(option?.Value ?? 0),
-      isPercentage: Boolean(option?.IsValuePercentage)
-    }))
-    .filter(option => option.name);
+function extractAccessoryUpgradeOptions(options, fullText = '') {
+  const parsed = [];
+  if (Array.isArray(options)) {
+    for (const option of options) {
+      if (String(option?.Type || '').toUpperCase() !== 'ACCESSORY_UPGRADE') continue;
+      parsed.push({
+        name: String(option?.OptionName || '').trim(),
+        value: Number(option?.Value ?? 0),
+        isPercentage: Boolean(option?.IsValuePercentage)
+      });
+    }
+  }
+
+  // 일부 응답은 ACCESSORY_UPGRADE가 Options에 없고 Tooltip/EtcOptions 텍스트로만 남을 수 있어 보조 파싱한다.
+  const text = normalizeText(fullText);
+  for (const label of ACCESSORY_REFINING_LABELS) {
+    const escaped = escapeRegExp(label).replace(/\s+/g, '\\s*');
+    const regex = new RegExp(`${escaped}\\s*(?:증가|효과)?\\s*(?:\\+)?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(%)?`, 'gi');
+    let match;
+    while ((match = regex.exec(text))) {
+      const value = Number(match[1]);
+      if (!Number.isFinite(value)) continue;
+      const isPercentage = Boolean(match[2]);
+      const duplicate = parsed.some(option => compactOptionName(option.name) === compactOptionName(label) && Math.abs(Number(option.value) - value) < 0.001 && Boolean(option.isPercentage) === isPercentage);
+      if (!duplicate) parsed.push({ name: label, value, isPercentage });
+    }
+  }
+  return parsed.filter(option => option.name);
 }
+
 function compactOptionName(value) {
   return normalizeText(value)
     .replace(/증가/g, '')
@@ -475,3 +524,5 @@ function summarizeTried(tried) {
   return { totalRequests, responseItems, responseTotalCount, errors: [...new Set(errors)].slice(0, 5) };
 }
 function stripUndefined(obj) { Object.keys(obj).forEach(key => obj[key] === undefined && delete obj[key]); return obj; }
+
+function escapeRegExp(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
