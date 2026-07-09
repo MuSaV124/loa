@@ -1,4 +1,4 @@
-const API_VERSION = '5.1.9';
+const API_VERSION = '5.2.0';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -71,31 +71,14 @@ async function getAuctionOptionDataCached(apiKey) {
 }
 
 async function makeAccessorySearchPlans(apiKey, rule, target) {
-  const optionData = await getAuctionOptionDataCached(apiKey);
-  const primary = findAuctionEtcOption(optionData, target.primary.label);
-  const secondary = findAuctionEtcOption(optionData, target.secondary.label);
-  const plans = [];
-
-  if (primary && secondary) {
-    for (const categoryCode of rule.categoryCandidates) {
-      plans.push({
-        type: 'accessory-2option-api',
-        categoryCode,
-        optionSearch: `${target.primary.label} ${target.primary.value}% / ${target.secondary.label} ${target.secondary.value}%`,
-        etcOptions: [
-          { FirstOption: primary.firstOption, SecondOption: primary.secondOption, MinValue: target.primary.value, MaxValue: target.primary.value },
-          { FirstOption: secondary.firstOption, SecondOption: secondary.secondOption, MinValue: target.secondary.value, MaxValue: target.secondary.value }
-        ]
-      });
-    }
-  }
-
-  // 옵션 ID를 못 찾거나 공식 API가 옵션 조합 검색을 거부할 때를 대비한 제한 fallback.
-  // 이전 버전처럼 3연마 전체를 과도하게 넘기지 않도록 기본 페이지 수는 작게 유지한다.
-  for (const categoryCode of rule.categoryCandidates) {
-    plans.push({ type: 'accessory-fallback-limited', categoryCode, optionSearch: '텍스트 필터 fallback', etcOptions: [] });
-  }
-  return plans;
+  // v5.2.0: 경매장 API 요청에서는 연마 옵션/기본 스탯/품질 조건을 모두 제외한다.
+  // 공식 응답의 Options 배열(Type === ACCESSORY_UPGRADE)만 파싱해서 3연마 + 선택 옵션 2개 포함 여부를 순서 무관으로 필터한다.
+  return rule.categoryCandidates.map(categoryCode => ({
+    type: 'accessory-base-only',
+    categoryCode,
+    optionSearch: '응답 Options 배열에서 3연마 + 선택 옵션 2개 포함 필터',
+    etcOptions: []
+  }));
 }
 
 function findAuctionEtcOption(data, label) {
@@ -138,8 +121,8 @@ async function searchAccessory(apiKey, query) {
   const debugSamples = [];
   const filterStats = {};
 
-  // v5.1.9: 기본 스탯(힘/민/지) 필터를 제거한다.
-  // 선택 연마 옵션 2개로 검색 범위를 줄이고, 응답 결과에서 3연마/필수옵션/수치만 필터링한다.
+  // v5.2.0: 요청은 부위/티어/등급만 사용한다. 연마 옵션·힘/민/지·품질은 요청/필터 조건에서 제외한다.
+  // 응답 Options 배열의 ACCESSORY_UPGRADE만 보고 3연마 + 선택 옵션 2개 포함 여부를 순서 무관으로 검사한다.
   const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target);
   for (const plan of searchPlans) {
     for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
@@ -150,8 +133,7 @@ async function searchAccessory(apiKey, query) {
         ItemTier: 4,
         ItemGrade: '고대',
         ItemName: rule.label,
-        PageNo: pageNo,
-        EtcOptions: plan.etcOptions?.length ? plan.etcOptions : undefined
+        PageNo: pageNo
       };
       stripUndefined(payload);
       debugPayloads.push({ ...payload });
@@ -196,7 +178,7 @@ async function searchAccessory(apiKey, query) {
     tried,
     debug: summarizeTried(tried),
     accessoryDebug: {
-      note: 'v5.1.9 악세 디버그: 기본 스탯 필터 제거, 요청 payload/응답 샘플/필터 제외 사유를 확인하세요.',
+      note: 'v5.2.0 악세 디버그: 요청 조건은 부위/티어/등급만 사용, 응답 Options 배열에서 3연마 + 선택 옵션 2개 포함 여부를 순서 무관으로 필터합니다.',
       requestPayloads: debugPayloads.slice(0, 8),
       filterStats,
       samples: debugSamples
@@ -208,9 +190,10 @@ function accessoryRejectReasons(normalized, rule, target) {
   const reasons = [];
   if (!normalized.price) reasons.push('가격 없음');
   if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) reasons.push('부위 불일치');
-  if (!hasThreeRefiningOptions(normalized.fullText, [target.primary.label, target.secondary.label])) reasons.push('3연마/필수옵션 불일치');
-  if (!hasOptionValue(normalized.fullText, target.primary.label, target.primary.value)) reasons.push(`옵션1 수치 불일치: ${target.primary.label} ${target.primary.value}%`);
-  if (!hasOptionValue(normalized.fullText, target.secondary.label, target.secondary.value)) reasons.push(`옵션2 수치 불일치: ${target.secondary.label} ${target.secondary.value}%`);
+  const upgrades = normalized.upgradeOptions || [];
+  if (upgrades.length !== 3) reasons.push(`3연마 아님: ${upgrades.length}개`);
+  if (!hasUpgradeOption(upgrades, target.primary.label)) reasons.push(`필수옵션 없음: ${target.primary.label}`);
+  if (!hasUpgradeOption(upgrades, target.secondary.label)) reasons.push(`필수옵션 없음: ${target.secondary.label}`);
   return reasons;
 }
 
@@ -221,6 +204,7 @@ function makeAccessoryDebugSample(raw, normalized, reasons) {
     price: normalized.price,
     quality: normalized.quality,
     refineCount: normalized.refineCount,
+    upgradeOptions: normalized.upgradeOptions,
     reasons,
     optionKeys: {
       hasOptions: Array.isArray(raw?.Options),
@@ -396,8 +380,21 @@ async function requestLostArk(apiKey, url, options = {}) {
 function normalizeAuctionItem(item) {
   const auctionInfo = item.AuctionInfo || {};
   const price = Number(auctionInfo.BuyPrice || item.BuyPrice || item.CurrentMinPrice || item.LowestPrice || 0);
+  const upgradeOptions = extractAccessoryUpgradeOptions(item.Options);
   const fullText = normalizeText([item.Name, item.Grade, item.Tier, item.Level, JSON.stringify(item.Options || ''), JSON.stringify(item.EtcOptions || ''), tooltipText(item.Tooltip)].join(' '));
-  return { id: item.Id || item.ItemId || null, name: item.Name || '', grade: item.Grade || '', icon: normalizeIconUrl(item.Icon || item.IconPath || findIconPath(item.Tooltip) || ''), price, bidStartPrice: Number(auctionInfo.BidStartPrice || 0), tradeAllowCount: Number(item.TradeAllowCount ?? item.TradeRemainCount ?? 0), quality: findQuality(item, fullText), refineCount: countRefiningOptions(fullText), fullText };
+  return {
+    id: item.Id || item.ItemId || null,
+    name: item.Name || '',
+    grade: item.Grade || '',
+    icon: normalizeIconUrl(item.Icon || item.IconPath || findIconPath(item.Tooltip) || ''),
+    price,
+    bidStartPrice: Number(auctionInfo.BidStartPrice || 0),
+    tradeAllowCount: Number(item.TradeAllowCount ?? item.TradeRemainCount ?? 0),
+    quality: findQuality(item, fullText),
+    refineCount: upgradeOptions.length,
+    upgradeOptions,
+    fullText
+  };
 }
 
 function normalizeMarketItem(item) {
@@ -407,15 +404,30 @@ function normalizeMarketItem(item) {
 }
 
 function isAccessoryPart(text, label) { return normalizeText(text).includes(label); }
-function hasStatRange(text, [min, max]) {
-  const compact = normalizeText(text);
-  const statNames = '(힘|민첩|지능)';
-  const patterns = [new RegExp(`${statNames}\\s*\\+?\\s*([0-9]{4,6})`, 'g'), /\+\s*([0-9]{4,6})/g];
-  for (const re of patterns) {
-    const matches = [...compact.matchAll(re)];
-    if (matches.map(m => Number(m[m.length - 1])).some(n => n >= min && n <= max)) return true;
-  }
-  return false;
+function extractAccessoryUpgradeOptions(options) {
+  if (!Array.isArray(options)) return [];
+  return options
+    .filter(option => String(option?.Type || '').toUpperCase() === 'ACCESSORY_UPGRADE')
+    .map(option => ({
+      name: String(option?.OptionName || '').trim(),
+      value: Number(option?.Value ?? 0),
+      isPercentage: Boolean(option?.IsValuePercentage)
+    }))
+    .filter(option => option.name);
+}
+function compactOptionName(value) {
+  return normalizeText(value)
+    .replace(/증가/g, '')
+    .replace(/효과/g, '')
+    .replace(/\s+/g, '')
+    .trim();
+}
+function hasUpgradeOption(upgrades, label) {
+  const wanted = compactOptionName(label);
+  return upgrades.some(option => {
+    const name = compactOptionName(option.name);
+    return name.includes(wanted) || wanted.includes(name);
+  });
 }
 function countRefiningOptions(text) {
   const compact = normalizeText(text).replace(/\s+/g, '');
