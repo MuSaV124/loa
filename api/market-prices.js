@@ -1,4 +1,4 @@
-const API_VERSION = '5.2.6';
+const API_VERSION = '5.2.7';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -70,58 +70,53 @@ async function getAuctionOptionDataCached(apiKey) {
   }
 }
 
-async function makeAccessorySearchPlans(apiKey, rule, target, comboRule) {
-  // v5.2.6: v5.2.4처럼 요청 수를 적게 유지한다.
-  // 상중/리버스 상중은 "양옵션 정확 필터"가 빈 결과를 줄 수 있어, 고정된 상 옵션 1개 필터를 보조로 딱 1개만 추가한다.
-  // 5.2.5처럼 단독/무필터를 여러 갈래로 병행하지 않아 타임아웃을 줄인다.
+async function makeAccessorySearchPlans(apiKey, rule, target) {
+  // v5.2.7: v5.2.4 방식으로 롤백. EtcOptions는 후보 검색용, 최종 판정은 Options의 ACCESSORY_UPGRADE 실제 Value로만 수행한다.
+  // 목걸이 로아와 검증값: 상상=적주피2.0+추피2.6, 상중=적주피2.0+추피1.6, 리버스상중=적주피1.2+추피2.6.
   const optionData = await getAuctionOptionDataCached(apiKey);
   const primaryOption = findAuctionEtcOption(optionData, target.primary.label);
   const secondaryOption = findAuctionEtcOption(optionData, target.secondary.label);
   const plans = [];
   const categoryList = [...new Set(rule.categoryCandidates.filter(code => code !== null && code !== undefined))].slice(0, 1);
 
-  const toEtc = (option, targetOption) => option ? {
-    FirstOption: option.firstOption,
-    SecondOption: option.secondOption,
-    MinValue: Number(targetOption.value),
-    MaxValue: Number(targetOption.value)
-  } : null;
-
-  const exactEtcOptions = [toEtc(primaryOption, target.primary), toEtc(secondaryOption, target.secondary)].filter(Boolean);
+  const filteredEtcOptions = [primaryOption, secondaryOption].filter(Boolean).map((option, index) => {
+    const targetOption = index === 0 ? target.primary : target.secondary;
+    return {
+      FirstOption: option.firstOption,
+      SecondOption: option.secondOption,
+      MinValue: Number(targetOption.value),
+      MaxValue: Number(targetOption.value)
+    };
+  });
 
   for (const categoryCode of categoryList) {
-    if (exactEtcOptions.length === 2) {
+    if (filteredEtcOptions.length === 2) {
       plans.push({
-        type: 'accessory-exact-two-options',
+        type: 'accessory-etc-candidate-asc',
         categoryCode,
         sortCondition: 'ASC',
         optionSearch: `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보 검색 후 직접 판정`,
-        etcOptions: exactEtcOptions,
-        pages: 4
+        etcOptions: filteredEtcOptions
       });
     }
-
-    // 상중/리버스 상중은 반드시 포함되는 "상" 옵션 하나로 후보를 좁혀서 찾는다.
-    // 상상은 exact two-options가 이미 잘 동작하므로 불필요한 추가 요청을 하지 않는다.
-    if (!(target.primary.grade === 'high' && target.secondary.grade === 'high')) {
-      const highSide = target.primary.grade === 'high'
-        ? { option: primaryOption, targetOption: target.primary, side: 'primary-high' }
-        : { option: secondaryOption, targetOption: target.secondary, side: 'secondary-high' };
-      const highEtc = toEtc(highSide.option, highSide.targetOption);
-      if (highEtc) {
-        plans.push({
-          type: `accessory-${highSide.side}-candidate`,
-          categoryCode,
-          sortCondition: 'ASC',
-          optionSearch: `${highSide.targetOption.label} ${highSide.targetOption.value}% 단일 후보 검색 후 ${target.primary.label}/${target.secondary.label} 직접 판정`,
-          etcOptions: [highEtc],
-          pages: 5
-        });
-      }
-    }
+    plans.push({
+      type: 'accessory-base-desc',
+      categoryCode,
+      sortCondition: 'DESC',
+      optionSearch: 'EtcOptions 미신뢰 보완: 고가 3연마 후보 직접 판정',
+      etcOptions: []
+    });
+    plans.push({
+      type: 'accessory-base-asc',
+      categoryCode,
+      sortCondition: 'ASC',
+      optionSearch: 'EtcOptions 미신뢰 보완: 저가 후보 직접 판정',
+      etcOptions: []
+    });
   }
   return plans;
 }
+
 function findAuctionEtcOption(data, label) {
   if (!data) return null;
   const labelCompact = normalizeText(label).replace(/\s+/g, '');
@@ -154,7 +149,7 @@ async function searchAccessory(apiKey, query) {
   const combo = String(query.combo || 'highHigh');
   const rule = ACCESSORY_RULES[part] || ACCESSORY_RULES.necklace;
   const comboRule = COMBO_RULES[combo] || COMBO_RULES.highHigh;
-  const maxPages = clamp(Number(query.pages || 5), 1, 12);
+  const maxPages = clamp(Number(query.pages || 8), 1, 30);
   const target = makeAccessoryTarget(rule, comboRule);
   const tried = [];
   const matchedMap = new Map();
@@ -162,14 +157,13 @@ async function searchAccessory(apiKey, query) {
   const debugSamples = [];
   const filterStats = {};
   const startedAt = Date.now();
-  const timeBudgetMs = 6500;
+  const timeBudgetMs = 8500;
 
-  // v5.2.4: 요청은 부위/티어/등급만 사용한다. 연마 옵션·힘/민/지·품질은 요청/필터 조건에서 제외한다.
-  // 응답 Options 배열의 ACCESSORY_UPGRADE만 보고 3연마 + 선택 옵션 2개를 위치 무관 + 퍼센트 값 기준으로 검사한다.
-  const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target, comboRule);
+  // v5.2.7: 5.2.4의 빠른 검색 플랜 유지. 응답 Options 배열의 ACCESSORY_UPGRADE만 보고 3연마 + 선택 옵션 2개를 위치 무관 + 실제 Value 기준으로 검사한다.
+  const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target);
   for (const plan of searchPlans) {
     if (Date.now() - startedAt > timeBudgetMs) break;
-    for (let pageNo = 1; pageNo <= Math.min(maxPages, plan.pages || maxPages); pageNo += 1) {
+    for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
       if (Date.now() - startedAt > timeBudgetMs) break;
       const payload = {
         Sort: 'BUY_PRICE',
@@ -224,7 +218,7 @@ async function searchAccessory(apiKey, query) {
     tried,
     debug: summarizeTried(tried),
     accessoryDebug: {
-      note: 'v5.2.6 악세 디버그: v5.2.4 방식처럼 요청 수를 줄이고, 상중/리버스 상중은 상 옵션 단일 후보 검색을 1개만 보강합니다. 최종 판정은 ACCESSORY_UPGRADE 3개 + 위치 무관 + 실제 Value 등급표로 수행합니다.',
+      note: 'v5.2.7 악세 디버그: v5.2.4 검색 방식으로 롤백하고, 최종 판정은 ACCESSORY_UPGRADE 3개 + 옵션 위치 무관 + 실제 Value 등급표로 수행합니다.',
       requestPayloads: debugPayloads.slice(0, 8),
       filterStats,
       samples: debugSamples
@@ -416,7 +410,7 @@ async function fetchMarketPage(apiKey, payload) {
 
 async function requestLostArk(apiKey, url, options = {}) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3500);
+  const timeout = setTimeout(() => controller.abort(), 4500);
   const init = { method: options.method || 'GET', headers: { Authorization: `bearer ${apiKey}`, Accept: 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}) }, signal: controller.signal };
   if (options.body) init.body = JSON.stringify(options.body);
   const response = await fetch(url, init).finally(() => clearTimeout(timeout));
