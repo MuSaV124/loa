@@ -1,4 +1,4 @@
-const API_VERSION = '5.2.4';
+const API_VERSION = '5.2.5';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -92,25 +92,43 @@ async function makeAccessorySearchPlans(apiKey, rule, target) {
   for (const categoryCode of categoryList) {
     if (filteredEtcOptions.length === 2) {
       plans.push({
-        type: 'accessory-etc-candidate-asc',
+        type: 'accessory-etc-both-asc',
         categoryCode,
         sortCondition: 'ASC',
-        optionSearch: `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보 검색 후 직접 판정`,
+        optionSearch: `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 양옵션 후보 검색 후 직접 판정`,
         etcOptions: filteredEtcOptions
       });
     }
-    plans.push({
-      type: 'accessory-base-desc',
-      categoryCode,
-      sortCondition: 'DESC',
-      optionSearch: 'EtcOptions 미신뢰 보완: 고가 3연마 후보 직접 판정',
-      etcOptions: []
-    });
+    if (filteredEtcOptions[0]) {
+      plans.push({
+        type: 'accessory-etc-primary-asc',
+        categoryCode,
+        sortCondition: 'ASC',
+        optionSearch: `${target.primary.label} ${target.primary.value}% 1옵션 후보 검색 후 직접 판정`,
+        etcOptions: [filteredEtcOptions[0]]
+      });
+    }
+    if (filteredEtcOptions[1]) {
+      plans.push({
+        type: 'accessory-etc-secondary-asc',
+        categoryCode,
+        sortCondition: 'ASC',
+        optionSearch: `${target.secondary.label} ${target.secondary.value}% 2옵션 후보 검색 후 직접 판정`,
+        etcOptions: [filteredEtcOptions[1]]
+      });
+    }
     plans.push({
       type: 'accessory-base-asc',
       categoryCode,
       sortCondition: 'ASC',
       optionSearch: 'EtcOptions 미신뢰 보완: 저가 후보 직접 판정',
+      etcOptions: []
+    });
+    plans.push({
+      type: 'accessory-base-desc',
+      categoryCode,
+      sortCondition: 'DESC',
+      optionSearch: 'EtcOptions 미신뢰 보완: 고가 3연마 후보 직접 판정',
       etcOptions: []
     });
   }
@@ -149,7 +167,7 @@ async function searchAccessory(apiKey, query) {
   const combo = String(query.combo || 'highHigh');
   const rule = ACCESSORY_RULES[part] || ACCESSORY_RULES.necklace;
   const comboRule = COMBO_RULES[combo] || COMBO_RULES.highHigh;
-  const maxPages = clamp(Number(query.pages || 8), 1, 30);
+  const maxPages = clamp(Number(query.pages || (combo === 'highHigh' ? 8 : 12)), 1, 30);
   const target = makeAccessoryTarget(rule, comboRule);
   const tried = [];
   const matchedMap = new Map();
@@ -157,7 +175,7 @@ async function searchAccessory(apiKey, query) {
   const debugSamples = [];
   const filterStats = {};
   const startedAt = Date.now();
-  const timeBudgetMs = 8500;
+  const timeBudgetMs = 10000;
 
   // v5.2.4: 요청은 부위/티어/등급만 사용한다. 연마 옵션·힘/민/지·품질은 요청/필터 조건에서 제외한다.
   // 응답 Options 배열의 ACCESSORY_UPGRADE만 보고 3연마 + 선택 옵션 2개를 위치 무관 + 퍼센트 값 기준으로 검사한다.
@@ -219,7 +237,7 @@ async function searchAccessory(apiKey, query) {
     tried,
     debug: summarizeTried(tried),
     accessoryDebug: {
-      note: 'v5.2.4 악세 디버그: EtcOptions는 후보 검색에만 사용하고 최종 판정은 Options의 ACCESSORY_UPGRADE 3개 + 옵션 위치 무관 + 실제 Value 등급표로 수행합니다.',
+      note: 'v5.2.5 악세 디버그: 상중/리버스 상중 후보 확보를 위해 양옵션/1옵션/2옵션/무필터 후보 검색을 병행하고, 최종 판정은 ACCESSORY_UPGRADE 실제 Value로만 수행합니다.',
       requestPayloads: debugPayloads.slice(0, 8),
       filterStats,
       samples: debugSamples
