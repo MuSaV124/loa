@@ -1,4 +1,4 @@
-const VERSION = '5.1.7';
+const VERSION = '5.1.8';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -1415,7 +1415,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.1.7',
+    apiVersion: '5.1.8',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1617,7 +1617,7 @@ function renderMarketResults(container, data, title, subtitle) {
   const triedText = Array.isArray(data?.tried) ? ` · 조회시도 ${data.tried.length}회` : '';
   const debugText = marketDebugText(data);
   if (!items.length) {
-    container.innerHTML = `<div class="marketEmptyBox">검색 조건에 맞는 매물을 찾지 못했습니다.${triedText}<br><small>공식 API 응답 ${escapeHtml(debugText || '')} · 카테고리/검색어/필터 조건을 확인하세요.</small></div>`;
+    container.innerHTML = `<div class="marketEmptyBox">검색 조건에 맞는 매물을 찾지 못했습니다.${triedText}<br><small>공식 API 응답 ${escapeHtml(debugText || '')} · 카테고리/검색어/필터 조건을 확인하세요.</small></div>${accessoryDebugHtml(data)}`;
     return;
   }
   container.innerHTML = `
@@ -1626,6 +1626,23 @@ function renderMarketResults(container, data, title, subtitle) {
       ${items.map(item => marketResultItemHtml(item)).join('')}
     </div>
   `;
+}
+
+function accessoryDebugHtml(data) {
+  const dbg = data?.accessoryDebug;
+  if (!dbg) return '';
+  const payloads = Array.isArray(dbg.requestPayloads) ? dbg.requestPayloads : [];
+  const samples = Array.isArray(dbg.samples) ? dbg.samples : [];
+  const stats = dbg.filterStats || {};
+  const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
+  return `<div class="marketDebugPanel">
+    <details open>
+      <summary>악세 디버그 보기 · v5.1.8</summary>
+      <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
+      <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
+      <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>
+    </details>
+  </div>`;
 }
 
 function marketResultItemHtml(item) {

@@ -1,4 +1,4 @@
-const API_VERSION = '5.1.7';
+const API_VERSION = '5.1.8';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -134,8 +134,11 @@ async function searchAccessory(apiKey, query) {
   const target = makeAccessoryTarget(rule, comboRule);
   const tried = [];
   const matchedMap = new Map();
+  const debugPayloads = [];
+  const debugSamples = [];
+  const filterStats = {};
 
-  // v5.1.7: 3연마 전체 조회를 먼저 하지 않는다. 사용자가 선택한 연마 옵션 2개로
+  // v5.1.8: 3연마 전체 조회를 먼저 하지 않는다. 사용자가 선택한 연마 옵션 2개로
   // 경매장 검색 범위를 먼저 줄이고, 응답 결과에서 3연마/기본 스탯/수치 일치 여부를 필터링한다.
   const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target);
   for (const plan of searchPlans) {
@@ -151,17 +154,20 @@ async function searchAccessory(apiKey, query) {
         EtcOptions: plan.etcOptions?.length ? plan.etcOptions : undefined
       };
       stripUndefined(payload);
+      debugPayloads.push({ ...payload });
       const result = await fetchAuctionPage(apiKey, payload);
       tried.push({ type: plan.type, keyword: rule.label, categoryCode: plan.categoryCode, pageNo, optionSearch: plan.optionSearch || null, count: result.items.length, totalCount: result.totalCount, error: result.error || null });
 
       for (const item of result.items) {
         const normalized = normalizeAuctionItem(item);
-        if (!normalized.price) continue;
-        if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) continue;
-        if (!hasStatRange(normalized.fullText, rule.statRange)) continue;
-        if (!hasThreeRefiningOptions(normalized.fullText, [target.primary.label, target.secondary.label])) continue;
-        if (!hasOptionValue(normalized.fullText, target.primary.label, target.primary.value)) continue;
-        if (!hasOptionValue(normalized.fullText, target.secondary.label, target.secondary.value)) continue;
+        const reasons = accessoryRejectReasons(normalized, rule, target);
+        if (debugSamples.length < 5) {
+          debugSamples.push(makeAccessoryDebugSample(item, normalized, reasons));
+        }
+        if (reasons.length) {
+          for (const reason of reasons) filterStats[reason] = (filterStats[reason] || 0) + 1;
+          continue;
+        }
         const key = normalized.id || `${normalized.name}-${normalized.price}-${normalized.quality}`;
         if (!matchedMap.has(key)) matchedMap.set(key, { ...normalized, part: rule.label, combo: comboRule.label, refineCount: normalized.refineCount, targetOptions: [target.primary, target.secondary] });
       }
@@ -175,7 +181,67 @@ async function searchAccessory(apiKey, query) {
   }
 
   const matched = [...matchedMap.values()].sort((a, b) => a.price - b.price);
-  return { ok: true, apiVersion: API_VERSION, source: 'auctions/items', mode: 'accessory', part, partLabel: rule.label, combo, comboLabel: comboRule.label, statRange: rule.statRange, targetOptions: [target.primary, target.secondary], items: matched.slice(0, 10), lowest: matched[0] || null, tried, debug: summarizeTried(tried) };
+  return {
+    ok: true,
+    apiVersion: API_VERSION,
+    source: 'auctions/items',
+    mode: 'accessory',
+    part,
+    partLabel: rule.label,
+    combo,
+    comboLabel: comboRule.label,
+    statRange: rule.statRange,
+    targetOptions: [target.primary, target.secondary],
+    items: matched.slice(0, 10),
+    lowest: matched[0] || null,
+    tried,
+    debug: summarizeTried(tried),
+    accessoryDebug: {
+      note: 'v5.1.8 악세 디버그: 실제 요청 payload, 응답 샘플, 필터 제외 사유를 확인하세요.',
+      requestPayloads: debugPayloads.slice(0, 8),
+      filterStats,
+      samples: debugSamples
+    }
+  };
+}
+
+function accessoryRejectReasons(normalized, rule, target) {
+  const reasons = [];
+  if (!normalized.price) reasons.push('가격 없음');
+  if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) reasons.push('부위 불일치');
+  if (!hasStatRange(normalized.fullText, rule.statRange)) reasons.push('기본 스탯 불일치');
+  if (!hasThreeRefiningOptions(normalized.fullText, [target.primary.label, target.secondary.label])) reasons.push('3연마/필수옵션 불일치');
+  if (!hasOptionValue(normalized.fullText, target.primary.label, target.primary.value)) reasons.push(`옵션1 수치 불일치: ${target.primary.label} ${target.primary.value}%`);
+  if (!hasOptionValue(normalized.fullText, target.secondary.label, target.secondary.value)) reasons.push(`옵션2 수치 불일치: ${target.secondary.label} ${target.secondary.value}%`);
+  return reasons;
+}
+
+function makeAccessoryDebugSample(raw, normalized, reasons) {
+  return {
+    name: normalized.name,
+    grade: normalized.grade,
+    price: normalized.price,
+    quality: normalized.quality,
+    refineCount: normalized.refineCount,
+    reasons,
+    optionKeys: {
+      hasOptions: Array.isArray(raw?.Options),
+      optionsLength: Array.isArray(raw?.Options) ? raw.Options.length : null,
+      hasEtcOptions: Array.isArray(raw?.EtcOptions),
+      etcOptionsLength: Array.isArray(raw?.EtcOptions) ? raw.EtcOptions.length : null,
+      tooltipType: typeof raw?.Tooltip
+    },
+    options: compactJson(raw?.Options, 900),
+    etcOptions: compactJson(raw?.EtcOptions, 900),
+    textPreview: normalized.fullText.slice(0, 1200)
+  };
+}
+
+function compactJson(value, max = 700) {
+  if (value === undefined || value === null) return null;
+  let text = '';
+  try { text = JSON.stringify(value); } catch { text = String(value); }
+  return text.length > max ? `${text.slice(0, max)}...` : text;
 }
 
 async function searchGem(apiKey, query) {
