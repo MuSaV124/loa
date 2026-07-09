@@ -1,4 +1,4 @@
-const API_VERSION = '5.1.2';
+const API_VERSION = '5.1.3';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -37,8 +37,11 @@ export default async function handler(req, res) {
     const mode = String(req.query.mode || '').trim();
     if (mode === 'accessory') return res.status(200).json(await searchAccessory(apiKey, req.query));
     if (mode === 'gem') return res.status(200).json(await searchGem(apiKey, req.query));
+    if (mode === 'gemList') return res.status(200).json(await searchGemList(apiKey, req.query));
     if (mode === 'engraving') return res.status(200).json(await searchEngraving(apiKey, req.query));
-    return res.status(400).json({ ok: false, error: 'mode는 accessory/gem/engraving 중 하나여야 합니다.' });
+    if (mode === 'engravingList') return res.status(200).json(await searchEngravingList(apiKey, req.query));
+    if (mode === 'auctionOptions') return res.status(200).json(await getAuctionOptions(apiKey));
+    return res.status(400).json({ ok: false, error: 'mode는 accessory/gem/gemList/engraving/engravingList/auctionOptions 중 하나여야 합니다.' });
   } catch (error) {
     return res.status(500).json({ ok: false, apiVersion: API_VERSION, error: '시세 조회 실패', message: error?.message || String(error) });
   }
@@ -110,6 +113,23 @@ async function searchGem(apiKey, query) {
   return { ok: true, apiVersion: API_VERSION, source: 'auctions/items', mode: 'gem', gem, gemLabel: rule.label, level, items: matched.slice(0, 10), lowest: matched[0] || null, tried };
 }
 
+async function searchGemList(apiKey, query) {
+  const levels = [10, 9, 8, 7, 6, 5];
+  const rows = [];
+  const tried = [];
+  for (const level of levels) {
+    const damage = await searchGem(apiKey, { gem: 'damage', level });
+    const cooldown = await searchGem(apiKey, { gem: 'cooldown', level });
+    tried.push(...(damage.tried || []), ...(cooldown.tried || []));
+    rows.push({
+      level,
+      damage: damage.lowest ? { ...damage.lowest, gem: '겁화', level } : null,
+      cooldown: cooldown.lowest ? { ...cooldown.lowest, gem: '작열', level } : null
+    });
+  }
+  return { ok: true, apiVersion: API_VERSION, source: 'auctions/items', mode: 'gemList', rows, tried, updatedAt: new Date().toISOString() };
+}
+
 async function searchEngraving(apiKey, query) {
   const name = String(query.name || '원한').trim();
   const keyword = name.includes('각인서') ? name : `${name} 각인서`;
@@ -133,6 +153,41 @@ async function searchEngraving(apiKey, query) {
   }
   matched.sort((a, b) => a.price - b.price);
   return { ok: true, apiVersion: API_VERSION, source: 'markets/items', mode: 'engraving', name, items: matched.slice(0, 10), lowest: matched[0] || null, tried };
+}
+
+async function searchEngravingList(apiKey, query) {
+  const maxPages = clamp(Number(query.pages || 20), 1, 50);
+  const seen = new Map();
+  const tried = [];
+  for (const categoryCode of [40000, 40010, null]) {
+    for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
+      const payload = { Sort: 'CURRENT_MIN_PRICE', SortCondition: 'DESC', CategoryCode: categoryCode ?? undefined, ItemGrade: '유물', ItemName: '각인서', PageNo: pageNo };
+      stripUndefined(payload);
+      const result = await fetchMarketPage(apiKey, payload);
+      tried.push({ categoryCode, pageNo, count: result.items.length, totalCount: result.totalCount, error: result.error || null });
+      for (const item of result.items) {
+        const normalized = normalizeMarketItem(item);
+        const text = normalizeText([normalized.name, normalized.fullText].join(' '));
+        if (!normalized.price) continue;
+        if (!text.includes('각인서')) continue;
+        if (normalized.grade && normalized.grade !== '유물') continue;
+        const key = normalized.name || normalized.id || text.slice(0, 60);
+        const prev = seen.get(key);
+        if (!prev || normalized.price < prev.price) seen.set(key, normalized);
+      }
+      const totalCount = Number(result.totalCount || 0);
+      const pageSize = Number(result.pageSize || result.items.length || 10) || 10;
+      if (!result.items.length || (totalCount && pageNo * pageSize >= totalCount)) break;
+    }
+    if (seen.size) break;
+  }
+  const items = [...seen.values()].sort((a, b) => b.price - a.price);
+  return { ok: true, apiVersion: API_VERSION, source: 'markets/items', mode: 'engravingList', sort: 'price-desc', items, tried, updatedAt: new Date().toISOString() };
+}
+
+async function getAuctionOptions(apiKey) {
+  const data = await requestLostArk(apiKey, 'https://developer-lostark.game.onstove.com/auctions/options', { method: 'GET' });
+  return { ok: true, apiVersion: API_VERSION, source: 'auctions/options', data, updatedAt: new Date().toISOString() };
 }
 
 function makeAccessoryTarget(rule, comboRule) {

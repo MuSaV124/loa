@@ -1,4 +1,4 @@
-const VERSION = '5.1.2';
+const VERSION = '5.1.3';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -1408,7 +1408,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.1.2',
+    apiVersion: '5.1.3',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1477,11 +1477,10 @@ const MARKET_ACCESSORY_RULES = {
 
 function initMarketPriceTab() {
   $('accSearchButton')?.addEventListener('click', searchMarketAccessory);
-  $('gemSearchButton')?.addEventListener('click', searchMarketGem);
-  $('engravingSearchButton')?.addEventListener('click', searchMarketEngraving);
+  $('gemListButton')?.addEventListener('click', loadMarketGemList);
+  $('engravingListButton')?.addEventListener('click', loadMarketEngravingList);
   $('accPartSelect')?.addEventListener('change', renderAccessoryRuleHint);
   $('accComboSelect')?.addEventListener('change', renderAccessoryRuleHint);
-  $('engravingNameInput')?.addEventListener('keydown', (event) => { if (event.key === 'Enter') searchMarketEngraving(); });
   renderAccessoryRuleHint();
 }
 
@@ -1513,39 +1512,33 @@ async function searchMarketAccessory() {
   }
 }
 
-async function searchMarketGem() {
-  const button = $('gemSearchButton');
+async function loadMarketGemList() {
+  const button = $('gemListButton');
   const resultEl = $('gemMarketResult');
-  const gem = $('gemTypeSelect')?.value || 'damage';
-  const level = $('gemLevelSelect')?.value || '10';
-  if (button) { button.disabled = true; button.textContent = '검색 중'; }
-  if (resultEl) resultEl.innerHTML = '경매장에서 보석 매물을 조회하는 중입니다.';
+  if (button) { button.disabled = true; button.textContent = '조회 중'; }
+  if (resultEl) resultEl.innerHTML = '경매장에서 5~10레벨 겁화/작열 최저가를 조회하는 중입니다.';
   try {
-    const url = `/api/market-prices?mode=gem&gem=${encodeURIComponent(gem)}&level=${encodeURIComponent(level)}&_=${Date.now()}`;
-    const data = await fetchMarketJson(url);
-    renderMarketResults(resultEl, data, `${data.gemLabel || '보석'} ${data.level || level}레벨`, '경매장 최저가순');
+    const data = await fetchMarketJson(`/api/market-prices?mode=gemList&_=${Date.now()}`);
+    renderGemPriceGrid(resultEl, data);
   } catch (error) {
     renderMarketError(resultEl, error.message);
   } finally {
-    if (button) { button.disabled = false; button.textContent = '보석 검색'; }
+    if (button) { button.disabled = false; button.textContent = '보석 전체 조회'; }
   }
 }
 
-async function searchMarketEngraving() {
-  const button = $('engravingSearchButton');
+async function loadMarketEngravingList() {
+  const button = $('engravingListButton');
   const resultEl = $('engravingMarketResult');
-  const name = ($('engravingNameInput')?.value || '').trim();
-  if (!name) return renderMarketError(resultEl, '각인명을 입력하세요.');
-  if (button) { button.disabled = true; button.textContent = '검색 중'; }
-  if (resultEl) resultEl.innerHTML = '거래소에서 유물 각인서를 조회하는 중입니다.';
+  if (button) { button.disabled = true; button.textContent = '조회 중'; }
+  if (resultEl) resultEl.innerHTML = '거래소에서 전체 유물 각인서 최저가를 조회하는 중입니다.';
   try {
-    const url = `/api/market-prices?mode=engraving&name=${encodeURIComponent(name)}&_=${Date.now()}`;
-    const data = await fetchMarketJson(url);
-    renderMarketResults(resultEl, data, `${name} 유물 각인서`, '거래소 최저가순');
+    const data = await fetchMarketJson(`/api/market-prices?mode=engravingList&_=${Date.now()}`);
+    renderEngravingPriceGrid(resultEl, data);
   } catch (error) {
     renderMarketError(resultEl, error.message);
   } finally {
-    if (button) { button.disabled = false; button.textContent = '유각 검색'; }
+    if (button) { button.disabled = false; button.textContent = '전체 유각 조회'; }
   }
 }
 
@@ -1554,6 +1547,62 @@ async function fetchMarketJson(url) {
   const data = await readJsonSafely(res);
   if (!res.ok || !data?.ok) throw new Error(data?.error || data?.message || '시세 조회 실패');
   return data;
+}
+
+
+function renderGemPriceGrid(container, data) {
+  if (!container) return;
+  const rows = Array.isArray(data?.rows) ? data.rows : [];
+  if (!rows.length) return renderMarketError(container, '보석 시세를 찾지 못했습니다.');
+  container.innerHTML = `<div class="marketResultList">
+    <div class="marketRuleHint"><b>보석 전체 시세</b> · 경매장 최저가 · ${escapeHtml(formatMarketUpdatedAt(data.updatedAt))}</div>
+    <div class="gemPriceGrid">
+      <div class="gemPriceHead">레벨</div><div class="gemPriceHead">겁화</div><div class="gemPriceHead">작열</div>
+      ${rows.map(row => `
+        <div class="gemLevelCell">Lv.${Number(row.level || 0)}</div>
+        ${gemPriceCell(row.damage, '겁화')}
+        ${gemPriceCell(row.cooldown, '작열')}
+      `).join('')}
+    </div>
+  </div>`;
+}
+
+function gemPriceCell(item, label) {
+  if (!item) return `<div class="gemPriceCell empty"><b>${escapeHtml(label)}</b><span>매물 없음</span></div>`;
+  const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="">` : '';
+  return `<div class="gemPriceCell">${icon}<div><b>${escapeHtml(label)}</b><span>${formatGold(item.price)}</span><small>${escapeHtml(item.name || '')}</small></div></div>`;
+}
+
+function renderEngravingPriceGrid(container, data) {
+  if (!container) return;
+  const items = Array.isArray(data?.items) ? data.items : [];
+  if (!items.length) return renderMarketError(container, '유물 각인서 시세를 찾지 못했습니다.');
+  container.innerHTML = `<div class="marketResultList">
+    <div class="marketRuleHint"><b>전체 유각 시세</b> · 최저가 비싼 순 · ${escapeHtml(formatMarketUpdatedAt(data.updatedAt))}</div>
+    <div class="engravingPriceGrid">
+      ${items.map(item => engravingPriceCard(item)).join('')}
+    </div>
+  </div>`;
+}
+
+function engravingPriceCard(item) {
+  const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="">` : `<div class="marketIconFallback bookIcon">유</div>`;
+  return `<article class="engravingPriceCard">
+    ${icon}
+    <div><b>${escapeHtml(cleanEngravingName(item.name || '유물 각인서'))}</b><small>${escapeHtml(item.grade || '유물')}</small></div>
+    <strong>${formatGold(item.price)}</strong>
+  </article>`;
+}
+
+function cleanEngravingName(name) {
+  return String(name || '').replace(/\s*각인서\s*/g, '').replace(/유물\s*/g, '').trim() || name;
+}
+
+function formatMarketUpdatedAt(value) {
+  if (!value) return '방금 갱신';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '방금 갱신';
+  return `마지막 갱신 ${d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
 }
 
 function renderMarketResults(container, data, title, subtitle) {

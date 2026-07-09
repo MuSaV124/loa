@@ -1358,3 +1358,33 @@ body.marketMode:not(.avatarMode) #legendAvatarPanel { display: none !important; 
 .marketError { color:#fecaca; border-color: rgba(248,113,113,.28); background: rgba(127,29,29,.22); }
 @media (max-width: 900px) { .marketSelectGrid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .marketSelectGrid, .marketResultItem { grid-template-columns: 1fr; } .marketPrice { white-space: normal; } }
+
+/* v5.1.3 market board layout */
+.marketSingleAction { grid-template-columns: minmax(0, 1fr) 180px; }
+.gemPriceGrid { display: grid; grid-template-columns: 92px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: stretch; }
+.gemPriceHead { color: #e2e8f0; font-weight: 1000; font-size: 13px; padding: 8px 10px; border-radius: 12px; background: rgba(148,163,184,.12); text-align: center; }
+.gemLevelCell { display: grid; place-items: center; color: #f8fafc; font-weight: 1000; border: 1px solid rgba(148,163,184,.14); border-radius: 14px; background: rgba(15,23,42,.50); }
+.gemPriceCell { display: grid; grid-template-columns: 42px 1fr; gap: 10px; align-items: center; min-height: 62px; border: 1px solid rgba(148,163,184,.14); border-radius: 14px; padding: 9px; background: rgba(15,23,42,.55); }
+.gemPriceCell.empty { display: flex; justify-content: space-between; color: var(--muted); }
+.gemPriceCell img { width: 42px; height: 42px; object-fit: contain; border-radius: 10px; background: rgba(255,255,255,.06); }
+.gemPriceCell b { display:block; color:#f8fafc; font-size: 13px; }
+.gemPriceCell span { display:block; color:#fbbf24; font-weight: 1000; font-size: 15px; }
+.gemPriceCell small { display:block; color: var(--muted); font-size: 11px; font-weight: 800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.engravingPriceGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.engravingPriceCard { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 10px; align-items: center; border: 1px solid rgba(148,163,184,.14); border-radius: 14px; padding: 10px; background: rgba(15,23,42,.55); min-width: 0; }
+.engravingPriceCard img { width: 46px; height: 46px; object-fit: contain; border-radius: 10px; background: rgba(255,255,255,.06); }
+.engravingPriceCard b { display:block; color:#f8fafc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.engravingPriceCard small { display:block; color: var(--muted); font-weight: 800; }
+.engravingPriceCard strong { color:#fbbf24; font-size: 16px; white-space:nowrap; }
+.gemIcon { background: linear-gradient(135deg, rgba(168,85,247,.35), rgba(244,114,182,.25)); }
+@media (max-width: 760px) {
+  .marketSingleAction { grid-template-columns: 1fr; }
+  .gemPriceGrid { grid-template-columns: 68px minmax(0, 1fr) minmax(0, 1fr); }
+  .engravingPriceGrid { grid-template-columns: 1fr; }
+  .engravingPriceCard { grid-template-columns: 42px minmax(0, 1fr) auto; }
+}
+@media (max-width: 520px) {
+  .gemPriceGrid { grid-template-columns: 1fr; }
+  .gemPriceHead { display:none; }
+  .gemLevelCell { padding: 9px; }
+}
