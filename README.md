@@ -1,4 +1,10 @@
-# Lost Ark Node Recommend Calculator v4.9.4
+# Lost Ark Node Recommend Calculator v5.1.4
+
+## v5.1.4
+
+- 시세 > 유각/보석 탭 진입 시 목록이 자동 조회되도록 변경.
+- 유각/보석 영역의 별도 검색/조회 카드와 `유`, `보` 아이콘 박스를 제거.
+- 유각/보석 버튼 문구를 `새로고침`으로 통일.
 
 ## v4.9.4
 

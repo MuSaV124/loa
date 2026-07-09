@@ -1293,6 +1293,13 @@ function renderMarketSubTab() {
     avatarPanel.style.display = isAvatar ? '' : 'none';
   }
   if (isAvatar) prepareLegendAvatarTab();
+  autoLoadMarketSubTab();
+}
+
+function autoLoadMarketSubTab() {
+  if (!document.body.classList.contains('marketMode')) return;
+  if (selectedMarketTab === 'gem') loadMarketGemList();
+  if (selectedMarketTab === 'engraving') loadMarketEngravingList();
 }
 
 function initMarketTabs() {
@@ -1523,7 +1530,7 @@ async function loadMarketGemList() {
   } catch (error) {
     renderMarketError(resultEl, error.message);
   } finally {
-    if (button) { button.disabled = false; button.textContent = '보석 전체 조회'; }
+    if (button) { button.disabled = false; button.textContent = '새로고침'; }
   }
 }
 
@@ -1538,7 +1545,7 @@ async function loadMarketEngravingList() {
   } catch (error) {
     renderMarketError(resultEl, error.message);
   } finally {
-    if (button) { button.disabled = false; button.textContent = '전체 유각 조회'; }
+    if (button) { button.disabled = false; button.textContent = '새로고침'; }
   }
 }
 
