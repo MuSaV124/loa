@@ -1,4 +1,4 @@
-const API_VERSION = '5.3.5';
+const API_VERSION = '5.3.6';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -77,12 +77,12 @@ async function getAuctionOptionDataCached(apiKey) {
 }
 
 async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey = 'necklace') {
-  // v5.3.2:
+  // v5.3.6:
   // 공식 API의 ACCESSORY_UPGRADE 값 필터는 중옵 조합에서 정확히 AND로 동작하지 않는 케이스가 확인됐다.
   // 그래서 먼저 3연마 후보를 줄이기 위해 ARK_PASSIVE "깨달음 13"을 함께 걸고,
   // 상상/상중/중상은 한쪽 핵심 상옵션 또는 양옵션 후보를 받은 뒤 Options의 실제 ACCESSORY_UPGRADE 값으로만 최종 판정한다.
   const fallback = AUCTION_ETC_OPTION_FALLBACK[partKey] || {};
-  // v5.3.5: 악세 조회 타임아웃 방지. 목걸이는 검증된 fallback 코드(적주피/추피)를 우선 사용해서
+  // v5.3.6: 악세 조회 타임아웃 방지. 목걸이는 검증된 fallback 코드(적주피/추피)를 우선 사용해서
   // auctions/options 선행 호출 1회를 제거한다. 필요한 부위에서만 options 메타를 조회한다.
   let optionData = null;
   let primaryOption = fallback.primary || null;
@@ -132,15 +132,15 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
     const secondaryBroad = broadEtc(secondaryOption);
 
     if (comboKey === 'highHigh') {
-      // v5.3.5: 공식 API의 양옵션 EtcOptions는 AND로 안정 동작하지 않아 노이즈가 많다.
-      // 그래서 한쪽 상옵션 + ItemUpgradeLevel=3 후보를 먼저 보고, 실제 Options에서 상상 여부를 직접 판정한다.
+      // v5.3.6: 공식 API의 양옵션 EtcOptions는 AND로 안정 동작하지 않아 노이즈가 많다.
+      // 그래서 한쪽 핵심 옵션 후보를 먼저 보고, 힘/민첩/지능 STAT 컷과 실제 Options로 상상 여부를 직접 판정한다.
       // 양옵션 검색은 보조 fallback으로만 짧게 사용한다.
-      if (primaryExact) addPlan(categoryCode, 'accessory-highhigh-primary-high-refine-asc', 'ASC', withRefine([primaryExact]), `${target.primary.label} ${target.primary.value}% + 3연마 후보 후 직접 판정`, 8);
-      if (secondaryExact) addPlan(categoryCode, 'accessory-highhigh-secondary-high-refine-asc', 'ASC', withRefine([secondaryExact]), `${target.secondary.label} ${target.secondary.value}% + 3연마 후보 후 직접 판정`, 8);
-      if (primaryExact) addPlan(categoryCode, 'accessory-highhigh-primary-high-refine-desc', 'DESC', withRefine([primaryExact]), `${target.primary.label} ${target.primary.value}% + 3연마 후보 DESC 후 직접 판정`, 3);
-      if (secondaryExact) addPlan(categoryCode, 'accessory-highhigh-secondary-high-refine-desc', 'DESC', withRefine([secondaryExact]), `${target.secondary.label} ${target.secondary.value}% + 3연마 후보 DESC 후 직접 판정`, 3);
+      if (primaryExact) addPlan(categoryCode, 'accessory-highhigh-primary-high-refine-asc', 'ASC', withRefine([primaryExact]), `${target.primary.label} ${target.primary.value}% + STAT컷 후보 후 직접 판정`, 8);
+      if (secondaryExact) addPlan(categoryCode, 'accessory-highhigh-secondary-high-refine-asc', 'ASC', withRefine([secondaryExact]), `${target.secondary.label} ${target.secondary.value}% + STAT컷 후보 후 직접 판정`, 8);
+      if (primaryExact) addPlan(categoryCode, 'accessory-highhigh-primary-high-refine-desc', 'DESC', withRefine([primaryExact]), `${target.primary.label} ${target.primary.value}% + STAT컷 후보 DESC 후 직접 판정`, 3);
+      if (secondaryExact) addPlan(categoryCode, 'accessory-highhigh-secondary-high-refine-desc', 'DESC', withRefine([secondaryExact]), `${target.secondary.label} ${target.secondary.value}% + STAT컷 후보 DESC 후 직접 판정`, 3);
       if (primaryExact && secondaryExact) {
-        addPlan(categoryCode, 'accessory-highhigh-exact-both-refine-asc-short', 'ASC', withRefine([primaryExact, secondaryExact]), `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% + 3연마 후보`, 2);
+        addPlan(categoryCode, 'accessory-highhigh-exact-both-refine-asc-short', 'ASC', withRefine([primaryExact, secondaryExact]), `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% + STAT컷 후보`, 2);
       }
       continue;
     }
@@ -154,18 +154,18 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
       : { exact: secondaryExact, label: target.secondary.label, value: target.secondary.value, side: 'secondary-mid' };
 
     if (highSide.exact) {
-      addPlan(categoryCode, `accessory-${comboKey}-${highSide.side}-refine-asc`, 'ASC', withRefine([highSide.exact]), `${highSide.label} ${highSide.value}% + 3연마 후보 후 직접 판정`, 8);
-      addPlan(categoryCode, `accessory-${comboKey}-${highSide.side}-refine-desc`, 'DESC', withRefine([highSide.exact]), `${highSide.label} ${highSide.value}% + 3연마 후보 DESC 후 직접 판정`, 4);
+      addPlan(categoryCode, `accessory-${comboKey}-${highSide.side}-refine-asc`, 'ASC', withRefine([highSide.exact]), `${highSide.label} ${highSide.value}% + STAT컷 후보 후 직접 판정`, 8);
+      addPlan(categoryCode, `accessory-${comboKey}-${highSide.side}-refine-desc`, 'DESC', withRefine([highSide.exact]), `${highSide.label} ${highSide.value}% + STAT컷 후보 DESC 후 직접 판정`, 4);
     }
 
     // 중옵 쪽 정확 필터도 깨달음 13과 함께 한 번 더 시도한다. 최종 판정은 여전히 직접 한다.
     if (midSide.exact) {
-      addPlan(categoryCode, `accessory-${comboKey}-${midSide.side}-refine-asc`, 'ASC', withRefine([midSide.exact]), `${midSide.label} ${midSide.value}% + 3연마 후보 후 직접 판정`, 6);
+      addPlan(categoryCode, `accessory-${comboKey}-${midSide.side}-refine-asc`, 'ASC', withRefine([midSide.exact]), `${midSide.label} ${midSide.value}% + STAT컷 후보 후 직접 판정`, 6);
     }
 
     // 옵션 존재 범위 검색은 마지막 fallback. 깨달음 13이 잡힐 때만 사용해서 저가 1~2연마를 최대한 제거한다.
     if (enlightenmentEtc && primaryBroad && secondaryBroad) {
-      addPlan(categoryCode, `accessory-${comboKey}-two-option-broad-refine-asc`, 'ASC', [primaryBroad, secondaryBroad, enlightenmentEtc], `${target.primary.label}/${target.secondary.label} 존재 + 3연마 후보 후 직접 판정`, 6);
+      addPlan(categoryCode, `accessory-${comboKey}-two-option-broad-refine-asc`, 'ASC', [primaryBroad, secondaryBroad, enlightenmentEtc], `${target.primary.label}/${target.secondary.label} 존재 + STAT컷 후보 후 직접 판정`, 6);
     }
   }
   return plans;
@@ -213,8 +213,8 @@ async function searchAccessory(apiKey, query) {
   const startedAt = Date.now();
   const timeBudgetMs = 8500;
 
-  // v5.3.5: 요청은 부위/티어/등급/ItemUpgradeLevel=3 + 후보 축소용 단일 EtcOptions 위주로 사용한다. 최종 판정은 ACCESSORY_UPGRADE 실제 값으로 한다.
-  // 응답 Options 배열의 ACCESSORY_UPGRADE만 보고 3연마 + 선택 옵션 2개를 위치 무관 + 퍼센트 값 기준으로 검사한다.
+  // v5.3.6: 공식 API의 3연마/양옵션 필터를 신뢰하지 않고, 후보 옵션 검색 후 힘/민첩/지능 STAT 컷으로 3연마급을 판정한다.
+  // 최종 판정은 ACCESSORY_UPGRADE 실제 Value + 부위별 주스탯 컷 기준으로 한다.
   const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target, combo, part);
   for (const plan of searchPlans) {
     if (Date.now() - startedAt > timeBudgetMs) break;
@@ -227,7 +227,6 @@ async function searchAccessory(apiKey, query) {
         CategoryCode: plan.categoryCode ?? undefined,
         ItemTier: 4,
         ItemGrade: '고대',
-        ItemUpgradeLevel: 3,
         ItemName: rule.label,
         PageNo: pageNo,
         EtcOptions: Array.isArray(plan.etcOptions) && plan.etcOptions.length ? plan.etcOptions : undefined
@@ -275,7 +274,7 @@ async function searchAccessory(apiKey, query) {
     tried,
     debug: summarizeTried(tried),
     accessoryDebug: {
-      note: 'v5.3.5 악세 디버그: 공식 API ItemUpgradeLevel=3으로 3연마 후보를 줄이고, 최종 판정은 ACCESSORY_UPGRADE 실제 Value 기준입니다.',
+      note: 'v5.3.6 악세 디버그: 공식 API 3연마 필터 대신 힘/민첩/지능 STAT 컷으로 3연마급을 판정하고, 최종 옵션은 ACCESSORY_UPGRADE 실제 Value 기준입니다.',
       requestPayloads: debugPayloads.slice(0, 8),
       filterStats,
       samples: debugSamples
@@ -289,11 +288,24 @@ function accessoryRejectReasons(normalized, rule, target) {
   if (normalized.tier && Number(normalized.tier) !== 4) reasons.push(`티어 불일치: ${normalized.tier}`);
   if (normalized.grade && normalized.grade !== '고대') reasons.push(`등급 불일치: ${normalized.grade}`);
   if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) reasons.push('부위 불일치');
+
+  const statThreshold = getAccessoryStatThreshold(rule.label);
+  if (statThreshold && Number(normalized.mainStat || 0) < statThreshold) {
+    reasons.push(`3연마 STAT 미달: ${normalized.mainStat || 0}/${statThreshold}`);
+  }
+
   const upgrades = normalized.upgradeOptions || [];
-  if (upgrades.length !== 3) reasons.push(`3연마 아님: ${upgrades.length}개`);
   if (!hasUpgradeOption(upgrades, target.primary)) reasons.push(`필수옵션 없음: ${target.primary.label} ${target.primary.value}%`);
   if (!hasUpgradeOption(upgrades, target.secondary)) reasons.push(`필수옵션 없음: ${target.secondary.label} ${target.secondary.value}%`);
   return reasons;
+}
+
+function getAccessoryStatThreshold(partLabel) {
+  const label = normalizeText(partLabel);
+  if (label.includes('목걸이')) return 16500;
+  if (label.includes('귀걸이')) return 12800;
+  if (label.includes('반지')) return 11900;
+  return 0;
 }
 
 function makeAccessoryDebugSample(raw, normalized, reasons) {
@@ -302,6 +314,7 @@ function makeAccessoryDebugSample(raw, normalized, reasons) {
     grade: normalized.grade,
     price: normalized.price,
     quality: normalized.quality,
+    mainStat: normalized.mainStat,
     refineCount: normalized.refineCount,
     upgradeOptions: normalized.upgradeOptions,
     reasons,
@@ -481,6 +494,7 @@ function normalizeAuctionItem(item) {
   const price = Number(auctionInfo.BuyPrice || item.BuyPrice || item.CurrentMinPrice || item.LowestPrice || 0);
   const fullText = normalizeText([item.Name, item.Grade, item.Tier, item.Level, JSON.stringify(item.Options || ''), JSON.stringify(item.EtcOptions || ''), tooltipText(item.Tooltip)].join(' '));
   const upgradeOptions = extractAccessoryUpgradeOptions(item.Options, fullText);
+  const mainStat = extractAccessoryMainStat(item.Options, fullText);
   return {
     id: item.Id || item.ItemId || null,
     name: item.Name || '',
@@ -492,6 +506,7 @@ function normalizeAuctionItem(item) {
     bidStartPrice: Number(auctionInfo.BidStartPrice || 0),
     tradeAllowCount: Number(item.TradeAllowCount ?? item.TradeRemainCount ?? 0),
     quality: findQuality(item, fullText),
+    mainStat,
     refineCount: upgradeOptions.length,
     upgradeOptions,
     fullText
@@ -533,6 +548,32 @@ function extractAccessoryUpgradeOptions(options, fullText = '') {
     }
   }
   return parsed.filter(option => option.name);
+}
+
+function extractAccessoryMainStat(options, fullText = '') {
+  const statNames = ['힘', '민첩', '지능'];
+  let maxStat = 0;
+  if (Array.isArray(options)) {
+    for (const option of options) {
+      if (String(option?.Type || '').toUpperCase() !== 'STAT') continue;
+      const name = normalizeText(option?.OptionName || '');
+      if (!statNames.some(stat => name.includes(stat))) continue;
+      const value = Number(option?.Value ?? 0);
+      if (Number.isFinite(value)) maxStat = Math.max(maxStat, value);
+    }
+  }
+  if (maxStat > 0) return maxStat;
+
+  const text = normalizeText(fullText);
+  for (const stat of statNames) {
+    const regex = new RegExp(`${stat}\\s*(?:\\+)?\\s*([0-9]{4,6})`, 'g');
+    let match;
+    while ((match = regex.exec(text))) {
+      const value = Number(match[1]);
+      if (Number.isFinite(value)) maxStat = Math.max(maxStat, value);
+    }
+  }
+  return maxStat;
 }
 
 function compactOptionName(value) {
