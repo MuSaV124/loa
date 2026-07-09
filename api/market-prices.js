@@ -1,4 +1,4 @@
-const API_VERSION = '5.2.10';
+const API_VERSION = '5.3.0';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -71,10 +71,10 @@ async function getAuctionOptionDataCached(apiKey) {
 }
 
 async function makeAccessorySearchPlans(apiKey, rule, target, comboKey) {
-  // v5.2.10:
-  // - 상상(highHigh)은 v5.2.4/5.2.9에서 동작하던 양옵션 EtcOptions 후보 검색을 그대로 유지한다.
-  // - 상중/리버스 상중은 공식 API의 양옵션 EtcOptions 필터가 1골드 노연마 매물을 반환하는 문제가 있어,
-  //   "상" 옵션 하나만 EtcOptions 후보 검색에 사용하고 최종 판정은 Options의 ACCESSORY_UPGRADE로 직접 수행한다.
+  // v5.3.0:
+  // - 상상(highHigh)은 v5.2.4/5.2.9에서 동작하던 정확 양옵션 EtcOptions 후보 검색을 유지한다.
+  // - 상중/리버스 상중은 값 필터가 불안정하므로 '적주피/추피가 붙은 매물'을 먼저 가져오도록
+  //   두 옵션의 전체 값 범위로 후보를 좁히고, 최종 판정은 Options의 ACCESSORY_UPGRADE 실제 Value로 직접 수행한다.
   const optionData = await getAuctionOptionDataCached(apiKey);
   const primaryOption = findAuctionEtcOption(optionData, target.primary.label);
   const secondaryOption = findAuctionEtcOption(optionData, target.secondary.label);
@@ -87,6 +87,18 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey) {
     MinValue: Number(targetOption.value),
     MaxValue: Number(targetOption.value)
   }] : [];
+
+  const makeRangeEtc = (option, targetOption) => {
+    if (!option || !targetOption?.rule?.values) return [];
+    const vals = Object.values(targetOption.rule.values).map(Number).filter(Number.isFinite);
+    if (!vals.length) return makeEtc(option, targetOption);
+    return [{
+      FirstOption: option.firstOption,
+      SecondOption: option.secondOption,
+      MinValue: Math.min(...vals),
+      MaxValue: Math.max(...vals)
+    }];
+  };
 
   const bothEtcOptions = [primaryOption, secondaryOption].filter(Boolean).map((option, index) => {
     const targetOption = index === 0 ? target.primary : target.secondary;
@@ -127,30 +139,43 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey) {
       continue;
     }
 
-    // 상중: 적주피 상(2.0) 하나만 후보 검색 → 추피 중(1.6)은 직접 필터.
-    // 리버스 상중: 추피 상(2.6) 하나만 후보 검색 → 적주피 중(1.2)은 직접 필터.
+    // 상중/리버스 상중: 값 '정확 필터' 대신 옵션명 두 개가 모두 붙은 후보를 먼저 모은다.
+    // 공식 API는 중옵 값 필터가 흔들리지만 옵션 종류 필터는 비교적 작동하므로, 각 옵션의 전체 값 범위로 요청한다.
+    const rangeEtcOptions = [
+      ...makeRangeEtc(primaryOption, target.primary),
+      ...makeRangeEtc(secondaryOption, target.secondary)
+    ];
+    if (rangeEtcOptions.length === 2) {
+      plans.push({
+        type: 'accessory-two-option-range-asc',
+        categoryCode,
+        sortCondition: 'ASC',
+        optionSearch: `${target.primary.label}/${target.secondary.label} 포함 후보 검색 후 ${target.primary.value}% + ${target.secondary.value}% 직접 판정`,
+        etcOptions: rangeEtcOptions
+      });
+      plans.push({
+        type: 'accessory-two-option-range-desc',
+        categoryCode,
+        sortCondition: 'DESC',
+        optionSearch: `${target.primary.label}/${target.secondary.label} 포함 고가 후보 보완 검색 후 직접 판정`,
+        etcOptions: rangeEtcOptions
+      });
+    }
+
+    // 범위형 양옵션 필터가 실패할 때만 최소 보조. 단일 필터는 노이즈가 많으므로 마지막에만 사용한다.
     const highSide = target.primary.grade === 'high'
       ? { option: primaryOption, targetOption: target.primary, side: 'primary-high' }
       : { option: secondaryOption, targetOption: target.secondary, side: 'secondary-high' };
     const singleHighEtc = makeEtc(highSide.option, highSide.targetOption);
     if (singleHighEtc.length) {
       plans.push({
-        type: `accessory-single-high-${highSide.side}-asc`,
+        type: `accessory-single-high-${highSide.side}-desc`,
         categoryCode,
-        sortCondition: 'ASC',
-        optionSearch: `${highSide.targetOption.label} ${highSide.targetOption.value}% 단일 후보 검색 후 ${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 직접 판정`,
+        sortCondition: 'DESC',
+        optionSearch: `보조: ${highSide.targetOption.label} ${highSide.targetOption.value}% 단일 후보 검색 후 직접 판정`,
         etcOptions: singleHighEtc
       });
     }
-
-    // 단일 필터가 실패할 때만 보조용. 단, 상중/리버스는 저가 노연마가 너무 많아 DESC를 먼저 본다.
-    plans.push({
-      type: 'accessory-base-desc',
-      categoryCode,
-      sortCondition: 'DESC',
-      optionSearch: '보조: 고가 3연마 후보 직접 판정',
-      etcOptions: []
-    });
   }
   return plans;
 }
@@ -197,7 +222,7 @@ async function searchAccessory(apiKey, query) {
   const startedAt = Date.now();
   const timeBudgetMs = 8500;
 
-  // v5.2.10: 요청은 부위/티어/등급만 사용한다. 연마 옵션·힘/민/지·품질은 요청/필터 조건에서 제외한다.
+  // v5.3.0: 요청은 부위/티어/등급 + 후보 축소용 EtcOptions만 사용한다. 최종 판정은 ACCESSORY_UPGRADE 실제 값으로 한다.
   // 응답 Options 배열의 ACCESSORY_UPGRADE만 보고 3연마 + 선택 옵션 2개를 위치 무관 + 퍼센트 값 기준으로 검사한다.
   const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target, combo);
   for (const plan of searchPlans) {
@@ -257,7 +282,7 @@ async function searchAccessory(apiKey, query) {
     tried,
     debug: summarizeTried(tried),
     accessoryDebug: {
-      note: 'v5.2.10 악세 디버그: EtcOptions는 후보 검색에만 사용하고 최종 판정은 Options의 ACCESSORY_UPGRADE 3개 + 옵션 위치 무관 + 실제 Value 등급표로 수행합니다.',
+      note: 'v5.3.0 악세 디버그: 상중/리버스상중은 적주피+추피 포함 후보를 공식 API에서 가져온 뒤 ACCESSORY_UPGRADE 실제 Value로 직접 판정합니다. 상상은 기존 성공 방식 유지.',
       requestPayloads: debugPayloads.slice(0, 8),
       filterStats,
       samples: debugSamples
