@@ -1,6 +1,6 @@
-# Lost Ark Node Recommend Calculator v5.2.7
+# Lost Ark Node Recommend Calculator v5.2.8
 
-## v5.2.7
+## v5.2.8
 
 - 악세 검색: EtcOptions는 후보 검색에만 사용하고 최종 판정은 ACCESSORY_UPGRADE 3연마 + 실제 Value 등급표로 수행.
 - 상상 목걸이 기준: 적에게 주는 피해 증가 2.0 + 추가 피해 2.6 매칭 확인.

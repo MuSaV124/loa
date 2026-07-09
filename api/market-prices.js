@@ -1,4 +1,4 @@
-const API_VERSION = '5.2.7';
+const API_VERSION = '5.2.8';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -70,48 +70,76 @@ async function getAuctionOptionDataCached(apiKey) {
   }
 }
 
-async function makeAccessorySearchPlans(apiKey, rule, target) {
-  // v5.2.7: v5.2.4 방식으로 롤백. EtcOptions는 후보 검색용, 최종 판정은 Options의 ACCESSORY_UPGRADE 실제 Value로만 수행한다.
-  // 목걸이 로아와 검증값: 상상=적주피2.0+추피2.6, 상중=적주피2.0+추피1.6, 리버스상중=적주피1.2+추피2.6.
+async function makeAccessorySearchPlans(apiKey, rule, target, comboKey = 'highHigh') {
+  // v5.2.8: v5.2.4의 빠른 방식 유지 + 상중/리버스상중은 단일 상옵션 후보 검색으로 조회한다.
+  // 로아와 확인값(목걸이): 상상=적주피2.0+추피2.6, 상중=적주피2.0+추피1.6, 리버스상중=적주피1.2+추피2.6.
+  // 공식 API의 EtcOptions 2개 동시 필터는 중옵 조합에서 누락될 수 있어, 최종 판정은 반드시 Options의 ACCESSORY_UPGRADE 실제 Value로만 수행한다.
   const optionData = await getAuctionOptionDataCached(apiKey);
   const primaryOption = findAuctionEtcOption(optionData, target.primary.label);
   const secondaryOption = findAuctionEtcOption(optionData, target.secondary.label);
   const plans = [];
   const categoryList = [...new Set(rule.categoryCandidates.filter(code => code !== null && code !== undefined))].slice(0, 1);
 
-  const filteredEtcOptions = [primaryOption, secondaryOption].filter(Boolean).map((option, index) => {
-    const targetOption = index === 0 ? target.primary : target.secondary;
-    return {
-      FirstOption: option.firstOption,
-      SecondOption: option.secondOption,
-      MinValue: Number(targetOption.value),
-      MaxValue: Number(targetOption.value)
-    };
-  });
+  const makeEtc = (option, targetOption) => option ? [{
+    FirstOption: option.firstOption,
+    SecondOption: option.secondOption,
+    MinValue: Number(targetOption.value),
+    MaxValue: Number(targetOption.value)
+  }] : [];
+
+  const makePairEtc = () => [
+    ...makeEtc(primaryOption, target.primary),
+    ...makeEtc(secondaryOption, target.secondary)
+  ];
 
   for (const categoryCode of categoryList) {
-    if (filteredEtcOptions.length === 2) {
+    if (comboKey === 'highHigh') {
+      const pair = makePairEtc();
+      if (pair.length === 2) {
+        plans.push({
+          type: 'accessory-etc-highhigh-pair',
+          categoryCode,
+          sortCondition: 'ASC',
+          optionSearch: `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보 검색 후 직접 판정`,
+          etcOptions: pair
+        });
+      }
+      // 상상은 가격대가 높아 pair 검색이 실패할 때만 고가 후보를 짧게 보완한다.
       plans.push({
-        type: 'accessory-etc-candidate-asc',
+        type: 'accessory-highhigh-secondary-fallback',
         categoryCode,
         sortCondition: 'ASC',
-        optionSearch: `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보 검색 후 직접 판정`,
-        etcOptions: filteredEtcOptions
+        optionSearch: `${target.secondary.label} ${target.secondary.value}% 단일 후보 검색 후 직접 판정`,
+        etcOptions: makeEtc(secondaryOption, target.secondary)
+      });
+    } else if (comboKey === 'highMid') {
+      // 상중 = 1옵션 상 + 2옵션 중. 1옵션 상 단일 필터가 가장 좁고 빠르다.
+      plans.push({
+        type: 'accessory-highmid-primary-high',
+        categoryCode,
+        sortCondition: 'ASC',
+        optionSearch: `${target.primary.label} ${target.primary.value}% 단일 후보 검색 후 ${target.secondary.label} ${target.secondary.value}% 직접 판정`,
+        etcOptions: makeEtc(primaryOption, target.primary)
+      });
+    } else if (comboKey === 'reverseHighMid') {
+      // 리버스상중 = 1옵션 중 + 2옵션 상. 2옵션 상 단일 필터가 가장 좁고 빠르다.
+      plans.push({
+        type: 'accessory-reverse-highmid-secondary-high',
+        categoryCode,
+        sortCondition: 'ASC',
+        optionSearch: `${target.secondary.label} ${target.secondary.value}% 단일 후보 검색 후 ${target.primary.label} ${target.primary.value}% 직접 판정`,
+        etcOptions: makeEtc(secondaryOption, target.secondary)
       });
     }
+
+    // 마지막 안전망: 무필터 저가 후보 2~3페이지만. 단, 최종 필터는 동일하게 실제 Options 기준이다.
     plans.push({
-      type: 'accessory-base-desc',
-      categoryCode,
-      sortCondition: 'DESC',
-      optionSearch: 'EtcOptions 미신뢰 보완: 고가 3연마 후보 직접 판정',
-      etcOptions: []
-    });
-    plans.push({
-      type: 'accessory-base-asc',
+      type: 'accessory-base-asc-safety',
       categoryCode,
       sortCondition: 'ASC',
       optionSearch: 'EtcOptions 미신뢰 보완: 저가 후보 직접 판정',
-      etcOptions: []
+      etcOptions: [],
+      maxPages: 3
     });
   }
   return plans;
@@ -149,7 +177,7 @@ async function searchAccessory(apiKey, query) {
   const combo = String(query.combo || 'highHigh');
   const rule = ACCESSORY_RULES[part] || ACCESSORY_RULES.necklace;
   const comboRule = COMBO_RULES[combo] || COMBO_RULES.highHigh;
-  const maxPages = clamp(Number(query.pages || 8), 1, 30);
+  const maxPages = clamp(Number(query.pages || 4), 1, 12);
   const target = makeAccessoryTarget(rule, comboRule);
   const tried = [];
   const matchedMap = new Map();
@@ -157,13 +185,13 @@ async function searchAccessory(apiKey, query) {
   const debugSamples = [];
   const filterStats = {};
   const startedAt = Date.now();
-  const timeBudgetMs = 8500;
+  const timeBudgetMs = 6500;
 
-  // v5.2.7: 5.2.4의 빠른 검색 플랜 유지. 응답 Options 배열의 ACCESSORY_UPGRADE만 보고 3연마 + 선택 옵션 2개를 위치 무관 + 실제 Value 기준으로 검사한다.
-  const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target);
+  // v5.2.8: 5.2.4의 빠른 검색 플랜 유지. 응답 Options 배열의 ACCESSORY_UPGRADE만 보고 3연마 + 선택 옵션 2개를 위치 무관 + 실제 Value 기준으로 검사한다.
+  const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target, combo);
   for (const plan of searchPlans) {
     if (Date.now() - startedAt > timeBudgetMs) break;
-    for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
+    for (let pageNo = 1, planMaxPages = Math.min(maxPages, Number(plan.maxPages || maxPages)); pageNo <= planMaxPages; pageNo += 1) {
       if (Date.now() - startedAt > timeBudgetMs) break;
       const payload = {
         Sort: 'BUY_PRICE',
@@ -218,7 +246,7 @@ async function searchAccessory(apiKey, query) {
     tried,
     debug: summarizeTried(tried),
     accessoryDebug: {
-      note: 'v5.2.7 악세 디버그: v5.2.4 검색 방식으로 롤백하고, 최종 판정은 ACCESSORY_UPGRADE 3개 + 옵션 위치 무관 + 실제 Value 등급표로 수행합니다.',
+      note: 'v5.2.8 악세 디버그: 5.2.4 방식 유지, 상중/리버스상중은 단일 상옵션 후보 검색 후 ACCESSORY_UPGRADE 실제 Value로 최종 판정합니다.',
       requestPayloads: debugPayloads.slice(0, 8),
       filterStats,
       samples: debugSamples
@@ -355,7 +383,7 @@ async function searchEngravingList(apiKey, query) {
   const seen = new Map();
   const tried = [];
   for (const categoryCode of [40000, 40010, null]) {
-    for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
+    for (let pageNo = 1, planMaxPages = Math.min(maxPages, Number(plan.maxPages || maxPages)); pageNo <= planMaxPages; pageNo += 1) {
       const payload = { Sort: 'CURRENT_MIN_PRICE', SortCondition: 'DESC', CategoryCode: categoryCode ?? undefined, ItemGrade: '유물', ItemName: '각인서', PageNo: pageNo };
       stripUndefined(payload);
       const result = await fetchMarketPage(apiKey, payload);
