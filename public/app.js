@@ -1,4 +1,4 @@
-const VERSION = '5.1.5';
+const VERSION = '5.1.6';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -1415,7 +1415,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.1.5',
+    apiVersion: '5.1.6',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1505,11 +1505,10 @@ async function searchMarketAccessory() {
   const resultEl = $('accMarketResult');
   const part = $('accPartSelect')?.value || 'necklace';
   const combo = $('accComboSelect')?.value || 'highHigh';
-  const quality = $('accQualityInput')?.value || '67';
   if (button) { button.disabled = true; button.textContent = '검색 중'; }
   if (resultEl) resultEl.innerHTML = '경매장에서 3연마 악세 매물을 조회하는 중입니다.';
   try {
-    const url = `/api/market-prices?mode=accessory&part=${encodeURIComponent(part)}&combo=${encodeURIComponent(combo)}&quality=${encodeURIComponent(quality)}&_=${Date.now()}`;
+    const url = `/api/market-prices?mode=accessory&part=${encodeURIComponent(part)}&combo=${encodeURIComponent(combo)}&_=${Date.now()}`;
     const data = await fetchMarketJson(url);
     renderMarketResults(resultEl, data, `${data.partLabel || '악세'} · ${data.comboLabel || ''}`, data.targetOptions?.map(o => `${o.label} ${Number(o.value).toFixed(2)}%`).join(' / '));
   } catch (error) {
@@ -1631,7 +1630,7 @@ function renderMarketResults(container, data, title, subtitle) {
 
 function marketResultItemHtml(item) {
   const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="">` : `<div class="marketIconFallback">?</div>`;
-  const meta = [item.grade, item.part, item.combo, item.gem ? `${item.gem} ${item.level}레벨` : '', item.quality ? `품질 ${item.quality}` : ''].filter(Boolean).join(' · ');
+  const meta = [item.grade, item.part, item.combo, item.refineCount ? `${item.refineCount}연마` : '', item.gem ? `${item.gem} ${item.level}레벨` : '', item.quality ? `품질 ${item.quality}` : ''].filter(Boolean).join(' · ');
   return `<article class="marketResultItem">
     ${icon}
     <div><b>${escapeHtml(item.name || '이름 없음')}</b><small>${escapeHtml(meta || '현재 매물')}</small></div>

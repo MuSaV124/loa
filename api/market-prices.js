@@ -1,4 +1,4 @@
-const API_VERSION = '5.1.5';
+const API_VERSION = '5.1.6';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -23,6 +23,14 @@ const COMBO_RULES = {
   highMid: { label: '상중', primary: 'high', secondary: 'mid' },
   reverseHighMid: { label: '리버스 상중', primary: 'mid', secondary: 'high' }
 };
+
+
+const ACCESSORY_REFINING_LABELS = [
+  '적에게 주는 피해', '추가 피해', '공격력', '무기 공격력', '치명타 피해', '치명타 적중률',
+  '최대 생명력', '최대 마나', '아군 공격력 강화 효과', '아군 피해량 강화 효과', '낙인력',
+  '상태이상 공격 지속시간', '상태이상 공격 지속 시간', '전투 중 생명력 회복량', '회복 아이덴티티 획득량',
+  '무력화 피해', '파티원 보호막 효과', '파티원 회복 효과'
+];
 
 const GEM_RULES = {
   damage: { label: '겁화', names: ['겁화'], icon: 'https://cdn-lostark.game.onstove.com/efui_iconatlas/use/use_9_70.png' },
@@ -52,14 +60,13 @@ async function searchAccessory(apiKey, query) {
   const combo = String(query.combo || 'highHigh');
   const rule = ACCESSORY_RULES[part] || ACCESSORY_RULES.necklace;
   const comboRule = COMBO_RULES[combo] || COMBO_RULES.highHigh;
-  const quality = clamp(Number(query.quality || 67), 0, 100);
-  const maxPages = clamp(Number(query.pages || 10), 1, 20);
+  const maxPages = clamp(Number(query.pages || 30), 1, 60);
   const target = makeAccessoryTarget(rule, comboRule);
   const tried = [];
   const matchedMap = new Map();
 
-  // v5.1.5: 경매장 API에는 옵션 조건을 직접 넣지 않고 넓게 조회한 뒤
-  // 응답 Tooltip/Options에서 품질과 목표 옵션을 직접 필터링한다.
+  // v5.1.6: 품질 조건은 제외한다. 경매장에서 3연마 악세를 먼저 넓게 조회한 뒤
+  // 기본 스탯(힘/민첩/지능) 범위와 사용자가 선택한 연마 옵션 2개 포함 여부로 필터링한다.
   for (const categoryCode of rule.categoryCandidates) {
     for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
       const payload = {
@@ -79,11 +86,12 @@ async function searchAccessory(apiKey, query) {
         const normalized = normalizeAuctionItem(item);
         if (!normalized.price) continue;
         if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) continue;
-        if (normalized.quality && normalized.quality < quality) continue;
+        if (!hasStatRange(normalized.fullText, rule.statRange)) continue;
+        if (!hasThreeRefiningOptions(normalized.fullText, [target.primary.label, target.secondary.label])) continue;
         if (!hasOptionValue(normalized.fullText, target.primary.label, target.primary.value)) continue;
         if (!hasOptionValue(normalized.fullText, target.secondary.label, target.secondary.value)) continue;
         const key = normalized.id || `${normalized.name}-${normalized.price}-${normalized.quality}`;
-        if (!matchedMap.has(key)) matchedMap.set(key, { ...normalized, part: rule.label, combo: comboRule.label, targetOptions: [target.primary, target.secondary] });
+        if (!matchedMap.has(key)) matchedMap.set(key, { ...normalized, part: rule.label, combo: comboRule.label, refineCount: normalized.refineCount, targetOptions: [target.primary, target.secondary] });
       }
 
       const pageSize = result.pageSize || result.items.length || 10;
@@ -95,7 +103,7 @@ async function searchAccessory(apiKey, query) {
   }
 
   const matched = [...matchedMap.values()].sort((a, b) => a.price - b.price);
-  return { ok: true, apiVersion: API_VERSION, source: 'auctions/items', mode: 'accessory', part, partLabel: rule.label, combo, comboLabel: comboRule.label, quality, targetOptions: [target.primary, target.secondary], items: matched.slice(0, 10), lowest: matched[0] || null, tried, debug: summarizeTried(tried) };
+  return { ok: true, apiVersion: API_VERSION, source: 'auctions/items', mode: 'accessory', part, partLabel: rule.label, combo, comboLabel: comboRule.label, statRange: rule.statRange, targetOptions: [target.primary, target.secondary], items: matched.slice(0, 10), lowest: matched[0] || null, tried, debug: summarizeTried(tried) };
 }
 
 async function searchGem(apiKey, query) {
@@ -253,7 +261,7 @@ function normalizeAuctionItem(item) {
   const auctionInfo = item.AuctionInfo || {};
   const price = Number(auctionInfo.BuyPrice || item.BuyPrice || item.CurrentMinPrice || item.LowestPrice || 0);
   const fullText = normalizeText([item.Name, item.Grade, item.Tier, item.Level, JSON.stringify(item.Options || ''), JSON.stringify(item.EtcOptions || ''), tooltipText(item.Tooltip)].join(' '));
-  return { id: item.Id || item.ItemId || null, name: item.Name || '', grade: item.Grade || '', icon: normalizeIconUrl(item.Icon || item.IconPath || findIconPath(item.Tooltip) || ''), price, bidStartPrice: Number(auctionInfo.BidStartPrice || 0), tradeAllowCount: Number(item.TradeAllowCount ?? item.TradeRemainCount ?? 0), quality: findQuality(item, fullText), fullText };
+  return { id: item.Id || item.ItemId || null, name: item.Name || '', grade: item.Grade || '', icon: normalizeIconUrl(item.Icon || item.IconPath || findIconPath(item.Tooltip) || ''), price, bidStartPrice: Number(auctionInfo.BidStartPrice || 0), tradeAllowCount: Number(item.TradeAllowCount ?? item.TradeRemainCount ?? 0), quality: findQuality(item, fullText), refineCount: countRefiningOptions(fullText), fullText };
 }
 
 function normalizeMarketItem(item) {
@@ -263,8 +271,36 @@ function normalizeMarketItem(item) {
 }
 
 function isAccessoryPart(text, label) { return normalizeText(text).includes(label); }
-function hasStatRange(text, [min, max]) { const nums = String(text).match(/\+\s*([0-9]{4,6})/g) || []; return nums.map(s => Number(s.replace(/\D/g, ''))).some(n => n >= min && n <= max); }
-function hasOptionValue(text, label, value) { const compact = normalizeText(text).replace(/\s+/g, ''); const numeric = Number(value).toFixed(2).replace(/\.00$/, ''); const numericAlt = Number(value).toFixed(1).replace(/\.0$/, ''); const labelCompact = label.replace(/\s+/g, ''); return compact.includes(labelCompact) && (compact.includes(`${numeric}%`) || compact.includes(`${numericAlt}%`) || compact.includes(`+${numeric}`) || compact.includes(`+${numericAlt}`)); }
+function hasStatRange(text, [min, max]) {
+  const compact = normalizeText(text);
+  const statNames = '(힘|민첩|지능)';
+  const patterns = [new RegExp(`${statNames}\\s*\\+?\\s*([0-9]{4,6})`, 'g'), /\+\s*([0-9]{4,6})/g];
+  for (const re of patterns) {
+    const matches = [...compact.matchAll(re)];
+    if (matches.map(m => Number(m[m.length - 1])).some(n => n >= min && n <= max)) return true;
+  }
+  return false;
+}
+function countRefiningOptions(text) {
+  const compact = normalizeText(text).replace(/\s+/g, '');
+  return ACCESSORY_REFINING_LABELS.reduce((count, label) => count + (compact.includes(label.replace(/\s+/g, '')) ? 1 : 0), 0);
+}
+function hasThreeRefiningOptions(text, requiredLabels = []) {
+  const compact = normalizeText(text).replace(/\s+/g, '');
+  const requiredOk = requiredLabels.every(label => compact.includes(String(label).replace(/\s+/g, '')));
+  if (!requiredOk) return false;
+  const knownCount = countRefiningOptions(text);
+  if (knownCount >= 3) return true;
+  const refineWordCount = (compact.match(/연마/g) || []).length;
+  return knownCount >= 2 && refineWordCount >= 3;
+}
+function hasOptionValue(text, label, value) {
+  const compact = normalizeText(text).replace(/\s+/g, '');
+  const labelCompact = label.replace(/\s+/g, '');
+  const raw = Number(value);
+  const variants = [...new Set([raw.toFixed(2), raw.toFixed(1), String(raw)].map(v => v.replace(/\.00$/, '').replace(/\.0$/, '')))];
+  return compact.includes(labelCompact) && variants.some(v => compact.includes(`${v}%`) || compact.includes(`+${v}%`) || compact.includes(`+${v}`));
+}
 function findQuality(item, text) { return Number(item.Quality || item.GradeQuality || (String(text).match(/품질\s*([0-9]{1,3})/) || [])[1] || 0); }
 function marketPrice(item) { return Number(item.CurrentMinPrice || item.MinPrice || item.LowestPrice || item.LowPrice || item?.AuctionInfo?.BuyPrice || 0); }
 function tooltipText(tooltip) { if (!tooltip) return ''; if (typeof tooltip === 'string') { try { return normalizeText(JSON.stringify(JSON.parse(tooltip))); } catch { return normalizeText(tooltip); } } return normalizeText(JSON.stringify(tooltip)); }
