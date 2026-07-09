@@ -1,4 +1,4 @@
-const API_VERSION = '5.1.6';
+const API_VERSION = '5.1.7';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -55,32 +55,104 @@ export default async function handler(req, res) {
   }
 }
 
+
+let auctionOptionCache = { expiresAt: 0, data: null };
+
+async function getAuctionOptionDataCached(apiKey) {
+  const now = Date.now();
+  if (auctionOptionCache.data && auctionOptionCache.expiresAt > now) return auctionOptionCache.data;
+  try {
+    const data = await requestLostArk(apiKey, 'https://developer-lostark.game.onstove.com/auctions/options', { method: 'GET' });
+    auctionOptionCache = { data, expiresAt: now + 10 * 60 * 1000 };
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+async function makeAccessorySearchPlans(apiKey, rule, target) {
+  const optionData = await getAuctionOptionDataCached(apiKey);
+  const primary = findAuctionEtcOption(optionData, target.primary.label);
+  const secondary = findAuctionEtcOption(optionData, target.secondary.label);
+  const plans = [];
+
+  if (primary && secondary) {
+    for (const categoryCode of rule.categoryCandidates) {
+      plans.push({
+        type: 'accessory-2option-api',
+        categoryCode,
+        optionSearch: `${target.primary.label} ${target.primary.value}% / ${target.secondary.label} ${target.secondary.value}%`,
+        etcOptions: [
+          { FirstOption: primary.firstOption, SecondOption: primary.secondOption, MinValue: target.primary.value, MaxValue: target.primary.value },
+          { FirstOption: secondary.firstOption, SecondOption: secondary.secondOption, MinValue: target.secondary.value, MaxValue: target.secondary.value }
+        ]
+      });
+    }
+  }
+
+  // 옵션 ID를 못 찾거나 공식 API가 옵션 조합 검색을 거부할 때를 대비한 제한 fallback.
+  // 이전 버전처럼 3연마 전체를 과도하게 넘기지 않도록 기본 페이지 수는 작게 유지한다.
+  for (const categoryCode of rule.categoryCandidates) {
+    plans.push({ type: 'accessory-fallback-limited', categoryCode, optionSearch: '텍스트 필터 fallback', etcOptions: [] });
+  }
+  return plans;
+}
+
+function findAuctionEtcOption(data, label) {
+  if (!data) return null;
+  const labelCompact = normalizeText(label).replace(/\s+/g, '');
+  const found = [];
+  walkOptionTree(data, [], found, labelCompact);
+  return found[0] || null;
+}
+
+function walkOptionTree(node, path, found, labelCompact) {
+  if (!node || found.length) return;
+  if (Array.isArray(node)) {
+    for (const child of node) walkOptionTree(child, path, found, labelCompact);
+    return;
+  }
+  if (typeof node !== 'object') return;
+
+  const text = normalizeText(node.Text ?? node.Name ?? node.OptionName ?? node.Label ?? node.ValueName ?? '').replace(/\s+/g, '');
+  const value = Number(node.Value ?? node.Id ?? node.Code ?? node.Option ?? node.OptionCode);
+  const nextPath = Number.isFinite(value) ? [...path, value] : path;
+  if (text && text.includes(labelCompact) && nextPath.length >= 2) {
+    found.push({ firstOption: nextPath[nextPath.length - 2], secondOption: nextPath[nextPath.length - 1], text });
+    return;
+  }
+
+  for (const key of Object.keys(node)) walkOptionTree(node[key], nextPath, found, labelCompact);
+}
+
 async function searchAccessory(apiKey, query) {
   const part = String(query.part || 'necklace');
   const combo = String(query.combo || 'highHigh');
   const rule = ACCESSORY_RULES[part] || ACCESSORY_RULES.necklace;
   const comboRule = COMBO_RULES[combo] || COMBO_RULES.highHigh;
-  const maxPages = clamp(Number(query.pages || 30), 1, 60);
+  const maxPages = clamp(Number(query.pages || 5), 1, 15);
   const target = makeAccessoryTarget(rule, comboRule);
   const tried = [];
   const matchedMap = new Map();
 
-  // v5.1.6: 품질 조건은 제외한다. 경매장에서 3연마 악세를 먼저 넓게 조회한 뒤
-  // 기본 스탯(힘/민첩/지능) 범위와 사용자가 선택한 연마 옵션 2개 포함 여부로 필터링한다.
-  for (const categoryCode of rule.categoryCandidates) {
+  // v5.1.7: 3연마 전체 조회를 먼저 하지 않는다. 사용자가 선택한 연마 옵션 2개로
+  // 경매장 검색 범위를 먼저 줄이고, 응답 결과에서 3연마/기본 스탯/수치 일치 여부를 필터링한다.
+  const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target);
+  for (const plan of searchPlans) {
     for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
       const payload = {
         Sort: 'BUY_PRICE',
         SortCondition: 'ASC',
-        CategoryCode: categoryCode ?? undefined,
+        CategoryCode: plan.categoryCode ?? undefined,
         ItemTier: 4,
         ItemGrade: '고대',
         ItemName: rule.label,
-        PageNo: pageNo
+        PageNo: pageNo,
+        EtcOptions: plan.etcOptions?.length ? plan.etcOptions : undefined
       };
       stripUndefined(payload);
       const result = await fetchAuctionPage(apiKey, payload);
-      tried.push({ type: 'accessory-wide', keyword: rule.label, categoryCode, pageNo, count: result.items.length, totalCount: result.totalCount, error: result.error || null });
+      tried.push({ type: plan.type, keyword: rule.label, categoryCode: plan.categoryCode, pageNo, optionSearch: plan.optionSearch || null, count: result.items.length, totalCount: result.totalCount, error: result.error || null });
 
       for (const item of result.items) {
         const normalized = normalizeAuctionItem(item);

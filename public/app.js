@@ -1,4 +1,4 @@
-const VERSION = '5.1.6';
+const VERSION = '5.1.7';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -1415,7 +1415,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.1.6',
+    apiVersion: '5.1.7',
     source: 'markets/items',
     mode: 'part-split',
     job,
