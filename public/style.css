@@ -1339,3 +1339,22 @@ body.marketMode #marketPanel,
 body.marketMode #legendAvatarPanel { grid-column: 1 / -1; }
 body.marketMode:not(.avatarMode) #legendAvatarPanel { display: none !important; }
 @media (max-width: 760px) { .marketCardGrid { grid-template-columns: 1fr; } .marketSubNav { flex-direction: column; align-items: stretch; } }
+/* v5.1.2 price search */
+.marketSearchBox { border: 1px solid rgba(148,163,184,.16); background: rgba(2,6,23,.34); border-radius: 16px; padding: 14px; margin-top: 12px; }
+.marketSelectGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
+.marketSelectGrid label { display: grid; gap: 7px; color: #cbd5e1; font-size: 12px; font-weight: 900; }
+.marketSelectGrid select, .marketSelectGrid input { width: 100%; border: 1px solid rgba(148,163,184,.25); background: rgba(15,23,42,.85); color: #f8fafc; border-radius: 12px; padding: 10px 11px; font-weight: 850; }
+.marketSelectGrid button { height: 42px; border: 0; border-radius: 12px; background: var(--amber); color: #111827; font-weight: 1000; cursor: pointer; }
+.marketSelectGrid button:disabled { opacity: .55; cursor: wait; }
+.marketRuleHint { margin-top: 12px; border: 1px dashed rgba(251,191,36,.34); color: #fde68a; border-radius: 12px; padding: 10px 12px; font-size: 12px; font-weight: 850; background: rgba(251,191,36,.06); }
+.marketResultBox { margin-top: 12px; border: 1px solid rgba(148,163,184,.16); border-radius: 16px; background: rgba(2,6,23,.35); padding: 14px; color: var(--muted); min-height: 72px; }
+.marketResultList { display: grid; gap: 10px; }
+.marketResultItem { display: grid; grid-template-columns: 52px 1fr auto; gap: 12px; align-items: center; border: 1px solid rgba(148,163,184,.14); border-radius: 14px; padding: 10px; background: rgba(15,23,42,.55); }
+.marketResultItem img { width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: rgba(255,255,255,.06); }
+.marketResultItem b { display:block; color:#f8fafc; margin-bottom:4px; }
+.marketResultItem small { color: var(--muted); font-weight: 800; }
+.marketPrice { color: #fbbf24; font-size: 18px; font-weight: 1000; white-space: nowrap; }
+.marketCard.mini { padding: 8px 10px; }
+.marketError { color:#fecaca; border-color: rgba(248,113,113,.28); background: rgba(127,29,29,.22); }
+@media (max-width: 900px) { .marketSelectGrid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .marketSelectGrid, .marketResultItem { grid-template-columns: 1fr; } .marketPrice { white-space: normal; } }

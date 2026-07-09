@@ -1,4 +1,4 @@
-const VERSION = '5.1.1';
+const VERSION = '5.1.2';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function hasCooldownEffect(name) {
@@ -1408,7 +1408,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.1.1',
+    apiVersion: '5.1.2',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1467,12 +1467,134 @@ async function searchLegendAvatarSet(job) {
 
 
 
+
+
+const MARKET_ACCESSORY_RULES = {
+  necklace: { label: '목걸이', range: '17322~17857', primary: '적주피', secondary: '추피', combos: { highHigh: '적주피 상 + 추피 상', highMid: '적주피 상 + 추피 중', reverseHighMid: '적주피 중 + 추피 상' } },
+  earring: { label: '귀걸이', range: '13450~13889', primary: '공격력', secondary: '무공', combos: { highHigh: '공격력 상 + 무공 상', highMid: '공격력 상 + 무공 중', reverseHighMid: '공격력 중 + 무공 상' } },
+  ring: { label: '반지', range: '12450~12897', primary: '치피', secondary: '치적', combos: { highHigh: '치피 상 + 치적 상', highMid: '치피 상 + 치적 중', reverseHighMid: '치피 중 + 치적 상' } }
+};
+
+function initMarketPriceTab() {
+  $('accSearchButton')?.addEventListener('click', searchMarketAccessory);
+  $('gemSearchButton')?.addEventListener('click', searchMarketGem);
+  $('engravingSearchButton')?.addEventListener('click', searchMarketEngraving);
+  $('accPartSelect')?.addEventListener('change', renderAccessoryRuleHint);
+  $('accComboSelect')?.addEventListener('change', renderAccessoryRuleHint);
+  $('engravingNameInput')?.addEventListener('keydown', (event) => { if (event.key === 'Enter') searchMarketEngraving(); });
+  renderAccessoryRuleHint();
+}
+
+function renderAccessoryRuleHint() {
+  const part = $('accPartSelect')?.value || 'necklace';
+  const combo = $('accComboSelect')?.value || 'highHigh';
+  const rule = MARKET_ACCESSORY_RULES[part] || MARKET_ACCESSORY_RULES.necklace;
+  const hint = $('accRuleHint');
+  if (!hint) return;
+  hint.textContent = `${rule.label} 3연마 · 기본 스탯 ${rule.range} · ${rule.combos[combo] || rule.combos.highHigh}`;
+}
+
+async function searchMarketAccessory() {
+  const button = $('accSearchButton');
+  const resultEl = $('accMarketResult');
+  const part = $('accPartSelect')?.value || 'necklace';
+  const combo = $('accComboSelect')?.value || 'highHigh';
+  const quality = $('accQualityInput')?.value || '67';
+  if (button) { button.disabled = true; button.textContent = '검색 중'; }
+  if (resultEl) resultEl.innerHTML = '경매장에서 3연마 악세 매물을 조회하는 중입니다.';
+  try {
+    const url = `/api/market-prices?mode=accessory&part=${encodeURIComponent(part)}&combo=${encodeURIComponent(combo)}&quality=${encodeURIComponent(quality)}&_=${Date.now()}`;
+    const data = await fetchMarketJson(url);
+    renderMarketResults(resultEl, data, `${data.partLabel || '악세'} · ${data.comboLabel || ''}`, data.targetOptions?.map(o => `${o.label} ${Number(o.value).toFixed(2)}%`).join(' / '));
+  } catch (error) {
+    renderMarketError(resultEl, error.message);
+  } finally {
+    if (button) { button.disabled = false; button.textContent = '악세 검색'; }
+  }
+}
+
+async function searchMarketGem() {
+  const button = $('gemSearchButton');
+  const resultEl = $('gemMarketResult');
+  const gem = $('gemTypeSelect')?.value || 'damage';
+  const level = $('gemLevelSelect')?.value || '10';
+  if (button) { button.disabled = true; button.textContent = '검색 중'; }
+  if (resultEl) resultEl.innerHTML = '경매장에서 보석 매물을 조회하는 중입니다.';
+  try {
+    const url = `/api/market-prices?mode=gem&gem=${encodeURIComponent(gem)}&level=${encodeURIComponent(level)}&_=${Date.now()}`;
+    const data = await fetchMarketJson(url);
+    renderMarketResults(resultEl, data, `${data.gemLabel || '보석'} ${data.level || level}레벨`, '경매장 최저가순');
+  } catch (error) {
+    renderMarketError(resultEl, error.message);
+  } finally {
+    if (button) { button.disabled = false; button.textContent = '보석 검색'; }
+  }
+}
+
+async function searchMarketEngraving() {
+  const button = $('engravingSearchButton');
+  const resultEl = $('engravingMarketResult');
+  const name = ($('engravingNameInput')?.value || '').trim();
+  if (!name) return renderMarketError(resultEl, '각인명을 입력하세요.');
+  if (button) { button.disabled = true; button.textContent = '검색 중'; }
+  if (resultEl) resultEl.innerHTML = '거래소에서 유물 각인서를 조회하는 중입니다.';
+  try {
+    const url = `/api/market-prices?mode=engraving&name=${encodeURIComponent(name)}&_=${Date.now()}`;
+    const data = await fetchMarketJson(url);
+    renderMarketResults(resultEl, data, `${name} 유물 각인서`, '거래소 최저가순');
+  } catch (error) {
+    renderMarketError(resultEl, error.message);
+  } finally {
+    if (button) { button.disabled = false; button.textContent = '유각 검색'; }
+  }
+}
+
+async function fetchMarketJson(url) {
+  const res = await fetch(url, { cache: 'no-store' });
+  const data = await readJsonSafely(res);
+  if (!res.ok || !data?.ok) throw new Error(data?.error || data?.message || '시세 조회 실패');
+  return data;
+}
+
+function renderMarketResults(container, data, title, subtitle) {
+  if (!container) return;
+  const items = Array.isArray(data?.items) ? data.items : [];
+  const triedText = Array.isArray(data?.tried) ? ` · 조회시도 ${data.tried.length}회` : '';
+  if (!items.length) {
+    container.innerHTML = `<div class="marketEmptyBox">검색 조건에 맞는 매물을 찾지 못했습니다.${triedText}<br><small>공식 API 카테고리/옵션 구조가 맞지 않으면 결과가 없을 수 있습니다.</small></div>`;
+    return;
+  }
+  container.innerHTML = `
+    <div class="marketResultList">
+      <div class="marketRuleHint"><b>${escapeHtml(title)}</b>${subtitle ? ` · ${escapeHtml(subtitle)}` : ''}${triedText}</div>
+      ${items.map(item => marketResultItemHtml(item)).join('')}
+    </div>
+  `;
+}
+
+function marketResultItemHtml(item) {
+  const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="">` : `<div class="marketIconFallback">?</div>`;
+  const meta = [item.grade, item.part, item.combo, item.gem ? `${item.gem} ${item.level}레벨` : '', item.quality ? `품질 ${item.quality}` : ''].filter(Boolean).join(' · ');
+  return `<article class="marketResultItem">
+    ${icon}
+    <div><b>${escapeHtml(item.name || '이름 없음')}</b><small>${escapeHtml(meta || '현재 매물')}</small></div>
+    <div class="marketPrice">${formatGold(item.price)}</div>
+  </article>`;
+}
+
+function renderMarketError(container, message) {
+  if (!container) return;
+  container.innerHTML = `<div class="marketEmptyBox marketError">${escapeHtml(message || '시세 조회 중 오류가 발생했습니다.')}</div>`;
+}
+
+
 // v5.0.4 boot fix: 5.0.2에서 전설 아바타 코드가 뒤에 붙으면서 초기화 호출이 빠져
 // 진화 DB가 로드되지 않고, 탭 버튼 이벤트도 연결되지 않았습니다.
 // DOM 요소와 모든 함수가 정의된 뒤 한 번만 초기화합니다.
 if (!window.__lostarkCalculatorBootedV506) {
   window.__lostarkCalculatorBootedV506 = true;
   initLegendAvatarTab();
+  initMarketPriceTab();
   setActiveTab('calculator');
   loadDb().catch((error) => setMessage(error.message || '진화 노드 데이터를 불러오지 못했습니다.'));
 }
