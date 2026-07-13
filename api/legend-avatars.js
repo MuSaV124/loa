@@ -1,4 +1,4 @@
-const API_VERSION = '5.0.8';
+const API_VERSION = '5.0.9';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 
@@ -154,33 +154,48 @@ async function fetchLegendAvatarPart(apiKey, job, part) {
   // 홈페이지: firstCategory=20000, secondCategory=부위코드, characterClass=직업ID, grade=4, tier=0, sortType=7
   // Open API: CategoryCode=secondCategory, CharacterClass=직업명 우선, ItemGrade='전설', ItemTier=0/null, Sort='CURRENT_MIN_PRICE'
   // 핵심 변경점: 부위별 CategoryCode를 이미 신뢰하므로 결과명/Tooltip 부위 정규식으로 다시 걸러내지 않는다.
-  const payloads = [
-    makePayload(categoryCode, job, '', 0),
-    makePayload(categoryCode, job, '', null),
-    makePayload(categoryCode, jobClassId, '', 0),
-    makePayload(categoryCode, String(jobClassId), '', 0),
-    makePayload(categoryCode, undefined, '', 0),
-    makePayload(20000, job, part, 0),
-    makePayload(20000, jobClassId, part, 0),
-    makePayload(20000, String(jobClassId), part, 0)
+  const payloadBatches = [
+    [
+      makePayload(categoryCode, job, '', 0),
+      makePayload(categoryCode, job, '', null)
+    ],
+    [
+      makePayload(categoryCode, jobClassId, '', 0),
+      makePayload(categoryCode, String(jobClassId), '', 0),
+      makePayload(categoryCode, undefined, '', 0)
+    ],
+    [
+      makePayload(20000, job, part, 0),
+      makePayload(20000, jobClassId, part, 0),
+      makePayload(20000, String(jobClassId), part, 0)
+    ]
   ];
 
-  for (const payload of payloads) {
-    const result = await fetchMarketPage(apiKey, payload);
-    tried.push({ part, categoryCode: payload.CategoryCode, characterClass: payload.CharacterClass ?? null, itemTier: payload.ItemTier ?? null, itemName: payload.ItemName || '', count: result.items.length, totalCount: result.totalCount, error: result.error || null });
-    if (result.error || !result.items.length) continue;
-
-    const picked = pickLowestPartItem(result.items, job, part, payload.CharacterClass != null, payload.CategoryCode === categoryCode);
-    if (picked) {
+  for (const payloads of payloadBatches) {
+    const settled = await Promise.allSettled(payloads.map(payload => fetchMarketPage(apiKey, payload).then(result => ({ payload, result }))));
+    const candidates = [];
+    for (let i = 0; i < settled.length; i += 1) {
+      const payload = payloads[i];
+      const entry = settled[i];
+      const result = entry.status === 'fulfilled' ? entry.value.result : { items: [], totalCount: 0, pageSize: 0, error: entry.reason?.message || String(entry.reason || '요청 실패') };
+      tried.push({ part, categoryCode: payload.CategoryCode, characterClass: payload.CharacterClass ?? null, itemTier: payload.ItemTier ?? null, itemName: payload.ItemName || '', count: result.items.length, totalCount: result.totalCount, error: result.error || null });
+      if (result.error || !result.items.length) continue;
+      const picked = pickLowestPartItem(result.items, job, part, payload.CharacterClass != null, payload.CategoryCode === categoryCode);
+      if (picked) candidates.push({ item: picked, result });
+    }
+    candidates.sort((a, b) => marketPrice(a.item) - marketPrice(b.item));
+    const best = candidates[0];
+    if (best) {
+      const normalized = normalizeAvatarItem(best.item, part);
       return {
-        item: normalizeAvatarItem(picked, part),
-        parts: { 머리: null, 상의: null, 하의: null, 무기: null, [part]: normalizeAvatarItem(picked, part) },
-        totalPrice: marketPrice(picked),
+        item: normalized,
+        parts: { 머리: null, 상의: null, 하의: null, 무기: null, [part]: normalized },
+        totalPrice: marketPrice(best.item),
         complete: true,
         matchedCount: 1,
-        matched: [normalizeAvatarItem(picked, part)],
-        scanned: result.items.length,
-        totalCount: result.totalCount,
+        matched: [normalized],
+        scanned: best.result.items.length,
+        totalCount: best.result.totalCount,
         categoryCode,
         jobClassId,
         tried

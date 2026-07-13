@@ -1,4 +1,4 @@
-const API_VERSION = '5.4.3';
+const API_VERSION = '5.4.4';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -76,6 +76,9 @@ const ACCESSORY_SCAN_TIME_BUDGET_MS = 54000;
 const LOSTARK_REQUEST_TIMEOUT_MS = 9000;
 const accessoryComboCache = new Map();
 const accessoryComboInflight = new Map();
+const marketListCache = new Map();
+const marketListInflight = new Map();
+const MARKET_LIST_CACHE_TTL_MS = 120 * 1000;
 
 async function getAuctionOptionDataCached(apiKey) {
   const now = Date.now();
@@ -214,7 +217,7 @@ async function searchAccessory(apiKey, query) {
     updatedAt: indexResult.updatedAt,
     index: indexResult.index,
     accessoryDebug: {
-      note: 'v5.4.3 악세 디버그: 공식 auctionOptions의 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
+      note: 'v5.4.4 악세 디버그: 공식 auctionOptions의 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
       requestPayloads: indexResult.requestPayloads.slice(0, 14),
       filterStats: indexResult.filterStats,
       samples: indexResult.samples
@@ -458,19 +461,27 @@ async function searchGem(apiKey, query) {
 }
 
 async function searchGemList(apiKey, query) {
+  const force = String(query.force || '') === '1';
+  const cacheKey = 'gemList:v1';
+  return getCachedMarketList(cacheKey, force, async () => searchGemListFresh(apiKey));
+}
+
+async function searchGemListFresh(apiKey) {
   const levels = [10, 9, 8, 7, 6, 5];
-  const rows = [];
   const tried = [];
-  for (const level of levels) {
-    const damage = await searchGem(apiKey, { gem: 'damage', level });
-    const cooldown = await searchGem(apiKey, { gem: 'cooldown', level });
+  const pairs = await Promise.all(levels.map(async level => {
+    const [damage, cooldown] = await Promise.all([
+      searchGem(apiKey, { gem: 'damage', level }),
+      searchGem(apiKey, { gem: 'cooldown', level })
+    ]);
     tried.push(...(damage.tried || []), ...(cooldown.tried || []));
-    rows.push({
+    return {
       level,
       damage: damage.lowest ? { ...damage.lowest, gem: '겁화', level } : null,
       cooldown: cooldown.lowest ? { ...cooldown.lowest, gem: '작열', level } : null
-    });
-  }
+    };
+  }));
+  const rows = pairs.sort((a, b) => b.level - a.level);
   return { ok: true, apiVersion: API_VERSION, source: 'auctions/items', mode: 'gemList', rows, tried, updatedAt: new Date().toISOString() };
 }
 
@@ -501,13 +512,26 @@ async function searchEngraving(apiKey, query) {
 
 async function searchEngravingList(apiKey, query) {
   const maxPages = clamp(Number(query.pages || 8), 1, 20);
+  const force = String(query.force || '') === '1';
+  const cacheKey = `engravingList:v1:pages${maxPages}`;
+  return getCachedMarketList(cacheKey, force, async () => searchEngravingListFresh(apiKey, maxPages));
+}
+
+async function searchEngravingListFresh(apiKey, maxPages) {
   const seen = new Map();
   const tried = [];
   for (const categoryCode of [40000, 40010, null]) {
+    const payloads = [];
     for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
       const payload = { Sort: 'CURRENT_MIN_PRICE', SortCondition: 'DESC', CategoryCode: categoryCode ?? undefined, ItemGrade: '유물', ItemName: '각인서', PageNo: pageNo };
       stripUndefined(payload);
-      const result = await fetchMarketPage(apiKey, payload);
+      payloads.push(payload);
+    }
+    const settled = await Promise.allSettled(payloads.map(payload => fetchMarketPage(apiKey, payload).then(result => ({ payload, result }))));
+    for (const entry of settled) {
+      const payload = entry.status === 'fulfilled' ? entry.value.payload : payloads[settled.indexOf(entry)];
+      const result = entry.status === 'fulfilled' ? entry.value.result : { items: [], totalCount: 0, pageSize: 0, error: entry.reason?.message || String(entry.reason || '요청 실패') };
+      const pageNo = payload.PageNo;
       tried.push({ categoryCode, pageNo, count: result.items.length, totalCount: result.totalCount, error: result.error || null });
       for (const item of result.items) {
         const normalized = normalizeMarketItem(item);
@@ -527,6 +551,22 @@ async function searchEngravingList(apiKey, query) {
   }
   const items = [...seen.values()].sort((a, b) => b.price - a.price);
   return { ok: true, apiVersion: API_VERSION, source: 'markets/items', mode: 'engravingList', sort: 'price-desc', items, tried, updatedAt: new Date().toISOString() };
+}
+
+async function getCachedMarketList(cacheKey, force, loader) {
+  const now = Date.now();
+  const cached = marketListCache.get(cacheKey);
+  if (!force && cached && cached.expiresAt > now) return { ...cached.data, cached: true };
+  if (!force && marketListInflight.has(cacheKey)) {
+    const data = await marketListInflight.get(cacheKey);
+    return { ...data, cached: true, joinedInflight: true };
+  }
+  const promise = loader().then(data => {
+    marketListCache.set(cacheKey, { expiresAt: Date.now() + MARKET_LIST_CACHE_TTL_MS, data });
+    return data;
+  }).finally(() => marketListInflight.delete(cacheKey));
+  marketListInflight.set(cacheKey, promise);
+  return promise;
 }
 
 async function getAuctionOptions(apiKey) {
