@@ -1,4 +1,4 @@
-const API_VERSION = '5.4.4';
+const API_VERSION = '5.4.5';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -93,15 +93,17 @@ async function getAuctionOptionDataCached(apiKey) {
 }
 
 async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey = 'necklace') {
-  // v5.4.3: 공식 auctionOptions의 EtcValues.Value(예: 2.00% => 200)를 사용해 후보군을 좁힌다.
+  // v5.4.5: 검증된 공식 연마 옵션 코드로 바로 검색해 cold start 요청 수를 줄인다.
+  // 값은 auctionOptions의 EtcValues.Value 규칙(예: 2.00% => 200)을 사용한다.
   // 최종 판정은 응답의 ACCESSORY_UPGRADE 3개와 실제 Value만 사용한다.
   const fallback = AUCTION_ETC_OPTION_FALLBACK[partKey] || {};
-  const optionData = await getAuctionOptionDataCached(apiKey);
-  const primaryOfficial = findAuctionEtcOption(optionData, target.primary.label) || null;
-  const secondaryOfficial = findAuctionEtcOption(optionData, target.secondary.label) || null;
+  const hasVerifiedFallback = Boolean(fallback.primary && fallback.secondary);
+  const optionData = hasVerifiedFallback ? null : await getAuctionOptionDataCached(apiKey);
+  const primaryOfficial = optionData ? findAuctionEtcOption(optionData, target.primary.label) : null;
+  const secondaryOfficial = optionData ? findAuctionEtcOption(optionData, target.secondary.label) : null;
   const primaryOption = primaryOfficial || fallback.primary || null;
   const secondaryOption = secondaryOfficial || fallback.secondary || null;
-  const optionSource = primaryOfficial && secondaryOfficial ? 'official-options' : (primaryOfficial || secondaryOfficial ? 'mixed-options' : 'fallback-options');
+  const optionSource = hasVerifiedFallback ? 'verified-static-options' : (primaryOfficial && secondaryOfficial ? 'official-options' : (primaryOfficial || secondaryOfficial ? 'mixed-options' : 'fallback-options'));
 
   const plans = [];
   const categoryCode = rule.categoryCandidates.find(code => code !== null && code !== undefined);
@@ -134,8 +136,8 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
       'exact-3refine-asc',
       'ASC',
       bothExact,
-      18,
-      4,
+      8,
+      2,
       `정확 2옵션 · 3연마 · ${target.primary.label} ${target.primary.value}%(${primaryExact.MinValue}) + ${target.secondary.label} ${target.secondary.value}%(${secondaryExact.MinValue}) · ${optionSource}`
     );
   }
@@ -144,7 +146,7 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
     '3refine-fallback-asc',
     'ASC',
     [],
-    bothExact.length === 2 ? 32 : 40,
+    bothExact.length === 2 ? 16 : 40,
     8,
     bothExact.length === 2 ? '정확 옵션 0건 보정 · 3연마 후보 검색' : '옵션 코드 탐색 실패 보정 · 3연마 후보 검색'
   );
@@ -217,7 +219,7 @@ async function searchAccessory(apiKey, query) {
     updatedAt: indexResult.updatedAt,
     index: indexResult.index,
     accessoryDebug: {
-      note: 'v5.4.4 악세 디버그: 공식 auctionOptions의 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
+      note: 'v5.4.5 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
       requestPayloads: indexResult.requestPayloads.slice(0, 14),
       filterStats: indexResult.filterStats,
       samples: indexResult.samples
