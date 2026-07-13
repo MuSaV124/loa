@@ -118,19 +118,19 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
       batchSize: 4,
       optionSearch: `3연마 · ${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}%`
     });
-  } else {
-    // 옵션 코드 탐색 실패 시에만 제한적으로 3연마 후보를 확인한다.
-    plans.push({
-      type: `accessory-${comboKey}-3refine-fallback-asc`,
-      categoryCode,
-      sortCondition: 'ASC',
-      etcOptions: [],
-      itemUpgradeLevel: 3,
-      maxPages: 8,
-      batchSize: 4,
-      optionSearch: '옵션 코드 탐색 실패 보정 · 3연마 제한 검색'
-    });
   }
+
+  // 정확 옵션 검색이 0건을 반환하는 경우가 있어, 최종 필터는 유지한 채 3연마 후보를 넓게 보정 검색한다.
+  plans.push({
+    type: `accessory-${comboKey}-3refine-fallback-asc`,
+    categoryCode,
+    sortCondition: 'ASC',
+    etcOptions: [],
+    itemUpgradeLevel: 3,
+    maxPages: bothExact.length === 2 ? 32 : 40,
+    batchSize: 8,
+    optionSearch: bothExact.length === 2 ? '정확 옵션 0건 보정 · 3연마 후보 검색' : '옵션 코드 탐색 실패 보정 · 3연마 후보 검색'
+  });
   return plans;
 }
 
