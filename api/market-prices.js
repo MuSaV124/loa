@@ -1,4 +1,4 @@
-const API_VERSION = '5.4.1';
+const API_VERSION = '5.4.2';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -64,6 +64,8 @@ export default async function handler(req, res) {
 
 let auctionOptionCache = { expiresAt: 0, data: null };
 const ACCESSORY_CACHE_TTL_MS = 90 * 1000;
+const ACCESSORY_SCAN_TIME_BUDGET_MS = 54000;
+const LOSTARK_REQUEST_TIMEOUT_MS = 9000;
 const accessoryComboCache = new Map();
 const accessoryComboInflight = new Map();
 
@@ -80,19 +82,17 @@ async function getAuctionOptionDataCached(apiKey) {
 }
 
 async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey = 'necklace') {
-  // v5.4.1:
+  // v5.4.2:
   // 서버에는 3연마 + 목표 옵션 2개를 동시에 전달해 후보군을 최대한 좁힌다.
   // 최종 판정은 응답의 ACCESSORY_UPGRADE 3개만 사용하며 옵션 순서는 무시한다.
   // 힘/민첩/지능과 품질은 검색 및 필터 조건에 사용하지 않는다.
   const fallback = AUCTION_ETC_OPTION_FALLBACK[partKey] || {};
-  let optionData = null;
-  let primaryOption = fallback.primary || null;
-  let secondaryOption = fallback.secondary || null;
-  if (!primaryOption || !secondaryOption) {
-    optionData = await getAuctionOptionDataCached(apiKey);
-    primaryOption = primaryOption || findAuctionEtcOption(optionData, target.primary.label) || null;
-    secondaryOption = secondaryOption || findAuctionEtcOption(optionData, target.secondary.label) || null;
-  }
+  const optionData = await getAuctionOptionDataCached(apiKey);
+  const primaryOfficial = findAuctionEtcOption(optionData, target.primary.label) || null;
+  const secondaryOfficial = findAuctionEtcOption(optionData, target.secondary.label) || null;
+  const primaryOption = primaryOfficial || fallback.primary || null;
+  const secondaryOption = secondaryOfficial || fallback.secondary || null;
+  const optionSource = primaryOfficial && secondaryOfficial ? 'official-options' : 'fallback-options';
 
   const plans = [];
   const categoryCode = rule.categoryCandidates.find(code => code !== null && code !== undefined);
@@ -116,7 +116,7 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
       itemUpgradeLevel: 3,
       maxPages: 18,
       batchSize: 4,
-      optionSearch: `3연마 · ${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}%`
+      optionSearch: `3연마 · ${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% · ${optionSource}`
     });
   }
 
@@ -189,7 +189,7 @@ async function searchAccessory(apiKey, query) {
     updatedAt: indexResult.updatedAt,
     index: indexResult.index,
     accessoryDebug: {
-      note: 'v5.4.1 악세 디버그: 3연마와 목표 옵션 2개를 동시에 검색하고, 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다. 힘/민첩/지능과 품질은 필터에 사용하지 않습니다.',
+      note: 'v5.4.2 악세 디버그: 공식 auction options 코드를 우선 사용하고, 정확 옵션 검색이 비면 3연마 후보를 보정 검색합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다. 힘/민첩/지능과 품질은 필터에 사용하지 않습니다.',
       requestPayloads: indexResult.requestPayloads.slice(0, 14),
       filterStats: indexResult.filterStats,
       samples: indexResult.samples
@@ -223,7 +223,7 @@ async function scanAccessoryComboIndex(apiKey, context) {
   const samples = [];
   const filterStats = {};
   const startedAt = Date.now();
-  const timeBudgetMs = 26000;
+  const timeBudgetMs = ACCESSORY_SCAN_TIME_BUDGET_MS;
   const searchPlans = await makeAccessorySearchPlans(apiKey, rule, target, combo, part);
   let stopReason = 'all-plans-complete';
   let matchedPlan = null;
@@ -353,7 +353,7 @@ function accessoryRejectReasons(normalized, rule, target) {
   if (normalized.grade && normalized.grade !== '고대') reasons.push(`등급 불일치: ${normalized.grade}`);
   if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) reasons.push('부위 불일치');
 
-  // v5.4.1: 실제 연마 옵션은 정확히 3개여야 하며, 목표 옵션 2개의 위치는 무관하다.
+  // v5.4.2: 실제 연마 옵션은 정확히 3개여야 하며, 목표 옵션 2개의 위치는 무관하다.
   // 힘/민첩/지능과 품질은 표시용 데이터일 뿐 검색/필터 판정에는 사용하지 않는다.
   const upgrades = normalized.upgradeOptions || [];
   if (upgrades.length !== 3) reasons.push(`3연마 아님: ${upgrades.length}개`);
@@ -534,7 +534,7 @@ async function fetchMarketPage(apiKey, payload) {
 
 async function requestLostArk(apiKey, url, options = {}) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const timeout = setTimeout(() => controller.abort(), LOSTARK_REQUEST_TIMEOUT_MS);
   const init = { method: options.method || 'GET', headers: { Authorization: `bearer ${apiKey}`, Accept: 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}) }, signal: controller.signal };
   if (options.body) init.body = JSON.stringify(options.body);
   const response = await fetch(url, init).finally(() => clearTimeout(timeout));
