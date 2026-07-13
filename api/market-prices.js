@@ -137,15 +137,15 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
 function findAuctionEtcOption(data, label) {
   if (!data) return null;
   const labelCompact = normalizeText(label).replace(/\s+/g, '');
-  const found = [];
-  walkOptionTree(data, [], found, labelCompact);
-  return found[0] || null;
+  const matches = [];
+  walkOptionTree(data, [], matches, labelCompact);
+  return matches.find(match => match.matchType === 'exact') || matches[0] || null;
 }
 
-function walkOptionTree(node, path, found, labelCompact) {
-  if (!node || found.length) return;
+function walkOptionTree(node, path, matches, labelCompact) {
+  if (!node) return;
   if (Array.isArray(node)) {
-    for (const child of node) walkOptionTree(child, path, found, labelCompact);
+    for (const child of node) walkOptionTree(child, path, matches, labelCompact);
     return;
   }
   if (typeof node !== 'object') return;
@@ -154,11 +154,11 @@ function walkOptionTree(node, path, found, labelCompact) {
   const value = Number(node.Value ?? node.Id ?? node.Code ?? node.Option ?? node.OptionCode);
   const nextPath = Number.isFinite(value) ? [...path, value] : path;
   if (text && text.includes(labelCompact) && nextPath.length >= 2) {
-    found.push({ firstOption: nextPath[nextPath.length - 2], secondOption: nextPath[nextPath.length - 1], text });
-    return;
+    const matchType = text === labelCompact ? 'exact' : 'partial';
+    matches.push({ firstOption: nextPath[nextPath.length - 2], secondOption: nextPath[nextPath.length - 1], text, matchType });
   }
 
-  for (const key of Object.keys(node)) walkOptionTree(node[key], nextPath, found, labelCompact);
+  for (const key of Object.keys(node)) walkOptionTree(node[key], nextPath, matches, labelCompact);
 }
 
 async function searchAccessory(apiKey, query) {
