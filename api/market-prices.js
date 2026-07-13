@@ -1,4 +1,4 @@
-const API_VERSION = '5.4.0';
+const API_VERSION = '5.4.1';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -80,10 +80,10 @@ async function getAuctionOptionDataCached(apiKey) {
 }
 
 async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey = 'necklace') {
-  // v5.4.0:
-  // 공식 EtcOptions는 정확값 필터가 아니라 후보군 축소용으로만 사용한다.
-  // 실제 판정은 응답 Options.ACCESSORY_UPGRADE의 옵션명 + Value만 본다.
-  // 선택 조합은 캐시형 인덱스로 스캔하고, 가격 오름차순 기준 첫 일치 페이지 + 다음 페이지만 확정한다.
+  // v5.4.1:
+  // 서버에는 3연마 + 목표 옵션 2개를 동시에 전달해 후보군을 최대한 좁힌다.
+  // 최종 판정은 응답의 ACCESSORY_UPGRADE 3개만 사용하며 옵션 순서는 무시한다.
+  // 힘/민첩/지능과 품질은 검색 및 필터 조건에 사용하지 않는다.
   const fallback = AUCTION_ETC_OPTION_FALLBACK[partKey] || {};
   let optionData = null;
   let primaryOption = fallback.primary || null;
@@ -95,8 +95,7 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
   }
 
   const plans = [];
-  const categoryList = [...new Set(rule.categoryCandidates.filter(code => code !== null && code !== undefined))].slice(0, 1);
-
+  const categoryCode = rule.categoryCandidates.find(code => code !== null && code !== undefined);
   const exactEtc = (option, targetOption) => option ? {
     FirstOption: option.firstOption,
     SecondOption: option.secondOption,
@@ -104,55 +103,32 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
     MaxValue: Number(targetOption.value)
   } : null;
 
-  for (const categoryCode of categoryList) {
-    const primaryExact = exactEtc(primaryOption, target.primary);
-    const secondaryExact = exactEtc(secondaryOption, target.secondary);
-    const bothExact = primaryExact && secondaryExact ? [primaryExact, secondaryExact] : [];
+  const primaryExact = exactEtc(primaryOption, target.primary);
+  const secondaryExact = exactEtc(secondaryOption, target.secondary);
+  const bothExact = primaryExact && secondaryExact ? [primaryExact, secondaryExact] : [];
 
-    if (bothExact.length === 2) {
-      plans.push({
-        type: `accessory-index-${comboKey}-both-asc`,
-        categoryCode,
-        sortCondition: 'ASC',
-        etcOptions: bothExact,
-        itemUpgradeLevel: null,
-        maxPages: 48,
-        batchSize: 8,
-        optionSearch: `${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% 후보 인덱스`
-      });
-      plans.push({
-        type: `accessory-index-${comboKey}-both-3refine-asc`,
-        categoryCode,
-        sortCondition: 'ASC',
-        etcOptions: bothExact,
-        itemUpgradeLevel: 3,
-        maxPages: 40,
-        batchSize: 8,
-        optionSearch: `3연마 후보 보강 · ${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}%`
-      });
-      plans.push({
-        type: `accessory-index-${comboKey}-both-3refine-desc-check`,
-        categoryCode,
-        sortCondition: 'DESC',
-        etcOptions: bothExact,
-        itemUpgradeLevel: 3,
-        maxPages: 4,
-        batchSize: 4,
-        optionSearch: '고가권 존재 확인용 보조 스캔'
-      });
-    }
-
-    // EtcOptions 코드 탐색이 실패했을 때도 완전히 빈 결과가 되지 않도록 마지막 보정 플랜을 둔다.
-    // 이 플랜은 넓기 때문에 페이지 수를 작게 제한하고, 최종 판정은 동일하게 Options만 사용한다.
+  if (bothExact.length === 2) {
     plans.push({
-      type: `accessory-index-${comboKey}-base-3refine-asc`,
+      type: `accessory-${comboKey}-exact-3refine-asc`,
+      categoryCode,
+      sortCondition: 'ASC',
+      etcOptions: bothExact,
+      itemUpgradeLevel: 3,
+      maxPages: 18,
+      batchSize: 4,
+      optionSearch: `3연마 · ${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}%`
+    });
+  } else {
+    // 옵션 코드 탐색 실패 시에만 제한적으로 3연마 후보를 확인한다.
+    plans.push({
+      type: `accessory-${comboKey}-3refine-fallback-asc`,
       categoryCode,
       sortCondition: 'ASC',
       etcOptions: [],
       itemUpgradeLevel: 3,
-      maxPages: bothExact.length === 2 ? 12 : 32,
-      batchSize: 8,
-      optionSearch: 'EtcOptions 실패 보정 · 3연마 후보 직접 인덱싱'
+      maxPages: 8,
+      batchSize: 4,
+      optionSearch: '옵션 코드 탐색 실패 보정 · 3연마 제한 검색'
     });
   }
   return plans;
@@ -213,7 +189,7 @@ async function searchAccessory(apiKey, query) {
     updatedAt: indexResult.updatedAt,
     index: indexResult.index,
     accessoryDebug: {
-      note: 'v5.4.0 악세 디버그: 캐시형 후보 인덱스 방식입니다. 공식 API EtcOptions는 후보 축소에만 쓰고, 최종 통과는 Options.ACCESSORY_UPGRADE 실제 옵션명+Value만 봅니다. 가격 오름차순에서 첫 일치 페이지와 다음 페이지만 확정합니다.',
+      note: 'v5.4.1 악세 디버그: 3연마와 목표 옵션 2개를 동시에 검색하고, 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다. 힘/민첩/지능과 품질은 필터에 사용하지 않습니다.',
       requestPayloads: indexResult.requestPayloads.slice(0, 14),
       filterStats: indexResult.filterStats,
       samples: indexResult.samples
@@ -377,20 +353,13 @@ function accessoryRejectReasons(normalized, rule, target) {
   if (normalized.grade && normalized.grade !== '고대') reasons.push(`등급 불일치: ${normalized.grade}`);
   if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) reasons.push('부위 불일치');
 
-  // v5.4.0: 최종 판정에서는 연마 단계/힘민지/품질을 보지 않고, 선택한 두 딜러 옵션의 실제 Value만 본다.
-  // 따라서 ItemUpgradeLevel, ACCESSORY_UPGRADE 개수, 힘/민첩/지능 STAT 컷은 필터에서 제외한다.
+  // v5.4.1: 실제 연마 옵션은 정확히 3개여야 하며, 목표 옵션 2개의 위치는 무관하다.
+  // 힘/민첩/지능과 품질은 표시용 데이터일 뿐 검색/필터 판정에는 사용하지 않는다.
   const upgrades = normalized.upgradeOptions || [];
+  if (upgrades.length !== 3) reasons.push(`3연마 아님: ${upgrades.length}개`);
   if (!hasUpgradeOption(upgrades, target.primary)) reasons.push(`필수옵션 없음: ${target.primary.label} ${target.primary.value}%`);
   if (!hasUpgradeOption(upgrades, target.secondary)) reasons.push(`필수옵션 없음: ${target.secondary.label} ${target.secondary.value}%`);
   return reasons;
-}
-
-function getAccessoryStatThreshold(partLabel) {
-  const label = normalizeText(partLabel);
-  if (label.includes('목걸이')) return 16500;
-  if (label.includes('귀걸이')) return 12800;
-  if (label.includes('반지')) return 11900;
-  return 0;
 }
 
 function makeAccessoryDebugSample(raw, normalized, reasons) {
@@ -579,7 +548,6 @@ function normalizeAuctionItem(item) {
   const price = Number(auctionInfo.BuyPrice || item.BuyPrice || item.CurrentMinPrice || item.LowestPrice || 0);
   const fullText = normalizeText([item.Name, item.Grade, item.Tier, item.Level, JSON.stringify(item.Options || ''), JSON.stringify(item.EtcOptions || ''), tooltipText(item.Tooltip)].join(' '));
   const upgradeOptions = extractAccessoryUpgradeOptions(item.Options, fullText);
-  const mainStat = extractAccessoryMainStat(item.Options, fullText);
   return {
     id: item.Id || item.ItemId || null,
     name: item.Name || '',
@@ -591,7 +559,6 @@ function normalizeAuctionItem(item) {
     bidStartPrice: Number(auctionInfo.BidStartPrice || 0),
     tradeAllowCount: Number(item.TradeAllowCount ?? item.TradeRemainCount ?? 0),
     quality: findQuality(item, fullText),
-    mainStat,
     refineCount: upgradeOptions.length,
     upgradeOptions,
     fullText
@@ -618,7 +585,10 @@ function extractAccessoryUpgradeOptions(options, fullText = '') {
     }
   }
 
-  // 일부 응답은 ACCESSORY_UPGRADE가 Options에 없고 Tooltip/EtcOptions 텍스트로만 남을 수 있어 보조 파싱한다.
+  // 공식 Options에 ACCESSORY_UPGRADE가 있으면 그것만 사용한다.
+  // Tooltip/EtcOptions 병합은 중복 옵션 수를 만들 수 있으므로 Options가 비어 있을 때만 보조 파싱한다.
+  if (parsed.length > 0) return parsed.filter(option => option.name);
+
   const text = normalizeText(fullText);
   for (const label of ACCESSORY_REFINING_LABELS) {
     const escaped = escapeRegExp(label).replace(/\s+/g, '\\s*');
@@ -633,32 +603,6 @@ function extractAccessoryUpgradeOptions(options, fullText = '') {
     }
   }
   return parsed.filter(option => option.name);
-}
-
-function extractAccessoryMainStat(options, fullText = '') {
-  const statNames = ['힘', '민첩', '지능'];
-  let maxStat = 0;
-  if (Array.isArray(options)) {
-    for (const option of options) {
-      if (String(option?.Type || '').toUpperCase() !== 'STAT') continue;
-      const name = normalizeText(option?.OptionName || '');
-      if (!statNames.some(stat => name.includes(stat))) continue;
-      const value = Number(option?.Value ?? 0);
-      if (Number.isFinite(value)) maxStat = Math.max(maxStat, value);
-    }
-  }
-  if (maxStat > 0) return maxStat;
-
-  const text = normalizeText(fullText);
-  for (const stat of statNames) {
-    const regex = new RegExp(`${stat}\\s*(?:\\+)?\\s*([0-9]{4,6})`, 'g');
-    let match;
-    while ((match = regex.exec(text))) {
-      const value = Number(match[1]);
-      if (Number.isFinite(value)) maxStat = Math.max(maxStat, value);
-    }
-  }
-  return maxStat;
 }
 
 function compactOptionName(value) {
