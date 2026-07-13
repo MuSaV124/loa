@@ -1,6 +1,8 @@
-const VERSION = '5.4.5';
+const VERSION = '5.4.6';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
+const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
+function isNoManaMainSkillEnabled() { return Boolean(document.getElementById('noManaMainSkill')?.checked); }
 function hasCooldownEffect(name) {
   const node = getNode(name);
   if (!node) return COOLDOWN_NODE_NAMES.includes(name);
@@ -15,7 +17,7 @@ function hasCooldownCandidate(tier2Entries, fourNames, fiveName) {
 }
 
 function emptyEngravingState() {
-  return { effects: { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, items: [], rawText: '', adrenaline: { adopted: false, level: 0, critRate: 0, attackPower: 0 } };
+  return { effects: { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, attackSpeed: 0, conditionalDamage: 0 }, items: [], rawText: '', adrenaline: { adopted: false, level: 0, critRate: 0, attackPower: 0 } };
 }
 
 const $ = (id) => document.getElementById(id);
@@ -84,6 +86,23 @@ function getLevelEffect(name, level) {
   if (['특화','제압','인내','숙련'].includes(name)) return { statBonus: level * 50 };
   const node = getNode(name);
   return node?.levels?.[String(level)] || {};
+}
+function getContextualLevelEffect(name, level) {
+  const effect = { ...getLevelEffect(name, level) };
+  if (!isNoManaMainSkillEnabled()) return effect;
+  if (name === '끝없는 마나' || name === '무한한 마력') {
+    delete effect.cooldownReduction;
+    effect.manaConditionNote = '주력기 마나 사용 안함: 마나 스킬 쿨감 제외';
+  }
+  if (name === '금단의 주문') {
+    effect.evolutionDamage = Number(level || 0) * 5;
+    effect.manaConditionNote = '주력기 마나 사용 안함: 마나 스킬 추가 진피 제외';
+  }
+  if (name === '마나 용광로') {
+    effect.evolutionDamage = 0;
+    effect.manaConditionNote = '주력기 마나 사용 안함: 마나 소모 조건 진피 제외';
+  }
+  return effect;
 }
 function allOptions(tier) { return [...new Set([...(state.evolution?.tiers?.[String(tier)] || []), ...(state.evolution?.nodes || []).filter(n => Number(n.tier) === Number(tier)).map(n => n.name)])]; }
 function defaultSelection() {
@@ -432,7 +451,8 @@ function getBaseStats(selection = state.selected) {
   const enlightenmentMoveSpeed = num(state.enlightenment.moveSpeed);
   const arkGridAttackSpeed = num(state.arkGrid.attackSpeed);
   const arkGridMoveSpeed = num(state.arkGrid.moveSpeed);
-  const attackSpeed = baseSpeed + swiftSpeedBonus + enlightenmentAttackSpeed + arkGridAttackSpeed + extraAttackSpeed;
+  const engravingAttackSpeed = num(state.engraving?.effects?.attackSpeed);
+  const attackSpeed = baseSpeed + swiftSpeedBonus + enlightenmentAttackSpeed + arkGridAttackSpeed + engravingAttackSpeed + extraAttackSpeed;
   const moveSpeed = baseSpeed + swiftSpeedBonus + enlightenmentMoveSpeed + arkGridMoveSpeed + extraMoveSpeed;
   let dynamicEnlightenmentCritRate = 0;
   let dynamicEnlightenmentCritDamage = 0;
@@ -493,6 +513,7 @@ function getBaseStats(selection = state.selected) {
     enlightenmentMoveSpeed,
     arkGridAttackSpeed,
     arkGridMoveSpeed,
+    engravingAttackSpeed,
     dynamicEnlightenmentCritRate,
     dynamicEnlightenmentCritDamage,
     baseMoveAttackSpeed: baseSpeed,
@@ -511,8 +532,9 @@ function getBaseStats(selection = state.selected) {
 }
 function applyEffect(stats, effect, sourceLabel = '진화') {
   const out = { ...stats };
+  if (effect.manaConditionNote) out.manaConditionNotes = [...(out.manaConditionNotes || []), { label: sourceLabel, note: effect.manaConditionNote }];
   if (effect.critStat) { out.critStat = (out.critStat || 0) + effect.critStat; out.statCritRate = critRateFromStat(out.critStat); out.critRate += critRateFromStat(effect.critStat); }
-  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.attackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentAttackSpeed || 0) + (out.extraAttackSpeed || 0); out.moveSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentMoveSpeed || 0) + (out.extraMoveSpeed || 0); out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
+  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.attackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentAttackSpeed || 0) + (out.arkGridAttackSpeed || 0) + (out.engravingAttackSpeed || 0) + (out.extraAttackSpeed || 0); out.moveSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentMoveSpeed || 0) + (out.arkGridMoveSpeed || 0) + (out.extraMoveSpeed || 0); out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
   if (effect.critRate) out.critRate += effect.critRate;
   if (effect.critDamage) out.critDamage += effect.critDamage;
   if (effect.critHitDamage) {
@@ -603,7 +625,8 @@ function cloneBaseStats(stats) {
   return {
     ...stats,
     enemyDamageSources: [...(stats.enemyDamageSources || [])],
-    critHitDamageSources: [...(stats.critHitDamageSources || [])]
+    critHitDamageSources: [...(stats.critHitDamageSources || [])],
+    manaConditionNotes: [...(stats.manaConditionNotes || [])]
   };
 }
 function statsWithSelection(selection = state.selected) {
@@ -616,7 +639,7 @@ function statsWithSelection(selection = state.selected) {
   const entries = selectedEntries(selection).sort((a, b) => Number(a.tier) - Number(b.tier));
   for (const row of entries) {
     if (row.name === '치명' || row.name === '신속') continue;
-    s = applyEffect(s, getLevelEffect(row.name, row.level), `진화 ${row.name}`);
+    s = applyEffect(s, getContextualLevelEffect(row.name, row.level), `진화 ${row.name}`);
   }
   return { stats: s, result: score(s) };
 }
@@ -699,6 +722,7 @@ function engravingAppliedDetailHtml() {
   if (Number(eff.additionalDamage || 0)) effParts.push(`추피 ${pct(eff.additionalDamage)}`);
   if (Number(eff.enemyDamage || 0)) effParts.push(`적주피 ${pct(eff.enemyDamage)}`);
   if (Number(eff.attackPower || 0)) effParts.push(`공격력 ${pct(eff.attackPower)}`);
+  if (Number(eff.attackSpeed || 0)) effParts.push(`공격 속도 ${pct(eff.attackSpeed)}`);
   if (Number(eff.conditionalDamage || 0)) effParts.push(`조건부 피해 ${pct(eff.conditionalDamage)}`);
   const adr = state.engraving?.adrenaline || {};
   if (adr.adopted) effParts.push(`아드레날린 치적 ${pct(adr.critRate || 0)}`, `아드레날린 공격력 ${pct(adr.attackPower || 0)}`);
@@ -726,7 +750,7 @@ function buildSourceSummary(current) {
   const enemyEvolution = [];
   for (const row of selectedEntries()) {
     if (row.name === '치명' || row.name === '신속') continue;
-    const eff = getLevelEffect(row.name, row.level);
+    const eff = getContextualLevelEffect(row.name, row.level);
     const label = `[진화] ${row.name} (Lv.${row.level})`;
     if (eff.critRate) critEvolution.push(sourceLine(label, eff.critRate));
     if (eff.critDamage) critDamageEvolution.push(sourceLine(label, eff.critDamage));
@@ -802,6 +826,7 @@ function buildSourceSummary(current) {
   if (base.enlightenmentMoveSpeed) moveSpeedLines.push(sourceLine('깨달음', base.enlightenmentMoveSpeed));
   if (base.arkGridAttackSpeed) attackSpeedLines.push(sourceLine('아크그리드', base.arkGridAttackSpeed));
   if (base.arkGridMoveSpeed) moveSpeedLines.push(sourceLine('아크그리드', base.arkGridMoveSpeed));
+  if (base.engravingAttackSpeed) attackSpeedLines.push(sourceLine('각인서/API', base.engravingAttackSpeed));
   if (base.extraAttackSpeed) attackSpeedLines.push(sourceLine('추가 입력', base.extraAttackSpeed));
   if (base.extraMoveSpeed) moveSpeedLines.push(sourceLine('추가 입력', base.extraMoveSpeed));
 
@@ -918,7 +943,22 @@ function manaStabilityBonusFromSelection(selection = state.selected) {
   }
   return bonus;
 }
-function candidateMemo(fourNames, fiveName, calc, singleHitPenalty = false, critOverPenalty = 0, critLowPenalty = 0, manaStabilityBonus = 0) {
+function manaFurnaceShortagePenalty(selection = state.selected) {
+  if (!isManaShortageBonusEnabled()) return 0;
+  const furnaceLv = Number(selection?.['마나 용광로']?.level || 0);
+  if (furnaceLv <= 0) return 0;
+  const relief =
+    Number(selection?.['끝없는 마나']?.level || 0) * 0.35 +
+    Number(selection?.['금단의 주문']?.level || 0) * 0.25 +
+    Number(selection?.['무한한 마력']?.level || 0) * 0.3;
+  return Math.max(0.4, furnaceLv * 1.0 - relief);
+}
+function manaConditionNoteText(calc) {
+  const notes = calc?.stats?.manaConditionNotes || [];
+  const text = [...new Set(notes.map(x => x.note).filter(Boolean))].join(' · ');
+  return text;
+}
+function candidateMemo(fourNames, fiveName, calc, singleHitPenalty = false, critOverPenalty = 0, critLowPenalty = 0, manaStabilityBonus = 0, manaFurnacePenalty = 0) {
   const current4 = currentTierNames(4);
   const current5 = currentTierNames(5).join(' + ') || '-';
   const bits = [];
@@ -930,12 +970,15 @@ function candidateMemo(fourNames, fiveName, calc, singleHitPenalty = false, crit
   if (critLowPenalty > 0) bits.push(`치적 95% 이하 보정 -${fmt(critLowPenalty)}%(추천만)`);
   if (critOverPenalty > 0) bits.push(`치적 초과 보정 -${fmt(critOverPenalty)}%(추천만)`);
   if (manaStabilityBonus > 0) bits.push(`마나 안정성 +${fmt(manaStabilityBonus)}% 보정`);
+  if (manaFurnacePenalty > 0) bits.push(`마나 용광로 부담 -${fmt(manaFurnacePenalty)}% 보정`);
+  const manaNote = manaConditionNoteText(calc);
+  if (manaNote) bits.push(manaNote);
   if (calc?.result?.sonicBreakEvolutionDamage > 0) bits.push(`음속 ${fmt(calc.result.sonicBreakEvolutionDamage)}%`);
   return bits.join(' / ');
 }
 function recommendationAdjustmentFor(fiveName, calc, singleHitPenaltyEnabled, selection = state.selected) {
   let multiplier = 1;
-  const details = { singleHitPenalty: false, critOverPenalty: 0, critLowPenalty: 0, manaStabilityBonus: 0 };
+  const details = { singleHitPenalty: false, critOverPenalty: 0, critLowPenalty: 0, manaStabilityBonus: 0, manaFurnacePenalty: 0 };
   if (singleHitPenaltyEnabled && fiveName === '뭉툭한 가시') {
     multiplier *= 0.975;
     details.singleHitPenalty = true;
@@ -964,6 +1007,11 @@ function recommendationAdjustmentFor(fiveName, calc, singleHitPenaltyEnabled, se
   if (manaBonus > 0) {
     multiplier *= (1 + manaBonus / 100);
     details.manaStabilityBonus = manaBonus;
+  }
+  const manaPenalty = manaFurnaceShortagePenalty(selection);
+  if (manaPenalty > 0) {
+    multiplier *= Math.max(0, 1 - manaPenalty / 100);
+    details.manaFurnacePenalty = manaPenalty;
   }
   return { value: Number(calc?.result?.value || 0) * multiplier, ...details };
 }
@@ -1015,6 +1063,9 @@ function penaltyNoteHtml(c) {
   if (c.critLowPenalty > 0) notes.push(`치적 95% 이하 -${fmt(c.critLowPenalty)}% 추천보정`);
   if (c.critOverPenalty > 0) notes.push(`치적초과 -${fmt(c.critOverPenalty)}% 추천보정`);
   if (c.manaStabilityBonus > 0) notes.push(`마나 안정성 +${fmt(c.manaStabilityBonus)}% 보정`);
+  if (c.manaFurnacePenalty > 0) notes.push(`마나 용광로 부담 -${fmt(c.manaFurnacePenalty)}% 보정`);
+  const manaNote = manaConditionNoteText(c.calc);
+  if (manaNote) notes.push(manaNote);
   if (c.penaltyApplied) notes.push('단타 -2.5% 추천보정');
   return notes.length ? `<div class="penaltyNote">${escapeHtml(notes.join(' · '))}</div>` : '';
 }
@@ -1032,8 +1083,6 @@ function calculateAndRender() {
   const currentAdjustment = recommendationAdjustmentFor(currentFiveName, current, false, state.selected);
   const apiBaseAdjustedValue = apiBaseAdjustment.value || Number(apiBase.result.value || 0);
   const currentAdjustedValue = currentAdjustment.value || Number(current.result.value || 0);
-  const apiManaStabilityBonus = apiBaseAdjustment.manaStabilityBonus || 0;
-  const currentManaStabilityBonus = currentAdjustment.manaStabilityBonus || 0;
   const baseValue = apiBaseAdjustedValue || currentAdjustedValue || current.result.value || 1;
   const currentDiff = ((currentAdjustedValue / baseValue) - 1) * 100;
   const candidates = [];
@@ -1052,7 +1101,7 @@ function calculateAndRender() {
   const tier2Options = allOptions(2).filter(name => {
     if (!getNode(name) || name === '축복의 여신') return false;
     if (excludeCooldown && hasCooldownEffect(name)) return false;
-    if (noManaMainSkill && ['끝없는 마나', '금단의 주문', '무한한 마력'].includes(name)) return false;
+    if (noManaMainSkill && MANA_SKILL_NODE_NAMES.includes(name)) return false;
     return true;
   });
   const tier2Candidates = tier2Allocations(tier2Options);
@@ -1085,6 +1134,7 @@ function calculateAndRender() {
           critOverPenalty: adjustment.critOverPenalty,
           critLowPenalty: adjustment.critLowPenalty,
           manaStabilityBonus: adjustment.manaStabilityBonus,
+          manaFurnacePenalty: adjustment.manaFurnacePenalty,
           diff: ((recValue / baseValue) - 1) * 100
         });
       }
@@ -1097,10 +1147,16 @@ function calculateAndRender() {
   if (apiBaseAdjustment.critLowPenalty > 0) apiAdjustParts.push(`치적 95% 이하 -${fmt(apiBaseAdjustment.critLowPenalty)}%`);
   if (apiBaseAdjustment.critOverPenalty > 0) apiAdjustParts.push(`치적초과 -${fmt(apiBaseAdjustment.critOverPenalty)}%`);
   if (apiBaseAdjustment.manaStabilityBonus > 0) apiAdjustParts.push(`마나 안정성 +${fmt(apiBaseAdjustment.manaStabilityBonus)}%`);
+  if (apiBaseAdjustment.manaFurnacePenalty > 0) apiAdjustParts.push(`마나 용광로 부담 -${fmt(apiBaseAdjustment.manaFurnacePenalty)}%`);
+  const apiManaConditionNote = manaConditionNoteText(apiBase);
+  if (apiManaConditionNote) apiAdjustParts.push(apiManaConditionNote);
   const currentAdjustParts = [];
   if (currentAdjustment.critLowPenalty > 0) currentAdjustParts.push(`치적 95% 이하 -${fmt(currentAdjustment.critLowPenalty)}%`);
   if (currentAdjustment.critOverPenalty > 0) currentAdjustParts.push(`치적초과 -${fmt(currentAdjustment.critOverPenalty)}%`);
   if (currentAdjustment.manaStabilityBonus > 0) currentAdjustParts.push(`마나 안정성 +${fmt(currentAdjustment.manaStabilityBonus)}%`);
+  if (currentAdjustment.manaFurnacePenalty > 0) currentAdjustParts.push(`마나 용광로 부담 -${fmt(currentAdjustment.manaFurnacePenalty)}%`);
+  const currentManaConditionNote = manaConditionNoteText(current);
+  if (currentManaConditionNote) currentAdjustParts.push(currentManaConditionNote);
   const apiManaLabel = apiAdjustParts.length ? `<small>이론 ${apiBase.result.value.toFixed(4)} · ${escapeHtml(apiAdjustParts.join(' · '))}</small>` : '';
   const currentManaLabel = currentAdjustParts.length ? `<small>이론 ${current.result.value.toFixed(4)} · ${escapeHtml(currentAdjustParts.join(' · '))}</small>` : '';
   $('currentScore').innerHTML = `<div class="apiBaselineRow">
@@ -1113,11 +1169,13 @@ function calculateAndRender() {
   if (apiBaseAdjustment.critLowPenalty > 0) apiDetailParts.push(`치적 95% 이하 -${fmt(apiBaseAdjustment.critLowPenalty)}%`);
   if (apiBaseAdjustment.critOverPenalty > 0) apiDetailParts.push(`치적초과 -${fmt(apiBaseAdjustment.critOverPenalty)}%`);
   if (apiBaseAdjustment.manaStabilityBonus > 0) apiDetailParts.push(`마나 안정성 +${fmt(apiBaseAdjustment.manaStabilityBonus)}%`);
+  if (apiBaseAdjustment.manaFurnacePenalty > 0) apiDetailParts.push(`마나 용광로 부담 -${fmt(apiBaseAdjustment.manaFurnacePenalty)}%`);
+  if (apiManaConditionNote) apiDetailParts.push(apiManaConditionNote);
   const apiManaDetail = apiDetailParts.length ? ` · ${escapeHtml(apiDetailParts.join(' · '))}` : '';
   $('baseInfo').innerHTML = `<b>API 기준 상세</b><span>치명 ${Math.round(apiBase.stats.critStat || 0)} · 최종치적 ${fmt(apiBase.result.critRate)}% · 치피 ${fmt(apiBase.result.critDamage)}% · 치적주피 ${fmt(apiBase.result.critHitDamage)}% · 진피 ${fmt(apiBase.result.evo)}% · 추피 ${fmt(apiBase.result.additionalDamage)}% · 적주피 ${fmt(apiBase.result.enemyDamage)}% · 공증 ${fmt(apiBase.result.attackPower)}%${apiManaDetail}</span>`;
   $('recommendList').innerHTML = top.length ? `<div class="comboRows">${top.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
-    const memo = candidateMemo(c.fourNames, c.fiveName, c.calc, c.penaltyApplied, c.critOverPenalty, c.critLowPenalty, c.manaStabilityBonus);
+    const memo = candidateMemo(c.fourNames, c.fiveName, c.calc, c.penaltyApplied, c.critOverPenalty, c.critLowPenalty, c.manaStabilityBonus, c.manaFurnacePenalty);
     return `<article class="comboRow ${i === 0 ? 'best' : ''}">
       <div class="rankBadge">${i + 1}</div>
       <div class="rowBuild">
@@ -1130,7 +1188,7 @@ function calculateAndRender() {
         ${penaltyNoteHtml(c)}
       </div>
       <div class="rowMetrics">
-        <div class="rowMetric"><span>추천값</span><b>${c.recValue.toFixed(4)}</b>${(c.penaltyApplied || c.critOverPenalty > 0 || c.critLowPenalty > 0 || c.manaStabilityBonus > 0) ? `<small>이론 ${c.calc.result.value.toFixed(4)}</small>` : ''}</div>
+        <div class="rowMetric"><span>추천값</span><b>${c.recValue.toFixed(4)}</b>${(c.penaltyApplied || c.critOverPenalty > 0 || c.critLowPenalty > 0 || c.manaStabilityBonus > 0 || c.manaFurnacePenalty > 0 || manaConditionNoteText(c.calc)) ? `<small>이론 ${c.calc.result.value.toFixed(4)}</small>` : ''}</div>
         <div class="rowMetric"><span>API 대비</span><b class="${cls}">${pct(c.diff)}</b></div>
         <div class="rowMetric"><span>치적</span><b>${fmt(c.calc.result.critRate)}%</b></div>
       </div>
@@ -1415,7 +1473,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.4.5',
+    apiVersion: '5.4.6',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1646,7 +1704,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.4.5</summary>
+      <summary>악세 디버그 보기 · v5.4.6</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>

@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     const arkGrid = await fetchOptionalJson(arkGridUrl, apiKey, 9000);
     const arkGridEffects = extractArkGridEffects(arkGrid.data);
 
-    return res.status(200).json({ ok: true, apiVersion: '5.1.0', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, raw: data });
+    return res.status(200).json({ ok: true, apiVersion: '5.4.6', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, raw: data });
   } catch (error) {
     const message = error.name === 'AbortError' ? 'Open API 응답 시간이 길어서 중단했습니다.' : error.message;
     return res.status(500).json({ error: '서버 함수 오류', message });
@@ -166,7 +166,7 @@ function extractEngravingEffects(engravingData) {
   const result = {
     rawText: '',
     items: [],
-    effects: { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 },
+    effects: { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, attackSpeed: 0, conditionalDamage: 0 },
     adrenaline: { adopted: false, level: 0, grade: '', bookLevel: 0, critRate: 0, attackPower: 0 }
   };
   if (!engravingData) return result;
@@ -186,6 +186,7 @@ function extractEngravingEffects(engravingData) {
     if (!rule) continue;
 
     const eff = evaluateBookRule(rule, grade, bookLevel);
+    if (name === '질량 증가') eff.attackSpeed = -10;
     result.items.push({ name, grade, bookLevel, count: bookLevel * 5, effects: eff });
 
     if (name === '아드레날린') {
@@ -247,7 +248,7 @@ const STONE_ENGRAVING_BONUS_RULES = {
 
 function evaluateBookRule(rule, grade, bookLevel) {
   const rank = engravingBookRank(grade, bookLevel);
-  const out = { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 };
+  const out = { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, attackSpeed: 0, conditionalDamage: 0 };
   const keys = new Set([...Object.keys(rule.hero4 || {}), ...Object.keys(rule.legendary4 || {}), ...Object.keys(rule.relic4 || {})]);
   for (const key of keys) {
     const h = Number(rule.hero4?.[key] || 0);
