@@ -1,4 +1,10 @@
-# Lost Ark Node Recommend Calculator v5.4.2
+# Lost Ark Node Recommend Calculator v5.4.3
+
+## v5.4.3
+- 공식 `/auctions/options` 응답 기준으로 악세 `EtcOptions` 값을 퍼센트 표시값이 아니라 `EtcValues.Value` 코드로 보내도록 수정했습니다. 예: `2.00%`는 `2`가 아니라 `200`.
+- 귀걸이/반지 연마 효과 fallback 코드도 공식 옵션 구조에 맞춰 추가했습니다.
+- 악세 디버그 REQUEST payload에 검색 플랜 타입, 옵션 소스, 인코딩된 옵션 값을 함께 표시해 다음 테스트에서 원인을 더 쉽게 분류할 수 있게 했습니다.
+- 프로젝트 내부 버전 표기를 v5.4.3으로 통일했습니다.
 
 ## v5.4.2
 - 악세 검색에서 공식 `/auctions/options` 옵션 코드를 우선 사용하고, 실패 시에만 기존 fallback 코드를 사용하도록 변경했습니다.

@@ -1,4 +1,4 @@
-const API_VERSION = '5.4.2';
+const API_VERSION = '5.4.3';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -28,6 +28,14 @@ const AUCTION_ETC_OPTION_FALLBACK = {
   necklace: {
     primary: { firstOption: 7, secondOption: 42, text: '적에게 주는 피해 증가' },
     secondary: { firstOption: 7, secondOption: 41, text: '추가 피해' }
+  },
+  earring: {
+    primary: { firstOption: 7, secondOption: 45, text: '공격력 %' },
+    secondary: { firstOption: 7, secondOption: 46, text: '무기 공격력 %' }
+  },
+  ring: {
+    primary: { firstOption: 7, secondOption: 50, text: '치명타 피해' },
+    secondary: { firstOption: 7, secondOption: 49, text: '치명타 적중률' }
   }
 };
 
@@ -82,55 +90,61 @@ async function getAuctionOptionDataCached(apiKey) {
 }
 
 async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey = 'necklace') {
-  // v5.4.2:
-  // 서버에는 3연마 + 목표 옵션 2개를 동시에 전달해 후보군을 최대한 좁힌다.
-  // 최종 판정은 응답의 ACCESSORY_UPGRADE 3개만 사용하며 옵션 순서는 무시한다.
-  // 힘/민첩/지능과 품질은 검색 및 필터 조건에 사용하지 않는다.
+  // v5.4.3: 공식 auctionOptions의 EtcValues.Value(예: 2.00% => 200)를 사용해 후보군을 좁힌다.
+  // 최종 판정은 응답의 ACCESSORY_UPGRADE 3개와 실제 Value만 사용한다.
   const fallback = AUCTION_ETC_OPTION_FALLBACK[partKey] || {};
   const optionData = await getAuctionOptionDataCached(apiKey);
   const primaryOfficial = findAuctionEtcOption(optionData, target.primary.label) || null;
   const secondaryOfficial = findAuctionEtcOption(optionData, target.secondary.label) || null;
   const primaryOption = primaryOfficial || fallback.primary || null;
   const secondaryOption = secondaryOfficial || fallback.secondary || null;
-  const optionSource = primaryOfficial && secondaryOfficial ? 'official-options' : 'fallback-options';
+  const optionSource = primaryOfficial && secondaryOfficial ? 'official-options' : (primaryOfficial || secondaryOfficial ? 'mixed-options' : 'fallback-options');
 
   const plans = [];
   const categoryCode = rule.categoryCandidates.find(code => code !== null && code !== undefined);
   const exactEtc = (option, targetOption) => option ? {
     FirstOption: option.firstOption,
     SecondOption: option.secondOption,
-    MinValue: Number(targetOption.value),
-    MaxValue: Number(targetOption.value)
+    MinValue: resolveAuctionEtcValue(option, targetOption.value),
+    MaxValue: resolveAuctionEtcValue(option, targetOption.value)
   } : null;
 
   const primaryExact = exactEtc(primaryOption, target.primary);
   const secondaryExact = exactEtc(secondaryOption, target.secondary);
   const bothExact = primaryExact && secondaryExact ? [primaryExact, secondaryExact] : [];
 
-  if (bothExact.length === 2) {
+  const addPlan = (typeSuffix, sortCondition, etcOptions, maxPages, batchSize, optionSearch) => {
     plans.push({
-      type: `accessory-${comboKey}-exact-3refine-asc`,
+      type: `accessory-${comboKey}-${typeSuffix}`,
       categoryCode,
-      sortCondition: 'ASC',
-      etcOptions: bothExact,
+      sortCondition,
+      etcOptions,
       itemUpgradeLevel: 3,
-      maxPages: 18,
-      batchSize: 4,
-      optionSearch: `3연마 · ${target.primary.label} ${target.primary.value}% + ${target.secondary.label} ${target.secondary.value}% · ${optionSource}`
+      maxPages,
+      batchSize,
+      optionSearch
     });
+  };
+
+  if (bothExact.length === 2) {
+    addPlan(
+      'exact-3refine-asc',
+      'ASC',
+      bothExact,
+      18,
+      4,
+      `정확 2옵션 · 3연마 · ${target.primary.label} ${target.primary.value}%(${primaryExact.MinValue}) + ${target.secondary.label} ${target.secondary.value}%(${secondaryExact.MinValue}) · ${optionSource}`
+    );
   }
 
-  // 정확 옵션 검색이 0건을 반환하는 경우가 있어, 최종 필터는 유지한 채 3연마 후보를 넓게 보정 검색한다.
-  plans.push({
-    type: `accessory-${comboKey}-3refine-fallback-asc`,
-    categoryCode,
-    sortCondition: 'ASC',
-    etcOptions: [],
-    itemUpgradeLevel: 3,
-    maxPages: bothExact.length === 2 ? 32 : 40,
-    batchSize: 8,
-    optionSearch: bothExact.length === 2 ? '정확 옵션 0건 보정 · 3연마 후보 검색' : '옵션 코드 탐색 실패 보정 · 3연마 후보 검색'
-  });
+  addPlan(
+    '3refine-fallback-asc',
+    'ASC',
+    [],
+    bothExact.length === 2 ? 32 : 40,
+    8,
+    bothExact.length === 2 ? '정확 옵션 0건 보정 · 3연마 후보 검색' : '옵션 코드 탐색 실패 보정 · 3연마 후보 검색'
+  );
   return plans;
 }
 
@@ -139,7 +153,7 @@ function findAuctionEtcOption(data, label) {
   const labelCompact = normalizeText(label).replace(/\s+/g, '');
   const matches = [];
   walkOptionTree(data, [], matches, labelCompact);
-  return matches.find(match => match.matchType === 'exact') || matches[0] || null;
+  return matches.find(match => match.matchType === 'exact') || matches.find(match => match.matchType === 'percent-exact') || matches[0] || null;
 }
 
 function walkOptionTree(node, path, matches, labelCompact) {
@@ -154,11 +168,22 @@ function walkOptionTree(node, path, matches, labelCompact) {
   const value = Number(node.Value ?? node.Id ?? node.Code ?? node.Option ?? node.OptionCode);
   const nextPath = Number.isFinite(value) ? [...path, value] : path;
   if (text && text.includes(labelCompact) && nextPath.length >= 2) {
-    const matchType = text === labelCompact ? 'exact' : 'partial';
-    matches.push({ firstOption: nextPath[nextPath.length - 2], secondOption: nextPath[nextPath.length - 1], text, matchType });
+    const matchType = text === labelCompact ? 'exact' : (text === `${labelCompact}%` ? 'percent-exact' : 'partial');
+    matches.push({ firstOption: nextPath[nextPath.length - 2], secondOption: nextPath[nextPath.length - 1], text, matchType, etcValues: Array.isArray(node.EtcValues) ? node.EtcValues : null });
   }
 
   for (const key of Object.keys(node)) walkOptionTree(node[key], nextPath, matches, labelCompact);
+}
+
+function resolveAuctionEtcValue(option, displayValue) {
+  const numeric = Number(displayValue);
+  const expectedCode = Number.isFinite(numeric) ? Math.round(numeric * 100) : NaN;
+  const values = Array.isArray(option?.etcValues) ? option.etcValues : [];
+  const matched = values.find(row => Number(row?.Value) === expectedCode)
+    || values.find(row => Math.abs(Number(String(row?.DisplayValue || '').replace('%', '')) - numeric) < 0.001);
+  if (matched && Number.isFinite(Number(matched.Value))) return Number(matched.Value);
+  if (Number.isFinite(expectedCode)) return expectedCode;
+  return numeric;
 }
 
 async function searchAccessory(apiKey, query) {
@@ -189,7 +214,7 @@ async function searchAccessory(apiKey, query) {
     updatedAt: indexResult.updatedAt,
     index: indexResult.index,
     accessoryDebug: {
-      note: 'v5.4.2 악세 디버그: 공식 auction options 코드를 우선 사용하고, 정확 옵션 검색이 비면 3연마 후보를 보정 검색합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다. 힘/민첩/지능과 품질은 필터에 사용하지 않습니다.',
+      note: 'v5.4.3 악세 디버그: 공식 auctionOptions의 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
       requestPayloads: indexResult.requestPayloads.slice(0, 14),
       filterStats: indexResult.filterStats,
       samples: indexResult.samples
@@ -256,7 +281,7 @@ async function scanAccessoryComboIndex(apiKey, context) {
       matchedPlan,
       matchedFirstPage,
       stopReason,
-      plans: searchPlans.map(plan => ({ type: plan.type, maxPages: plan.maxPages, batchSize: plan.batchSize, itemUpgradeLevel: plan.itemUpgradeLevel ?? null, hasEtcOptions: Array.isArray(plan.etcOptions) && plan.etcOptions.length > 0 }))
+      plans: searchPlans.map(plan => ({ type: plan.type, maxPages: plan.maxPages, batchSize: plan.batchSize, itemUpgradeLevel: plan.itemUpgradeLevel ?? null, optionSearch: plan.optionSearch || null, hasEtcOptions: Array.isArray(plan.etcOptions) && plan.etcOptions.length > 0 }))
     }
   };
 }
@@ -279,7 +304,7 @@ async function scanAccessoryPlan(apiKey, plan, context) {
     }
     if (!rows.length) break;
     for (const row of rows) {
-      if (requestPayloads.length < 40) requestPayloads.push({ ...row.payload });
+      if (requestPayloads.length < 60) requestPayloads.push({ planType: plan.type, optionSearch: plan.optionSearch || null, ...row.payload });
     }
 
     const settled = await Promise.allSettled(rows.map(row => fetchAuctionPage(apiKey, row.payload).then(result => ({ row, result }))));
@@ -353,7 +378,7 @@ function accessoryRejectReasons(normalized, rule, target) {
   if (normalized.grade && normalized.grade !== '고대') reasons.push(`등급 불일치: ${normalized.grade}`);
   if (!isAccessoryPart(`${normalized.name} ${normalized.fullText}`, rule.label)) reasons.push('부위 불일치');
 
-  // v5.4.2: 실제 연마 옵션은 정확히 3개여야 하며, 목표 옵션 2개의 위치는 무관하다.
+  // 실제 연마 옵션은 정확히 3개여야 하며, 목표 옵션 2개의 위치는 무관하다.
   // 힘/민첩/지능과 품질은 표시용 데이터일 뿐 검색/필터 판정에는 사용하지 않는다.
   const upgrades = normalized.upgradeOptions || [];
   if (upgrades.length !== 3) reasons.push(`3연마 아님: ${upgrades.length}개`);
