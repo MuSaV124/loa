@@ -1,4 +1,4 @@
-const VERSION = '5.4.9';
+const VERSION = '5.5.0';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -317,6 +317,7 @@ function renderCharacter(profile) {
 }
 function renderSummary(profile, arkPassive) {
   $('summaryPanel').classList.remove('hidden');
+  document.body.classList.add('calculatorReady');
   renderCombatStats();
 }
 
@@ -1224,6 +1225,7 @@ async function searchCharacter(name) {
   const button = $('searchButton');
   button.disabled = true; button.textContent = '검색...'; setMessage('');
   // 이전 검색 결과가 남아 보이지 않도록 검색 시작 시 화면을 먼저 비웁니다.
+  document.body.classList.remove('calculatorReady');
   $('characterCard').classList.add('hidden');
   $('characterCard').innerHTML = '';
   $('summaryPanel').classList.add('hidden');
@@ -1477,7 +1479,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.4.9',
+    apiVersion: '5.5.0',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1741,7 +1743,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.4.9</summary>
+      <summary>악세 디버그 보기 · v5.5.0</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>

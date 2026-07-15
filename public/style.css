@@ -1763,3 +1763,51 @@ select {
     display: none;
   }
 }
+
+/* v5.5.0 search-first calculator entry */
+body:not(.calculatorReady):not(.marketMode) #characterCard,
+body:not(.calculatorReady):not(.marketMode) #summaryPanel,
+body:not(.calculatorReady):not(.marketMode) #inputPanel,
+body:not(.calculatorReady):not(.marketMode) #evolutionPanel,
+body:not(.calculatorReady):not(.marketMode) #recommendPanel,
+body:not(.calculatorReady):not(.marketMode) #keenPanel {
+  display: none !important;
+}
+body:not(.calculatorReady):not(.marketMode) .wrap {
+  grid-template-columns: 1fr;
+  width: min(960px, calc(100vw - 28px));
+}
+body:not(.calculatorReady):not(.marketMode) .hero {
+  margin-top: clamp(34px, 8vh, 86px);
+  padding: clamp(22px, 4vw, 34px);
+}
+body:not(.calculatorReady):not(.marketMode) .hero h1 {
+  font-size: clamp(30px, 4vw, 42px);
+}
+body:not(.calculatorReady):not(.marketMode) .hero p {
+  max-width: 680px;
+}
+body:not(.calculatorReady):not(.marketMode) .search {
+  margin-top: 18px;
+}
+body:not(.calculatorReady):not(.marketMode) .search input {
+  min-height: 50px;
+  font-size: 15px;
+}
+body:not(.calculatorReady):not(.marketMode) .search button {
+  min-width: 92px;
+}
+body:not(.calculatorReady):not(.marketMode) .tabNav {
+  grid-column: 1;
+}
+@media (max-width: 760px) {
+  body:not(.calculatorReady):not(.marketMode) .wrap {
+    width: min(100vw - 24px, 560px);
+  }
+  body:not(.calculatorReady):not(.marketMode) .hero {
+    margin-top: 18px;
+  }
+  body:not(.calculatorReady):not(.marketMode) .hero h1 {
+    font-size: 28px;
+  }
+}
