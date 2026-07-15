@@ -230,6 +230,41 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .powerStoneRow {
   grid-template-columns: 54px minmax(0, 1fr);
 }
+.powerBraceletRow {
+  grid-template-columns: 54px minmax(0, 1fr);
+}
+.powerBraceletContent {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+.powerBraceletMeta {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.powerBraceletMeta b,
+.powerBraceletMeta span {
+  min-height: 21px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1;
+}
+.powerBraceletMeta b {
+  background: #ca8a04;
+  color: #fff7ed;
+}
+.powerBraceletMeta span {
+  border: 1px solid rgba(148, 163, 184, .24);
+  background: rgba(255, 255, 255, .06);
+  color: #dbeafe;
+}
 .powerStoneSummary span {
   min-height: 24px;
   display: inline-flex;
@@ -2147,7 +2182,7 @@ select {
   }
 }
 
-/* v5.6.9 search-first calculator entry */
+/* v5.7.0 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
 body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,

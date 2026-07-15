@@ -1,4 +1,4 @@
-const VERSION = '5.6.9';
+const VERSION = '5.7.0';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -450,6 +450,22 @@ function optionRowsWithPlaceholders(rows, count = 3) {
   while (next.length < count) next.push({ key: `empty${next.length}`, text: '옵션 없음', gradeClass: '' });
   return next;
 }
+function braceletMetaRows(effects = {}) {
+  const rows = [];
+  const statMap = [
+    ['critStat', '치명'],
+    ['swiftStat', '신속'],
+    ['specStat', '특화'],
+    ['strength', '힘'],
+    ['dexterity', '민첩'],
+    ['intelligence', '지능']
+  ];
+  for (const [key, label] of statMap) {
+    const value = Number(effects?.[key] || 0);
+    if (Math.abs(value) > 0) rows.push({ key, text: `${label} ${formatNumber(value)}` });
+  }
+  return rows;
+}
 function renderPowerStoneRow(item, engravings = '') {
   if (!item) return '';
   const tierGrade = ['T4', item.grade || '-'].filter(Boolean).join(' - ');
@@ -458,6 +474,36 @@ function renderPowerStoneRow(item, engravings = '') {
     ${powerItemIcon(item, { hideQuality: true })}
     <div class="powerStoneSummary">
       <span>${escapeHtml(`${tierGrade} - ${engravingText}`)}</span>
+    </div>
+  </div>`;
+}
+function renderPowerBraceletRow(item, effects) {
+  if (!item) return '';
+  const allRows = powerEffectRows(effects);
+  const metaRows = braceletMetaRows(effects);
+  const slottedKeys = new Set((effects?.optionSlots || []).map(slot => slot?.key).filter(Boolean));
+  const hiddenBySlot = new Set();
+  if (slottedKeys.has('critRate') || slottedKeys.has('critDamage')) hiddenBySlot.add('critHitDamage');
+  if (slottedKeys.has('enemyDamage')) hiddenBySlot.add('enemyDamage');
+  if (slottedKeys.has('additionalDamage')) hiddenBySlot.add('additionalDamage');
+  if (slottedKeys.has('weaponPowerFlat')) hiddenBySlot.add('weaponPowerFlat');
+  const optionRows = allRows.filter(row => !['statTrio', 'critStat', 'swiftStat', 'specStat'].includes(row.key) && !hiddenBySlot.has(row.key));
+  const displayRows = optionRows.length ? optionRows : [{ text: '파싱 효과 없음', gradeClass: '' }];
+  const metaHtml = [
+    `<b>${escapeHtml(item.grade || '-')}</b>`,
+    ...metaRows.map(row => `<span>${escapeHtml(row.text)}</span>`)
+  ].join('');
+  const effectHtml = displayRows
+    .map(row => {
+      const grade = row.gradeClass ? row.gradeClass.replace('option', '') : '';
+      const gradeLabel = row.grade || (grade === 'High' ? '상' : grade === 'Mid' ? '중' : grade === 'Low' ? '하' : '-');
+      return `<div class="powerAccessoryOption ${row.gradeClass || ''}"><b>${escapeHtml(gradeLabel)}</b><span>${escapeHtml(row.text)}</span></div>`;
+    }).join('');
+  return `<div class="powerAccessoryRow powerBraceletRow">
+    ${powerItemIcon(item, { hideQuality: true })}
+    <div class="powerBraceletContent">
+      <div class="powerBraceletMeta">${metaHtml}</div>
+      <div class="powerAccessoryOptions">${effectHtml}</div>
     </div>
   </div>`;
 }
@@ -517,7 +563,7 @@ function renderPowerSnapshot(snapshot) {
   const accessoryEffectItems = effects.accessory?.items || [];
   const accessoryRows = accessories.map((item, index) => renderPowerAccessoryRow(item, accessoryEffectItems[index]?.effects)).join('');
   const braceletEffects = effects.bracelet?.items?.[0]?.effects || effects.bracelet || {};
-  const braceletRow = renderPowerAccessoryRow(equipment.bracelet, braceletEffects, '팔찌', { hideQuality: true });
+  const braceletRow = renderPowerBraceletRow(equipment.bracelet, braceletEffects);
   const stone = equipment.abilityStone;
   const stoneEngravings = (effects.abilityStone?.items?.[0]?.engravings || effects.abilityStone?.engravings || []).map(e => `${e.name} Lv.${e.level}`).join(' · ');
   const stoneRow = renderPowerStoneRow(stone, stoneEngravings);
@@ -1709,7 +1755,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.6.9',
+    apiVersion: '5.7.0',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1973,7 +2019,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.6.9</summary>
+      <summary>악세 디버그 보기 · v5.7.0</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>
