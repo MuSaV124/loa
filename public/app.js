@@ -1,4 +1,4 @@
-const VERSION = '5.5.3';
+const VERSION = '5.5.4';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -332,10 +332,9 @@ function renderPowerSnapshot(snapshot) {
   const weapon = combat.find(item => item.type === '무기') || {};
   const advancedReady = combat.filter(item => item.advancedHoningLevel != null).length;
   const gemItems = gems.items || [];
-  const topGems = gemItems
+  const equippedGems = gemItems
     .slice()
     .sort((a, b) => Number(b.level || 0) - Number(a.level || 0))
-    .slice(0, 6)
     .map(gem => {
       const label = gem.kind === 'damage' ? '딜' : gem.kind === 'cooldown' ? '쿨' : '?';
       const icon = gem.icon ? `<img src="${escapeHtml(gem.icon)}" alt="">` : `<i>${escapeHtml(label)}</i>`;
@@ -365,7 +364,7 @@ function renderPowerSnapshot(snapshot) {
     </div>
     <div class="powerSnapshotColumns">
       <div class="powerSnapshotBlock"><h3>장비 파싱</h3><div class="powerGearList">${gearRows || '<p>전투 장비를 찾지 못했습니다.</p>'}</div></div>
-      <div class="powerSnapshotBlock"><h3>상위 보석</h3><div class="powerGemList">${topGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
+      <div class="powerSnapshotBlock"><h3>장착 보석</h3><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
     </div>
     <p class="powerSnapshotNote">이 카드는 전투력 계산식 투입 전 검증용입니다. 강화/상급재련은 API Tooltip 문구 기반이라 실제 캐릭터 샘플로 오차를 확인해야 합니다.</p>
   `;
@@ -1537,7 +1536,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.5.3',
+    apiVersion: '5.5.4',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1801,7 +1800,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.5.3</summary>
+      <summary>악세 디버그 보기 · v5.5.4</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>
