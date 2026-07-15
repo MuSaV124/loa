@@ -1,4 +1,4 @@
-const VERSION = '5.6.6';
+const VERSION = '5.6.8';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -336,6 +336,17 @@ function powerEffectPills(effects = {}, fallback = '파싱 효과 없음') {
   if (!rows.length) return `<span class="powerEffectEmpty">${escapeHtml(fallback)}</span>`;
   return rows.map(row => `<span class="powerEffectPill ${row.gradeClass || ''}">${escapeHtml(row.text)}</span>`).join('');
 }
+const DEALER_POWER_OPTION_KEYS = new Set(['statTrio', 'critRate', 'critDamage', 'critHitDamage', 'enemyDamage', 'additionalDamage', 'attackPowerPercent', 'weaponPowerPercent', 'attackPowerFlat', 'weaponPowerFlat', 'critStat', 'swiftStat', 'specStat', 'attackPower']);
+const SUPPORT_POWER_OPTION_KEYS = new Set(['identityGain', 'brandPower', 'allyAttackBuff', 'allyDamageBuff', 'partyHeal', 'partyShield']);
+function powerOptionRole(key) {
+  if (DEALER_POWER_OPTION_KEYS.has(key)) return 'dealer';
+  if (SUPPORT_POWER_OPTION_KEYS.has(key)) return 'support';
+  return 'utility';
+}
+function powerOptionGradeClass(key, grade) {
+  if (powerOptionRole(key) !== 'dealer') return 'optionNeutral';
+  return accessoryOptionGradeClass(grade);
+}
 function powerEffectRows(effects = {}) {
   const rows = [];
   const statTrio = [
@@ -348,6 +359,8 @@ function powerEffectRows(effects = {}) {
     const sameValue = statValues.length === 3 && statValues.every(value => value === statValues[0]);
     rows.push({
       key: 'statTrio',
+      role: 'dealer',
+      gradeClass: 'optionDealer',
       text: sameValue
         ? `힘/민/지 +${formatNumber(statValues[0])}`
         : statTrio.map(([key, label]) => `${label} +${formatNumber(Number(effects[key]))}`).join(' / ')
@@ -356,9 +369,9 @@ function powerEffectRows(effects = {}) {
   const slotKeys = new Set();
   for (const slot of effects?.optionSlots || []) {
     if (!slot?.text) continue;
-    const gradeClass = accessoryOptionGradeClass(slot.grade);
+    const gradeClass = powerOptionGradeClass(slot.key, slot.grade);
     if (slot.key) slotKeys.add(slot.key);
-    rows.push({ key: slot.key || 'braceletSlot', gradeClass, text: slot.text });
+    rows.push({ key: slot.key || 'braceletSlot', role: powerOptionRole(slot.key), grade: slot.grade || '', gradeClass, text: slot.text });
   }
   const effectDefs = [
     ['critRate', '치적'],
@@ -373,14 +386,33 @@ function powerEffectRows(effects = {}) {
     ['critStat', '치명'],
     ['swiftStat', '신속'],
     ['specStat', '특화'],
+    ['identityGain', '아덴'],
+    ['brandPower', '낙인력'],
+    ['allyAttackBuff', '아군 공증'],
+    ['allyDamageBuff', '아군 피해'],
+    ['partyHeal', '파티 회복'],
+    ['partyShield', '파티 보호'],
+    ['maxHp', '최생'],
+    ['maxMana', '최마'],
+    ['statusDuration', '상태이상'],
+    ['combatHpRegen', '전투 회복'],
+    ['attackMoveSpeed', '공이속'],
+    ['seedDamage', '시드 피해'],
+    ['seedDamageReduction', '시드 피감'],
+    ['physicalDefense', '물방'],
+    ['magicDefense', '마방'],
+    ['resourceRecovery', '자원 회복'],
+    ['spaceCooldown', '이동기 쿨'],
     ['attackPower', '공격력']
   ].filter(([key]) => !slotKeys.has(key) && Math.abs(Number(effects?.[key] || 0)) > 0);
   for (const [key, label] of effectDefs) {
     const value = Number(effects[key]);
-    const gradeClass = accessoryOptionGradeClass(effects?.optionGrades?.[key]);
-    const isFlat = key.endsWith('Flat') || ['critStat', 'swiftStat', 'specStat'].includes(key);
+    const role = powerOptionRole(key);
+    const grade = effects?.optionGrades?.[key] || '';
+    const gradeClass = powerOptionGradeClass(key, grade);
+    const isFlat = key.endsWith('Flat') || ['critStat', 'swiftStat', 'specStat', 'maxHp', 'maxMana', 'combatHpRegen', 'physicalDefense', 'magicDefense'].includes(key);
     const text = isFlat ? `+${formatNumber(value)}` : pct(value);
-    rows.push({ key, gradeClass, text: `${label} ${text}` });
+    rows.push({ key, role, grade, gradeClass, text: `${label} ${text}` });
   }
   return rows;
 }
@@ -410,7 +442,7 @@ function renderPowerEquipmentRow(item) {
   </div>`;
 }
 function optionRowsWithPlaceholders(rows, count = 3) {
-  const next = rows.slice(0, count);
+  const next = rows.slice();
   while (next.length < count) next.push({ key: `empty${next.length}`, text: '옵션 없음', gradeClass: '' });
   return next;
 }
@@ -436,7 +468,7 @@ function renderPowerAccessoryRow(item, effects, extra = '', options = {}) {
   const effectHtml = displayRows
     .map(row => {
       const grade = row.gradeClass ? row.gradeClass.replace('option', '') : '';
-      const gradeLabel = grade === 'High' ? '상' : grade === 'Mid' ? '중' : grade === 'Low' ? '하' : '-';
+      const gradeLabel = row.grade || (grade === 'High' ? '상' : grade === 'Mid' ? '중' : grade === 'Low' ? '하' : '-');
       return `<div class="powerAccessoryOption ${row.gradeClass || ''}"><b>${escapeHtml(gradeLabel)}</b><span>${escapeHtml(row.text)}</span></div>`;
     }).join('');
   return `<div class="powerAccessoryRow ${options.extraRow ? 'extraRow' : ''}">
@@ -1673,7 +1705,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.6.6',
+    apiVersion: '5.6.8',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1937,7 +1969,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.6.6</summary>
+      <summary>악세 디버그 보기 · v5.6.8</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>

@@ -1,4 +1,4 @@
-const API_VERSION = '5.6.6';
+const API_VERSION = '5.6.8';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = 60 * 1000;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -395,7 +395,7 @@ function extractAccessoryEffects(equipment) {
   for (const item of Array.isArray(equipment) ? equipment : []) {
     if (!accessoryTypes.has(item?.Type)) continue;
     const text = tooltipText(item.Tooltip);
-    const effects = parseAccessoryText(text, item.Type);
+    const effects = parseAccessoryText(text, item.Type, item.Grade);
     result.critRate += effects.critRate;
     result.critDamage += effects.critDamage;
     result.critHitDamage += effects.critHitDamage;
@@ -422,7 +422,7 @@ function extractBraceletEffects(equipment) {
   for (const item of Array.isArray(equipment) ? equipment : []) {
     if (item?.Type !== '팔찌') continue;
     const text = tooltipText(item.Tooltip);
-    const effects = parseAccessoryText(text, item.Type);
+    const effects = parseAccessoryText(text, item.Type, item.Grade);
     result.critRate += effects.critRate;
     result.critDamage += effects.critDamage;
     result.critHitDamage += effects.critHitDamage;
@@ -670,41 +670,102 @@ function round2(value) {
 const ACCESSORY_OPTION_GRADE_VALUES = {
   '목걸이': {
     enemyDamage: { high: 2.00, mid: 1.20, low: 0.55 },
-    additionalDamage: { high: 2.60, mid: 1.60, low: 0.70 }
+    additionalDamage: { high: 2.60, mid: 1.60, low: 0.60 },
+    attackPowerFlat: { high: 390, mid: 195, low: 80 },
+    weaponPowerFlat: { high: 960, mid: 480, low: 195 },
+    identityGain: { high: 6.00, mid: 3.60, low: 1.60 },
+    brandPower: { high: 8.00, mid: 4.80, low: 2.15 }
   },
   '귀걸이': {
     attackPowerPercent: { high: 1.55, mid: 0.95, low: 0.40 },
-    weaponPowerPercent: { high: 3.00, mid: 1.80, low: 0.80 }
+    weaponPowerPercent: { high: 3.00, mid: 1.80, low: 0.80 },
+    attackPowerFlat: { high: 390, mid: 195, low: 80 },
+    weaponPowerFlat: { high: 960, mid: 480, low: 195 }
   },
   '반지': {
     critDamage: { high: 4.00, mid: 2.40, low: 1.10 },
-    critRate: { high: 1.55, mid: 0.95, low: 0.40 }
+    critRate: { high: 1.55, mid: 0.95, low: 0.40 },
+    attackPowerFlat: { high: 390, mid: 195, low: 80 },
+    weaponPowerFlat: { high: 960, mid: 480, low: 195 },
+    allyAttackBuff: { high: 5.00, mid: 3.00, low: 1.35 },
+    allyDamageBuff: { high: 7.50, mid: 4.50, low: 2.00 }
   }
 };
 
 const BRACELET_OPTION_GRADE_VALUES = {
-  critRate: [{ high: 4.20, mid: 3.40, low: 2.60 }],
-  critDamage: [{ high: 8.40, mid: 6.80, low: 5.20 }],
-  enemyDamage: [
-    { high: 2.50, mid: 2.00, low: 1.50 },
-    { high: 5.00, mid: 4.50, low: 4.00 },
-    { high: 3.00, mid: 2.50, low: 2.00 }
-  ],
-  additionalDamage: [
-    { high: 3.00, mid: 2.50, low: 2.00 },
-    { high: 3.50, mid: 3.00, low: 2.50 }
-  ],
-  weaponPowerFlat: [
-    { high: 1320, mid: 1160, low: 1000 },
-    { high: 8100, mid: 7200, low: 6300 },
-    { high: 7800, mid: 6900, low: 6000 },
-    { high: 2200, mid: 2000, low: 1800 },
-    { high: 140, mid: 130, low: 120 }
-  ]
+  relic: {
+    critRate: [{ high: 4.20, mid: 3.40, low: 2.60 }],
+    critDamage: [{ high: 8.40, mid: 6.80, low: 5.20 }],
+    enemyDamage: [
+      { high: 2.50, mid: 2.00, low: 1.50 },
+      { high: 5.00, mid: 4.50, low: 4.00 },
+      { high: 3.00, mid: 2.50, low: 2.00 }
+    ],
+    additionalDamage: [
+      { high: 3.00, mid: 2.50, low: 2.00 },
+      { high: 3.50, mid: 3.00, low: 2.50 }
+    ],
+    weaponPowerFlat: [
+      { high: 1320, mid: 1160, low: 1000 },
+      { high: 8100, mid: 7200, low: 6300 },
+      { high: 7800, mid: 6900, low: 6000 },
+      { high: 2200, mid: 2000, low: 1800 },
+      { high: 140, mid: 130, low: 120 }
+    ]
+  },
+  ancient: {
+    critRate: [{ high: 5.00, mid: 4.20, low: 3.40 }],
+    critDamage: [{ high: 10.00, mid: 8.40, low: 6.80 }],
+    enemyDamage: [
+      { high: 3.00, mid: 2.50, low: 2.00 },
+      { high: 5.50, mid: 5.00, low: 4.50 },
+      { high: 3.50, mid: 3.00, low: 2.50 }
+    ],
+    additionalDamage: [
+      { high: 3.50, mid: 3.00, low: 2.50 },
+      { high: 4.00, mid: 3.50, low: 3.00 }
+    ],
+    weaponPowerFlat: [
+      { high: 1480, mid: 1320, low: 1160 },
+      { high: 9000, mid: 8100, low: 7200 },
+      { high: 8700, mid: 7800, low: 6900 },
+      { high: 2400, mid: 2200, low: 2000 },
+      { high: 150, mid: 140, low: 130 }
+    ]
+  },
+  common: {
+    critRate: [{ high: 5.00, mid: 4.20, low: 3.40 }, { high: 4.20, mid: 3.40, low: 2.60 }],
+    critDamage: [{ high: 10.00, mid: 8.40, low: 6.80 }, { high: 8.40, mid: 6.80, low: 5.20 }],
+    enemyDamage: [
+      { high: 3.00, mid: 2.50, low: 2.00 },
+      { high: 2.50, mid: 2.00, low: 1.50 },
+      { high: 5.50, mid: 5.00, low: 4.50 },
+      { high: 5.00, mid: 4.50, low: 4.00 },
+      { high: 3.50, mid: 3.00, low: 2.50 },
+      { high: 3.00, mid: 2.50, low: 2.00 }
+    ],
+    additionalDamage: [
+      { high: 4.00, mid: 3.50, low: 3.00 },
+      { high: 3.50, mid: 3.00, low: 2.50 },
+      { high: 3.00, mid: 2.50, low: 2.00 }
+    ],
+    weaponPowerFlat: [
+      { high: 1480, mid: 1320, low: 1160 },
+      { high: 1320, mid: 1160, low: 1000 },
+      { high: 9000, mid: 8100, low: 7200 },
+      { high: 8100, mid: 7200, low: 6300 },
+      { high: 8700, mid: 7800, low: 6900 },
+      { high: 7800, mid: 6900, low: 6000 },
+      { high: 2400, mid: 2200, low: 2000 },
+      { high: 2200, mid: 2000, low: 1800 },
+      { high: 150, mid: 140, low: 130 },
+      { high: 140, mid: 130, low: 120 }
+    ]
+  }
 };
 
-function parseAccessoryText(text, itemType = '') {
-  const out = { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, attackPowerFlat: 0, weaponPowerFlat: 0, attackPowerPercent: 0, weaponPowerPercent: 0, strength: 0, dexterity: 0, intelligence: 0, critStat: 0, swiftStat: 0, specStat: 0, optionGrades: {} };
+function parseAccessoryText(text, itemType = '', itemGrade = '') {
+  const out = { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, attackPowerFlat: 0, weaponPowerFlat: 0, attackPowerPercent: 0, weaponPowerPercent: 0, strength: 0, dexterity: 0, intelligence: 0, critStat: 0, swiftStat: 0, specStat: 0, identityGain: 0, brandPower: 0, allyAttackBuff: 0, allyDamageBuff: 0, partyHeal: 0, partyShield: 0, maxHp: 0, maxMana: 0, statusDuration: 0, combatHpRegen: 0, attackMoveSpeed: 0, seedDamage: 0, seedDamageReduction: 0, physicalDefense: 0, magicDefense: 0, resourceRecovery: 0, spaceCooldown: 0, optionGrades: {} };
   const source = stripHtml(text);
 
   // 팔찌/악세 툴팁은 문장형, 축약형(+), HTML 조각이 섞여 들어와서
@@ -712,60 +773,130 @@ function parseAccessoryText(text, itemType = '') {
   addMatches(out, 'critRate', source, [
     /치명타\s*적중률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /치명타\s*확률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
 
   addMatches(out, 'critDamage', source, [
     /치명타\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
 
   addMatches(out, 'additionalDamage', source, [
     /추가\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
 
   addMatches(out, 'weaponPowerPercent', source, [
     /무기\s*공격력(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
 
   addMatches(out, 'attackPowerPercent', source, [
     /(?<!무기\s*)공격력(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
 
   addMatches(out, 'weaponPowerFlat', source, [
     /무기\s*공격력(?:이)?\s*(?:\+)?(\d[\d,]*)(?![\d,.]*\s*%)/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
 
   addMatches(out, 'attackPowerFlat', source, [
     /(?<!무기\s*)공격력(?:이)?\s*(?:\+)?(\d[\d,]*)(?![\d,.]*\s*%)/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
 
   addMatches(out, 'strength', source, [
     /힘\s*(?:\+)?(\d[\d,]*)/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
 
   addMatches(out, 'dexterity', source, [
     /민첩\s*(?:\+)?(\d[\d,]*)/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
 
   addMatches(out, 'intelligence', source, [
     /지능\s*(?:\+)?(\d[\d,]*)/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
 
   addMatches(out, 'critStat', source, [
     /(?:^|\s)치명\s*(?:\+)?(\d[\d,]*)/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
 
   addMatches(out, 'swiftStat', source, [
     /(?:^|\s)신속\s*(?:\+)?(\d[\d,]*)/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
 
   addMatches(out, 'specStat', source, [
     /(?:^|\s)특화\s*(?:\+)?(\d[\d,]*)/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'identityGain', source, [
+    /(?:아덴|아이덴티티|서폿\s*아덴|세레나데,\s*신앙,\s*조화\s*게이지)\s*획득량(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'brandPower', source, [
+    /낙인력(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'allyAttackBuff', source, [
+    /아군\s*공격력\s*강화\s*효과(?:가|는)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'allyDamageBuff', source, [
+    /아군\s*피해량\s*강화\s*효과(?:가|는)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'partyHeal', source, [
+    /파티원\s*회복\s*효과(?:가|는)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
+    /파티원\s*보호\s*및\s*회복\s*효과(?:가|는)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'partyShield', source, [
+    /파티원\s*보호막\s*효과(?:가|는)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
+    /보호\s*효과가\s*적용된\s*대상이\s*\d+초\s*동안\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'maxHp', source, [
+    /최대\s*생명력\s*(?:\+)?(\d[\d,]*)/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'maxMana', source, [
+    /최대\s*마나\s*(?:\+)?(\d[\d,]*)/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'statusDuration', source, [
+    /상태이상\s*공격\s*지속시간(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'combatHpRegen', source, [
+    /전투\s*중\s*생명력\s*회복량\s*(?:\+)?(\d[\d,]*)/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'attackMoveSpeed', source, [
+    /공격\s*및\s*이동\s*속도(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'seedDamage', source, [
+    /시드\s*등급\s*이하\s*몬스터에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'seedDamageReduction', source, [
+    /시드\s*등급\s*이하\s*몬스터에게\s*받는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:감소)?/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'physicalDefense', source, [
+    /물리\s*방어력\s*(?:\+)?(\d[\d,]*)/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'magicDefense', source, [
+    /마법\s*방어력\s*(?:\+)?(\d[\d,]*)/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'resourceRecovery', source, [
+    /전투자원\s*자연\s*회복량\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+  ], source, itemType, itemGrade);
+
+  addMatches(out, 'spaceCooldown', source, [
+    /이동기\s*및\s*기상기\s*재사용\s*대기\s*시간(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:감소)?/g
+  ], source, itemType, itemGrade);
 
   // 치명타 적중 시 적주피는 일반 적주피가 아니라 치명타 배율 안에서 별도 곱연산으로 계산합니다.
   addMatches(out, 'critHitDamage', source, [
     /공격이\s*치명타로\s*적중\s*시\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
 
   // "무력화 상태의 적에게 주는 피해"는 별도 조건부라 제외하고,
   // 일반 적주피/쿨증 적주피/백·헤드·비방향성 적주피는 각 출처별 곱연산으로 계산합니다.
@@ -774,9 +905,9 @@ function parseAccessoryText(text, itemType = '') {
     /백어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /헤드어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /방향성\s*공격이\s*아닌\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source, itemType);
+  ], source, itemType, itemGrade);
 
-  if (itemType === '팔찌') out.optionSlots = extractBraceletOptionSlots(source, out);
+  if (itemType === '팔찌') out.optionSlots = extractBraceletOptionSlots(source, out, itemGrade);
 
   for (const key of Object.keys(out)) {
     if (key === 'optionGrades' || key === 'optionSlots') continue;
@@ -785,11 +916,11 @@ function parseAccessoryText(text, itemType = '') {
   return out;
 }
 
-function extractBraceletOptionSlots(text, effects) {
+function extractBraceletOptionSlots(text, effects, itemGrade = '') {
   const source = String(text || '');
   const slots = [];
   const push = (key, label, value, gradeKey = key, extraText = '') => {
-    const grade = optionGradeByValue(gradeKey, value, '팔찌') || effects?.optionGrades?.[gradeKey] || '';
+    const grade = optionGradeByValue(gradeKey, value, '팔찌', itemGrade) || effects?.optionGrades?.[gradeKey] || '';
     const main = key.endsWith('Flat') ? `${label} +${Number(value).toLocaleString('ko-KR')}` : `${label} ${pctForServer(value)}`;
     slots.push({ key, text: extraText ? `${main} / ${extraText}` : main, grade });
   };
@@ -851,7 +982,7 @@ function pctForServer(value) {
   return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
 }
 
-function addMatches(out, key, text, regexList, sourceText = text, itemType = '') {
+function addMatches(out, key, text, regexList, sourceText = text, itemType = '', itemGrade = '') {
   const seen = new Set();
   for (const re of regexList) {
     let match;
@@ -865,14 +996,15 @@ function addMatches(out, key, text, regexList, sourceText = text, itemType = '')
       if (seen.has(token)) continue;
       seen.add(token);
       out[key] += value;
-      const grade = optionGradeByValue(key, value, itemType) || optionGradeNearMatch(sourceText, match.index);
+      const grade = optionGradeByValue(key, value, itemType, itemGrade) || optionGradeNearMatch(sourceText, match.index);
       if (grade && !out.optionGrades[key]) out.optionGrades[key] = grade;
     }
   }
 }
 
-function optionGradeByValue(key, value, itemType = '') {
-  const table = itemType === '팔찌' ? BRACELET_OPTION_GRADE_VALUES : ACCESSORY_OPTION_GRADE_VALUES[itemType];
+function optionGradeByValue(key, value, itemType = '', itemGrade = '') {
+  const gradeKey = String(itemGrade || '').includes('고대') ? 'ancient' : String(itemGrade || '').includes('유물') ? 'relic' : 'common';
+  const table = itemType === '팔찌' ? (BRACELET_OPTION_GRADE_VALUES[gradeKey] || BRACELET_OPTION_GRADE_VALUES.common) : ACCESSORY_OPTION_GRADE_VALUES[itemType];
   const entries = Array.isArray(table?.[key]) ? table[key] : (table?.[key] ? [table[key]] : []);
   for (const entry of entries) {
     for (const grade of ['high', 'mid', 'low']) {

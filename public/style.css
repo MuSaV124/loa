@@ -300,6 +300,12 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .powerAccessoryOption.optionLow b {
   background: #2563eb;
 }
+.powerAccessoryOption.optionNeutral b {
+  background: #64748b;
+}
+.powerAccessoryOption.optionNeutral span {
+  color: #cbd5e1;
+}
 .powerFieldGrid {
   display: grid;
   grid-template-columns: 70px 76px 82px;
@@ -2140,7 +2146,7 @@ select {
   }
 }
 
-/* v5.6.6 search-first calculator entry */
+/* v5.6.8 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
 body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,
