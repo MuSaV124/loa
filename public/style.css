@@ -102,7 +102,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 }
 .powerGearRow {
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) auto;
+  grid-template-columns: 46px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   padding: 8px;
@@ -144,18 +144,44 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.powerGearInfo span,
+.powerGearMeta,
 .powerSnapshotBlock p,
 .powerSnapshotNote {
   color: var(--muted);
 }
-.powerGearRow strong {
-  min-width: 72px;
-  text-align: right;
-  color: #cbd5e1;
+.powerGearMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 1.25;
 }
-.powerGearRow strong.qualityReady {
-  color: #fbbf24;
+.powerGearDot {
+  color: rgba(148, 163, 184, .62);
+}
+.powerGearDash {
+  color: rgba(148, 163, 184, .72);
+  font-weight: 900;
+}
+.powerGearQuality {
+  font-weight: 950;
+}
+.powerGearQuality.qualityUncommon {
+  color: #4ade80;
+}
+.powerGearQuality.qualityRare {
+  color: #60a5fa;
+}
+.powerGearQuality.qualityEpic {
+  color: #c084fc;
+}
+.powerGearQuality.qualityLegend {
+  color: #facc15;
+}
+.powerGearQuality.qualityUnknown {
+  color: var(--muted);
 }
 .powerGemList {
   display: grid;
@@ -1910,7 +1936,7 @@ select {
   }
 }
 
-/* v5.6.0 search-first calculator entry */
+/* v5.6.1 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
 body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,
@@ -1928,10 +1954,8 @@ body:not(.calculatorReady):not(.marketMode) #keenPanel {
   .powerGearRow {
     grid-template-columns: 42px minmax(0, 1fr);
   }
-  .powerGearRow strong {
-    grid-column: 2;
-    min-width: 0;
-    text-align: left;
+  .powerGearMeta {
+    font-size: 13px;
   }
 }
 body:not(.calculatorReady):not(.marketMode) .wrap {

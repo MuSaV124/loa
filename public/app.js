@@ -1,4 +1,4 @@
-const VERSION = '5.6.0';
+const VERSION = '5.6.1';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -316,6 +316,14 @@ function renderCharacter(profile) {
   el.innerHTML = `${image ? `<img src="${escapeHtml(image)}" alt="" />` : ''}<div><h2>${escapeHtml(profile?.CharacterName || '-')} / ${escapeHtml(profile?.CharacterClassName || '-')}</h2><p>서버 ${escapeHtml(profile?.ServerName || '-')} · 아이템 레벨 ${escapeHtml(profile?.ItemAvgLevel || '-')} · 전투력 ${escapeHtml(profile?.CombatPower || '-')}</p></div>`;
   el.classList.remove('hidden');
 }
+function gearQualityClass(value) {
+  const quality = Number(value);
+  if (!Number.isFinite(quality)) return 'qualityUnknown';
+  if (quality >= 100) return 'qualityLegend';
+  if (quality > 80) return 'qualityEpic';
+  if (quality > 60) return 'qualityRare';
+  return 'qualityUncommon';
+}
 function renderPowerSnapshot(snapshot) {
   const panel = $('powerSnapshotPanel');
   const view = $('powerSnapshotView');
@@ -343,15 +351,19 @@ function renderPowerSnapshot(snapshot) {
     const honing = item.honingLevel != null ? `+${item.honingLevel}` : '확인 필요';
     const advanced = item.advancedHoningExcluded ? '' : (item.advancedHoningLevel != null ? `상재 ${item.advancedHoningLevel}` : '상재 미확인');
     const quality = item.quality != null ? `품질 ${item.quality}` : '품질 미확인';
-    const meta = [item.type || '-', honing, advanced].filter(Boolean).join(' · ');
+    const qualityClass = gearQualityClass(item.quality);
+    const meta = [
+      `<span>${escapeHtml(item.type || '-')} <span class="powerGearQuality ${qualityClass}">${escapeHtml(quality)}</span></span>`,
+      advanced ? `<span>${escapeHtml(advanced)}</span>` : '',
+      `<span>${escapeHtml(honing)}</span>`
+    ].filter(Boolean).join('<span class="powerGearDash">-</span>');
     const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="">` : `<div class="powerGearFallback">${escapeHtml(item.type?.slice(0, 1) || '?')}</div>`;
     return `<div class="powerGearRow">
       <div class="powerGearIcon">${icon}</div>
       <div class="powerGearInfo">
         <b>${escapeHtml(item.name || item.type || '-')}</b>
-        <span>${escapeHtml(meta)}</span>
+        <div class="powerGearMeta">${meta}</div>
       </div>
-      <strong class="${item.quality != null ? 'qualityReady' : ''}">${escapeHtml(quality)}</strong>
     </div>`;
   }).join('');
   view.innerHTML = `
@@ -1529,7 +1541,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.6.0',
+    apiVersion: '5.6.1',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1793,7 +1805,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.6.0</summary>
+      <summary>악세 디버그 보기 · v5.6.1</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>
