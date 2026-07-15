@@ -1,4 +1,5 @@
-const API_VERSION = '5.5.2';
+const API_VERSION = '5.5.3';
+const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = 60 * 1000;
 const CHARACTER_CACHE_MAX_SIZE = 80;
 const characterCache = new Map();
@@ -142,6 +143,14 @@ function tooltipText(tooltip) {
   return stripHtml(JSON.stringify(tooltip));
 }
 
+function parseTooltip(tooltip) {
+  if (!tooltip) return null;
+  if (typeof tooltip === 'string') {
+    try { return JSON.parse(tooltip); } catch { return null; }
+  }
+  return typeof tooltip === 'object' ? tooltip : null;
+}
+
 const COMBAT_EQUIPMENT_TYPES = new Set(['무기', '투구', '상의', '하의', '장갑', '어깨']);
 const ACCESSORY_EQUIPMENT_TYPES = new Set(['목걸이', '귀걸이', '반지']);
 
@@ -202,17 +211,18 @@ function extractEquipmentSnapshot(equipment) {
 }
 
 function parseEquipmentSnapshotItem(item) {
+  const tooltip = parseTooltip(item?.Tooltip);
   const text = tooltipText(item?.Tooltip);
   const name = stripHtml(item?.Name || '');
   const quality = firstFiniteNumber([
     item?.Quality,
-    matchNumber(text, [/품질[^0-9]{0,12}([0-9,.]+)/])
+    findQualityValue(tooltip)
   ]);
   return {
     type: item?.Type || item?.ItemType || '',
     name,
     grade: item?.Grade || '',
-    icon: item?.Icon || '',
+    icon: normalizeIconUrl(item?.Icon || item?.IconPath || findIconPath(item?.Tooltip) || ''),
     honingLevel: firstFiniteNumber([
       item?.HoningLevel,
       matchNumber(name, [/^\s*\+([0-9]+)/]),
@@ -256,7 +266,7 @@ function extractGemSnapshot(gemData) {
       level,
       kind,
       grade: gem?.Grade || '',
-      icon: gem?.Icon || '',
+      icon: normalizeIconUrl(gem?.Icon || gem?.IconPath || findIconPath(gem?.Tooltip) || ''),
       skillName: effect?.Name || parseGemSkillName(effectText),
       effectText: effectText.slice(0, 500)
     };
@@ -307,6 +317,46 @@ function parseGemSkillName(text) {
   const source = stripHtml(text);
   const match = source.match(/['"「]?([가-힣A-Za-z0-9\s]+)['"」]?\s*(?:스킬)?(?:의)?\s*(?:피해|재사용|쿨타임)/);
   return match ? match[1].trim() : '';
+}
+
+function findQualityValue(value) {
+  const candidates = [];
+  const visit = (current, key = '') => {
+    if (current == null) return;
+    if (typeof current === 'number' || typeof current === 'string') {
+      if (/quality/i.test(key)) candidates.push(current);
+      return;
+    }
+    if (Array.isArray(current)) {
+      current.forEach(item => visit(item, key));
+      return;
+    }
+    if (typeof current === 'object') {
+      for (const [childKey, childValue] of Object.entries(current)) {
+        if (/^(quality|qualityValue|quality_value)$/i.test(childKey)) candidates.push(childValue);
+        visit(childValue, childKey);
+      }
+    }
+  };
+  visit(value);
+  for (const candidate of candidates) {
+    const n = parseNumber(candidate);
+    if (Number.isFinite(n) && n >= 0 && n <= 100) return n;
+  }
+  return null;
+}
+
+function findIconPath(tooltip) {
+  const raw = typeof tooltip === 'string' ? tooltip : JSON.stringify(tooltip || '');
+  const match = raw.match(/"iconPath"\s*:\s*"([^"]+)"/) || raw.match(/iconPath['"]?\s*[:=]\s*['"]([^'"]+)['"]/i);
+  return match?.[1] || '';
+}
+
+function normalizeIconUrl(value) {
+  const icon = String(value || '').trim();
+  if (!icon) return '';
+  if (/^https?:\/\//i.test(icon)) return icon;
+  return `${CDN_PREFIX}${icon.replace(/^\/+/, '')}`;
 }
 
 function firstFiniteNumber(values) {
