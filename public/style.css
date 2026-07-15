@@ -141,6 +141,9 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   border-radius: 9px;
   background: rgba(15, 23, 42, .50);
 }
+.powerEquipmentRow {
+  grid-template-columns: 54px minmax(0, 1fr);
+}
 .powerAccessoryRow.extraRow {
   margin-top: 2px;
 }
@@ -216,13 +219,29 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .powerAccessoryName b {
   display: block;
   color: #fbbf24;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 .powerAccessoryName {
   grid-column: 2 / 4;
   display: none;
+}
+.powerStoneRow {
+  grid-template-columns: 54px minmax(0, 1fr);
+}
+.powerStoneSummary span {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(148, 163, 184, .24);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .05);
+  padding: 4px 8px;
+  color: #dbeafe;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.25;
 }
 .powerAccessorySummary {
   display: grid;
@@ -283,7 +302,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 }
 .powerFieldGrid {
   display: grid;
-  grid-template-columns: 70px 76px minmax(82px, 1fr);
+  grid-template-columns: 70px 76px 82px;
   gap: 6px;
   margin-top: 7px;
 }
@@ -2121,7 +2140,7 @@ select {
   }
 }
 
-/* v5.6.5 search-first calculator entry */
+/* v5.6.6 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
 body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,
