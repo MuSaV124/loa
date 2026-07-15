@@ -1144,7 +1144,8 @@ select {
 .shareControl.disabled::after { content: '적용값 0%'; margin-left: 8px; color: #fbbf24; font-size: 12px; font-weight: 700; }
 
 /* v4.9.6 legendary avatar market price tab */
-.tabNav { grid-column: 1 / -1; display: flex; gap: 8px; margin: -4px 0 0; }
+.tabNav { grid-column: 1 / -1; display: flex; gap: 12px; align-items: stretch; margin: -4px 0 0; }
+.tabButtonGroup { display: flex; gap: 8px; align-items: center; flex: 0 0 auto; }
 .tabButton { border: 1px solid var(--softLine); background: rgba(15,23,42,.72); color: var(--muted); border-radius: 999px; padding: 10px 16px; font-weight: 950; cursor: pointer; }
 .tabButton.active { color: #111827; background: var(--amber); border-color: rgba(245,182,66,.65); }
 .hiddenByTab { display: none !important; }
@@ -1180,6 +1181,7 @@ select {
 }
 @media (max-width: 560px) {
   .tabNav, .avatarControls { flex-direction: column; align-items: stretch; }
+  .tabButtonGroup { width: 100%; }
   .avatarPartGrid { grid-template-columns: 1fr; }
 }
 
@@ -1318,6 +1320,7 @@ body:not(.avatarMode) #legendAvatarPanel {
 /* v5.1.1 market tab */
 .marketPanel { grid-column: 1 / -1; }
 .lostarkNoticeCard { margin: 12px 0 14px; }
+.tabNoticeCard { flex: 1 1 auto; min-width: 0; margin: 0; }
 .lostarkNoticeLink {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -1332,6 +1335,9 @@ body:not(.avatarMode) #legendAvatarPanel {
   text-decoration: none;
 }
 .lostarkNoticeLink:hover { border-color: rgba(251,191,36,.45); background: rgba(251,191,36,.07); }
+.tabNoticeCard .lostarkNoticeLink { min-height: 42px; padding: 6px 10px; border-radius: 999px; }
+.tabNoticeCard .lostarkNoticeBadge { min-width: 54px; height: 28px; font-size: 12px; }
+.tabNoticeCard .lostarkNoticeLink strong { font-size: 14px; }
 .lostarkNoticeBadge {
   display: inline-flex;
   justify-content: center;
@@ -1381,6 +1387,7 @@ body.marketMode:not(.avatarMode) #legendAvatarPanel { display: none !important; 
 @media (max-width: 760px) {
   .marketCardGrid { grid-template-columns: 1fr; }
   .marketSubNav { flex-direction: column; align-items: stretch; }
+  .tabNoticeCard .lostarkNoticeLink,
   .lostarkNoticeLink { grid-template-columns: 1fr; gap: 8px; }
   .lostarkNoticeBadge { width: fit-content; }
   .lostarkNoticeLink strong { white-space: normal; }

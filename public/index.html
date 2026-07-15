@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v5.4.7 · 2/4/5티어 추천</span>
+        <span class="badge">v5.4.8 · 2/4/5티어 추천</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -24,8 +24,17 @@
     </section>
 
     <div class="tabNav">
-      <button class="tabButton active" type="button" data-tab="calculator">계산기</button>
-      <button class="tabButton" type="button" data-tab="market">시세</button>
+      <div class="tabButtonGroup">
+        <button class="tabButton active" type="button" data-tab="calculator">계산기</button>
+        <button class="tabButton" type="button" data-tab="market">시세</button>
+      </div>
+      <div id="lostarkNoticeCardTop" class="lostarkNoticeCard tabNoticeCard" aria-live="polite">
+        <a class="lostarkNoticeLink" href="https://lostark.game.onstove.com/News/Notice/List" target="_blank" rel="noopener">
+          <span class="lostarkNoticeBadge">공지</span>
+          <strong>로아 공홈 공지사항을 불러오는 중입니다.</strong>
+          <small>공식 홈페이지</small>
+        </a>
+      </div>
     </div>
 
     <section id="characterCard" class="panel character hidden calcTabPanel"></section>
@@ -176,7 +185,7 @@
 
   </main>
 
-  <div class="version">Version 5.4.7</div>
+  <div class="version">Version 5.4.8</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>
