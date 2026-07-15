@@ -1764,7 +1764,7 @@ select {
   }
 }
 
-/* v5.5.0 search-first calculator entry */
+/* v5.5.1 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,
 body:not(.calculatorReady):not(.marketMode) #inputPanel,

@@ -1,7 +1,11 @@
+const API_VERSION = '5.5.1';
+const CHARACTER_CACHE_TTL_MS = 60 * 1000;
+const CHARACTER_CACHE_MAX_SIZE = 80;
+const characterCache = new Map();
+const characterInflight = new Map();
+
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
+  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=120');
   try {
     const name = String(req.query.name || '').trim();
 
@@ -10,41 +14,89 @@ export default async function handler(req, res) {
     const apiKey = process.env.LOSTARK_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'Vercel 환경변수 LOSTARK_API_KEY가 없습니다.' });
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 9000);
-    const url = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}?filters=profiles+equipment+arkpassive+engravings`;
-    const arkGridUrl = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}/arkgrid`;
-
-    const response = await fetch(url, {
-      headers: { Authorization: `bearer ${apiKey}`, Accept: 'application/json' },
-      signal: controller.signal
-    }).finally(() => clearTimeout(timeout));
-
-    const text = await response.text();
-    if (!response.ok) {
-      return res.status(response.status).json({ error: '로스트아크 Open API 호출 실패', status: response.status, body: text.slice(0, 500) });
+    const cacheKey = name.toLowerCase();
+    const cached = characterCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.status(200).json({ ...cached.data, cached: true });
     }
 
-    let data;
-    try { data = JSON.parse(text); } catch { return res.status(502).json({ error: 'Open API 응답이 JSON이 아닙니다.', body: text.slice(0, 500) }); }
+    let pending = characterInflight.get(cacheKey);
+    if (!pending) {
+      pending = loadCharacterData(name, apiKey).finally(() => characterInflight.delete(cacheKey));
+      characterInflight.set(cacheKey, pending);
+    }
 
-    const profile = data.ArmoryProfile || data.Profile || null;
-    const arkPassive = data.ArkPassive || data.ArmoryArkPassive || null;
-    const equipment = data.ArmoryEquipment || data.Equipment || [];
-    const accessoryEffects = extractAccessoryEffects(equipment);
-    const braceletEffects = extractBraceletEffects(equipment);
-    const abilityStoneEffects = extractAbilityStoneEffects(equipment);
-    const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
-    const arkGrid = await fetchOptionalJson(arkGridUrl, apiKey, 9000);
-    const arkGridEffects = extractArkGridEffects(arkGrid.data);
-
-    return res.status(200).json({ ok: true, apiVersion: '5.5.0', profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, raw: data });
+    const data = await pending;
+    setCharacterCache(cacheKey, data);
+    return res.status(200).json({ ...data, cached: false });
   } catch (error) {
     const message = error.name === 'AbortError' ? 'Open API 응답 시간이 길어서 중단했습니다.' : error.message;
+    if (error.status) return res.status(error.status).json({ error: message, status: error.status, body: error.body });
     return res.status(500).json({ error: '서버 함수 오류', message });
   }
 }
 
+function setCharacterCache(key, data) {
+  characterCache.set(key, { data, expiresAt: Date.now() + CHARACTER_CACHE_TTL_MS });
+  while (characterCache.size > CHARACTER_CACHE_MAX_SIZE) {
+    const oldestKey = characterCache.keys().next().value;
+    characterCache.delete(oldestKey);
+  }
+}
+
+async function loadCharacterData(name, apiKey) {
+  const url = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}?filters=profiles+equipment+arkpassive+engravings`;
+  const arkGridUrl = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}/arkgrid`;
+
+  const [response, arkGrid] = await Promise.all([
+    fetchJson(url, apiKey, 9000),
+    fetchOptionalJson(arkGridUrl, apiKey, 9000)
+  ]);
+
+  const data = response.data;
+  if (!data || typeof data !== 'object') {
+    const error = new Error('Open API 응답에 캐릭터 데이터가 없습니다.');
+    error.status = 502;
+    throw error;
+  }
+  const profile = data.ArmoryProfile || data.Profile || null;
+  const arkPassive = data.ArkPassive || data.ArmoryArkPassive || null;
+  const equipment = data.ArmoryEquipment || data.Equipment || [];
+  const accessoryEffects = extractAccessoryEffects(equipment);
+  const braceletEffects = extractBraceletEffects(equipment);
+  const abilityStoneEffects = extractAbilityStoneEffects(equipment);
+  const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
+  const arkGridEffects = extractArkGridEffects(arkGrid.data);
+
+  return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, raw: data };
+}
+
+async function fetchJson(url, apiKey, timeoutMs = 9000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers: { Authorization: `bearer ${apiKey}`, Accept: 'application/json' },
+      signal: controller.signal
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      const error = new Error('로스트아크 Open API 호출 실패');
+      error.status = response.status;
+      error.body = text.slice(0, 500);
+      throw error;
+    }
+    try { return { data: text ? JSON.parse(text) : null, error: null }; }
+    catch {
+      const error = new Error('Open API 응답이 JSON이 아닙니다.');
+      error.status = 502;
+      error.body = text.slice(0, 500);
+      throw error;
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 async function fetchOptionalJson(url, apiKey, timeoutMs = 9000) {
   const controller = new AbortController();
