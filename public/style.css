@@ -96,74 +96,157 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   font-size: 14px;
   color: #e2e8f0;
 }
-.powerGearList {
+.powerEquipmentList,
+.powerAccessoryList {
   display: grid;
   gap: 8px;
 }
-.powerGearRow {
+.powerBuildGrid {
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  padding: 8px;
-  border-top: 1px solid rgba(148, 163, 184, .10);
+  grid-template-columns: minmax(360px, .92fr) minmax(420px, 1.08fr);
+  gap: 14px;
+  align-items: start;
+}
+.powerBuildColumn {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, .12);
   border-radius: 10px;
-  background: rgba(15, 23, 42, .42);
+  background: rgba(2, 6, 23, .26);
+  padding: 12px;
 }
-.powerGearIcon,
-.powerGearIcon img,
-.powerGearFallback {
-  width: 42px;
-  height: 42px;
+.powerBuildHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
 }
-.powerGearIcon {
+.powerBuildHeader b {
+  color: #e2e8f0;
+}
+.powerBuildHeader span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.powerEquipmentRow,
+.powerAccessoryRow {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid rgba(148, 163, 184, .10);
+  border-radius: 9px;
+  background: rgba(15, 23, 42, .50);
+}
+.powerItemIcon {
+  position: relative;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(251, 191, 36, .28);
+  border: 1px solid rgba(251, 191, 36, .24);
   border-radius: 8px;
-  background: rgba(2, 6, 23, .72);
-  overflow: hidden;
+  background: rgba(2, 6, 23, .76);
 }
-.powerGearIcon img {
+.powerItemIcon img,
+.powerItemIcon i {
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+}
+.powerItemIcon img {
   display: block;
   object-fit: contain;
 }
-.powerGearFallback {
+.powerItemIcon i {
   display: grid;
   place-items: center;
-  color: #fbbf24;
+  color: #bfdbfe;
+  font-style: normal;
   font-weight: 1000;
 }
-.powerGearInfo {
+.powerItemIcon b {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -8px;
+  min-height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 3px;
+  color: #06101f;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 1000;
+  white-space: nowrap;
+}
+.powerItemIcon.qualityUncommon b {
+  background: #4ade80;
+}
+.powerItemIcon.qualityRare b {
+  background: #60a5fa;
+}
+.powerItemIcon.qualityEpic b {
+  background: #c084fc;
+}
+.powerItemIcon.qualityLegend b {
+  background: #facc15;
+}
+.powerItemIcon.qualityUnknown b {
+  background: #94a3b8;
+}
+.powerEquipmentFields,
+.powerAccessoryInfo {
   min-width: 0;
 }
-.powerGearInfo b {
+.powerEquipmentFields b,
+.powerAccessoryInfo b {
   display: block;
   color: #fbbf24;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.powerGearMeta,
+.powerFieldGrid {
+  display: grid;
+  grid-template-columns: 64px 72px minmax(76px, 1fr) 58px minmax(82px, 1fr);
+  gap: 6px;
+  margin-top: 5px;
+}
+.powerFieldGrid span,
+.powerAccessoryMeta span,
+.powerEffectPill,
+.powerEffectEmpty {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(148, 163, 184, .20);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .05);
+  padding: 3px 7px;
+  color: #dbeafe;
+  font-size: 12px;
+  font-weight: 850;
+}
+.powerAccessoryMeta,
+.powerEffectList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+.powerEffectPill {
+  border-color: rgba(96, 165, 250, .22);
+  background: rgba(37, 99, 235, .14);
+}
+.powerEffectEmpty {
+  color: var(--muted);
+}
 .powerSnapshotBlock p,
 .powerSnapshotNote {
   color: var(--muted);
-}
-.powerGearMeta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  margin-top: 2px;
-  font-size: 14px;
-  line-height: 1.25;
-}
-.powerGearDot {
-  color: rgba(148, 163, 184, .62);
-}
-.powerGearDash {
-  color: rgba(148, 163, 184, .72);
-  font-weight: 900;
 }
 .powerGearQuality {
   font-weight: 950;
@@ -1936,7 +2019,7 @@ select {
   }
 }
 
-/* v5.6.1 search-first calculator entry */
+/* v5.6.2 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
 body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,
@@ -1951,11 +2034,11 @@ body:not(.calculatorReady):not(.marketMode) #keenPanel {
   .powerSnapshotColumns {
     grid-template-columns: 1fr;
   }
-  .powerGearRow {
-    grid-template-columns: 42px minmax(0, 1fr);
+  .powerBuildGrid {
+    grid-template-columns: 1fr;
   }
-  .powerGearMeta {
-    font-size: 13px;
+  .powerFieldGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 body:not(.calculatorReady):not(.marketMode) .wrap {

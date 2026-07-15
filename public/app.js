@@ -1,4 +1,4 @@
-const VERSION = '5.6.1';
+const VERSION = '5.6.2';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -324,6 +324,58 @@ function gearQualityClass(value) {
   if (quality > 60) return 'qualityRare';
   return 'qualityUncommon';
 }
+function powerItemIcon(item) {
+  const icon = item?.icon ? `<img src="${escapeHtml(item.icon)}" alt="">` : `<i>${escapeHtml(item?.type?.slice(0, 1) || '?')}</i>`;
+  const quality = item?.quality != null ? Number(item.quality) : null;
+  const qualityLabel = quality != null ? `품질 ${quality}` : '품질 -';
+  return `<div class="powerItemIcon ${gearQualityClass(quality)}">${icon}<b>${escapeHtml(qualityLabel)}</b></div>`;
+}
+function powerEffectPills(effects = {}, fallback = '파싱 효과 없음') {
+  const rows = [
+    ['critRate', '치적'],
+    ['critDamage', '치피'],
+    ['critHitDamage', '치명타 피해'],
+    ['enemyDamage', '적주피'],
+    ['additionalDamage', '추피'],
+    ['attackPower', '공격력']
+  ].filter(([key]) => Math.abs(Number(effects?.[key] || 0)) > 0);
+  if (!rows.length) return `<span class="powerEffectEmpty">${escapeHtml(fallback)}</span>`;
+  return rows.map(([key, label]) => `<span class="powerEffectPill">${escapeHtml(label)} ${pct(Number(effects[key]))}</span>`).join('');
+}
+function renderPowerEquipmentRow(item) {
+  const honing = item.honingLevel != null ? `+${item.honingLevel}` : '확인 필요';
+  const advanced = item.advancedHoningExcluded ? '상재 없음' : (item.advancedHoningLevel != null ? `상재 ${item.advancedHoningLevel}` : '상재 미확인');
+  const quality = item.quality != null ? `품질 ${item.quality}` : '품질 미확인';
+  const qualityClass = gearQualityClass(item.quality);
+  return `<div class="powerEquipmentRow">
+    ${powerItemIcon(item)}
+    <div class="powerEquipmentFields">
+      <b>${escapeHtml(item.name || item.type || '-')}</b>
+      <div class="powerFieldGrid">
+        <span>${escapeHtml(item.itemLevel || '-')}</span>
+        <span>${escapeHtml(item.type || '-')}</span>
+        <span class="powerGearQuality ${qualityClass}">${escapeHtml(quality)}</span>
+        <span>${escapeHtml(honing)}</span>
+        <span>${escapeHtml(advanced)}</span>
+      </div>
+    </div>
+  </div>`;
+}
+function renderPowerAccessoryRow(item, effects, extra = '') {
+  if (!item) return '';
+  const grade = [item.grade, item.type].filter(Boolean).join(' · ');
+  return `<div class="powerAccessoryRow">
+    ${powerItemIcon(item)}
+    <div class="powerAccessoryInfo">
+      <b>${escapeHtml(item.name || item.type || '-')}</b>
+      <div class="powerAccessoryMeta">
+        ${grade ? `<span>${escapeHtml(grade)}</span>` : ''}
+        ${extra ? `<span>${escapeHtml(extra)}</span>` : ''}
+      </div>
+      <div class="powerEffectList">${powerEffectPills(effects)}</div>
+    </div>
+  </div>`;
+}
 function renderPowerSnapshot(snapshot) {
   const panel = $('powerSnapshotPanel');
   const view = $('powerSnapshotView');
@@ -336,6 +388,8 @@ function renderPowerSnapshot(snapshot) {
   panel.classList.remove('hidden');
   const equipment = snapshot.equipment || {};
   const combat = equipment.combat || [];
+  const accessories = equipment.accessories || [];
+  const effects = snapshot.effects || {};
   const gems = snapshot.gems || { items: [], summary: {} };
   const gemItems = gems.items || [];
   const equippedGems = gemItems
@@ -347,29 +401,32 @@ function renderPowerSnapshot(snapshot) {
       return `<span title="${escapeHtml(label)} Lv.${Number(gem.level || 0)} ${escapeHtml(gem.skillName || gem.name || '-')}">${icon}<b>${Number(gem.level || 0)}</b></span>`;
     })
     .join('');
-  const gearRows = combat.map(item => {
-    const honing = item.honingLevel != null ? `+${item.honingLevel}` : '확인 필요';
-    const advanced = item.advancedHoningExcluded ? '' : (item.advancedHoningLevel != null ? `상재 ${item.advancedHoningLevel}` : '상재 미확인');
-    const quality = item.quality != null ? `품질 ${item.quality}` : '품질 미확인';
-    const qualityClass = gearQualityClass(item.quality);
-    const meta = [
-      `<span>${escapeHtml(item.type || '-')} <span class="powerGearQuality ${qualityClass}">${escapeHtml(quality)}</span></span>`,
-      advanced ? `<span>${escapeHtml(advanced)}</span>` : '',
-      `<span>${escapeHtml(honing)}</span>`
-    ].filter(Boolean).join('<span class="powerGearDash">-</span>');
-    const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="">` : `<div class="powerGearFallback">${escapeHtml(item.type?.slice(0, 1) || '?')}</div>`;
-    return `<div class="powerGearRow">
-      <div class="powerGearIcon">${icon}</div>
-      <div class="powerGearInfo">
-        <b>${escapeHtml(item.name || item.type || '-')}</b>
-        <div class="powerGearMeta">${meta}</div>
-      </div>
-    </div>`;
-  }).join('');
+  const gearRows = combat.map(renderPowerEquipmentRow).join('');
+  const accessoryEffectItems = effects.accessory?.items || [];
+  const accessoryRows = accessories.map((item, index) => renderPowerAccessoryRow(item, accessoryEffectItems[index]?.effects)).join('');
+  const braceletEffects = effects.bracelet?.items?.[0]?.effects || effects.bracelet || {};
+  const braceletRow = renderPowerAccessoryRow(equipment.bracelet, braceletEffects, '팔찌');
+  const stone = equipment.abilityStone;
+  const stoneEffects = effects.abilityStone?.items?.[0]?.effects || effects.abilityStone?.effects || {};
+  const stoneEngravings = (effects.abilityStone?.items?.[0]?.engravings || effects.abilityStone?.engravings || []).map(e => `${e.name} Lv.${e.level}`).join(' · ');
+  const stoneRow = renderPowerAccessoryRow(stone, stoneEffects, stoneEngravings || '어빌리티 스톤');
+  const accessoryPanelRows = [accessoryRows, braceletRow, stoneRow].filter(Boolean).join('');
   view.innerHTML = `
     <div class="powerSnapshotColumns">
       <div class="powerSnapshotBlock"><h3>장착 보석</h3><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
-      <div class="powerSnapshotBlock"><h3>장비 파싱</h3><div class="powerGearList">${gearRows || '<p>전투 장비를 찾지 못했습니다.</p>'}</div></div>
+      <div class="powerSnapshotBlock powerBuildPanel">
+        <h3>장비 파싱</h3>
+        <div class="powerBuildGrid">
+          <div class="powerBuildColumn">
+            <div class="powerBuildHeader"><b>장비</b><span>아바타 제외</span></div>
+            <div class="powerEquipmentList">${gearRows || '<p>전투 장비를 찾지 못했습니다.</p>'}</div>
+          </div>
+          <div class="powerBuildColumn">
+            <div class="powerBuildHeader"><b>악세사리</b><span>팔찌/어빌리티 스톤 포함</span></div>
+            <div class="powerAccessoryList">${accessoryPanelRows || '<p>악세사리 정보를 찾지 못했습니다.</p>'}</div>
+          </div>
+        </div>
+      </div>
     </div>
     <p class="powerSnapshotNote">이 카드는 전투력 계산식 투입 전 검증용입니다. 강화/상급재련은 API Tooltip 문구 기반이라 실제 캐릭터 샘플로 오차를 확인해야 합니다.</p>
   `;
@@ -1541,7 +1598,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.6.1',
+    apiVersion: '5.6.2',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1805,7 +1862,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.6.1</summary>
+      <summary>악세 디버그 보기 · v5.6.2</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>
