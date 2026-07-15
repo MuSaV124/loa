@@ -1,4 +1,4 @@
-const VERSION = '5.5.6';
+const VERSION = '5.5.7';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -329,8 +329,6 @@ function renderPowerSnapshot(snapshot) {
   const equipment = snapshot.equipment || {};
   const combat = equipment.combat || [];
   const gems = snapshot.gems || { items: [], summary: {} };
-  const weapon = combat.find(item => item.type === '무기') || {};
-  const advancedReady = combat.filter(item => item.advancedHoningLevel != null).length;
   const gemItems = gems.items || [];
   const equippedGems = gemItems
     .slice()
@@ -356,12 +354,6 @@ function renderPowerSnapshot(snapshot) {
     </div>`;
   }).join('');
   view.innerHTML = `
-    <div class="powerSnapshotGrid">
-      <div class="powerMetric"><span>공식 전투력</span><b>${formatNumber(snapshot.profile?.combatPower)}</b><small>프로필 CombatPower 기준</small></div>
-      <div class="powerMetric"><span>무기 강화</span><b>${weapon.honingLevel != null ? '+' + weapon.honingLevel : '확인 필요'}</b><small>${weapon.advancedHoningLevel != null ? '상급 재련 ' + weapon.advancedHoningLevel : '상급 재련 미확인'}</small></div>
-      <div class="powerMetric"><span>전투 장비</span><b>${combat.length}/6</b><small>상재 확인 ${advancedReady}부위</small></div>
-      <div class="powerMetric"><span>보석</span><b>${Number(gems.summary?.total || 0)}개</b><small>겁/멸 ${Number(gems.summary?.damage || 0)} · 작/홍 ${Number(gems.summary?.cooldown || 0)} · 평균 Lv.${Number(gems.summary?.averageLevel || 0).toFixed(2)}</small></div>
-    </div>
     <div class="powerSnapshotColumns">
       <div class="powerSnapshotBlock"><h3>장비 파싱</h3><div class="powerGearList">${gearRows || '<p>전투 장비를 찾지 못했습니다.</p>'}</div></div>
       <div class="powerSnapshotBlock"><h3>장착 보석</h3><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
@@ -1536,7 +1528,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.5.6',
+    apiVersion: '5.5.7',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1800,7 +1792,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.5.6</summary>
+      <summary>악세 디버그 보기 · v5.5.7</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>
