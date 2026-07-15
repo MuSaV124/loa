@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v5.4.6 · 2/4/5티어 추천</span>
+        <span class="badge">v5.4.7 · 2/4/5티어 추천</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -104,6 +104,13 @@
           <p class="hint">악세, 아바타, 유각, 보석 시세 기능을 한 탭에 모았습니다.</p>
         </div>
       </div>
+      <div id="lostarkNoticeCard" class="lostarkNoticeCard" aria-live="polite">
+        <a class="lostarkNoticeLink" href="https://lostark.game.onstove.com/News/Notice/List" target="_blank" rel="noopener">
+          <span class="lostarkNoticeBadge">공지</span>
+          <strong>로아 공홈 공지사항을 불러오는 중입니다.</strong>
+          <small>공식 홈페이지</small>
+        </a>
+      </div>
       <div class="marketSubNav">
         <button class="marketSubButton active" type="button" data-market-tab="accessory">악세</button>
         <button class="marketSubButton" type="button" data-market-tab="avatar">아바타</button>
@@ -169,7 +176,7 @@
 
   </main>
 
-  <div class="version">Version 5.4.6</div>
+  <div class="version">Version 5.4.7</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

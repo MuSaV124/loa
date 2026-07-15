@@ -1,4 +1,4 @@
-const VERSION = '5.4.6';
+const VERSION = '5.4.7';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1304,6 +1304,7 @@ function formatGold(value) {
 }
 
 let selectedMarketTab = 'accessory';
+let lostarkNoticeLoaded = false;
 
 function setActiveTab(tabName) {
   document.querySelectorAll('.tabButton').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
@@ -1327,7 +1328,10 @@ function setActiveTab(tabName) {
     avatarPanel.classList.toggle('hiddenByTab', !isAvatar);
     avatarPanel.style.display = isAvatar ? '' : 'none';
   }
-  if (isMarket) renderMarketSubTab();
+  if (isMarket) {
+    loadLostarkNoticeCard();
+    renderMarketSubTab();
+  }
   if (isAvatar) prepareLegendAvatarTab();
 }
 
@@ -1473,7 +1477,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.4.6',
+    apiVersion: '5.4.7',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1547,6 +1551,37 @@ function initMarketPriceTab() {
   $('accPartSelect')?.addEventListener('change', renderAccessoryRuleHint);
   $('accComboSelect')?.addEventListener('change', renderAccessoryRuleHint);
   renderAccessoryRuleHint();
+}
+
+async function loadLostarkNoticeCard(force = false) {
+  const card = $('lostarkNoticeCard');
+  if (!card || (lostarkNoticeLoaded && !force)) return;
+  lostarkNoticeLoaded = true;
+  try {
+    const data = await fetchMarketJson(`/api/lostark-news?_=${Date.now()}`);
+    renderLostarkNoticeCard(data);
+  } catch (error) {
+    card.innerHTML = `<a class="lostarkNoticeLink warning" href="https://lostark.game.onstove.com/News/Notice/List" target="_blank" rel="noopener">
+      <span class="lostarkNoticeBadge">공지</span>
+      <strong>로아 공홈 공지사항</strong>
+      <small>${escapeHtml(error.message || '공식 공지 목록으로 이동')}</small>
+    </a>`;
+  }
+}
+
+function renderLostarkNoticeCard(data) {
+  const card = $('lostarkNoticeCard');
+  if (!card) return;
+  const item = data?.featured || {};
+  const title = item.title || '로아 공홈 공지사항';
+  const url = item.url || data?.sourceUrl || 'https://lostark.game.onstove.com/News/Notice/List';
+  const category = item.category || '공지';
+  const meta = [item.views ? `조회 ${item.views}` : '', item.date || '', data?.cached ? '캐시' : '공식'].filter(Boolean).join(' · ');
+  card.innerHTML = `<a class="lostarkNoticeLink" href="${escapeHtml(url)}" target="_blank" rel="noopener">
+    <span class="lostarkNoticeBadge">${escapeHtml(category)}</span>
+    <strong>${escapeHtml(title)}</strong>
+    <small>${escapeHtml(meta || '공식 홈페이지')}</small>
+  </a>`;
 }
 
 function renderAccessoryRuleHint() {
@@ -1704,7 +1739,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.4.6</summary>
+      <summary>악세 디버그 보기 · v5.4.7</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>

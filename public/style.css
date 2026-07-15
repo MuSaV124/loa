@@ -1317,6 +1317,46 @@ body:not(.avatarMode) #legendAvatarPanel {
 
 /* v5.1.1 market tab */
 .marketPanel { grid-column: 1 / -1; }
+.lostarkNoticeCard { margin: 12px 0 14px; }
+.lostarkNoticeLink {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  min-height: 58px;
+  border: 1px solid rgba(148,163,184,.16);
+  border-radius: 16px;
+  background: rgba(2,6,23,.38);
+  color: #f8fafc;
+  padding: 12px 14px;
+  text-decoration: none;
+}
+.lostarkNoticeLink:hover { border-color: rgba(251,191,36,.45); background: rgba(251,191,36,.07); }
+.lostarkNoticeBadge {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 62px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(148,163,184,.22);
+  border-radius: 999px;
+  background: rgba(15,23,42,.75);
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 950;
+}
+.lostarkNoticeLink strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #f8fafc;
+  font-size: 15px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lostarkNoticeLink small { color: var(--muted); font-size: 12px; font-weight: 850; white-space: nowrap; }
+.lostarkNoticeLink.warning small { color: #fca5a5; }
 .marketSubNav { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
 .marketSubButton { border: 1px solid rgba(148,163,184,.28); background: rgba(15,23,42,.58); color: #e5e7eb; border-radius: 999px; padding: 9px 15px; font-weight: 950; cursor: pointer; }
 .marketSubButton:hover { border-color: rgba(251,191,36,.55); background: rgba(251,191,36,.08); }
@@ -1338,7 +1378,14 @@ body.marketMode .tabNav,
 body.marketMode #marketPanel,
 body.marketMode #legendAvatarPanel { grid-column: 1 / -1; }
 body.marketMode:not(.avatarMode) #legendAvatarPanel { display: none !important; }
-@media (max-width: 760px) { .marketCardGrid { grid-template-columns: 1fr; } .marketSubNav { flex-direction: column; align-items: stretch; } }
+@media (max-width: 760px) {
+  .marketCardGrid { grid-template-columns: 1fr; }
+  .marketSubNav { flex-direction: column; align-items: stretch; }
+  .lostarkNoticeLink { grid-template-columns: 1fr; gap: 8px; }
+  .lostarkNoticeBadge { width: fit-content; }
+  .lostarkNoticeLink strong { white-space: normal; }
+  .lostarkNoticeLink small { white-space: normal; }
+}
 /* v5.1.2 price search */
 .marketSearchBox { border: 1px solid rgba(148,163,184,.16); background: rgba(2,6,23,.34); border-radius: 16px; padding: 14px; margin-top: 12px; }
 .marketSelectGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
