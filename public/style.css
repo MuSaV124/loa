@@ -132,7 +132,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .powerEquipmentRow,
 .powerAccessoryRow {
   display: grid;
-  grid-template-columns: 54px 92px minmax(0, 1fr);
+  grid-template-columns: 54px 116px minmax(0, 1fr);
   gap: 10px;
   align-items: center;
   padding: 8px;
@@ -176,15 +176,15 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 }
 .powerItemIcon b {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -8px;
-  min-height: 16px;
+  left: -3px;
+  right: -3px;
+  bottom: -9px;
+  min-height: 18px;
   display: grid;
   place-items: center;
   border-radius: 3px;
   color: #06101f;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1;
   font-weight: 1000;
   white-space: nowrap;
@@ -260,6 +260,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   font-size: 12px;
   font-style: normal;
   font-weight: 850;
+  white-space: nowrap;
 }
 .powerAccessoryOptions {
   display: grid;
@@ -2146,7 +2147,7 @@ select {
   }
 }
 
-/* v5.6.8 search-first calculator entry */
+/* v5.6.9 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
 body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,

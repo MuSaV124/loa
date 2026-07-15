@@ -1,4 +1,4 @@
-const API_VERSION = '5.6.8';
+const API_VERSION = '5.6.9';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = 60 * 1000;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -680,7 +680,9 @@ const ACCESSORY_OPTION_GRADE_VALUES = {
     attackPowerPercent: { high: 1.55, mid: 0.95, low: 0.40 },
     weaponPowerPercent: { high: 3.00, mid: 1.80, low: 0.80 },
     attackPowerFlat: { high: 390, mid: 195, low: 80 },
-    weaponPowerFlat: { high: 960, mid: 480, low: 195 }
+    weaponPowerFlat: { high: 960, mid: 480, low: 195 },
+    partyHeal: { high: 3.50, mid: 2.10, low: 0.95 },
+    partyShield: { high: 3.50, mid: 2.10, low: 0.95 }
   },
   '반지': {
     critDamage: { high: 4.00, mid: 2.40, low: 1.10 },
@@ -898,14 +900,16 @@ function parseAccessoryText(text, itemType = '', itemGrade = '') {
     /공격이\s*치명타로\s*적중\s*시\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
   ], source, itemType, itemGrade);
 
-  // "무력화 상태의 적에게 주는 피해"는 별도 조건부라 제외하고,
+  const enemyDamageSource = source.replace(/공격이\s*치명타로\s*적중\s*시\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?\d+(?:\.\d+)?%\s*(?:증가)?/g, '');
+
+  // "무력화 상태의 적에게 주는 피해"와 치명타 적중 시 피해는 별도 조건부라 제외하고,
   // 일반 적주피/쿨증 적주피/백·헤드·비방향성 적주피는 각 출처별 곱연산으로 계산합니다.
-  addMatches(out, 'enemyDamage', source, [
+  addMatches(out, 'enemyDamage', enemyDamageSource, [
     /(?<!무력화\s*상태의\s*)(?<!치명타로\s*적중\s*시\s*)적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /백어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /헤드어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /방향성\s*공격이\s*아닌\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source, itemType, itemGrade);
+  ], enemyDamageSource, itemType, itemGrade);
 
   if (itemType === '팔찌') out.optionSlots = extractBraceletOptionSlots(source, out, itemGrade);
 

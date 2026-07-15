@@ -1,4 +1,4 @@
-const VERSION = '5.6.8';
+const VERSION = '5.6.9';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -404,7 +404,11 @@ function powerEffectRows(effects = {}) {
     ['resourceRecovery', '자원 회복'],
     ['spaceCooldown', '이동기 쿨'],
     ['attackPower', '공격력']
-  ].filter(([key]) => !slotKeys.has(key) && Math.abs(Number(effects?.[key] || 0)) > 0);
+  ].filter(([key]) => {
+    if (slotKeys.has(key)) return false;
+    if (key === 'critHitDamage' && (slotKeys.has('critRate') || slotKeys.has('critDamage'))) return false;
+    return Math.abs(Number(effects?.[key] || 0)) > 0;
+  });
   for (const [key, label] of effectDefs) {
     const value = Number(effects[key]);
     const role = powerOptionRole(key);
@@ -1705,7 +1709,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.6.8',
+    apiVersion: '5.6.9',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1969,7 +1973,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.6.8</summary>
+      <summary>악세 디버그 보기 · v5.6.9</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>
