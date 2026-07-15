@@ -136,7 +136,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   gap: 10px;
   align-items: center;
   padding: 8px;
-  min-height: 72px;
+  min-height: 96px;
   border: 1px solid rgba(148, 163, 184, .10);
   border-radius: 9px;
   background: rgba(15, 23, 42, .50);
@@ -218,9 +218,9 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 }
 .powerFieldGrid {
   display: grid;
-  grid-template-columns: 64px 72px minmax(74px, 1fr) 56px minmax(80px, 1fr);
+  grid-template-columns: 70px 76px minmax(82px, 1fr);
   gap: 6px;
-  margin-top: 5px;
+  margin-top: 7px;
 }
 .powerFieldGrid span,
 .powerAccessoryMeta span,
@@ -2056,7 +2056,7 @@ select {
   }
 }
 
-/* v5.6.3 search-first calculator entry */
+/* v5.6.4 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
 body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,

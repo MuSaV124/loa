@@ -1,4 +1,4 @@
-const API_VERSION = '5.6.3';
+const API_VERSION = '5.6.4';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = 60 * 1000;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -390,12 +390,12 @@ function parseNumber(value) {
 }
 
 function extractAccessoryEffects(equipment) {
-  const result = { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, attackPowerFlat: 0, weaponPowerFlat: 0, attackPowerPercent: 0, weaponPowerPercent: 0, items: [] };
+  const result = { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, attackPowerFlat: 0, weaponPowerFlat: 0, attackPowerPercent: 0, weaponPowerPercent: 0, strength: 0, dexterity: 0, intelligence: 0, critStat: 0, swiftStat: 0, specStat: 0, items: [] };
   const accessoryTypes = new Set(['목걸이', '귀걸이', '반지']);
   for (const item of Array.isArray(equipment) ? equipment : []) {
     if (!accessoryTypes.has(item?.Type)) continue;
     const text = tooltipText(item.Tooltip);
-    const effects = parseAccessoryText(text);
+    const effects = parseAccessoryText(text, item.Type);
     result.critRate += effects.critRate;
     result.critDamage += effects.critDamage;
     result.critHitDamage += effects.critHitDamage;
@@ -405,18 +405,24 @@ function extractAccessoryEffects(equipment) {
     result.weaponPowerFlat += effects.weaponPowerFlat;
     result.attackPowerPercent += effects.attackPowerPercent;
     result.weaponPowerPercent += effects.weaponPowerPercent;
+    result.strength += effects.strength;
+    result.dexterity += effects.dexterity;
+    result.intelligence += effects.intelligence;
+    result.critStat += effects.critStat;
+    result.swiftStat += effects.swiftStat;
+    result.specStat += effects.specStat;
     result.items.push({ type: item.Type, name: item.Name, grade: item.Grade, effects });
   }
-  for (const key of ['critRate', 'critDamage', 'critHitDamage', 'enemyDamage', 'additionalDamage', 'attackPowerFlat', 'weaponPowerFlat', 'attackPowerPercent', 'weaponPowerPercent']) result[key] = Math.round(result[key] * 100) / 100;
+  for (const key of ['critRate', 'critDamage', 'critHitDamage', 'enemyDamage', 'additionalDamage', 'attackPowerFlat', 'weaponPowerFlat', 'attackPowerPercent', 'weaponPowerPercent', 'strength', 'dexterity', 'intelligence', 'critStat', 'swiftStat', 'specStat']) result[key] = Math.round(result[key] * 100) / 100;
   return result;
 }
 
 function extractBraceletEffects(equipment) {
-  const result = { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, attackPowerFlat: 0, weaponPowerFlat: 0, attackPowerPercent: 0, weaponPowerPercent: 0, items: [] };
+  const result = { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, attackPowerFlat: 0, weaponPowerFlat: 0, attackPowerPercent: 0, weaponPowerPercent: 0, strength: 0, dexterity: 0, intelligence: 0, critStat: 0, swiftStat: 0, specStat: 0, items: [] };
   for (const item of Array.isArray(equipment) ? equipment : []) {
     if (item?.Type !== '팔찌') continue;
     const text = tooltipText(item.Tooltip);
-    const effects = parseAccessoryText(text);
+    const effects = parseAccessoryText(text, item.Type);
     result.critRate += effects.critRate;
     result.critDamage += effects.critDamage;
     result.critHitDamage += effects.critHitDamage;
@@ -426,9 +432,15 @@ function extractBraceletEffects(equipment) {
     result.weaponPowerFlat += effects.weaponPowerFlat;
     result.attackPowerPercent += effects.attackPowerPercent;
     result.weaponPowerPercent += effects.weaponPowerPercent;
+    result.strength += effects.strength;
+    result.dexterity += effects.dexterity;
+    result.intelligence += effects.intelligence;
+    result.critStat += effects.critStat;
+    result.swiftStat += effects.swiftStat;
+    result.specStat += effects.specStat;
     result.items.push({ type: item.Type, name: item.Name, grade: item.Grade, effects });
   }
-  for (const key of ['critRate', 'critDamage', 'critHitDamage', 'enemyDamage', 'additionalDamage', 'attackPowerFlat', 'weaponPowerFlat', 'attackPowerPercent', 'weaponPowerPercent']) result[key] = Math.round(result[key] * 100) / 100;
+  for (const key of ['critRate', 'critDamage', 'critHitDamage', 'enemyDamage', 'additionalDamage', 'attackPowerFlat', 'weaponPowerFlat', 'attackPowerPercent', 'weaponPowerPercent', 'strength', 'dexterity', 'intelligence', 'critStat', 'swiftStat', 'specStat']) result[key] = Math.round(result[key] * 100) / 100;
   return result;
 }
 
@@ -655,8 +667,44 @@ function round2(value) {
   return Math.round(Number(value || 0) * 100) / 100;
 }
 
-function parseAccessoryText(text) {
-  const out = { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, attackPowerFlat: 0, weaponPowerFlat: 0, attackPowerPercent: 0, weaponPowerPercent: 0, optionGrades: {} };
+const ACCESSORY_OPTION_GRADE_VALUES = {
+  '목걸이': {
+    enemyDamage: { high: 2.00, mid: 1.20, low: 0.55 },
+    additionalDamage: { high: 2.60, mid: 1.60, low: 0.70 }
+  },
+  '귀걸이': {
+    attackPowerPercent: { high: 1.55, mid: 0.95, low: 0.40 },
+    weaponPowerPercent: { high: 3.00, mid: 1.80, low: 0.80 }
+  },
+  '반지': {
+    critDamage: { high: 4.00, mid: 2.40, low: 1.10 },
+    critRate: { high: 1.55, mid: 0.95, low: 0.40 }
+  }
+};
+
+const BRACELET_OPTION_GRADE_VALUES = {
+  critRate: [{ high: 4.20, mid: 3.40, low: 2.60 }],
+  critDamage: [{ high: 8.40, mid: 6.80, low: 5.20 }],
+  enemyDamage: [
+    { high: 2.50, mid: 2.00, low: 1.50 },
+    { high: 5.00, mid: 4.50, low: 4.00 },
+    { high: 3.00, mid: 2.50, low: 2.00 }
+  ],
+  additionalDamage: [
+    { high: 3.00, mid: 2.50, low: 2.00 },
+    { high: 3.50, mid: 3.00, low: 2.50 }
+  ],
+  weaponPowerFlat: [
+    { high: 1320, mid: 1160, low: 1000 },
+    { high: 8100, mid: 7200, low: 6300 },
+    { high: 7800, mid: 6900, low: 6000 },
+    { high: 2200, mid: 2000, low: 1800 },
+    { high: 140, mid: 130, low: 120 }
+  ]
+};
+
+function parseAccessoryText(text, itemType = '') {
+  const out = { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, attackPowerFlat: 0, weaponPowerFlat: 0, attackPowerPercent: 0, weaponPowerPercent: 0, strength: 0, dexterity: 0, intelligence: 0, critStat: 0, swiftStat: 0, specStat: 0, optionGrades: {} };
   const source = stripHtml(text);
 
   // 팔찌/악세 툴팁은 문장형, 축약형(+), HTML 조각이 섞여 들어와서
@@ -664,36 +712,60 @@ function parseAccessoryText(text) {
   addMatches(out, 'critRate', source, [
     /치명타\s*적중률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /치명타\s*확률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source);
+  ], source, itemType);
 
   addMatches(out, 'critDamage', source, [
     /치명타\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source);
+  ], source, itemType);
 
   addMatches(out, 'additionalDamage', source, [
     /추가\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source);
+  ], source, itemType);
 
   addMatches(out, 'weaponPowerPercent', source, [
     /무기\s*공격력(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source);
+  ], source, itemType);
 
   addMatches(out, 'attackPowerPercent', source, [
     /(?<!무기\s*)공격력(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source);
+  ], source, itemType);
 
   addMatches(out, 'weaponPowerFlat', source, [
     /무기\s*공격력(?:이)?\s*(?:\+)?(\d[\d,]*)(?![\d,.]*\s*%)/g
-  ], source);
+  ], source, itemType);
 
   addMatches(out, 'attackPowerFlat', source, [
     /(?<!무기\s*)공격력(?:이)?\s*(?:\+)?(\d[\d,]*)(?![\d,.]*\s*%)/g
-  ], source);
+  ], source, itemType);
+
+  addMatches(out, 'strength', source, [
+    /힘\s*(?:\+)?(\d[\d,]*)/g
+  ], source, itemType);
+
+  addMatches(out, 'dexterity', source, [
+    /민첩\s*(?:\+)?(\d[\d,]*)/g
+  ], source, itemType);
+
+  addMatches(out, 'intelligence', source, [
+    /지능\s*(?:\+)?(\d[\d,]*)/g
+  ], source, itemType);
+
+  addMatches(out, 'critStat', source, [
+    /(?:^|\s)치명\s*(?:\+)?(\d[\d,]*)/g
+  ], source, itemType);
+
+  addMatches(out, 'swiftStat', source, [
+    /(?:^|\s)신속\s*(?:\+)?(\d[\d,]*)/g
+  ], source, itemType);
+
+  addMatches(out, 'specStat', source, [
+    /(?:^|\s)특화\s*(?:\+)?(\d[\d,]*)/g
+  ], source, itemType);
 
   // 치명타 적중 시 적주피는 일반 적주피가 아니라 치명타 배율 안에서 별도 곱연산으로 계산합니다.
   addMatches(out, 'critHitDamage', source, [
     /공격이\s*치명타로\s*적중\s*시\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source);
+  ], source, itemType);
 
   // "무력화 상태의 적에게 주는 피해"는 별도 조건부라 제외하고,
   // 일반 적주피/쿨증 적주피/백·헤드·비방향성 적주피는 각 출처별 곱연산으로 계산합니다.
@@ -702,7 +774,7 @@ function parseAccessoryText(text) {
     /백어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /헤드어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
     /방향성\s*공격이\s*아닌\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source);
+  ], source, itemType);
 
   for (const key of Object.keys(out)) {
     if (key === 'optionGrades') continue;
@@ -711,7 +783,7 @@ function parseAccessoryText(text) {
   return out;
 }
 
-function addMatches(out, key, text, regexList, sourceText = text) {
+function addMatches(out, key, text, regexList, sourceText = text, itemType = '') {
   const seen = new Set();
   for (const re of regexList) {
     let match;
@@ -725,10 +797,21 @@ function addMatches(out, key, text, regexList, sourceText = text) {
       if (seen.has(token)) continue;
       seen.add(token);
       out[key] += value;
-      const grade = optionGradeNearMatch(sourceText, match.index);
+      const grade = optionGradeByValue(key, value, itemType) || optionGradeNearMatch(sourceText, match.index);
       if (grade && !out.optionGrades[key]) out.optionGrades[key] = grade;
     }
   }
+}
+
+function optionGradeByValue(key, value, itemType = '') {
+  const table = itemType === '팔찌' ? BRACELET_OPTION_GRADE_VALUES : ACCESSORY_OPTION_GRADE_VALUES[itemType];
+  const entries = Array.isArray(table?.[key]) ? table[key] : (table?.[key] ? [table[key]] : []);
+  for (const entry of entries) {
+    for (const grade of ['high', 'mid', 'low']) {
+      if (Math.abs(Number(entry[grade]) - Number(value)) < 0.001) return ({ high: '상', mid: '중', low: '하' })[grade];
+    }
+  }
+  return '';
 }
 
 function optionGradeNearMatch(text, index) {

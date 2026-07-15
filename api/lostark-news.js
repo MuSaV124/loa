@@ -1,4 +1,4 @@
-const API_VERSION = '5.6.3';
+const API_VERSION = '5.6.4';
 const LOSTARK_ORIGIN = 'https://lostark.game.onstove.com';
 const NOTICE_URL = `${LOSTARK_ORIGIN}/News/Notice/List`;
 const UPDATE_URL = `${LOSTARK_ORIGIN}/News/Update/List`;
@@ -56,7 +56,7 @@ async function fetchOfficialHtml(url) {
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 LostarkCalculator/5.6.3',
+        'User-Agent': 'Mozilla/5.0 LostarkCalculator/5.6.4',
         'Accept': 'text/html,application/xhtml+xml'
       }
     });
