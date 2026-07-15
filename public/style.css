@@ -159,27 +159,29 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 }
 .powerGemList {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 7px;
+  grid-template-columns: repeat(11, 36px);
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 0 4px;
 }
 .powerGemList span {
-  display: inline-grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  align-items: center;
-  gap: 6px;
+  position: relative;
+  display: grid;
+  place-items: center;
   border: 1px solid rgba(96, 165, 250, .22);
-  border-radius: 999px;
-  background: rgba(30, 64, 175, .18);
-  padding: 4px 9px 4px 4px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, .62);
+  padding: 3px;
   color: #dbeafe;
   font-size: 12px;
   font-weight: 900;
-  min-width: 0;
+  width: 36px;
+  height: 36px;
 }
 .powerGemList img,
 .powerGemList i {
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   border-radius: 6px;
   background: rgba(255, 255, 255, .07);
 }
@@ -192,12 +194,21 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   font-style: normal;
   color: #bfdbfe;
 }
-.powerGemList em {
-  min-width: 0;
-  font-style: normal;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.powerGemList b {
+  position: absolute;
+  right: -3px;
+  top: -5px;
+  min-width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(15, 23, 42, .86);
+  border-radius: 3px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 1000;
 }
 .powerSnapshotNote {
   margin: 0;
@@ -1897,7 +1908,7 @@ select {
   }
 }
 
-/* v5.5.8 search-first calculator entry */
+/* v5.5.9 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
 body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,
@@ -1919,9 +1930,6 @@ body:not(.calculatorReady):not(.marketMode) #keenPanel {
     grid-column: 2;
     min-width: 0;
     text-align: left;
-  }
-  .powerGemList {
-    grid-template-columns: 1fr;
   }
 }
 body:not(.calculatorReady):not(.marketMode) .wrap {
