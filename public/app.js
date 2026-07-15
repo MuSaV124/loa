@@ -1,4 +1,4 @@
-const VERSION = '5.6.4';
+const VERSION = '5.6.5';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -332,7 +332,29 @@ function powerItemIcon(item, options = {}) {
   return `<div class="powerItemIcon ${gearQualityClass(quality)}">${icon}<b>${escapeHtml(qualityLabel)}</b></div>`;
 }
 function powerEffectPills(effects = {}, fallback = '파싱 효과 없음') {
-  const rows = [
+  const rows = powerEffectRows(effects);
+  if (!rows.length) return `<span class="powerEffectEmpty">${escapeHtml(fallback)}</span>`;
+  return rows.map(row => `<span class="powerEffectPill ${row.gradeClass || ''}">${escapeHtml(row.text)}</span>`).join('');
+}
+function powerEffectRows(effects = {}) {
+  const rows = [];
+  const statTrio = [
+    ['strength', '힘'],
+    ['dexterity', '민첩'],
+    ['intelligence', '지능']
+  ].filter(([key]) => Math.abs(Number(effects?.[key] || 0)) > 0);
+  if (statTrio.length) rows.push({
+    key: 'statTrio',
+    text: statTrio.map(([key, label]) => `${label} +${formatNumber(Number(effects[key]))}`).join(' / ')
+  });
+  const slotKeys = new Set();
+  for (const slot of effects?.optionSlots || []) {
+    if (!slot?.text) continue;
+    const gradeClass = accessoryOptionGradeClass(slot.grade);
+    if (slot.key) slotKeys.add(slot.key);
+    rows.push({ key: slot.key || 'braceletSlot', gradeClass, text: slot.text });
+  }
+  const effectDefs = [
     ['critRate', '치적'],
     ['critDamage', '치피'],
     ['critHitDamage', '치명타 피해'],
@@ -342,21 +364,19 @@ function powerEffectPills(effects = {}, fallback = '파싱 효과 없음') {
     ['weaponPowerPercent', '무공%'],
     ['attackPowerFlat', '공격력'],
     ['weaponPowerFlat', '무공'],
-    ['strength', '힘'],
-    ['dexterity', '민첩'],
-    ['intelligence', '지능'],
     ['critStat', '치명'],
     ['swiftStat', '신속'],
     ['specStat', '특화'],
     ['attackPower', '공격력']
-  ].filter(([key]) => Math.abs(Number(effects?.[key] || 0)) > 0);
-  if (!rows.length) return `<span class="powerEffectEmpty">${escapeHtml(fallback)}</span>`;
-  return rows.map(([key, label]) => {
+  ].filter(([key]) => !slotKeys.has(key) && Math.abs(Number(effects?.[key] || 0)) > 0);
+  for (const [key, label] of effectDefs) {
     const value = Number(effects[key]);
     const gradeClass = accessoryOptionGradeClass(effects?.optionGrades?.[key]);
-    const text = key.endsWith('Flat') ? `+${formatNumber(value)}` : pct(value);
-    return `<span class="powerEffectPill ${gradeClass}">${escapeHtml(label)} ${escapeHtml(text)}</span>`;
-  }).join('');
+    const isFlat = key.endsWith('Flat') || ['critStat', 'swiftStat', 'specStat'].includes(key);
+    const text = isFlat ? `+${formatNumber(value)}` : pct(value);
+    rows.push({ key, gradeClass, text: `${label} ${text}` });
+  }
+  return rows;
 }
 function accessoryOptionGradeClass(grade) {
   if (grade === '상') return 'optionHigh';
@@ -366,7 +386,7 @@ function accessoryOptionGradeClass(grade) {
 }
 function renderPowerEquipmentRow(item) {
   const honing = item.honingLevel != null ? `+${item.honingLevel}` : '확인 필요';
-  const advanced = item.advancedHoningExcluded ? '상재 없음' : (item.advancedHoningLevel != null ? `상재 ${item.advancedHoningLevel}` : '상재 미확인');
+  const advanced = item.advancedHoningExcluded ? '' : (item.advancedHoningLevel != null ? `상재 ${item.advancedHoningLevel}` : '상재 미확인');
   const quality = item.quality != null ? `품질 ${item.quality}` : '품질 미확인';
   const qualityClass = gearQualityClass(item.quality);
   return `<div class="powerEquipmentRow">
@@ -376,25 +396,37 @@ function renderPowerEquipmentRow(item) {
       <div class="powerFieldGrid">
         <span>${escapeHtml(item.itemLevel || '-')}</span>
         <span>${escapeHtml(item.type || '-')}</span>
-        <span class="powerGearQuality ${qualityClass}">${escapeHtml(quality)}</span>
         <span>${escapeHtml(honing)}</span>
-        <span>${escapeHtml(advanced)}</span>
+        <span class="powerGearQuality ${qualityClass}">${escapeHtml(quality)}</span>
+        ${advanced ? `<span>${escapeHtml(advanced)}</span>` : ''}
       </div>
     </div>
   </div>`;
 }
 function renderPowerAccessoryRow(item, effects, extra = '', options = {}) {
   if (!item) return '';
-  const grade = [item.grade, item.type].filter(Boolean).join(' · ');
+  const rows = powerEffectRows(effects);
+  const statRow = rows.find(row => row.key === 'statTrio');
+  const optionRows = rows.filter(row => row.key !== 'statTrio');
+  const tierGrade = ['T4', item.grade || '-'].filter(Boolean).join(' ');
+  const itemValue = statRow?.text || item.itemLevel || item.type || '-';
+  const effectHtml = optionRows.length
+    ? optionRows.slice(0, 3).map(row => {
+      const grade = row.gradeClass ? row.gradeClass.replace('option', '') : '';
+      const gradeLabel = grade === 'High' ? '상' : grade === 'Mid' ? '중' : grade === 'Low' ? '하' : '-';
+      return `<div class="powerAccessoryOption ${row.gradeClass || ''}"><b>${escapeHtml(gradeLabel)}</b><span>${escapeHtml(row.text)}</span></div>`;
+    }).join('')
+    : `<div class="powerAccessoryOption"><b>-</b><span>파싱 효과 없음</span></div>`;
   return `<div class="powerAccessoryRow ${options.extraRow ? 'extraRow' : ''}">
     ${powerItemIcon(item, { hideQuality: options.hideQuality })}
-    <div class="powerAccessoryInfo">
+    <div class="powerAccessorySummary">
+      <span>${escapeHtml(tierGrade)}</span>
+      <span>${escapeHtml(itemValue)}</span>
+      ${extra ? `<em>${escapeHtml(extra)}</em>` : ''}
+    </div>
+    <div class="powerAccessoryOptions">${effectHtml}</div>
+    <div class="powerAccessoryName">
       <b>${escapeHtml(item.name || item.type || '-')}</b>
-      <div class="powerAccessoryMeta">
-        ${grade ? `<span>${escapeHtml(grade)}</span>` : ''}
-        ${extra ? `<span>${escapeHtml(extra)}</span>` : ''}
-      </div>
-      <div class="powerEffectList">${powerEffectPills(effects)}</div>
     </div>
   </div>`;
 }
@@ -1620,7 +1652,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.6.4',
+    apiVersion: '5.6.5',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1884,7 +1916,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.6.4</summary>
+      <summary>악세 디버그 보기 · v5.6.5</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>

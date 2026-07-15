@@ -1,4 +1,4 @@
-const API_VERSION = '5.6.4';
+const API_VERSION = '5.6.5';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = 60 * 1000;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -776,11 +776,79 @@ function parseAccessoryText(text, itemType = '') {
     /방향성\s*공격이\s*아닌\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
   ], source, itemType);
 
+  if (itemType === '팔찌') out.optionSlots = extractBraceletOptionSlots(source, out);
+
   for (const key of Object.keys(out)) {
-    if (key === 'optionGrades') continue;
+    if (key === 'optionGrades' || key === 'optionSlots') continue;
     out[key] = Math.round(out[key] * 100) / 100;
   }
   return out;
+}
+
+function extractBraceletOptionSlots(text, effects) {
+  const source = String(text || '');
+  const slots = [];
+  const push = (key, label, value, gradeKey = key, extraText = '') => {
+    const grade = optionGradeByValue(gradeKey, value, '팔찌') || effects?.optionGrades?.[gradeKey] || '';
+    const main = key.endsWith('Flat') ? `${label} +${Number(value).toLocaleString('ko-KR')}` : `${label} ${pctForServer(value)}`;
+    slots.push({ key, text: extraText ? `${main} / ${extraText}` : main, grade });
+  };
+
+  const critRate = firstMatchNumber(source, [
+    /치명타\s*적중률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*증가한다\.\s*공격이\s*치명타로\s*적중\s*시\s*(?:적에게\s*주는\s*)?피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i,
+    /치명타\s*적중률\s*\+\s*(\d+(?:\.\d+)?)\s*%/i
+  ]);
+  if (critRate) {
+    const bonus = firstMatchNumber(source, [/치명타로\s*적중\s*시\s*(?:적에게\s*주는\s*)?피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
+    push('critRate', '치적', critRate, 'critRate', bonus ? `치명타 피해 ${pctForServer(bonus)}` : '');
+  }
+
+  const critDamage = firstMatchNumber(source, [
+    /치명타\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*증가한다\.\s*공격이\s*치명타로\s*적중\s*시\s*(?:적에게\s*주는\s*)?피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i,
+    /치명타\s*피해\s*\+\s*(\d+(?:\.\d+)?)\s*%/i
+  ]);
+  if (critDamage) {
+    const bonus = firstMatchNumber(source, [/치명타로\s*적중\s*시\s*(?:적에게\s*주는\s*)?피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
+    push('critDamage', '치피', critDamage, 'critDamage', bonus ? `치명타 피해 ${pctForServer(bonus)}` : '');
+  }
+
+  const enemyDamage = firstMatchNumber(source, [/(?<!무력화\s*상태의\s*)적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*증가한다/i]);
+  if (enemyDamage) {
+    const stagger = firstMatchNumber(source, [/무력화\s*상태의\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
+    push('enemyDamage', '적주피', enemyDamage, 'enemyDamage', stagger ? `무력화 피해 ${pctForServer(stagger)}` : '');
+  }
+
+  const additional = firstMatchNumber(source, [/추가\s*피해(?:가|\s*\+)?\s*(?:\+)?(\d+(?:\.\d+)?)\s*%/i]);
+  if (additional) {
+    const demon = firstMatchNumber(source, [/악마\s*및\s*대악마\s*계열\s*피해량(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
+    push('additionalDamage', '추피', additional, 'additionalDamage', demon ? `악마 피해 ${pctForServer(demon)}` : '');
+  }
+
+  const weaponValues = [...source.matchAll(/무기\s*공격력(?:이)?\s*(?:\+)?(\d[\d,]*)(?![\d,.]*\s*%)/g)]
+    .map(match => Number(String(match[1]).replace(/,/g, '')))
+    .filter(Number.isFinite);
+  if (weaponValues.length) {
+    const main = weaponValues[0];
+    const extra = weaponValues.slice(1).map(v => `조건부 무공 +${v.toLocaleString('ko-KR')}`).join(' / ');
+    push('weaponPowerFlat', '무공', main, 'weaponPowerFlat', extra);
+  }
+
+  return slots;
+}
+
+function firstMatchNumber(text, regexList) {
+  for (const re of regexList) {
+    const match = String(text || '').match(re);
+    if (!match) continue;
+    const n = Number(String(match[1] || '').replace(/,/g, ''));
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+}
+
+function pctForServer(value) {
+  const n = Number(value || 0);
+  return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
 }
 
 function addMatches(out, key, text, regexList, sourceText = text, itemType = '') {
