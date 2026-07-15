@@ -1,4 +1,4 @@
-const API_VERSION = '5.5.1';
+const API_VERSION = '5.5.2';
 const CHARACTER_CACHE_TTL_MS = 60 * 1000;
 const CHARACTER_CACHE_MAX_SIZE = 80;
 const characterCache = new Map();
@@ -45,7 +45,7 @@ function setCharacterCache(key, data) {
 }
 
 async function loadCharacterData(name, apiKey) {
-  const url = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}?filters=profiles+equipment+arkpassive+engravings`;
+  const url = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}?filters=profiles+equipment+arkpassive+engravings+gems`;
   const arkGridUrl = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}/arkgrid`;
 
   const [response, arkGrid] = await Promise.all([
@@ -62,13 +62,15 @@ async function loadCharacterData(name, apiKey) {
   const profile = data.ArmoryProfile || data.Profile || null;
   const arkPassive = data.ArkPassive || data.ArmoryArkPassive || null;
   const equipment = data.ArmoryEquipment || data.Equipment || [];
+  const gems = data.ArmoryGem || data.ArmoryGems || data.Gems || null;
   const accessoryEffects = extractAccessoryEffects(equipment);
   const braceletEffects = extractBraceletEffects(equipment);
   const abilityStoneEffects = extractAbilityStoneEffects(equipment);
   const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
   const arkGridEffects = extractArkGridEffects(arkGrid.data);
+  const powerSnapshot = buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects });
 
-  return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, raw: data };
+  return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, powerSnapshot, raw: data };
 }
 
 async function fetchJson(url, apiKey, timeoutMs = 9000) {
@@ -138,6 +140,201 @@ function tooltipText(tooltip) {
     } catch { return stripHtml(tooltip); }
   }
   return stripHtml(JSON.stringify(tooltip));
+}
+
+const COMBAT_EQUIPMENT_TYPES = new Set(['무기', '투구', '상의', '하의', '장갑', '어깨']);
+const ACCESSORY_EQUIPMENT_TYPES = new Set(['목걸이', '귀걸이', '반지']);
+
+function buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects }) {
+  const equipmentSnapshot = extractEquipmentSnapshot(equipment);
+  const gemSnapshot = extractGemSnapshot(gems);
+  return {
+    version: API_VERSION,
+    source: 'lostark-open-api',
+    accuracyTarget: {
+      officialCombatPower: parseNumber(profile?.CombatPower),
+      officialCombatPowerText: profile?.CombatPower || '',
+      basis: '프로필 CombatPower를 기준값으로 두고 장비/보석/효과 파싱 결과를 검증합니다.'
+    },
+    profile: {
+      server: profile?.ServerName || '',
+      name: profile?.CharacterName || '',
+      className: profile?.CharacterClassName || '',
+      itemAvgLevel: parseNumber(profile?.ItemAvgLevel),
+      itemMaxLevel: parseNumber(profile?.ItemMaxLevel),
+      combatPower: parseNumber(profile?.CombatPower),
+      stats: Array.isArray(profile?.Stats) ? profile.Stats.map(row => ({ type: row.Type, value: parseNumber(row.Value), raw: row.Value })) : []
+    },
+    equipment: equipmentSnapshot,
+    gems: gemSnapshot,
+    effects: {
+      accessory: accessoryEffects,
+      bracelet: braceletEffects,
+      abilityStone: abilityStoneEffects,
+      engraving: engravingEffects,
+      arkGrid: arkGridEffects
+    },
+    coverage: {
+      officialCombatPower: Boolean(profile?.CombatPower),
+      combatEquipment: equipmentSnapshot.combat.length,
+      accessories: equipmentSnapshot.accessories.length,
+      bracelet: Boolean(equipmentSnapshot.bracelet),
+      abilityStone: Boolean(equipmentSnapshot.abilityStone),
+      gems: gemSnapshot.items.length,
+      needsVerification: [
+        '강화/상급재련은 장비 Tooltip 문구 기반 파싱이라 실제 샘플로 검증이 필요합니다.',
+        '보석은 캐릭터 ArmoryGem 응답 기준으로 레벨/종류/스킬 연결을 구조화했습니다.',
+        '공식 전투력 산식은 공개값이 아니므로 profile.CombatPower와 샘플 오차 검증으로 보정해야 합니다.'
+      ]
+    }
+  };
+}
+
+function extractEquipmentSnapshot(equipment) {
+  const items = (Array.isArray(equipment) ? equipment : []).map(parseEquipmentSnapshotItem);
+  return {
+    all: items,
+    combat: items.filter(item => COMBAT_EQUIPMENT_TYPES.has(item.type)),
+    accessories: items.filter(item => ACCESSORY_EQUIPMENT_TYPES.has(item.type)),
+    bracelet: items.find(item => item.type === '팔찌') || null,
+    abilityStone: items.find(item => item.type === '어빌리티 스톤') || null
+  };
+}
+
+function parseEquipmentSnapshotItem(item) {
+  const text = tooltipText(item?.Tooltip);
+  const name = stripHtml(item?.Name || '');
+  const quality = firstFiniteNumber([
+    item?.Quality,
+    matchNumber(text, [/품질[^0-9]{0,12}([0-9,.]+)/])
+  ]);
+  return {
+    type: item?.Type || item?.ItemType || '',
+    name,
+    grade: item?.Grade || '',
+    icon: item?.Icon || '',
+    honingLevel: firstFiniteNumber([
+      item?.HoningLevel,
+      matchNumber(name, [/^\s*\+([0-9]+)/]),
+      matchNumber(text, [/강화\s*단계[^0-9]{0,12}([0-9]+)/, /\+([0-9]+)\s*강/])
+    ]),
+    advancedHoningLevel: firstFiniteNumber([
+      item?.AdvancedHoningLevel,
+      matchNumber(text, [/상급\s*재련[^0-9]{0,20}([0-9]+)\s*단계/, /상급\s*재련\s*([0-9]+)/])
+    ]),
+    itemLevel: firstFiniteNumber([
+      item?.ItemLevel,
+      item?.Level,
+      matchNumber(text, [/아이템\s*레벨[^0-9]{0,12}([0-9,.]+)/])
+    ]),
+    quality,
+    weaponPower: matchNumber(text, [/무기\s*공격력[^0-9+-]{0,12}\+?([0-9,.]+)/]),
+    attackPower: matchNumber(text, [/(?<!무기\s*)공격력[^0-9+-]{0,12}\+?([0-9,.]+)/]),
+    rawKnownKeys: Object.keys(item || {}).sort()
+  };
+}
+
+function extractGemSnapshot(gemData) {
+  const gems = rawGemItems(gemData);
+  const effects = rawGemEffects(gemData);
+  const bySlot = new Map(effects.map(effect => [Number(effect?.GemSlot ?? effect?.Slot ?? -1), effect]));
+  const items = gems.map(gem => {
+    const text = tooltipText(gem?.Tooltip);
+    const name = stripHtml(gem?.Name || '');
+    const slot = Number(gem?.Slot ?? gem?.GemSlot ?? -1);
+    const effect = bySlot.get(slot) || null;
+    const effectText = tooltipText(effect?.Tooltip || effect?.Description || effect);
+    const level = firstFiniteNumber([
+      gem?.Level,
+      matchNumber(name, [/([0-9]+)\s*레벨/]),
+      matchNumber(text, [/([0-9]+)\s*레벨/])
+    ]);
+    const kind = classifyGemKind([name, text, effectText].join(' '));
+    return {
+      slot,
+      name,
+      level,
+      kind,
+      grade: gem?.Grade || '',
+      icon: gem?.Icon || '',
+      skillName: effect?.Name || parseGemSkillName(effectText),
+      effectText: effectText.slice(0, 500)
+    };
+  }).sort((a, b) => Number(a.slot) - Number(b.slot));
+  const damage = items.filter(item => item.kind === 'damage');
+  const cooldown = items.filter(item => item.kind === 'cooldown');
+  return {
+    items,
+    effects: effects.map(effect => ({ slot: Number(effect?.GemSlot ?? effect?.Slot ?? -1), name: effect?.Name || '', description: stripHtml(effect?.Description || ''), tooltip: tooltipText(effect?.Tooltip).slice(0, 500) })),
+    summary: {
+      total: items.length,
+      damage: damage.length,
+      cooldown: cooldown.length,
+      averageLevel: round2(items.reduce((sum, item) => sum + Number(item.level || 0), 0) / Math.max(items.length, 1)),
+      levelCounts: items.reduce((acc, item) => {
+        const key = `Lv.${Number(item.level || 0)}`;
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {})
+    }
+  };
+}
+
+function rawGemItems(gemData) {
+  if (!gemData) return [];
+  if (Array.isArray(gemData)) return gemData;
+  if (Array.isArray(gemData.Gems)) return gemData.Gems;
+  if (Array.isArray(gemData.gems)) return gemData.gems;
+  if (Array.isArray(gemData.Items)) return gemData.Items;
+  return [];
+}
+
+function rawGemEffects(gemData) {
+  if (!gemData || Array.isArray(gemData)) return [];
+  if (Array.isArray(gemData.Effects)) return gemData.Effects;
+  if (Array.isArray(gemData.effects)) return gemData.effects;
+  return [];
+}
+
+function classifyGemKind(text) {
+  const source = stripHtml(text);
+  if (/겁화|멸화|피해|데미지|damage/i.test(source)) return 'damage';
+  if (/작열|홍염|재사용|쿨타임|cooldown/i.test(source)) return 'cooldown';
+  return 'unknown';
+}
+
+function parseGemSkillName(text) {
+  const source = stripHtml(text);
+  const match = source.match(/['"「]?([가-힣A-Za-z0-9\s]+)['"」]?\s*(?:스킬)?(?:의)?\s*(?:피해|재사용|쿨타임)/);
+  return match ? match[1].trim() : '';
+}
+
+function firstFiniteNumber(values) {
+  for (const value of values) {
+    const parsed = parseNumber(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function matchNumber(text, regexList) {
+  const source = stripHtml(text);
+  for (const re of regexList) {
+    re.lastIndex = 0;
+    const match = re.exec(source);
+    if (!match) continue;
+    const value = parseNumber(match[1]);
+    if (Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+function parseNumber(value) {
+  if (value == null || value === '') return null;
+  const normalized = String(value).replace(/,/g, '').replace(/[^0-9.+-]/g, '');
+  if (!normalized || normalized === '+' || normalized === '-') return null;
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : null;
 }
 
 function extractAccessoryEffects(equipment) {

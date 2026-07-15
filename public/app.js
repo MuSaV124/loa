@@ -1,4 +1,4 @@
-const VERSION = '5.5.1';
+const VERSION = '5.5.2';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -22,7 +22,7 @@ function emptyEngravingState() {
 
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
-const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] } };
+const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] }, powerSnapshot: null };
 
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
 function escapeRegExp(v) { return String(v || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -50,6 +50,7 @@ function effectFullText(effect) {
 function num(v, fallback = 0) { const n = Number(String(v ?? '').replace(/,/g, '')); return Number.isFinite(n) ? n : fallback; }
 function pct(v) { return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`; }
 function fmt(v) { return Number(v || 0).toFixed(2); }
+function formatNumber(v) { const n = Number(v); return Number.isFinite(n) ? n.toLocaleString('ko-KR') : '-'; }
 function item(label, value) { return `<div class="cell"><b>${label}</b><span>${escapeHtml(value ?? '-')}</span></div>`; }
 function setMessage(text) { const el = $('message'); if (!text) { el.classList.add('hidden'); el.textContent = ''; return; } el.classList.remove('hidden'); el.textContent = text; }
 function getStat(profile, type) { return (profile?.Stats || []).find(s => s.Type === type)?.Value ?? '-'; }
@@ -314,6 +315,48 @@ function renderCharacter(profile) {
   const image = profile?.CharacterImage || '';
   el.innerHTML = `${image ? `<img src="${escapeHtml(image)}" alt="" />` : ''}<div><h2>${escapeHtml(profile?.CharacterName || '-')} / ${escapeHtml(profile?.CharacterClassName || '-')}</h2><p>서버 ${escapeHtml(profile?.ServerName || '-')} · 아이템 레벨 ${escapeHtml(profile?.ItemAvgLevel || '-')} · 전투력 ${escapeHtml(profile?.CombatPower || '-')}</p></div>`;
   el.classList.remove('hidden');
+}
+function renderPowerSnapshot(snapshot) {
+  const panel = $('powerSnapshotPanel');
+  const view = $('powerSnapshotView');
+  if (!panel || !view) return;
+  if (!snapshot) {
+    panel.classList.add('hidden');
+    view.innerHTML = '';
+    return;
+  }
+  panel.classList.remove('hidden');
+  const equipment = snapshot.equipment || {};
+  const combat = equipment.combat || [];
+  const gems = snapshot.gems || { items: [], summary: {} };
+  const weapon = combat.find(item => item.type === '무기') || {};
+  const advancedReady = combat.filter(item => item.advancedHoningLevel != null).length;
+  const gemItems = gems.items || [];
+  const topGems = gemItems
+    .slice()
+    .sort((a, b) => Number(b.level || 0) - Number(a.level || 0))
+    .slice(0, 6)
+    .map(gem => `<span>${escapeHtml(gem.kind === 'damage' ? '딜' : gem.kind === 'cooldown' ? '쿨' : '?')} Lv.${Number(gem.level || 0)} ${escapeHtml(gem.skillName || gem.name || '-')}</span>`)
+    .join('');
+  const gearRows = combat.map(item => {
+    const honing = item.honingLevel != null ? `+${item.honingLevel}` : '확인 필요';
+    const advanced = item.advancedHoningLevel != null ? `상재 ${item.advancedHoningLevel}` : '상재 미확인';
+    const quality = item.quality != null ? `품질 ${item.quality}` : '품질 미확인';
+    return `<div class="powerGearRow"><b>${escapeHtml(item.type || '-')}</b><span>${escapeHtml(honing)} · ${escapeHtml(advanced)} · ${escapeHtml(quality)}</span></div>`;
+  }).join('');
+  view.innerHTML = `
+    <div class="powerSnapshotGrid">
+      <div class="powerMetric"><span>공식 전투력</span><b>${formatNumber(snapshot.profile?.combatPower)}</b><small>프로필 CombatPower 기준</small></div>
+      <div class="powerMetric"><span>무기 강화</span><b>${weapon.honingLevel != null ? '+' + weapon.honingLevel : '확인 필요'}</b><small>${weapon.advancedHoningLevel != null ? '상급 재련 ' + weapon.advancedHoningLevel : '상급 재련 미확인'}</small></div>
+      <div class="powerMetric"><span>전투 장비</span><b>${combat.length}/6</b><small>상재 확인 ${advancedReady}부위</small></div>
+      <div class="powerMetric"><span>보석</span><b>${Number(gems.summary?.total || 0)}개</b><small>겁/멸 ${Number(gems.summary?.damage || 0)} · 작/홍 ${Number(gems.summary?.cooldown || 0)} · 평균 Lv.${Number(gems.summary?.averageLevel || 0).toFixed(2)}</small></div>
+    </div>
+    <div class="powerSnapshotColumns">
+      <div class="powerSnapshotBlock"><h3>장비 파싱</h3>${gearRows || '<p>전투 장비를 찾지 못했습니다.</p>'}</div>
+      <div class="powerSnapshotBlock"><h3>상위 보석</h3><div class="powerGemList">${topGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
+    </div>
+    <p class="powerSnapshotNote">이 카드는 전투력 계산식 투입 전 검증용입니다. 강화/상급재련은 API Tooltip 문구 기반이라 실제 캐릭터 샘플로 오차를 확인해야 합니다.</p>
+  `;
 }
 function renderSummary(profile, arkPassive) {
   $('summaryPanel').classList.remove('hidden');
@@ -1228,9 +1271,12 @@ async function searchCharacter(name) {
   document.body.classList.remove('calculatorReady');
   $('characterCard').classList.add('hidden');
   $('characterCard').innerHTML = '';
+  $('powerSnapshotPanel')?.classList.add('hidden');
+  if ($('powerSnapshotView')) $('powerSnapshotView').innerHTML = '';
   $('summaryPanel').classList.add('hidden');
   state.selected = {};
   state.apiSelected = {};
+  state.powerSnapshot = null;
   state.abilityStone = { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
   state.engraving = emptyEngravingState();
   state.arkGrid = { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
@@ -1245,8 +1291,10 @@ async function searchCharacter(name) {
     state.abilityStone = data.abilityStoneEffects || { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
     state.engraving = data.engravingEffects || emptyEngravingState();
     state.arkGrid = data.arkGridEffects || { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+    state.powerSnapshot = data.powerSnapshot || null;
     syncAdrenalineControlsFromEngraving();
     renderCharacter(data.profile);
+    renderPowerSnapshot(state.powerSnapshot);
     state.foundEffects = readEffects(data.arkPassive);
     state.enlightenment = extractEnlightenmentEffects(state.foundEffects);
     state.selected = classifyEvolution(state.foundEffects);
@@ -1477,7 +1525,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.5.1',
+    apiVersion: '5.5.2',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1741,7 +1789,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.5.1</summary>
+      <summary>악세 디버그 보기 · v5.5.2</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>

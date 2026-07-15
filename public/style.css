@@ -71,6 +71,96 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .recommend.down strong { color: #fca5a5; }
 .recommend em { font-style: normal; font-size: 11px; color: #111827; background: var(--amber); padding: 3px 6px; border-radius: 999px; font-weight: 900; }
 .version { position: fixed; right: 12px; bottom: 10px; color: #94a3b8; font-size: 12px; }
+
+.powerSnapshotPanel {
+  border-color: rgba(96, 165, 250, .22);
+}
+.powerSnapshotView {
+  display: grid;
+  gap: 14px;
+}
+.powerSnapshotGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.powerMetric {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, .52);
+  padding: 12px;
+}
+.powerMetric span,
+.powerMetric small {
+  display: block;
+  color: var(--muted);
+  font-weight: 800;
+}
+.powerMetric b {
+  display: block;
+  margin: 5px 0;
+  color: #f8fafc;
+  font-size: 20px;
+}
+.powerSnapshotColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr);
+  gap: 12px;
+}
+.powerSnapshotBlock {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, .14);
+  border-radius: 12px;
+  background: rgba(2, 6, 23, .35);
+  padding: 12px;
+}
+.powerSnapshotBlock h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: #e2e8f0;
+}
+.powerGearRow {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  padding: 7px 0;
+  border-top: 1px solid rgba(148, 163, 184, .10);
+}
+.powerGearRow:first-of-type {
+  border-top: 0;
+}
+.powerGearRow b {
+  color: #fbbf24;
+}
+.powerGearRow span,
+.powerSnapshotBlock p,
+.powerSnapshotNote {
+  color: var(--muted);
+}
+.powerGemList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.powerGemList span {
+  max-width: 100%;
+  border: 1px solid rgba(96, 165, 250, .22);
+  border-radius: 999px;
+  background: rgba(30, 64, 175, .18);
+  padding: 6px 9px;
+  color: #dbeafe;
+  font-size: 12px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.powerSnapshotNote {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+}
 @media (max-width: 980px) {
   .grid, .manualGrid, .effectList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tiers { grid-template-columns: 1fr; }
@@ -1764,14 +1854,25 @@ select {
   }
 }
 
-/* v5.5.1 search-first calculator entry */
+/* v5.5.2 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
+body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,
 body:not(.calculatorReady):not(.marketMode) #inputPanel,
 body:not(.calculatorReady):not(.marketMode) #evolutionPanel,
 body:not(.calculatorReady):not(.marketMode) #recommendPanel,
 body:not(.calculatorReady):not(.marketMode) #keenPanel {
   display: none !important;
+}
+
+@media (max-width: 760px) {
+  .powerSnapshotGrid,
+  .powerSnapshotColumns {
+    grid-template-columns: 1fr;
+  }
+  .powerGearRow {
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
 }
 body:not(.calculatorReady):not(.marketMode) .wrap {
   grid-template-columns: 1fr;
