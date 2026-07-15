@@ -1,4 +1,4 @@
-const VERSION = '5.5.4';
+const VERSION = '5.5.5';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -331,6 +331,9 @@ function renderPowerSnapshot(snapshot) {
   const gems = snapshot.gems || { items: [], summary: {} };
   const weapon = combat.find(item => item.type === '무기') || {};
   const advancedReady = combat.filter(item => item.advancedHoningLevel != null).length;
+  const currentCalc = statsWithSelection(state.selected);
+  const currentScore = Number(currentCalc?.result?.value || 0);
+  const currentWeaponPower = Number(weapon.weaponPower || 0);
   const gemItems = gems.items || [];
   const equippedGems = gemItems
     .slice()
@@ -366,8 +369,45 @@ function renderPowerSnapshot(snapshot) {
       <div class="powerSnapshotBlock"><h3>장비 파싱</h3><div class="powerGearList">${gearRows || '<p>전투 장비를 찾지 못했습니다.</p>'}</div></div>
       <div class="powerSnapshotBlock"><h3>장착 보석</h3><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
     </div>
+    <div class="powerSimulationBlock">
+      <div class="powerSimulationHead">
+        <div><h3>전투력 시뮬레이션</h3><p>무기 강화 후 무기 공격력을 입력해 현재 계산기 기준 상승률을 확인합니다.</p></div>
+        <strong id="weaponUpgradeGain">+0.00%</strong>
+      </div>
+      <div class="powerSimulationGrid">
+        <label>현재 무기 공격력<input id="simWeaponPowerCurrent" type="number" step="1" value="${currentWeaponPower || ''}" placeholder="현재 무공" /></label>
+        <label>강화 후 무기 공격력<input id="simWeaponPowerNext" type="number" step="1" value="" placeholder="+1강 후 무공" /></label>
+        <div class="powerSimulationResult"><span>현재 기대값</span><b>${currentScore ? currentScore.toFixed(4) : '-'}</b></div>
+        <div class="powerSimulationResult"><span>강화 후 기대값</span><b id="weaponUpgradeScore">-</b></div>
+      </div>
+      <p class="powerSnapshotNote">무기 강화 효율은 무기 공격력 증가분을 기준으로 계산합니다. 단계별 자동값은 강화/상급재련 표본 검증 후 추가합니다.</p>
+    </div>
     <p class="powerSnapshotNote">이 카드는 전투력 계산식 투입 전 검증용입니다. 강화/상급재련은 API Tooltip 문구 기반이라 실제 캐릭터 샘플로 오차를 확인해야 합니다.</p>
   `;
+  bindPowerSimulation(currentScore);
+}
+function bindPowerSimulation(currentScore) {
+  const currentInput = $('simWeaponPowerCurrent');
+  const nextInput = $('simWeaponPowerNext');
+  const gainEl = $('weaponUpgradeGain');
+  const scoreEl = $('weaponUpgradeScore');
+  if (!currentInput || !nextInput || !gainEl || !scoreEl) return;
+  const update = () => {
+    const currentWeaponPower = num(currentInput.value);
+    const nextWeaponPower = num(nextInput.value);
+    if (currentWeaponPower <= 0 || nextWeaponPower <= 0 || nextWeaponPower <= currentWeaponPower || currentScore <= 0) {
+      gainEl.textContent = '+0.00%';
+      scoreEl.textContent = '-';
+      return;
+    }
+    const multiplier = Math.sqrt(nextWeaponPower / currentWeaponPower);
+    const gain = (multiplier - 1) * 100;
+    gainEl.textContent = pct(gain);
+    scoreEl.textContent = (currentScore * multiplier).toFixed(4);
+  };
+  currentInput.addEventListener('input', update);
+  nextInput.addEventListener('input', update);
+  update();
 }
 function renderSummary(profile, arkPassive) {
   $('summaryPanel').classList.remove('hidden');
@@ -1305,12 +1345,12 @@ async function searchCharacter(name) {
     state.powerSnapshot = data.powerSnapshot || null;
     syncAdrenalineControlsFromEngraving();
     renderCharacter(data.profile);
-    renderPowerSnapshot(state.powerSnapshot);
     state.foundEffects = readEffects(data.arkPassive);
     state.enlightenment = extractEnlightenmentEffects(state.foundEffects);
     state.selected = classifyEvolution(state.foundEffects);
     state.apiSelected = JSON.parse(JSON.stringify(state.selected));
     applyProfileDefaults(data.profile, state.selected);
+    renderPowerSnapshot(state.powerSnapshot);
     renderEvolutionTiers();
     renderSummary(data.profile, data.arkPassive);
     calculateAndRender();
@@ -1536,7 +1576,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.5.4',
+    apiVersion: '5.5.5',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1800,7 +1840,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.5.4</summary>
+      <summary>악세 디버그 보기 · v5.5.5</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>
