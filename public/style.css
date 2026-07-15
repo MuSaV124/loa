@@ -81,7 +81,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 }
 .powerSnapshotColumns {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr);
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 .powerSnapshotBlock {
@@ -159,7 +159,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 }
 .powerGemList {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 7px;
 }
 .powerGemList span {
@@ -1897,7 +1897,7 @@ select {
   }
 }
 
-/* v5.5.7 search-first calculator entry */
+/* v5.5.8 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
 body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,

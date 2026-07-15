@@ -1,4 +1,4 @@
-const VERSION = '5.5.7';
+const VERSION = '5.5.8';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -341,22 +341,23 @@ function renderPowerSnapshot(snapshot) {
     .join('');
   const gearRows = combat.map(item => {
     const honing = item.honingLevel != null ? `+${item.honingLevel}` : '확인 필요';
-    const advanced = item.advancedHoningLevel != null ? `상재 ${item.advancedHoningLevel}` : '상재 미확인';
+    const advanced = item.advancedHoningExcluded ? '' : (item.advancedHoningLevel != null ? `상재 ${item.advancedHoningLevel}` : '상재 미확인');
     const quality = item.quality != null ? `품질 ${item.quality}` : '품질 미확인';
+    const meta = [item.type || '-', honing, advanced].filter(Boolean).join(' · ');
     const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="">` : `<div class="powerGearFallback">${escapeHtml(item.type?.slice(0, 1) || '?')}</div>`;
     return `<div class="powerGearRow">
       <div class="powerGearIcon">${icon}</div>
       <div class="powerGearInfo">
         <b>${escapeHtml(item.name || item.type || '-')}</b>
-        <span>${escapeHtml(item.type || '-')} · ${escapeHtml(honing)} · ${escapeHtml(advanced)}</span>
+        <span>${escapeHtml(meta)}</span>
       </div>
       <strong class="${item.quality != null ? 'qualityReady' : ''}">${escapeHtml(quality)}</strong>
     </div>`;
   }).join('');
   view.innerHTML = `
     <div class="powerSnapshotColumns">
-      <div class="powerSnapshotBlock"><h3>장비 파싱</h3><div class="powerGearList">${gearRows || '<p>전투 장비를 찾지 못했습니다.</p>'}</div></div>
       <div class="powerSnapshotBlock"><h3>장착 보석</h3><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
+      <div class="powerSnapshotBlock"><h3>장비 파싱</h3><div class="powerGearList">${gearRows || '<p>전투 장비를 찾지 못했습니다.</p>'}</div></div>
     </div>
     <p class="powerSnapshotNote">이 카드는 전투력 계산식 투입 전 검증용입니다. 강화/상급재련은 API Tooltip 문구 기반이라 실제 캐릭터 샘플로 오차를 확인해야 합니다.</p>
   `;
@@ -1528,7 +1529,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.5.7',
+    apiVersion: '5.5.8',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1792,7 +1793,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.5.7</summary>
+      <summary>악세 디버그 보기 · v5.5.8</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>

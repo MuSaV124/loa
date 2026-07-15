@@ -1,4 +1,4 @@
-const API_VERSION = '5.5.7';
+const API_VERSION = '5.5.8';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = 60 * 1000;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -214,6 +214,7 @@ function parseEquipmentSnapshotItem(item) {
   const tooltip = parseTooltip(item?.Tooltip);
   const text = tooltipText(item?.Tooltip);
   const name = stripHtml(item?.Name || '');
+  const advancedHoningExcluded = name.includes('전율');
   const quality = firstFiniteNumber([
     item?.Quality,
     findQualityValue(tooltip)
@@ -228,10 +229,11 @@ function parseEquipmentSnapshotItem(item) {
       matchNumber(name, [/^\s*\+([0-9]+)/]),
       matchNumber(text, [/강화\s*단계[^0-9]{0,12}([0-9]+)/, /\+([0-9]+)\s*강/])
     ]),
-    advancedHoningLevel: firstFiniteNumber([
+    advancedHoningLevel: advancedHoningExcluded ? null : firstFiniteNumber([
       item?.AdvancedHoningLevel,
       matchNumber(text, [/상급\s*재련[^0-9]{0,20}([0-9]+)\s*단계/, /상급\s*재련\s*([0-9]+)/])
     ]),
+    advancedHoningExcluded,
     itemLevel: firstFiniteNumber([
       item?.ItemLevel,
       item?.Level,
