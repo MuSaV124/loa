@@ -1,4 +1,4 @@
-const VERSION = '5.7.34';
+const VERSION = '5.7.35';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1209,16 +1209,31 @@ function calculateNextNormalRefineEstimates(snapshot, priceMap) {
   });
 }
 const SPEC_ACCESSORY_CANDIDATES = [
-  { part: 'necklace', label: '목걸이', combo: 'highHigh', comboLabel: '상상', effects: { enemyDamage: 2.0, additionalDamage: 2.6 } },
-  { part: 'necklace', label: '목걸이', combo: 'highMid', comboLabel: '상중', effects: { enemyDamage: 2.0, additionalDamage: 1.6 } },
-  { part: 'necklace', label: '목걸이', combo: 'reverseHighMid', comboLabel: '중상', effects: { enemyDamage: 1.2, additionalDamage: 2.6 } },
-  { part: 'earring', label: '귀걸이', combo: 'highHigh', comboLabel: '상상', effects: { attackPowerPercent: 1.55, weaponPowerPercent: 3.0 } },
-  { part: 'earring', label: '귀걸이', combo: 'highMid', comboLabel: '상중', effects: { attackPowerPercent: 1.55, weaponPowerPercent: 1.8 } },
-  { part: 'earring', label: '귀걸이', combo: 'reverseHighMid', comboLabel: '중상', effects: { attackPowerPercent: 0.95, weaponPowerPercent: 3.0 } },
-  { part: 'ring', label: '반지', combo: 'highHigh', comboLabel: '상상', effects: { critDamage: 4.0, critRate: 1.55 } },
-  { part: 'ring', label: '반지', combo: 'highMid', comboLabel: '상중', effects: { critDamage: 4.0, critRate: 0.95 } },
-  { part: 'ring', label: '반지', combo: 'reverseHighMid', comboLabel: '중상', effects: { critDamage: 2.4, critRate: 1.55 } }
+  { part: 'necklace', label: '목걸이', combo: 'highHigh', comboLabel: '상상', gradePair: ['상', '상'], gradeKeys: ['enemyDamage', 'additionalDamage'], effects: { enemyDamage: 2.0, additionalDamage: 2.6 } },
+  { part: 'necklace', label: '목걸이', combo: 'highMid', comboLabel: '상중', gradePair: ['상', '중'], gradeKeys: ['enemyDamage', 'additionalDamage'], effects: { enemyDamage: 2.0, additionalDamage: 1.6 } },
+  { part: 'necklace', label: '목걸이', combo: 'reverseHighMid', comboLabel: '중상', gradePair: ['중', '상'], gradeKeys: ['enemyDamage', 'additionalDamage'], effects: { enemyDamage: 1.2, additionalDamage: 2.6 } },
+  { part: 'earring', label: '귀걸이', combo: 'highHigh', comboLabel: '상상', gradePair: ['상', '상'], gradeKeys: ['attackPowerPercent', 'weaponPowerPercent'], effects: { attackPowerPercent: 1.55, weaponPowerPercent: 3.0 } },
+  { part: 'earring', label: '귀걸이', combo: 'highMid', comboLabel: '상중', gradePair: ['상', '중'], gradeKeys: ['attackPowerPercent', 'weaponPowerPercent'], effects: { attackPowerPercent: 1.55, weaponPowerPercent: 1.8 } },
+  { part: 'earring', label: '귀걸이', combo: 'reverseHighMid', comboLabel: '중상', gradePair: ['중', '상'], gradeKeys: ['attackPowerPercent', 'weaponPowerPercent'], effects: { attackPowerPercent: 0.95, weaponPowerPercent: 3.0 } },
+  { part: 'ring', label: '반지', combo: 'highHigh', comboLabel: '상상', gradePair: ['상', '상'], gradeKeys: ['critDamage', 'critRate'], effects: { critDamage: 4.0, critRate: 1.55 } },
+  { part: 'ring', label: '반지', combo: 'highMid', comboLabel: '상중', gradePair: ['상', '중'], gradeKeys: ['critDamage', 'critRate'], effects: { critDamage: 4.0, critRate: 0.95 } },
+  { part: 'ring', label: '반지', combo: 'reverseHighMid', comboLabel: '중상', gradePair: ['중', '상'], gradeKeys: ['critDamage', 'critRate'], effects: { critDamage: 2.4, critRate: 1.55 } }
 ];
+const ACCESSORY_GRADE_SCORE = { 하: 1, 중: 2, 상: 3 };
+function accessoryCandidateUpgradesEquipped(candidate, equipped) {
+  if (!candidate?.gradePair?.length || !candidate?.gradeKeys?.length) return true;
+  const matching = (equipped || []).filter(item => item?.type === candidate.label);
+  if (!matching.length) return true;
+  return matching.some(item => {
+    const grades = item?.effects?.optionGrades || {};
+    const currentPair = candidate.gradeKeys.map(key => grades[key] || '');
+    if (currentPair.some(grade => !ACCESSORY_GRADE_SCORE[grade])) return true;
+    const nextPair = candidate.gradePair;
+    const noDowngrade = nextPair.every((grade, index) => ACCESSORY_GRADE_SCORE[grade] >= ACCESSORY_GRADE_SCORE[currentPair[index]]);
+    const hasUpgrade = nextPair.some((grade, index) => ACCESSORY_GRADE_SCORE[grade] > ACCESSORY_GRADE_SCORE[currentPair[index]]);
+    return noDowngrade && hasUpgrade;
+  });
+}
 function combatPowerFeaturePerUnit(key) {
   const value = Number(state.combatPowerModel?.features?.[key]?.perUnit || 0);
   return Number.isFinite(value) && value > 0 ? value : 0;
@@ -1241,7 +1256,9 @@ function specMarketCost(price, pheonCost = 0) {
   return { totalGold: Number(price || 0) + pheonGold, tradeGold: Number(price || 0), fixedGold: pheonGold, silver: 0 };
 }
 async function calculateAccessorySpecEstimates() {
-  const rows = await Promise.all(SPEC_ACCESSORY_CANDIDATES.map(async candidate => {
+  const equipped = state.powerSnapshot?.effects?.accessory?.items || state.accessory?.items || [];
+  const candidates = SPEC_ACCESSORY_CANDIDATES.filter(candidate => accessoryCandidateUpgradesEquipped(candidate, equipped));
+  const rows = await Promise.all(candidates.map(async candidate => {
     try {
       const data = await fetchMarketJson(`/api/market-prices?mode=accessory&part=${encodeURIComponent(candidate.part)}&combo=${encodeURIComponent(candidate.combo)}&_=${Date.now()}`);
       const item = data.lowest || data.items?.[0] || null;
