@@ -1,4 +1,4 @@
-const VERSION = '5.7.39';
+const VERSION = '5.7.40';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1112,12 +1112,25 @@ function normalHoningCalibrationKey(snapshot, item, next = null) {
     Number(next?.to ?? Number(item?.honingLevel || 0) + 1)
   ].join('||');
 }
-function normalHoningFallback(snapshot, item) {
+function normalHoningFallback(snapshot, item, next = null) {
   const normal = state.combatPowerModel?.upgradeDelta?.normalHoning || {};
   const official = snapshotOfficialCombatPower(snapshot);
   const className = normalizePowerModelText(snapshot?.profile?.className);
   const slot = powerGearSlot(item);
   const group = slot === 'weapon' ? 'weapon' : 'armor';
+  const fromLevel = Number(next?.from ?? item?.honingLevel ?? 0);
+  const toLevel = Number(next?.to ?? fromLevel + 1);
+  const slotLevelKey = `${slot}:${fromLevel}:${toLevel}`;
+  const slotLevel = normal.percentBySlotLevel?.[slotLevelKey];
+  const slotLevelPercent = Number(slotLevel?.percent ?? slotLevel);
+  if (official > 0 && Number.isFinite(slotLevelPercent) && slotLevelPercent > 0) {
+    return {
+      value: official * slotLevelPercent / 100,
+      percent: slotLevelPercent,
+      confidence: slotLevel?.confidence || 'verified',
+      basis: slotLevel?.basis || 'slot and honing-level calibrated percent'
+    };
+  }
   const classFallback = normal.classFallbacks?.[className] || normal.byClass?.[className] || null;
   const classPercent = Number(classFallback?.[`${slot}Percent`] ?? classFallback?.[`${group}Percent`]);
   if (official > 0 && Number.isFinite(classPercent) && classPercent > 0) {
@@ -1171,7 +1184,7 @@ function estimateNormalHoningPowerDelta(item, snapshot, next = null) {
       basis: calibration.basis || 'build-specific verified'
     };
   }
-  const fallback = normalHoningFallback(snapshot, item);
+  const fallback = normalHoningFallback(snapshot, item, next);
   if (fallback) {
     return {
       value: round2(fallback.value),

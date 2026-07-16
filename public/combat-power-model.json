@@ -219,6 +219,38 @@
         "shoulder": 0.11,
         "armor": 0.11
       },
+      "percentBySlotLevel": {
+        "weapon:23:24": {
+          "percent": 1.241,
+          "confidence": "verified",
+          "basis": "Loaup Musav spec-up sample"
+        },
+        "head:20:21": {
+          "percent": 0.223,
+          "confidence": "verified",
+          "basis": "Loaup Musav spec-up sample"
+        },
+        "top:20:21": {
+          "percent": 0.178,
+          "confidence": "verified",
+          "basis": "Loaup Musav spec-up sample"
+        },
+        "bottom:20:21": {
+          "percent": 0.193,
+          "confidence": "verified",
+          "basis": "Loaup Musav spec-up sample"
+        },
+        "gloves:21:22": {
+          "percent": 0.274,
+          "confidence": "verified",
+          "basis": "Loaup Musav spec-up sample"
+        },
+        "shoulder:20:21": {
+          "percent": 0.237,
+          "confidence": "verified",
+          "basis": "Loaup Musav spec-up sample"
+        }
+      },
       "coverage": "all-loawa-rank-classes",
       "confidence": "estimated",
       "basis": "Percent fallback from current official CombatPower. Used only until before/after upgrade deltaPercent samples are verified."

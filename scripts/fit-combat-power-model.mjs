@@ -9,6 +9,14 @@ const MIN_COMBAT_POWER = Number(process.env.LOA_MODEL_MIN_CP || 5000);
 const MAX_COMBAT_POWER = Number(process.env.LOA_MODEL_MAX_CP || 6500);
 const NORMAL_HONING_WEAPON_PERCENT = Number(process.env.LOA_NORMAL_HONING_WEAPON_PERCENT || 0.46);
 const NORMAL_HONING_ARMOR_PERCENT = Number(process.env.LOA_NORMAL_HONING_ARMOR_PERCENT || 0.11);
+const NORMAL_HONING_SLOT_LEVEL_PERCENT = {
+  'weapon:23:24': { percent: 1.241, confidence: 'verified', basis: 'Loaup Musav spec-up sample; shared by all classes until broader samples are collected.' },
+  'head:20:21': { percent: 0.223, confidence: 'verified', basis: 'Loaup Musav spec-up sample; shared by all classes until broader samples are collected.' },
+  'top:20:21': { percent: 0.178, confidence: 'verified', basis: 'Loaup Musav spec-up sample; shared by all classes until broader samples are collected.' },
+  'bottom:20:21': { percent: 0.193, confidence: 'verified', basis: 'Loaup Musav spec-up sample; shared by all classes until broader samples are collected.' },
+  'gloves:21:22': { percent: 0.274, confidence: 'verified', basis: 'Loaup Musav spec-up sample; shared by all classes until broader samples are collected.' },
+  'shoulder:20:21': { percent: 0.237, confidence: 'verified', basis: 'Loaup Musav spec-up sample; shared by all classes until broader samples are collected.' }
+};
 
 const ALL_CLASS_NAMES = [
   '디스트로이어', '발키리', '버서커', '슬레이어', '워로드', '홀리나이트',
@@ -374,6 +382,7 @@ async function main() {
           shoulder: NORMAL_HONING_ARMOR_PERCENT,
           armor: NORMAL_HONING_ARMOR_PERCENT
         },
+        percentBySlotLevel: NORMAL_HONING_SLOT_LEVEL_PERCENT,
         classFallbacks: buildNormalHoningFallbacks(rows),
         coverage: 'all-loawa-rank-classes',
         confidence: 'estimated',
