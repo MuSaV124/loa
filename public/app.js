@@ -1,4 +1,4 @@
-const VERSION = '5.7.32';
+const VERSION = '5.7.34';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1291,9 +1291,11 @@ async function calculateGemSpecEstimates(snapshot) {
   return [...counts.entries()].map(([key, count]) => {
     const [kind, nextLevelText] = key.split(':');
     const nextLevel = Number(nextLevelText || 0);
-    const row = (data.rows || []).find(item => Number(item.level || 0) === nextLevel);
+    const currentLevel = nextLevel - 1;
+    const row = (data.rows || []).find(item => Number(item.level || 0) === currentLevel);
     const market = kind === '작열' ? row?.cooldown : row?.damage;
-    const price = Number(market?.price || 0) * Number(count || 1);
+    const buyCount = Number(count || 1) * 2;
+    const price = Number(market?.price || 0) * buyCount;
     const powerDelta = round2(perGemDelta * Number(count || 1));
     return {
       category: 'gem',
@@ -1305,10 +1307,10 @@ async function calculateGemSpecEstimates(snapshot) {
       expectedCost: { expectedGold: price },
       powerDelta,
       powerEstimate: { confidence: 'estimated', basis: 'gem average combat-power coefficient model' },
-      supportLabel: `${kind} ${nextLevel}레벨 최저가 × ${count}개`,
+      supportLabel: `${kind} ${currentLevel}레벨 최저가 × ${buyCount}개`,
       stepLabel: `${kind} 보석`,
       stepDetail: `Lv.${nextLevel - 1} → Lv.${nextLevel} · CP +${powerDelta.toFixed(1)}`,
-      reason: price > 0 ? '보석 평균 레벨 추정' : '보석 시세 없음'
+      reason: price > 0 ? '보석 합성 3개 기준' : '보석 시세 없음'
     };
   });
 }
@@ -1345,9 +1347,25 @@ function renderSpecEfficiencyShell() {
 }
 function specEfficiencyScore(row) {
   const expectedGold = Number(row?.expectedCost?.expectedGold || 0);
-  const powerDelta = Number(row?.powerDelta || 0);
-  if (!row?.available || expectedGold <= 0 || powerDelta <= 0) return Infinity;
-  return expectedGold / powerDelta;
+  const percent = specEfficiencyPercent(row);
+  if (!row?.available || expectedGold <= 0 || percent <= 0) return Infinity;
+  return expectedGold / percent;
+}
+function specEfficiencyPercent(row) {
+  const direct = Number(row?.powerEstimate?.percent || 0);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const official = snapshotOfficialCombatPower(state.powerSnapshot);
+  const delta = Number(row?.powerDelta || 0);
+  return official > 0 && delta > 0 ? (delta / official) * 100 : 0;
+}
+function formatSpecGold(value) {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n) || n <= 0) return '-';
+  if (n >= 10000) {
+    const valueText = (n / 10000).toLocaleString('ko-KR', { maximumFractionDigits: 1 });
+    return `${valueText}만`;
+  }
+  return `${Math.round(n).toLocaleString('ko-KR')}G`;
 }
 function specEfficiencyReason(row) {
   if (row?.category === 'accessory' || row?.category === 'gem') return row.reason || '시세 기반 추정';
@@ -1385,46 +1403,44 @@ function renderSpecEfficiencyTable() {
       const pityAttempts = Number(expected.pityAttempts || 0);
       const expectedAttempts = Number(expected.expectedAttempts || 0);
       const supportLabel = row.supportLabel || '보조재료 없음';
-      const rank = row.available && Number.isFinite(specEfficiencyScore(row)) ? index + 1 : '-';
       const powerDelta = Number(row.powerDelta || 0);
-      const scoreText = row.available && expectedGold > 0 && powerDelta > 0 ? `${formatGold(expectedGold / powerDelta)} / CP` : '-';
+      const efficiencyPercent = specEfficiencyPercent(row);
+      const efficiencyText = row.available && efficiencyPercent > 0 ? `${efficiencyPercent.toFixed(3)}%` : '-';
+      const scoreText = row.available && expectedGold > 0 && efficiencyPercent > 0 ? formatSpecGold(expectedGold / efficiencyPercent) : '-';
       const marketCostText = row.category && row.category !== 'honing';
-      const expectedGoldText = expectedGold > 0 ? formatGold(expectedGold) : '-';
+      const expectedGoldText = expectedGold > 0 ? formatSpecGold(expectedGold) : '-';
       const expectedDetailText = expectedGold > 0 && marketCostText
-        ? `${supportLabel} · 거래 ${formatGold(tradeGold)}${fixedGold > 0 ? ` · 페온 ${formatGold(fixedGold)}` : ''}`
+        ? `최저가: ${supportLabel} · 거래 ${formatGold(tradeGold)}${fixedGold > 0 ? ` · 페온 ${formatGold(fixedGold)}` : ''}`
         : expectedGold > 0
-        ? `1회 ${formatGold(totalGold)} · ${supportLabel} · 성공률 ${ratePercent.toFixed(2)}~${Number(expected.maxRatePercent || ratePercent).toFixed(2)}% · 평균 ${expectedAttempts.toFixed(1)}회 · 장기백 ${formatNumber(pityAttempts)}회`
+        ? `최저가: ${supportLabel} · 평균 ${formatGold(expectedGold)} · 장기백 ${formatGold((expected.pityAttempts || 0) * totalGold)}`
         : `1회 ${formatGold(totalGold)} · 거래 ${formatGold(tradeGold)} · 고정 ${formatGold(fixedGold)} · 실링 ${formatNumber(silver)}`;
-      const deltaPercent = Number(row.powerEstimate?.percent || 0);
-      const percentText = deltaPercent > 0 ? ` · ${deltaPercent.toFixed(2)}%` : '';
-      const powerText = powerDelta > 0 ? `CP +${powerDelta.toFixed(1)}${percentText}` : 'CP -';
+      const powerText = powerDelta > 0 ? `CP +${powerDelta.toFixed(1)}` : 'CP -';
       const stepMainText = row.stepLabel || `+${Number(row.from || item.honingLevel || 0)} → +${Number(row.to || 0)}`;
       const stepSubText = row.stepDetail || powerText;
       return `<div class="specEfficiencyRow ${row.available ? '' : 'disabled'}">
-        <div class="specEfficiencyRank">${escapeHtml(rank)}</div>
         <div class="specEfficiencyTarget">
           ${powerItemIcon(item)}
           <div>
             <b>${escapeHtml(item.type || '-')}</b>
-            <span>${escapeHtml(item.name || '-')}</span>
+            <span>${escapeHtml(item.name || '-')} · ${escapeHtml(stepMainText)}</span>
           </div>
         </div>
-        <div class="specEfficiencyStep"><b>${escapeHtml(stepMainText)}</b><span>${escapeHtml(stepSubText)}</span></div>
+        <div class="specEfficiencyStep"><b>${escapeHtml(efficiencyText)}</b><span>${escapeHtml(stepSubText)}</span></div>
         <div class="specEfficiencyExpected">
           <b>${escapeHtml(expectedGoldText)}</b>
-          <span>${escapeHtml(expectedDetailText)}</span>
+          <span>기대 비용</span>
         </div>
         <div class="specEfficiencyCost">
           <b>${escapeHtml(scoreText)}</b>
-          <span>${escapeHtml(powerDelta > 0 ? `전투력 +${powerDelta.toFixed(1)} 기준` : '전투력 변화량 없음')}</span>
+          <span>1% 상승당</span>
         </div>
-        <div class="specEfficiencyNote">${escapeHtml(specEfficiencyReason(row))}</div>
+        <div class="specEfficiencyDetail">${escapeHtml(expectedDetailText)} · ${escapeHtml(specEfficiencyReason(row))}</div>
       </div>`;
     }).join('');
   el.innerHTML = `<div class="specEfficiencyHeader">
-    <span>순위</span><span>대상</span><span>현재강화 → 올라간 강화 단계</span><span>기대값상 드는 골드</span><span>전투력 대비 사용 골드</span><span>비고</span>
+    <span>스펙업 목표</span><span>효율</span><span>비용</span><span>비용/효율</span>
   </div>${rows}
-  <p class="powerCostHint">강화는 장인의 기운 기대 비용, 악세/보석은 현재 시세와 전투력 모델 계수 기반 변화량으로 같은 골드/CP 기준에 합산합니다.</p>`;
+  <p class="powerCostHint">효율은 현재 전투력 대비 상승률(%), 비용/효율은 1% 상승당 기대 골드로 계산합니다. 강화는 장인의 기운 기대 비용, 악세/보석은 현재 시세와 전투력 모델 계수 기반 변화량을 사용합니다.</p>`;
 }
 function renderAdvancedHoningAttemptCostTable() {
   const renderRows = (rows = []) => rows.map(row => {

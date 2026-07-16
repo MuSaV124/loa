@@ -140,22 +140,25 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .specEfficiencyHeader,
 .specEfficiencyRow {
   display: grid;
-  grid-template-columns: 42px minmax(210px, 1.15fr) minmax(150px, .78fr) minmax(240px, 1.12fr) minmax(150px, .74fr) minmax(130px, .6fr);
-  gap: 10px;
+  grid-template-columns: minmax(260px, 1fr) 110px 110px 120px;
+  gap: 14px;
   align-items: center;
 }
 .specEfficiencyHeader {
-  color: #93c5fd;
-  font-size: 11px;
+  color: #ffffff;
+  font-size: 13px;
   font-weight: 900;
-  padding: 0 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(251, 191, 36, .22);
+  border-radius: 7px;
+  background: rgba(68, 35, 31, .78);
 }
 .specEfficiencyRow {
-  min-height: 74px;
-  border: 1px solid rgba(148, 163, 184, .12);
-  border-radius: 9px;
-  background: rgba(15, 23, 42, .55);
-  padding: 9px 10px;
+  min-height: 92px;
+  border: 1px solid rgba(226, 232, 240, .34);
+  border-radius: 8px;
+  background: rgba(31, 20, 23, .82);
+  padding: 10px 13px;
 }
 .specEfficiencyRow.disabled {
   opacity: .62;
@@ -181,7 +184,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .specEfficiencyExpected b,
 .specEfficiencyCost b,
 .specEfficiencyStep b {
-  color: #fbbf24;
+  color: #ffffff;
 }
 .specEfficiencyTarget span,
 .specEfficiencyExpected span,
@@ -192,6 +195,12 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   font-size: 12px;
   font-weight: 800;
 }
+.specEfficiencyExpected b {
+  color: #facc15;
+}
+.specEfficiencyCost b {
+  color: #fb923c;
+}
 .specEfficiencyTarget span {
   display: block;
   overflow: hidden;
@@ -199,9 +208,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   white-space: nowrap;
 }
 .specEfficiencyStep {
-  display: flex;
-  gap: 5px;
-  align-items: baseline;
+  min-width: 0;
 }
 .specEfficiencyCost {
   min-width: 0;
@@ -214,6 +221,30 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .specEfficiencyCost b,
 .specEfficiencyCost span {
   display: block;
+}
+.specEfficiencyStep b,
+.specEfficiencyExpected b,
+.specEfficiencyCost b {
+  font-size: 15px;
+  text-align: right;
+}
+.specEfficiencyStep span,
+.specEfficiencyExpected span,
+.specEfficiencyCost span {
+  text-align: right;
+}
+.specEfficiencyDetail {
+  grid-column: 1 / -1;
+  min-width: 0;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .04);
+  color: #bfdbfe;
+  font-size: 12px;
+  font-weight: 850;
+  padding: 6px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .specEfficiencyNote {
   color: var(--muted);
@@ -2853,14 +2884,22 @@ body:not(.calculatorReady):not(.marketMode) #keenPanel {
     display: none;
   }
   .specEfficiencyRow {
-    grid-template-columns: 38px minmax(0, 1fr);
+    grid-template-columns: 1fr;
     align-items: start;
   }
   .specEfficiencyStep,
   .specEfficiencyExpected,
   .specEfficiencyCost,
-  .specEfficiencyNote {
-    grid-column: 2;
+  .specEfficiencyDetail {
+    grid-column: 1;
+  }
+  .specEfficiencyStep b,
+  .specEfficiencyExpected b,
+  .specEfficiencyCost b,
+  .specEfficiencyStep span,
+  .specEfficiencyExpected span,
+  .specEfficiencyCost span {
+    text-align: left;
   }
   .specEfficiencyTarget {
     grid-template-columns: 44px minmax(0, 1fr);
