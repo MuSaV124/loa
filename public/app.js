@@ -352,8 +352,19 @@ function classifyEvolution(effects) {
 function renderCharacter(profile) {
   const el = $('characterCard');
   const image = profile?.CharacterImage || '';
-  el.innerHTML = `${image ? `<img src="${escapeHtml(image)}" alt="" />` : ''}<div><h2>${escapeHtml(profile?.CharacterName || '-')} / ${escapeHtml(profile?.CharacterClassName || '-')}</h2><p>서버 ${escapeHtml(profile?.ServerName || '-')} · 아이템 레벨 ${escapeHtml(profile?.ItemAvgLevel || '-')} · 전투력 ${escapeHtml(profile?.CombatPower || '-')}</p></div>`;
+  el.innerHTML = `
+    <div class="characterIdentity">
+      ${image ? `<img src="${escapeHtml(image)}" alt="" />` : ''}
+      <div><h2>${escapeHtml(profile?.CharacterName || '-')} / ${escapeHtml(profile?.CharacterClassName || '-')}</h2><p>서버 ${escapeHtml(profile?.ServerName || '-')} · 아이템 레벨 ${escapeHtml(profile?.ItemAvgLevel || '-')} · 전투력 ${escapeHtml(profile?.CombatPower || '-')}</p></div>
+    </div>
+    <button id="simulatorJumpButton" class="simulatorJumpButton" type="button">시뮬레이터</button>
+  `;
   el.classList.remove('hidden');
+  $('simulatorJumpButton')?.addEventListener('click', () => {
+    const target = $('powerSnapshotPanel');
+    if (!target || target.classList.contains('hidden')) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 }
 function gearQualityClass(value) {
   const quality = Number(value);

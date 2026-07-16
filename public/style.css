@@ -834,6 +834,8 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 }
 @media (max-width: 560px) {
   .grid, .manualGrid, .effectList { grid-template-columns: 1fr; }
+  .character { flex-direction: column; }
+  .simulatorJumpButton { width: 100%; }
   .search { flex-direction: column; }
   .search button { min-height: 42px; }
 }
@@ -943,6 +945,37 @@ body {
 .hero,
 .character {
   grid-column: 1 / -1;
+}
+.character {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.characterIdentity {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.characterIdentity img {
+  flex: 0 0 auto;
+}
+.simulatorJumpButton {
+  flex: 0 0 auto;
+  min-height: 38px;
+  border: 1px solid rgba(96, 165, 250, .34);
+  border-radius: 999px;
+  background: rgba(96, 165, 250, .13);
+  color: #dbeafe;
+  padding: 0 16px;
+  font-weight: 950;
+  cursor: pointer;
+}
+.simulatorJumpButton:hover {
+  border-color: rgba(251, 191, 36, .52);
+  background: rgba(251, 191, 36, .14);
+  color: #ffe2a3;
 }
 #summaryPanel {
   grid-column: 2;
@@ -2525,6 +2558,12 @@ select {
   }
   .version {
     display: none;
+  }
+  .character {
+    align-items: stretch;
+  }
+  .simulatorJumpButton {
+    align-self: center;
   }
 }
 
