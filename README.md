@@ -1,4 +1,9 @@
-# Lost Ark Node Recommend Calculator v5.7.35
+# Lost Ark Node Recommend Calculator v5.7.36
+
+## v5.7.36
+- 배포 후 브라우저가 예전 `app.js`/`style.css`를 계속 사용하는 문제를 줄이기 위해 정적 파일 경로에 버전 쿼리를 추가했습니다.
+- 캐릭터 검색 API 요청에 `cache: no-store`와 타임스탬프를 붙여 검색 결과가 오래된 캐시에 묶이지 않도록 했습니다.
+- 화면과 프로젝트 내부 버전 표기를 v5.7.36으로 통일했습니다.
 
 ## v5.7.35
 - 악세 효율표에서 현재 착용 옵션과 같거나 한쪽 옵션이 내려가는 교체 후보를 제외했습니다.

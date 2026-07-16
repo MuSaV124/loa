@@ -1,4 +1,4 @@
-const VERSION = '5.7.35';
+const VERSION = '5.7.36';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2701,7 +2701,7 @@ async function searchCharacter(name) {
   simulatorRendered = false;
   document.body.classList.remove('simulatorMode');
   try {
-    const res = await fetch(`/api/character?name=${encodeURIComponent(name)}`);
+    const res = await fetch(`/api/character?name=${encodeURIComponent(name)}&_=${Date.now()}`, { cache: 'no-store' });
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || data.message || '검색 실패');
     if (!data.profile?.CharacterName) throw new Error('캐릭터 프로필을 가져오지 못했습니다.');
