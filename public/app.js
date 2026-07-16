@@ -1,4 +1,4 @@
-const VERSION = '5.7.37';
+const VERSION = '5.7.38';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1249,6 +1249,25 @@ function accessoryPowerDeltaFromEffects(effects = {}) {
   };
   return Object.entries(effects).reduce((sum, [key, value]) => sum + Number(value || 0) * combatPowerFeaturePerUnit(keyMap[key]), 0);
 }
+function engravingPowerEstimateFromEffects(effects = {}, snapshot = state.powerSnapshot) {
+  const official = snapshotOfficialCombatPower(snapshot);
+  const modelDelta =
+    Number(effects.attackPower || 0) * combatPowerFeaturePerUnit('engravingAttackPower') +
+    Number(effects.enemyDamage || 0) * combatPowerFeaturePerUnit('engravingEnemyDamage') +
+    Number(effects.additionalDamage || 0) * combatPowerFeaturePerUnit('engravingAdditionalDamage') +
+    Number(effects.critRate || 0) * combatPowerFeaturePerUnit('engravingCritRate') +
+    Number(effects.critDamage || 0) * combatPowerFeaturePerUnit('engravingCritDamage');
+  if (modelDelta > 0) return { value: round2(modelDelta), percent: official > 0 ? round2((modelDelta / official) * 100) : 0, confidence: 'estimated', basis: 'engraving combat-power coefficient model' };
+  const estimatedPercent =
+    Number(effects.enemyDamage || 0) +
+    Number(effects.additionalDamage || 0) +
+    Number(effects.conditionalDamage || 0) +
+    Number(effects.attackPower || 0) +
+    Number(effects.critRate || 0) * 0.35 +
+    Number(effects.critDamage || 0) * 0.25;
+  const percent = Math.max(0, estimatedPercent);
+  return { value: official > 0 ? round2((official * percent) / 100) : 0, percent: round2(percent), confidence: 'estimated', basis: 'engraving effect delta heuristic' };
+}
 function specMarketCost(price, pheonCost = 0) {
   const crystalGoldPer100 = Number($('crystalGoldPer100Input')?.value || 0);
   const pheonCrystalPerOne = Number($('pheonCrystalPerOneInput')?.value || DEFAULT_PHEON_CRYSTAL_PER_ONE);
@@ -1331,12 +1350,47 @@ async function calculateGemSpecEstimates(snapshot) {
     };
   });
 }
+async function calculateEngravingSpecEstimates(snapshot) {
+  const books = Array.isArray(snapshot?.effects?.engraving?.items) ? snapshot.effects.engraving.items : [];
+  const candidates = books.filter(item => item?.grade === '유물' && Number(item.bookLevel || 0) < 4 && item?.deltaEffects && Object.keys(item.deltaEffects).length);
+  if (!candidates.length) return [];
+  const rows = await Promise.all(candidates.map(async book => {
+    try {
+      const data = await fetchMarketJson(`/api/market-prices?mode=engraving&name=${encodeURIComponent(book.name)}&_=${Date.now()}`);
+      const item = data.lowest || data.items?.[0] || null;
+      const unitPrice = Number(item?.price || 0);
+      const buyCount = 5;
+      const price = unitPrice * buyCount;
+      const powerEstimate = engravingPowerEstimateFromEffects(book.deltaEffects, snapshot);
+      const powerDelta = round2(powerEstimate.value);
+      return {
+        category: 'engraving',
+        item: { type: '각인서', name: `${book.name} 유물 Lv.${book.bookLevel}→${book.nextBookLevel}`, icon: item?.icon || '' },
+        available: price > 0 && powerDelta > 0,
+        from: book.bookLevel,
+        to: book.nextBookLevel,
+        cost: specMarketCost(price, 0),
+        expectedCost: { expectedGold: price },
+        powerDelta,
+        powerEstimate,
+        supportLabel: `${book.name} 유물 각인서 최저가 × ${buyCount}장`,
+        stepLabel: `${book.name} 각인서`,
+        stepDetail: `Lv.${book.bookLevel} → Lv.${book.nextBookLevel}`,
+        reason: price > 0 ? '각인서 효과 기반 추정' : '각인서 시세 없음'
+      };
+    } catch (error) {
+      return { category: 'engraving', item: { type: '각인서', name: `${book.name} 유물 각인서` }, available: false, reason: error.message || '각인서 시세 조회 실패', powerDelta: 0, cost: {}, expectedCost: {} };
+    }
+  }));
+  return rows;
+}
 async function calculateMarketSpecEstimates(snapshot) {
-  const [accessories, gems] = await Promise.all([
+  const [accessories, gems, engravings] = await Promise.all([
     calculateAccessorySpecEstimates(),
-    calculateGemSpecEstimates(snapshot)
+    calculateGemSpecEstimates(snapshot),
+    calculateEngravingSpecEstimates(snapshot)
   ]);
-  return [...accessories, ...gems];
+  return [...accessories, ...gems, ...engravings];
 }
 async function storePowerCostEstimates(priceMap) {
   const honingRows = calculateNextNormalRefineEstimates(state.powerSnapshot, priceMap);
@@ -1385,7 +1439,7 @@ function formatSpecGold(value) {
   return `${Math.round(n).toLocaleString('ko-KR')}G`;
 }
 function specEfficiencyReason(row) {
-  if (row?.category === 'accessory' || row?.category === 'gem') return row.reason || '시세 기반 추정';
+  if (row?.category === 'accessory' || row?.category === 'gem' || row?.category === 'engraving') return row.reason || '시세 기반 추정';
   if (row?.available && !Number(row.expectedCost?.ratePercent || 0)) return '강화 확률 미확인';
   if (!row?.available) return row.reason || '비용표 없음';
   const missing = (row.cost?.rows || []).filter(item => item.missingPrice).map(item => item.name);
@@ -1458,7 +1512,7 @@ function renderSpecEfficiencyTable() {
   el.innerHTML = `<div class="specEfficiencyHeader">
     <span>스펙업 목표</span><span>효율</span><span>비용</span><span>비용/효율</span>
   </div>${rows}
-  <p class="powerCostHint">효율은 현재 전투력 대비 상승률(%), 비용/효율은 1% 상승당 기대 골드로 계산합니다. 강화는 장인의 기운 기대 비용, 악세/보석은 현재 시세와 전투력 모델 계수 기반 변화량을 사용합니다.</p>`;
+  <p class="powerCostHint">효율은 현재 전투력 대비 상승률(%), 비용/효율은 1% 상승당 기대 골드로 계산합니다. 강화는 장인의 기운 기대 비용, 악세/보석/각인서는 현재 시세와 전투력 변화량 추정치를 사용합니다.</p>`;
 }
 function renderAdvancedHoningAttemptCostTable() {
   const renderRows = (rows = []) => rows.map(row => {

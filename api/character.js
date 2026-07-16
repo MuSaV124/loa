@@ -1,4 +1,4 @@
-const API_VERSION = '5.7.17';
+const API_VERSION = '5.7.38';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = 60 * 1000;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -654,8 +654,11 @@ function extractEngravingEffects(engravingData) {
     if (!rule) continue;
 
     const eff = evaluateBookRule(rule, grade, bookLevel);
+    const nextBookLevel = bookLevel < 4 ? bookLevel + 1 : null;
+    const nextEff = nextBookLevel != null ? evaluateBookRule(rule, grade, nextBookLevel) : null;
+    const deltaEff = nextEff ? diffEngravingEffects(nextEff, eff) : null;
     if (name === '질량 증가') eff.attackSpeed = -10;
-    result.items.push({ name, grade, bookLevel, count: bookLevel * 5, effects: eff });
+    result.items.push({ name, grade, bookLevel, count: bookLevel * 5, effects: eff, nextBookLevel, nextEffects: nextEff, deltaEffects: deltaEff });
 
     if (name === '아드레날린') {
       result.adrenaline = {
@@ -675,6 +678,16 @@ function extractEngravingEffects(engravingData) {
   result.adrenaline.critRate = round2(result.adrenaline.critRate);
   result.adrenaline.attackPower = round2(result.adrenaline.attackPower);
   return result;
+}
+
+function diffEngravingEffects(nextEff = {}, currentEff = {}) {
+  const out = {};
+  const keys = new Set([...Object.keys(nextEff || {}), ...Object.keys(currentEff || {})]);
+  for (const key of keys) {
+    const delta = round2(Number(nextEff[key] || 0) - Number(currentEff[key] || 0));
+    if (Math.abs(delta) > 0.0001) out[key] = delta;
+  }
+  return out;
 }
 
 // 각인서는 전투 각인 Lv.1~3이 아니라 영웅/전설/유물 등급과 0~4 연마 레벨로 효과가 정해진다.
