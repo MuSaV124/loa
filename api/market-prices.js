@@ -1,4 +1,4 @@
-const API_VERSION = '5.7.12';
+const API_VERSION = '5.7.13';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -252,7 +252,7 @@ async function searchAccessory(apiKey, query) {
     updatedAt: indexResult.updatedAt,
     index: indexResult.index,
     accessoryDebug: {
-      note: 'v5.7.12 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
+      note: 'v5.7.13 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
       requestPayloads: indexResult.requestPayloads.slice(0, 14),
       filterStats: indexResult.filterStats,
       samples: indexResult.samples
@@ -590,16 +590,13 @@ async function searchEngravingListFresh(apiKey, maxPages) {
 
 async function searchT4Materials(apiKey, query) {
   const force = String(query.force || '') === '1';
-  const cacheKey = 't4Materials:v6';
+  const cacheKey = 't4Materials:v7';
   return getCachedMarketList(cacheKey, force, async () => searchT4MaterialsFresh(apiKey));
 }
 
 async function searchT4MaterialsFresh(apiKey) {
   const tasks = T4_MATERIAL_GROUPS.flatMap(group => group.items.map(name => ({ group: group.group, name })));
-  const results = await mapWithConcurrency(tasks, 8, task => {
-    if (isArkGridGemName(task.name)) return searchArkGridGemAuction(apiKey, task.name, task.group);
-    return searchMarketMaterial(apiKey, task.name, task.group);
-  });
+  const results = await mapWithConcurrency(tasks, 8, task => searchMarketMaterial(apiKey, task.name, task.group));
   const rows = [];
   const tried = [];
   for (let i = 0; i < results.length; i += 1) {
@@ -631,7 +628,8 @@ async function searchMarketMaterial(apiKey, name, group) {
         if (!item.price) continue;
         const itemText = normalizeText(`${item.name} ${item.fullText}`);
         if (!isMaterialNameMatch(itemText, name, keyword)) continue;
-        matched.push(applyMaterialUnitMeta({ ...item, group, requestedName: name }, name));
+        const meta = applyMaterialUnitMeta({ ...item, group, requestedName: name, source: 'markets/items' }, name);
+        matched.push(isArkGridGemName(name) ? { ...meta, pheonCost: defaultArkGridGemPheonCost(meta.grade) } : meta);
       }
       if (matched.length) break;
     }
@@ -639,40 +637,6 @@ async function searchMarketMaterial(apiKey, name, group) {
   }
   matched.sort((a, b) => a.effectiveUnitPrice - b.effectiveUnitPrice || a.unitPrice - b.unitPrice || a.price - b.price);
   const item = matched[0] || applyMaterialUnitMeta({ group, requestedName: name, name, price: 0, unitPrice: 0, bundleCount: 1, icon: '', grade: '', missing: true }, name);
-  return { item: { ...item, group, requestedName: name }, tried };
-}
-
-async function searchArkGridGemAuction(apiKey, name, group) {
-  const tried = [];
-  const matched = [];
-  const aliases = materialSearchAliases(name);
-  for (const keyword of aliases) {
-    for (const categoryCode of [null, 210000, 210010, 210020]) {
-      const payload = { Sort: 'BUY_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode ?? undefined, ItemName: keyword, PageNo: 1 };
-      stripUndefined(payload);
-      const result = await fetchAuctionPage(apiKey, payload);
-      tried.push({ group, name, keyword, categoryCode, source: 'auction', count: result.items.length, totalCount: result.totalCount, error: result.error || null });
-      for (const raw of result.items) {
-        const item = normalizeAuctionItem(raw);
-        if (!item.price) continue;
-        const itemText = normalizeText(`${item.name} ${item.fullText}`);
-        if (!isMaterialNameMatch(itemText, name, keyword)) continue;
-        matched.push({
-          ...item,
-          group,
-          requestedName: name,
-          source: 'auctions/items',
-          unitPrice: item.price,
-          effectiveUnitPrice: item.price,
-          pheonCost: item.pheonCost || defaultArkGridGemPheonCost(item.grade)
-        });
-      }
-      if (matched.length) break;
-    }
-    if (matched.length) break;
-  }
-  matched.sort((a, b) => a.price - b.price);
-  const item = matched[0] || { group, requestedName: name, name, price: 0, unitPrice: 0, effectiveUnitPrice: 0, bundleCount: 1, icon: '', grade: '', missing: true, source: 'auctions/items' };
   return { item: { ...item, group, requestedName: name }, tried };
 }
 

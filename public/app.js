@@ -1,4 +1,4 @@
-const VERSION = '5.7.12';
+const VERSION = '5.7.13';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -185,9 +185,9 @@ const PHEON_COST_RULES = [
   { label: '고대 악세', cost: 35, note: '목걸이/귀걸이/반지 부위당' },
   { label: '영웅 아바타', cost: 10, note: '거래횟수 2회 이하' },
   { label: '전설 아바타', cost: 30, note: '거래횟수 2회 이하' },
-  { label: '아크그리드 젬 고급', cost: 3, note: '경매장 구매' },
-  { label: '아크그리드 젬 희귀', cost: 6, note: '경매장 구매' },
-  { label: '아크그리드 젬 영웅', cost: 12, note: '경매장 구매' }
+  { label: '아크그리드 젬 고급', cost: 3, note: '거래소 구매' },
+  { label: '아크그리드 젬 희귀', cost: 6, note: '거래소 구매' },
+  { label: '아크그리드 젬 영웅', cost: 12, note: '거래소 구매' }
 ];
 let t4MaterialPriceCache = null;
 let t4MaterialPriceInflight = null;
@@ -2579,7 +2579,7 @@ async function loadMarketMaterialList(force = false) {
   const button = $('materialListButton');
   const resultEl = $('materialMarketResult');
   if (button) { button.disabled = true; button.textContent = '조회 중'; }
-  if (resultEl) resultEl.innerHTML = '거래소/경매장에서 4티어 재료와 아크그리드 젬 최저가를 조회하는 중입니다.';
+  if (resultEl) resultEl.innerHTML = '거래소에서 4티어 재료와 아크그리드 젬 최저가를 조회하는 중입니다.';
   try {
     const data = await fetchMarketJson(`/api/market-prices?mode=t4Materials${force ? '&force=1' : ''}&_=${Date.now()}`);
     renderMaterialPriceGrid(resultEl, data);
@@ -2745,7 +2745,7 @@ function renderMaterialPriceGrid(container, data) {
     grouped.get(group).push(item);
   }
   container.innerHTML = `<div class="marketResultList">
-    <div class="marketRuleHint"><b>4티어 재료/아크그리드 젬</b> · 거래소/경매장 최저가 · ${escapeHtml(formatMarketUpdatedAt(data.updatedAt))}${data.cached ? ' · 캐시' : ''}</div>
+    <div class="marketRuleHint"><b>4티어 재료/아크그리드 젬</b> · 거래소 최저가 · ${escapeHtml(formatMarketUpdatedAt(data.updatedAt))}${data.cached ? ' · 캐시' : ''}</div>
     ${[...grouped.entries()].map(([group, rows]) => `
       <section class="materialPriceGroup">
         <h3>${escapeHtml(group)}</h3>
