@@ -129,6 +129,88 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   font-size: 12px;
   font-weight: 800;
 }
+.powerEfficiencyPanel {
+  display: grid;
+  gap: 10px;
+}
+.specEfficiencyTable {
+  display: grid;
+  gap: 8px;
+}
+.specEfficiencyHeader,
+.specEfficiencyRow {
+  display: grid;
+  grid-template-columns: 48px minmax(220px, 1.2fr) 96px minmax(230px, 1fr) minmax(160px, .7fr);
+  gap: 10px;
+  align-items: center;
+}
+.specEfficiencyHeader {
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 0 10px;
+}
+.specEfficiencyRow {
+  min-height: 74px;
+  border: 1px solid rgba(148, 163, 184, .12);
+  border-radius: 9px;
+  background: rgba(15, 23, 42, .55);
+  padding: 9px 10px;
+}
+.specEfficiencyRow.disabled {
+  opacity: .62;
+}
+.specEfficiencyRank {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, .18);
+  color: #fde68a;
+  font-weight: 950;
+}
+.specEfficiencyTarget {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  min-width: 0;
+}
+.specEfficiencyTarget b,
+.specEfficiencyCost b,
+.specEfficiencyStep b {
+  color: #fbbf24;
+}
+.specEfficiencyTarget span,
+.specEfficiencyCost span,
+.specEfficiencyStep span,
+.specEfficiencyNote {
+  color: #bfdbfe;
+  font-size: 12px;
+  font-weight: 800;
+}
+.specEfficiencyTarget span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.specEfficiencyStep {
+  display: flex;
+  gap: 5px;
+  align-items: baseline;
+}
+.specEfficiencyCost {
+  min-width: 0;
+}
+.specEfficiencyCost b,
+.specEfficiencyCost span {
+  display: block;
+}
+.specEfficiencyNote {
+  color: var(--muted);
+}
 .powerEquipmentRow,
 .powerAccessoryRow {
   display: grid;
@@ -2723,7 +2805,7 @@ select {
   }
 }
 
-/* v5.7.13 search-first calculator entry */
+/* v5.7.14 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
 body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,
@@ -2759,6 +2841,21 @@ body:not(.calculatorReady):not(.marketMode) #keenPanel {
   .powerPheonGrid,
   .powerPheonRules {
     grid-template-columns: 1fr;
+  }
+  .specEfficiencyHeader {
+    display: none;
+  }
+  .specEfficiencyRow {
+    grid-template-columns: 38px minmax(0, 1fr);
+    align-items: start;
+  }
+  .specEfficiencyStep,
+  .specEfficiencyCost,
+  .specEfficiencyNote {
+    grid-column: 2;
+  }
+  .specEfficiencyTarget {
+    grid-template-columns: 44px minmax(0, 1fr);
   }
 }
 body:not(.calculatorReady):not(.marketMode) .wrap {

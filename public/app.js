@@ -1,4 +1,4 @@
-const VERSION = '5.7.13';
+const VERSION = '5.7.14';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -922,7 +922,73 @@ function calculateNextNormalRefineEstimates(snapshot, priceMap) {
 }
 function storePowerCostEstimates(priceMap) {
   state.powerCostEstimates = calculateNextNormalRefineEstimates(state.powerSnapshot, priceMap);
+  renderSpecEfficiencyTable();
   return state.powerCostEstimates;
+}
+function renderSpecEfficiencyShell() {
+  return `<div class="powerSnapshotBlock powerEfficiencyPanel">
+    <div class="powerCostHead">
+      <div><h3>스펙업 효율표</h3><p>현재 장비의 다음 일반 재련 비용을 시세와 귀속 체크 상태로 비교합니다.</p></div>
+      <strong>1차 기준</strong>
+    </div>
+    <div id="specEfficiencyTable" class="specEfficiencyTable">
+      <p class="powerCostHint">재료 시세를 불러오는 중입니다.</p>
+    </div>
+  </div>`;
+}
+function specEfficiencyScore(row) {
+  const cost = row?.cost || {};
+  const totalGold = Number(cost.totalGold || 0);
+  if (!row?.available || totalGold <= 0) return Infinity;
+  return totalGold;
+}
+function specEfficiencyReason(row) {
+  if (!row?.available) return row.reason || '비용표 없음';
+  const missing = (row.cost?.rows || []).filter(item => item.missingPrice).map(item => item.name);
+  if (missing.length) return `시세 없음: ${missing.slice(0, 2).join(', ')}${missing.length > 2 ? ' 외' : ''}`;
+  if (row.hasGrowth) return '장비 성장 포함';
+  return '1회 재련 기준';
+}
+function renderSpecEfficiencyTable() {
+  const el = $('specEfficiencyTable');
+  if (!el) return;
+  const estimates = Array.isArray(state.powerCostEstimates) ? state.powerCostEstimates.slice() : [];
+  if (!estimates.length) {
+    el.innerHTML = '<p class="powerCostHint">재료 시세를 불러오는 중입니다.</p>';
+    return;
+  }
+  const rows = estimates
+    .sort((a, b) => specEfficiencyScore(a) - specEfficiencyScore(b))
+    .map((row, index) => {
+      const item = row.item || {};
+      const cost = row.cost || {};
+      const totalGold = row.available ? Number(cost.totalGold || 0) : 0;
+      const tradeGold = Number(cost.tradeGold || 0);
+      const fixedGold = Number(cost.fixedGold || 0);
+      const silver = Number(cost.silver || 0);
+      const rank = row.available && Number.isFinite(specEfficiencyScore(row)) ? index + 1 : '-';
+      const scoreText = row.available && totalGold > 0 ? `${formatGold(totalGold)} / +1` : '-';
+      return `<div class="specEfficiencyRow ${row.available ? '' : 'disabled'}">
+        <div class="specEfficiencyRank">${escapeHtml(rank)}</div>
+        <div class="specEfficiencyTarget">
+          ${powerItemIcon(item)}
+          <div>
+            <b>${escapeHtml(item.type || '-')}</b>
+            <span>${escapeHtml(item.name || '-')}</span>
+          </div>
+        </div>
+        <div class="specEfficiencyStep"><b>+${Number(row.from || item.honingLevel || 0)}</b><span>→ +${Number(row.to || 0)}</span></div>
+        <div class="specEfficiencyCost">
+          <b>${escapeHtml(scoreText)}</b>
+          <span>거래 ${formatGold(tradeGold)} · 고정 ${formatGold(fixedGold)} · 실링 ${formatNumber(silver)}</span>
+        </div>
+        <div class="specEfficiencyNote">${escapeHtml(specEfficiencyReason(row))}</div>
+      </div>`;
+    }).join('');
+  el.innerHTML = `<div class="specEfficiencyHeader">
+    <span>순위</span><span>대상</span><span>구간</span><span>예상 비용</span><span>비고</span>
+  </div>${rows}
+  <p class="powerCostHint">현재는 다음 일반 재련 1회 비용 기준입니다. 전투력 상승량 보정식이 확정되면 비용 대비 전투력 상승률로 정렬 기준을 바꿀 수 있습니다.</p>`;
 }
 function renderAdvancedHoningAttemptCostTable() {
   const renderRows = (rows = []) => rows.map(row => {
@@ -1158,6 +1224,7 @@ async function hydratePowerCostMaterialPrices() {
     });
   } catch {
     state.powerCostEstimates = [];
+    renderSpecEfficiencyTable();
     list.querySelectorAll('.powerCostMaterial small').forEach(small => {
       small.textContent = '시세 확인 실패 · 시세탭 재료에서 다시 확인 가능';
     });
@@ -1219,6 +1286,7 @@ function renderPowerSnapshot(snapshot) {
         </div>
       </div>
       ${renderPowerCostPrep(snapshot)}
+      ${renderSpecEfficiencyShell()}
     </div>
     <p class="powerSnapshotNote">이 카드는 전투력 계산식 투입 전 검증용입니다. 강화/상급재련은 API Tooltip 문구 기반이라 실제 캐릭터 샘플로 오차를 확인해야 합니다.</p>
   `;
