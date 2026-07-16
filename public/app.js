@@ -1,4 +1,4 @@
-const VERSION = '5.7.14';
+const VERSION = '5.7.17';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -22,7 +22,7 @@ function emptyEngravingState() {
 
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
-const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] }, powerSnapshot: null, powerCostEstimates: [] };
+const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] }, powerSnapshot: null, powerCostEstimates: [], combatPowerModel: null };
 let simulatorRendered = false;
 
 const T4_GEAR_COST_RULES = {
@@ -903,6 +903,82 @@ function calculateMaterialGoldCost(materials, priceMap) {
   }
   return { rows, tradeGold, fixedGold, silver, totalGold: tradeGold + fixedGold };
 }
+let combatPowerModelPromise = null;
+async function loadCombatPowerModel() {
+  if (state.combatPowerModel) return state.combatPowerModel;
+  if (!combatPowerModelPromise) {
+    combatPowerModelPromise = fetch('/combat-power-model.json', { cache: 'no-store' })
+      .then(res => res.ok ? res.json() : null)
+      .then(model => {
+        state.combatPowerModel = model || null;
+        return state.combatPowerModel;
+      })
+      .catch(() => {
+        state.combatPowerModel = null;
+        return null;
+      });
+  }
+  return combatPowerModelPromise;
+}
+function isPowerWeaponItem(item) {
+  const text = `${item?.type || ''} ${item?.name || ''}`;
+  return text.includes('무기') || text.includes('臾닿린');
+}
+function snapshotOfficialCombatPower(snapshot) {
+  const value = Number(snapshot?.profile?.combatPower || snapshot?.accuracyTarget?.officialCombatPower || 0);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+function currentSnapshotCombatGear(snapshot, item) {
+  const combat = Array.isArray(snapshot?.equipment?.combat) ? snapshot.equipment.combat : [];
+  if (!combat.length || !item) return item || null;
+  const sameName = combat.find(row => row?.name && item?.name && row.name === item.name);
+  if (sameName) return sameName;
+  const sameType = combat.find(row => row?.type && item?.type && row.type === item.type);
+  return sameType || item;
+}
+function normalizePowerModelText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+function normalHoningCalibrationKey(snapshot, item, next = null) {
+  const profile = snapshot?.profile || {};
+  const arkGridSlots = Array.isArray(snapshot?.arkGrid?.slots) ? snapshot.arkGrid.slots : [];
+  const coreKey = arkGridSlots
+    .map(slot => [slot?.side, slot?.symbol, slot?.name, slot?.grade, slot?.point].map(normalizePowerModelText).join(':'))
+    .join('|');
+  return [
+    normalizePowerModelText(profile.className),
+    normalizePowerModelText(profile.secondClass),
+    coreKey,
+    isPowerWeaponItem(item) ? 'weapon' : 'armor',
+    Number(next?.from ?? item?.honingLevel ?? 0),
+    Number(next?.to ?? Number(item?.honingLevel || 0) + 1)
+  ].join('||');
+}
+function findNormalHoningCalibration(snapshot, item, next = null) {
+  const model = state.combatPowerModel;
+  const normal = model?.upgradeDelta?.normalHoning || {};
+  const key = normalHoningCalibrationKey(snapshot, item, next);
+  const direct = normal.calibrationsByKey?.[key];
+  if (direct && Number(direct.delta || 0) > 0) return { key, ...direct };
+  const rows = Array.isArray(normal.calibrations) ? normal.calibrations : [];
+  const found = rows.find(row => row?.key === key && Number(row.delta || 0) > 0);
+  return found ? { key, ...found } : null;
+}
+function estimateNormalHoningPowerDelta(item, snapshot, next = null) {
+  const calibration = findNormalHoningCalibration(snapshot, item, next);
+  if (calibration) {
+    return {
+      value: round2(Number(calibration.delta)),
+      confidence: calibration.confidence || 'verified',
+      basis: calibration.basis || 'build-specific verified'
+    };
+  }
+  return {
+    value: 0,
+    confidence: 'unverified',
+    basis: 'class/build/ark-grid CP delta is not verified yet'
+  };
+}
 function calculateNextNormalRefineEstimates(snapshot, priceMap) {
   const combat = snapshot?.equipment?.combat || [];
   return combat.map(item => {
@@ -917,7 +993,8 @@ function calculateNextNormalRefineEstimates(snapshot, priceMap) {
       };
     }
     const cost = calculateMaterialGoldCost(next.materials, priceMap);
-    return { item, available: true, ...next, cost };
+    const powerEstimate = estimateNormalHoningPowerDelta(item, snapshot, next);
+    return { item, available: true, ...next, cost, powerDelta: powerEstimate.value, powerEstimate };
   });
 }
 function storePowerCostEstimates(priceMap) {
@@ -939,8 +1016,9 @@ function renderSpecEfficiencyShell() {
 function specEfficiencyScore(row) {
   const cost = row?.cost || {};
   const totalGold = Number(cost.totalGold || 0);
-  if (!row?.available || totalGold <= 0) return Infinity;
-  return totalGold;
+  const powerDelta = Number(row?.powerDelta || 0);
+  if (!row?.available || totalGold <= 0 || powerDelta <= 0) return Infinity;
+  return totalGold / powerDelta;
 }
 function specEfficiencyReason(row) {
   if (!row?.available) return row.reason || '비용표 없음';
@@ -967,7 +1045,9 @@ function renderSpecEfficiencyTable() {
       const fixedGold = Number(cost.fixedGold || 0);
       const silver = Number(cost.silver || 0);
       const rank = row.available && Number.isFinite(specEfficiencyScore(row)) ? index + 1 : '-';
-      const scoreText = row.available && totalGold > 0 ? `${formatGold(totalGold)} / +1` : '-';
+      const powerDelta = Number(row.powerDelta || 0);
+      const scoreText = row.available && totalGold > 0 && powerDelta > 0 ? `${formatGold(totalGold / powerDelta)} / CP` : '-';
+      const powerText = powerDelta > 0 ? `CP +${powerDelta.toFixed(1)}` : 'CP -';
       return `<div class="specEfficiencyRow ${row.available ? '' : 'disabled'}">
         <div class="specEfficiencyRank">${escapeHtml(rank)}</div>
         <div class="specEfficiencyTarget">
@@ -977,7 +1057,7 @@ function renderSpecEfficiencyTable() {
             <span>${escapeHtml(item.name || '-')}</span>
           </div>
         </div>
-        <div class="specEfficiencyStep"><b>+${Number(row.from || item.honingLevel || 0)}</b><span>→ +${Number(row.to || 0)}</span></div>
+        <div class="specEfficiencyStep"><b>+${Number(row.from || item.honingLevel || 0)}</b><span>→ +${Number(row.to || 0)} · ${escapeHtml(powerText)}</span></div>
         <div class="specEfficiencyCost">
           <b>${escapeHtml(scoreText)}</b>
           <span>거래 ${formatGold(tradeGold)} · 고정 ${formatGold(fixedGold)} · 실링 ${formatNumber(silver)}</span>
@@ -1219,6 +1299,7 @@ async function hydratePowerCostMaterialPrices() {
       small.textContent = `단가 ${formatGold(unit)} · 체크 해제 시 귀속재료로 간주해 0골드`;
     });
     storePowerCostEstimates(priceMap);
+    loadCombatPowerModel().then(() => storePowerCostEstimates(priceMap));
     list.querySelectorAll('.powerCostMaterial input').forEach(input => {
       input.addEventListener('change', () => storePowerCostEstimates(priceMap));
     });
