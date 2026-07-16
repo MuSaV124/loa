@@ -1,4 +1,4 @@
-const VERSION = '5.7.19';
+const VERSION = '5.7.20';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1362,8 +1362,8 @@ async function hydratePowerCostMaterialPrices() {
       const unit = Number(item.effectiveUnitPrice || item.unitPrice || item.price || 0);
       small.textContent = `단가 ${formatGold(unit)} · 체크 해제 시 귀속재료로 간주해 0골드`;
     });
+    await loadCombatPowerModel();
     storePowerCostEstimates(priceMap);
-    loadCombatPowerModel().then(() => storePowerCostEstimates(priceMap));
     list.querySelectorAll('.powerCostMaterial input').forEach(input => {
       input.addEventListener('change', () => storePowerCostEstimates(priceMap));
     });
