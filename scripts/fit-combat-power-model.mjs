@@ -4,41 +4,100 @@ import { dirname, resolve } from 'node:path';
 const INPUT = resolve(process.env.LOA_SAMPLE_INPUT || 'tmp/combat-samples-loawa-around.json');
 const OUTPUT = resolve(process.env.LOA_MODEL_OUTPUT || 'tmp/combat-power-model.json');
 
-const MODEL_VERSION = 'combat-power-delta-v1';
+const MODEL_VERSION = 'combat-power-delta-v2';
 const MIN_COMBAT_POWER = Number(process.env.LOA_MODEL_MIN_CP || 5000);
 const MAX_COMBAT_POWER = Number(process.env.LOA_MODEL_MAX_CP || 6500);
 const NORMAL_HONING_WEAPON_PERCENT = Number(process.env.LOA_NORMAL_HONING_WEAPON_PERCENT || 0.46);
 const NORMAL_HONING_ARMOR_PERCENT = Number(process.env.LOA_NORMAL_HONING_ARMOR_PERCENT || 0.11);
 const NORMAL_HONING_SLOT_LEVEL_PERCENT = {
-  'weapon:23:24': { percent: 1.241, confidence: 'verified', basis: 'Loaup Musav spec-up sample; shared by all classes until broader samples are collected.' },
-  'head:20:21': { percent: 0.223, confidence: 'verified', basis: 'Loaup Musav spec-up sample; shared by all classes until broader samples are collected.' },
-  'top:20:21': { percent: 0.178, confidence: 'verified', basis: 'Loaup Musav spec-up sample; shared by all classes until broader samples are collected.' },
-  'bottom:20:21': { percent: 0.193, confidence: 'verified', basis: 'Loaup Musav spec-up sample; shared by all classes until broader samples are collected.' },
-  'gloves:21:22': { percent: 0.274, confidence: 'verified', basis: 'Loaup Musav spec-up sample; shared by all classes until broader samples are collected.' },
-  'shoulder:20:21': { percent: 0.237, confidence: 'verified', basis: 'Loaup Musav spec-up sample; shared by all classes until broader samples are collected.' }
+  'weapon:23:24': { percent: 1.241214, confidence: 'verified', basis: 'Lopec before-after official CombatPower; Loaup rounded value cross-check.' },
+  'head:20:21': { percent: 0.222648, confidence: 'verified', basis: 'Lopec before-after official CombatPower; Loaup rounded value cross-check.' },
+  'top:20:21': { percent: 0.178007, confidence: 'verified', basis: 'Lopec before-after official CombatPower; Loaup rounded value cross-check.' },
+  'bottom:20:21': { percent: 0.19233, confidence: 'verified', basis: 'Lopec before-after official CombatPower; Loaup rounded value cross-check.' },
+  'gloves:21:22': { percent: 0.273614, confidence: 'verified', basis: 'Lopec before-after official CombatPower; Loaup rounded value cross-check.' },
+  'shoulder:20:21': { percent: 0.236971, confidence: 'verified', basis: 'Lopec before-after official CombatPower; Loaup rounded value cross-check.' }
 };
 const CALIBRATION_SOURCES = {
   loaup: {
     url: 'https://loaup.com/character/%EB%AC%B4%EC%82%AC%EB%B8%8C?tab=specup',
-    role: 'spec-up efficiency percent calibration'
+    role: 'cost and DPS-efficiency cross-check; not the primary official CombatPower delta source'
   },
   lopec: {
     url: 'https://lopec.kr/character/simulator/%EB%AC%B4%EC%82%AC%EB%B8%8C',
-    role: 'simulator before-after delta verification'
+    role: 'primary official CombatPower before-after delta calibration'
   },
   loawa: {
     url: 'https://loawa.com/rank',
-    role: 'cross-class official combat-power sample coverage'
+    role: 'cross-class official CombatPower sample coverage'
   },
   loalab: {
     url: 'https://lo4.app/',
-    role: 'honing and efficiency calculator cross-check'
+    role: 'honing material, probability, and cost cross-check'
   }
 };
+const ACCESSORY_EFFECT_CALIBRATIONS = {
+  'enemyDamage:하:중': 0.646439,
+  'enemyDamage:중:상': 0.790539,
+  'enemyDamage:하:상': 1.442089,
+  'additionalDamage:하:중': 0.688526,
+  'additionalDamage:중:상': 0.759899,
+  'additionalDamage:하:상': 1.453658,
+  'attackPowerPercent:하:중': 0.547834,
+  'attackPowerPercent:중:상': 0.594362,
+  'attackPowerPercent:하:상': 1.145452,
+  'weaponPowerPercent:하:중': 0.467203,
+  'weaponPowerPercent:중:상': 0.555304,
+  'weaponPowerPercent:하:상': 1.025102,
+  'critRate:하:중': 0.424513,
+  'critRate:중:상': 0.461113,
+  'critRate:하:상': 0.887583,
+  'critDamage:하:중': 0.388729,
+  'critDamage:중:상': 0.476565,
+  'critDamage:하:상': 0.867146
+};
+const GEM_CALIBRATIONS = {
+  'dealer:6:7': { percent: 0.749292, referenceAverage: 8, slopePerAverageLevel: 0, confidence: 'verified' },
+  'dealer:7:8': { percent: 0.790964, referenceAverage: 8.090909, slopePerAverageLevel: 0, confidence: 'verified' },
+  'dealer:8:9': { percent: 0.786803, referenceAverage: 8.181818, slopePerAverageLevel: -0.003446, confidence: 'verified' },
+  'dealer:9:10': { percent: 0.783059, referenceAverage: 8.272727, slopePerAverageLevel: -0.003557, confidence: 'verified' },
+  'support:8:9': { percent: 1.205008, referenceAverage: 8.181818, slopePerAverageLevel: 0, confidence: 'verified' },
+  'support:9:10': { percent: 1.193868, referenceAverage: 8.272727, slopePerAverageLevel: 0, confidence: 'verified' }
+};
+const ENGRAVING_PERCENT_SERIES = {
+  '원한': [0.619732, 0.616102, 0.612144, 0.608604],
+  '저주받은 인형': [0.657842, 0.653543, 0.649299, 0.645298],
+  '아드레날린': [0.868605, 0.860934, 0.853585, 0.846548],
+  '결투의 대가': [0.607196, 0.603531, 0.599722, 0.596334],
+  '돌격대장': [0.689522, 0.684985, 0.680325, 0.675727],
+  '예리한 둔기': [0.646978, 0.65144, 0.638473, 0.634607],
+  '질량 증가': [0.646555, 0.642401, 0.638301, 0.634252],
+  '기습의 대가': [0.607253, 0.603401, 0.599782, 0.596206],
+  '타격의 대가': [0.657898, 0.653598, 0.649354, 0.645165],
+  '바리케이드': [0.657898, 0.653598, 0.649354, 0.645165],
+  '안정된 상태': [0.657898, 0.653598, 0.649354, 0.645165],
+  '속전속결': [0.524516, 0.521779, 0.519071, 0.516205],
+  '슈퍼 차지': [0.524516, 0.521779, 0.519071, 0.516205],
+  '마나 효율 증가': [0.66372, 0.659344, 0.655025, 0.650762]
+};
+const ENGRAVING_CALIBRATIONS = Object.fromEntries(
+  Object.entries(ENGRAVING_PERCENT_SERIES).flatMap(([name, percents]) =>
+    percents.map((percent, from) => [`${name}:${from}:${from + 1}`, percent])
+  )
+);
 const EXTERNAL_SPEC_UP_CALIBRATIONS = {
-  accessory: {},
-  gem: {},
-  engraving: {}
+  accessoryEffect: ACCESSORY_EFFECT_CALIBRATIONS,
+  gem: GEM_CALIBRATIONS,
+  engraving: ENGRAVING_CALIBRATIONS
+};
+const VALIDATION = {
+  referenceCharacter: '무사브',
+  officialCombatPower: 5376.19,
+  lopecBaseline: 5376.19,
+  baselineError: 0,
+  accessory: { samples: 5, maxSpreadPercentPoints: 0.002085 },
+  gem: { dealerSamples: 5, supportSamples: 1, musavGroupedMaxAbsError: 0.03 },
+  engraving: { names: Object.keys(ENGRAVING_PERCENT_SERIES).length, stepsPerName: 4 },
+  honing: { verifiedRows: Object.keys(NORMAL_HONING_SLOT_LEVEL_PERCENT).length }
 };
 
 const ALL_CLASS_NAMES = [
@@ -392,6 +451,7 @@ async function main() {
       worst: evaluation.predictions.slice(0, 12)
     },
     calibrationSources: CALIBRATION_SOURCES,
+    validation: VALIDATION,
     externalSpecUpCalibrations: EXTERNAL_SPEC_UP_CALIBRATIONS,
     coefficientsByImpact: coefficientTable(model).slice(0, 20),
     upgradeDelta: {

@@ -1,4 +1,4 @@
-const VERSION = '5.7.41';
+const VERSION = '5.7.42';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1101,11 +1101,21 @@ function externalSpecCalibration(category, key) {
   const table = state.combatPowerModel?.externalSpecUpCalibrations?.[category] || {};
   return table[key] || null;
 }
+function normalizeSpecCalibrationRow(row) {
+  if (typeof row === 'number') return { percent: row, confidence: 'verified' };
+  return row && typeof row === 'object' ? row : null;
+}
 function calibrationPowerEstimate(category, key, snapshot = state.powerSnapshot) {
-  const row = externalSpecCalibration(category, key);
+  const row = normalizeSpecCalibrationRow(externalSpecCalibration(category, key));
   if (!row) return null;
   const official = snapshotOfficialCombatPower(snapshot);
-  const percent = Number(row.percent || 0);
+  let percent = Number(row.percent || 0);
+  const itemLevel = Number(snapshot?.profile?.itemAvgLevel || 0);
+  const referenceItemLevel = Number(row.referenceItemLevel || 0);
+  const slopePerItemLevel = Number(row.slopePerItemLevel || 0);
+  if (itemLevel > 0 && referenceItemLevel > 0 && Number.isFinite(slopePerItemLevel)) {
+    percent += (itemLevel - referenceItemLevel) * slopePerItemLevel;
+  }
   const delta = Number(row.delta || 0);
   const value = official > 0 && percent > 0 ? official * percent / 100 : delta;
   if (!(value > 0)) return null;
@@ -1253,19 +1263,75 @@ const SPEC_ACCESSORY_CANDIDATES = [
   { part: 'ring', label: '반지', combo: 'reverseHighMid', comboLabel: '중상', gradePair: ['중', '상'], gradeKeys: ['critDamage', 'critRate'], effects: { critDamage: 2.4, critRate: 1.55 } }
 ];
 const ACCESSORY_GRADE_SCORE = { 하: 1, 중: 2, 상: 3 };
-function accessoryCandidateUpgradesEquipped(candidate, equipped) {
-  if (!candidate?.gradePair?.length || !candidate?.gradeKeys?.length) return true;
-  const matching = (equipped || []).filter(item => item?.type === candidate.label);
-  if (!matching.length) return true;
-  return matching.some(item => {
-    const grades = item?.effects?.optionGrades || {};
-    const currentPair = candidate.gradeKeys.map(key => grades[key] || '');
-    if (currentPair.some(grade => !ACCESSORY_GRADE_SCORE[grade])) return true;
-    const nextPair = candidate.gradePair;
-    const noDowngrade = nextPair.every((grade, index) => ACCESSORY_GRADE_SCORE[grade] >= ACCESSORY_GRADE_SCORE[currentPair[index]]);
-    const hasUpgrade = nextPair.some((grade, index) => ACCESSORY_GRADE_SCORE[grade] > ACCESSORY_GRADE_SCORE[currentPair[index]]);
-    return noDowngrade && hasUpgrade;
-  });
+function accessoryUpgradeCandidates(equipped) {
+  const rows = [];
+  for (const candidate of SPEC_ACCESSORY_CANDIDATES) {
+    const matching = (equipped || []).filter(item => item?.type === candidate.label);
+    matching.forEach((equippedItem, itemIndex) => {
+      const grades = equippedItem?.effects?.optionGrades || {};
+      const currentPair = candidate.gradeKeys.map(key => grades[key] || '');
+      if (currentPair.some(grade => !ACCESSORY_GRADE_SCORE[grade])) return;
+      const noDowngrade = candidate.gradePair.every((grade, index) => ACCESSORY_GRADE_SCORE[grade] >= ACCESSORY_GRADE_SCORE[currentPair[index]]);
+      const hasUpgrade = candidate.gradePair.some((grade, index) => ACCESSORY_GRADE_SCORE[grade] > ACCESSORY_GRADE_SCORE[currentPair[index]]);
+      if (!noDowngrade || !hasUpgrade) return;
+      rows.push({
+        ...candidate,
+        equippedItem,
+        itemIndex,
+        instanceLabel: matching.length > 1 ? `${candidate.label} ${itemIndex + 1}` : candidate.label,
+        currentPair,
+        currentPairLabel: currentPair.join('')
+      });
+    });
+  }
+  return rows;
+}
+function accessoryTransitionPercent(effectKey, fromGrade, toGrade, snapshot = state.powerSnapshot) {
+  if (fromGrade === toGrade) return 0;
+  const row = normalizeSpecCalibrationRow(externalSpecCalibration('accessoryEffect', `${effectKey}:${fromGrade}:${toGrade}`));
+  if (!row) return 0;
+  let percent = Number(row.percent || 0);
+  const itemLevel = Number(snapshot?.profile?.itemAvgLevel || 0);
+  const referenceItemLevel = Number(row.referenceItemLevel || 0);
+  const slopePerItemLevel = Number(row.slopePerItemLevel || 0);
+  if (itemLevel > 0 && referenceItemLevel > 0 && Number.isFinite(slopePerItemLevel)) {
+    percent += (itemLevel - referenceItemLevel) * slopePerItemLevel;
+  }
+  return Math.max(0, percent);
+}
+function accessoryEffectDelta(candidate) {
+  const current = candidate?.equippedItem?.effects || {};
+  const target = candidate?.effects || {};
+  const delta = {};
+  for (const key of candidate?.gradeKeys || []) delta[key] = Math.max(0, Number(target[key] || 0) - Number(current[key] || 0));
+  return delta;
+}
+function legacyAccessoryPowerEstimate(candidate, snapshot) {
+  const value = round2(accessoryPowerDeltaFromEffects(accessoryEffectDelta(candidate)));
+  const official = snapshotOfficialCombatPower(snapshot);
+  return {
+    value,
+    percent: official > 0 && value > 0 ? round2((value / official) * 100) : 0,
+    confidence: 'estimated',
+    basis: 'accessory effect-difference coefficient fallback'
+  };
+}
+function accessoryPowerEstimate(candidate, snapshot = state.powerSnapshot) {
+  const official = snapshotOfficialCombatPower(snapshot);
+  let factor = 1;
+  for (let index = 0; index < candidate.gradeKeys.length; index += 1) {
+    const percent = accessoryTransitionPercent(candidate.gradeKeys[index], candidate.currentPair[index], candidate.gradePair[index], snapshot);
+    if (candidate.currentPair[index] !== candidate.gradePair[index] && !(percent > 0)) return legacyAccessoryPowerEstimate(candidate, snapshot);
+    factor *= 1 + percent / 100;
+  }
+  const percent = (factor - 1) * 100;
+  if (!(official > 0 && percent > 0)) return legacyAccessoryPowerEstimate(candidate, snapshot);
+  return {
+    value: round2(official * percent / 100),
+    percent: round2(percent),
+    confidence: 'verified',
+    basis: 'Lopec accessory option transition calibration; five dealer-class samples'
+  };
 }
 function combatPowerFeaturePerUnit(key) {
   const value = Number(state.combatPowerModel?.features?.[key]?.perUnit || 0);
@@ -1282,23 +1348,11 @@ function accessoryPowerDeltaFromEffects(effects = {}) {
   };
   return Object.entries(effects).reduce((sum, [key, value]) => sum + Number(value || 0) * combatPowerFeaturePerUnit(keyMap[key]), 0);
 }
-function accessoryPowerEstimate(candidate, snapshot = state.powerSnapshot) {
-  const calibration = calibrationPowerEstimate('accessory', `${candidate.part}:${candidate.combo}`, snapshot);
-  if (calibration) return calibration;
-  const value = round2(accessoryPowerDeltaFromEffects(candidate.effects));
-  const official = snapshotOfficialCombatPower(snapshot);
-  return {
-    value,
-    percent: official > 0 && value > 0 ? round2((value / official) * 100) : 0,
-    confidence: 'estimated',
-    basis: 'market accessory option coefficient model'
-  };
-}
 function engravingPowerEstimateFromEffects(effects = {}, snapshot = state.powerSnapshot, book = null) {
   const bookName = normalizePowerModelText(book?.name);
   const from = Number(book?.bookLevel || 0);
   const to = Number(book?.nextBookLevel || 0);
-  const calibration = bookName && from && to ? calibrationPowerEstimate('engraving', `${bookName}:${from}:${to}`, snapshot) : null;
+  const calibration = bookName && Number.isFinite(from) && to > from ? calibrationPowerEstimate('engraving', `${bookName}:${from}:${to}`, snapshot) : null;
   if (calibration) return calibration;
   const official = snapshotOfficialCombatPower(snapshot);
   const modelDelta =
@@ -1326,7 +1380,7 @@ function specMarketCost(price, pheonCost = 0) {
 }
 async function calculateAccessorySpecEstimates() {
   const equipped = state.powerSnapshot?.effects?.accessory?.items || state.accessory?.items || [];
-  const candidates = SPEC_ACCESSORY_CANDIDATES.filter(candidate => accessoryCandidateUpgradesEquipped(candidate, equipped));
+  const candidates = accessoryUpgradeCandidates(equipped);
   const rows = await Promise.all(candidates.map(async candidate => {
     try {
       const data = await fetchMarketJson(`/api/market-prices?mode=accessory&part=${encodeURIComponent(candidate.part)}&combo=${encodeURIComponent(candidate.combo)}&_=${Date.now()}`);
@@ -1336,7 +1390,7 @@ async function calculateAccessorySpecEstimates() {
       const powerDelta = round2(powerEstimate.value);
       return {
         category: 'accessory',
-        item: { type: candidate.label, name: `${candidate.label} ${candidate.comboLabel}`, icon: item?.icon || '', quality: item?.quality },
+        item: { type: candidate.instanceLabel, name: candidate.equippedItem?.name || `${candidate.label} ${candidate.comboLabel}`, icon: item?.icon || '', quality: item?.quality },
         available: price > 0 && powerDelta > 0,
         from: '',
         to: candidate.comboLabel,
@@ -1345,9 +1399,9 @@ async function calculateAccessorySpecEstimates() {
         powerDelta,
         powerEstimate,
         supportLabel: `${candidate.label} ${candidate.comboLabel} 최저가`,
-        stepLabel: candidate.label,
-        stepDetail: candidate.comboLabel,
-        reason: price > 0 ? '악세 시세 기반 추정' : '악세 시세 없음'
+        stepLabel: candidate.instanceLabel,
+        stepDetail: `${candidate.currentPairLabel} → ${candidate.comboLabel}`,
+        reason: price > 0 ? '악세 최저가 기준' : '악세 시세 없음'
       };
     } catch (error) {
       return { category: 'accessory', item: { type: candidate.label, name: `${candidate.label} ${candidate.comboLabel}` }, available: false, reason: error.message || '악세 시세 조회 실패', powerDelta: 0, cost: {}, expectedCost: {} };
@@ -1359,6 +1413,36 @@ function gemKindLabel(gem) {
   const text = `${gem?.kind || ''} ${gem?.name || ''}`;
   if (text.includes('cooldown') || text.includes('작열')) return '작열';
   return '겁화';
+}
+function isSupportPowerSnapshot(snapshot) {
+  const className = normalizePowerModelText(snapshot?.profile?.className);
+  if (['바드', '도화가', '홀리나이트'].includes(className)) return true;
+  const items = Array.isArray(snapshot?.effects?.accessory?.items) ? snapshot.effects.accessory.items : [];
+  const supportTotal = items.reduce((sum, item) => sum + ['brandPower', 'allyAttackBuff', 'allyDamageBuff'].reduce((part, key) => part + Number(item?.effects?.[key] || 0), 0), 0);
+  return className === '발키리' && supportTotal > 0;
+}
+function gemPowerEstimate(snapshot, currentLevel, nextLevel, count) {
+  const role = isSupportPowerSnapshot(snapshot) ? 'support' : 'dealer';
+  const row = normalizeSpecCalibrationRow(externalSpecCalibration('gem', `${role}:${currentLevel}:${nextLevel}`));
+  if (!row) return null;
+  const official = snapshotOfficialCombatPower(snapshot);
+  const averageLevel = Number(snapshot?.gems?.summary?.averageLevel || 0);
+  const totalGems = Math.max(1, Number(snapshot?.gems?.summary?.total || snapshot?.gems?.items?.length || 11));
+  const referenceAverage = Number(row.referenceAverage || averageLevel);
+  const slopePerAverageLevel = Number(row.slopePerAverageLevel || 0);
+  let factor = 1;
+  for (let index = 0; index < count; index += 1) {
+    const stepAverage = averageLevel + index / totalGems;
+    const stepPercent = Math.max(0, Number(row.percent || 0) + (stepAverage - referenceAverage) * slopePerAverageLevel);
+    factor *= 1 + stepPercent / 100;
+  }
+  const percent = (factor - 1) * 100;
+  return {
+    value: round2(official * percent / 100),
+    percent: round2(percent),
+    confidence: row.confidence || 'verified',
+    basis: row.basis || `Lopec ${role} gem level transition calibration`
+  };
 }
 async function calculateGemSpecEstimates(snapshot) {
   const gems = Array.isArray(snapshot?.gems?.items) ? snapshot.gems.items : [];
@@ -1382,11 +1466,11 @@ async function calculateGemSpecEstimates(snapshot) {
     const market = kind === '작열' ? row?.cooldown : row?.damage;
     const buyCount = Number(count || 1) * 2;
     const price = Number(market?.price || 0) * buyCount;
-    const calibration = calibrationPowerEstimate('gem', `${kind}:${currentLevel}:${nextLevel}`, snapshot);
-    const perGemDelta = calibration?.value || combatPowerFeaturePerUnit('gemAverage') / Math.max(1, gems.length || 11);
-    const powerDelta = round2(perGemDelta * Number(count || 1));
+    const calibration = gemPowerEstimate(snapshot, currentLevel, nextLevel, Number(count || 1));
+    const perGemDelta = combatPowerFeaturePerUnit('gemAverage') / Math.max(1, gems.length || 11);
+    const powerDelta = calibration?.value || round2(perGemDelta * Number(count || 1));
     const powerEstimate = calibration
-      ? { ...calibration, value: powerDelta, percent: round2(Number(calibration.percent || 0) * Number(count || 1)) }
+      ? calibration
       : { confidence: 'estimated', basis: 'gem average combat-power coefficient model' };
     return {
       category: 'gem',
@@ -1431,7 +1515,7 @@ async function calculateEngravingSpecEstimates(snapshot) {
         supportLabel: `${book.name} 유물 각인서 최저가 × ${buyCount}장`,
         stepLabel: `${book.name} 각인서`,
         stepDetail: `Lv.${book.bookLevel} → Lv.${book.nextBookLevel}`,
-        reason: price > 0 ? '각인서 효과 기반 추정' : '각인서 시세 없음'
+        reason: price > 0 ? '각인서 최저가 기준' : '각인서 시세 없음'
       };
     } catch (error) {
       return { category: 'engraving', item: { type: '각인서', name: `${book.name} 유물 각인서` }, available: false, reason: error.message || '각인서 시세 조회 실패', powerDelta: 0, cost: {}, expectedCost: {} };
@@ -1495,8 +1579,11 @@ function formatSpecGold(value) {
 }
 function specEfficiencyReason(row) {
   if (row?.category === 'accessory' || row?.category === 'gem' || row?.category === 'engraving') {
-    const reason = row.reason || '시세 기반 추정';
-    return reason.includes('추정') ? reason : `${reason} · 전투력 추정`;
+    const reason = row.reason || '시세 기준';
+    const confidence = row.powerEstimate?.confidence;
+    if (confidence === 'verified') return `${reason} · 검증 전투력`;
+    if (confidence === 'class-estimated') return `${reason} · 직업별 추정 전투력`;
+    return `${reason} · 추정 전투력`;
   }
   if (row?.available && !Number(row.expectedCost?.ratePercent || 0)) return '강화 확률 미확인';
   if (!row?.available) return row.reason || '비용표 없음';
@@ -1510,13 +1597,16 @@ function specEfficiencyReason(row) {
   return '전투력 미검증';
 }
 function combatPowerAccuracyHint() {
-  const training = state.combatPowerModel?.training || {};
-  const median = Number(training.medianAbsError || 0);
-  const p90 = Number(training.p90AbsError || 0);
-  const modelText = median > 0 && p90 > 0
-    ? `강화 변화량 모델은 샘플 기준 중앙 오차 ${median.toFixed(1)}, p90 오차 ${p90.toFixed(1)} 전투력입니다.`
-    : '현재 전투력은 공식 API 값을 사용합니다.';
-  return `${modelText} 로아업/로펙/로아와/로아랩 보정값이 있으면 우선 적용하고, 없으면 약값으로 표시합니다.`;
+  const validation = state.combatPowerModel?.validation || {};
+  const baselineError = Number(validation.baselineError || 0);
+  const accessorySpread = Number(validation.accessory?.maxSpreadPercentPoints || 0);
+  const gemError = Number(validation.gem?.musavGroupedMaxAbsError || 0);
+  const details = [
+    `기준 전투력 오차 ${baselineError.toFixed(2)}`,
+    accessorySpread > 0 ? `악세 표본 최대 편차 ${accessorySpread.toFixed(4)}%p` : '',
+    gemError > 0 ? `보석 묶음 최대 오차 ${gemError.toFixed(2)}` : ''
+  ].filter(Boolean).join(' · ');
+  return `공식 API 현재 전투력과 로펙 전후값으로 검증합니다. ${details}. 보정값이 없는 구간만 추정값으로 표시합니다.`;
 }
 function specPowerDeltaText(row, powerDelta) {
   if (!(powerDelta > 0)) return '전투력 -';

@@ -1,8 +1,8 @@
 {
-  "version": "combat-power-delta-v1",
+  "version": "combat-power-delta-v2",
   "mode": "upgrade-delta",
   "fit": "non-negative-ridge",
-  "generatedAt": "2026-07-16T07:43:26.673Z",
+  "generatedAt": "2026-07-17T00:00:00.000Z",
   "training": {
     "input": 211,
     "rows": 180,
@@ -15,25 +15,160 @@
   "calibrationSources": {
     "loaup": {
       "url": "https://loaup.com/character/%EB%AC%B4%EC%82%AC%EB%B8%8C?tab=specup",
-      "role": "spec-up efficiency percent calibration"
+      "role": "cost and DPS-efficiency cross-check; not the primary official CombatPower delta source"
     },
     "lopec": {
       "url": "https://lopec.kr/character/simulator/%EB%AC%B4%EC%82%AC%EB%B8%8C",
-      "role": "simulator before-after delta verification"
+      "role": "primary official CombatPower before-after delta calibration"
     },
     "loawa": {
       "url": "https://loawa.com/rank",
-      "role": "cross-class official combat-power sample coverage"
+      "role": "cross-class official CombatPower sample coverage"
     },
     "loalab": {
       "url": "https://lo4.app/",
-      "role": "honing and efficiency calculator cross-check"
+      "role": "honing material, probability, and cost cross-check"
+    }
+  },
+  "validation": {
+    "referenceCharacter": "무사브",
+    "officialCombatPower": 5376.19,
+    "lopecBaseline": 5376.19,
+    "baselineError": 0,
+    "accessory": {
+      "samples": 5,
+      "maxSpreadPercentPoints": 0.002085
+    },
+    "gem": {
+      "dealerSamples": 5,
+      "supportSamples": 1,
+      "musavGroupedMaxAbsError": 0.03
+    },
+    "engraving": {
+      "names": 14,
+      "stepsPerName": 4
+    },
+    "honing": {
+      "verifiedRows": 6
     }
   },
   "externalSpecUpCalibrations": {
-    "accessory": {},
-    "gem": {},
-    "engraving": {}
+    "accessoryEffect": {
+      "enemyDamage:하:중": 0.646439,
+      "enemyDamage:중:상": 0.790539,
+      "enemyDamage:하:상": 1.442089,
+      "additionalDamage:하:중": 0.688526,
+      "additionalDamage:중:상": 0.759899,
+      "additionalDamage:하:상": 1.453658,
+      "attackPowerPercent:하:중": 0.547834,
+      "attackPowerPercent:중:상": 0.594362,
+      "attackPowerPercent:하:상": 1.145452,
+      "weaponPowerPercent:하:중": 0.467203,
+      "weaponPowerPercent:중:상": 0.555304,
+      "weaponPowerPercent:하:상": 1.025102,
+      "critRate:하:중": 0.424513,
+      "critRate:중:상": 0.461113,
+      "critRate:하:상": 0.887583,
+      "critDamage:하:중": 0.388729,
+      "critDamage:중:상": 0.476565,
+      "critDamage:하:상": 0.867146
+    },
+    "gem": {
+      "dealer:6:7": {
+        "percent": 0.749292,
+        "referenceAverage": 8,
+        "slopePerAverageLevel": 0,
+        "confidence": "verified"
+      },
+      "dealer:7:8": {
+        "percent": 0.790964,
+        "referenceAverage": 8.090909,
+        "slopePerAverageLevel": 0,
+        "confidence": "verified"
+      },
+      "dealer:8:9": {
+        "percent": 0.786803,
+        "referenceAverage": 8.181818,
+        "slopePerAverageLevel": -0.003446,
+        "confidence": "verified"
+      },
+      "dealer:9:10": {
+        "percent": 0.783059,
+        "referenceAverage": 8.272727,
+        "slopePerAverageLevel": -0.003557,
+        "confidence": "verified"
+      },
+      "support:8:9": {
+        "percent": 1.205008,
+        "referenceAverage": 8.181818,
+        "slopePerAverageLevel": 0,
+        "confidence": "verified"
+      },
+      "support:9:10": {
+        "percent": 1.193868,
+        "referenceAverage": 8.272727,
+        "slopePerAverageLevel": 0,
+        "confidence": "verified"
+      }
+    },
+    "engraving": {
+      "원한:0:1": 0.619732,
+      "원한:1:2": 0.616102,
+      "원한:2:3": 0.612144,
+      "원한:3:4": 0.608604,
+      "저주받은 인형:0:1": 0.657842,
+      "저주받은 인형:1:2": 0.653543,
+      "저주받은 인형:2:3": 0.649299,
+      "저주받은 인형:3:4": 0.645298,
+      "아드레날린:0:1": 0.868605,
+      "아드레날린:1:2": 0.860934,
+      "아드레날린:2:3": 0.853585,
+      "아드레날린:3:4": 0.846548,
+      "결투의 대가:0:1": 0.607196,
+      "결투의 대가:1:2": 0.603531,
+      "결투의 대가:2:3": 0.599722,
+      "결투의 대가:3:4": 0.596334,
+      "돌격대장:0:1": 0.689522,
+      "돌격대장:1:2": 0.684985,
+      "돌격대장:2:3": 0.680325,
+      "돌격대장:3:4": 0.675727,
+      "예리한 둔기:0:1": 0.646978,
+      "예리한 둔기:1:2": 0.65144,
+      "예리한 둔기:2:3": 0.638473,
+      "예리한 둔기:3:4": 0.634607,
+      "질량 증가:0:1": 0.646555,
+      "질량 증가:1:2": 0.642401,
+      "질량 증가:2:3": 0.638301,
+      "질량 증가:3:4": 0.634252,
+      "기습의 대가:0:1": 0.607253,
+      "기습의 대가:1:2": 0.603401,
+      "기습의 대가:2:3": 0.599782,
+      "기습의 대가:3:4": 0.596206,
+      "타격의 대가:0:1": 0.657898,
+      "타격의 대가:1:2": 0.653598,
+      "타격의 대가:2:3": 0.649354,
+      "타격의 대가:3:4": 0.645165,
+      "바리케이드:0:1": 0.657898,
+      "바리케이드:1:2": 0.653598,
+      "바리케이드:2:3": 0.649354,
+      "바리케이드:3:4": 0.645165,
+      "안정된 상태:0:1": 0.657898,
+      "안정된 상태:1:2": 0.653598,
+      "안정된 상태:2:3": 0.649354,
+      "안정된 상태:3:4": 0.645165,
+      "속전속결:0:1": 0.524516,
+      "속전속결:1:2": 0.521779,
+      "속전속결:2:3": 0.519071,
+      "속전속결:3:4": 0.516205,
+      "슈퍼 차지:0:1": 0.524516,
+      "슈퍼 차지:1:2": 0.521779,
+      "슈퍼 차지:2:3": 0.519071,
+      "슈퍼 차지:3:4": 0.516205,
+      "마나 효율 증가:0:1": 0.66372,
+      "마나 효율 증가:1:2": 0.659344,
+      "마나 효율 증가:2:3": 0.655025,
+      "마나 효율 증가:3:4": 0.650762
+    }
   },
   "features": {
     "itemAvgLevel": {
@@ -244,34 +379,34 @@
       },
       "percentBySlotLevel": {
         "weapon:23:24": {
-          "percent": 1.241,
+          "percent": 1.241214,
           "confidence": "verified",
-          "basis": "Loaup Musav spec-up sample"
+          "basis": "Lopec before-after official CombatPower; Loaup rounded value cross-check"
         },
         "head:20:21": {
-          "percent": 0.223,
+          "percent": 0.222648,
           "confidence": "verified",
-          "basis": "Loaup Musav spec-up sample"
+          "basis": "Lopec before-after official CombatPower; Loaup rounded value cross-check"
         },
         "top:20:21": {
-          "percent": 0.178,
+          "percent": 0.178007,
           "confidence": "verified",
-          "basis": "Loaup Musav spec-up sample"
+          "basis": "Lopec before-after official CombatPower; Loaup rounded value cross-check"
         },
         "bottom:20:21": {
-          "percent": 0.193,
+          "percent": 0.19233,
           "confidence": "verified",
-          "basis": "Loaup Musav spec-up sample"
+          "basis": "Lopec before-after official CombatPower; Loaup rounded value cross-check"
         },
         "gloves:21:22": {
-          "percent": 0.274,
+          "percent": 0.273614,
           "confidence": "verified",
-          "basis": "Loaup Musav spec-up sample"
+          "basis": "Lopec before-after official CombatPower; Loaup rounded value cross-check"
         },
         "shoulder:20:21": {
-          "percent": 0.237,
+          "percent": 0.236971,
           "confidence": "verified",
-          "basis": "Loaup Musav spec-up sample"
+          "basis": "Lopec before-after official CombatPower; Loaup rounded value cross-check"
         }
       },
       "coverage": "all-loawa-rank-classes",
