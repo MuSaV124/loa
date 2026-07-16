@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v5.7.0 · 2/4/5티어 추천</span>
+        <span class="badge">v5.7.2 · 2/4/5티어 추천</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -118,18 +118,12 @@
           <p class="hint">악세, 아바타, 유각, 보석 시세 기능을 한 탭에 모았습니다.</p>
         </div>
       </div>
-      <div id="lostarkNoticeCard" class="lostarkNoticeCard" aria-live="polite">
-        <a class="lostarkNoticeLink" href="https://lostark.game.onstove.com/News/Notice/List" target="_blank" rel="noopener">
-          <span class="lostarkNoticeBadge">공지</span>
-          <strong>로아 공홈 공지사항을 불러오는 중입니다.</strong>
-          <small>공식 홈페이지</small>
-        </a>
-      </div>
       <div class="marketSubNav">
         <button class="marketSubButton active" type="button" data-market-tab="accessory">악세</button>
         <button class="marketSubButton" type="button" data-market-tab="avatar">아바타</button>
         <button class="marketSubButton" type="button" data-market-tab="engraving">유각</button>
         <button class="marketSubButton" type="button" data-market-tab="gem">보석</button>
+        <button class="marketSubButton" type="button" data-market-tab="material">재료</button>
       </div>
       <div id="marketAccessoryPanel" class="marketSubPanel">
         <div class="marketSearchBox">
@@ -170,6 +164,14 @@
         </div>
         <div id="gemMarketResult" class="marketResultBox">5레벨 겁화/작열부터 10레벨 겁화/작열까지 한 번에 조회합니다.</div>
       </div>
+      <div id="marketMaterialPanel" class="marketSubPanel hidden">
+        <div class="marketSearchBox">
+          <div class="marketSelectGrid marketSingleAction">
+            <button id="materialListButton" type="button">새로고침</button>
+          </div>
+        </div>
+        <div id="materialMarketResult" class="marketResultBox">4티어 강화 재료 시세를 거래소에서 조회합니다.</div>
+      </div>
     </section>
 
     <section id="legendAvatarPanel" class="panel legendAvatarPanel tabContent hidden">
@@ -190,7 +192,7 @@
 
   </main>
 
-  <div class="version">Version 5.7.0</div>
+  <div class="version">Version 5.7.2</div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

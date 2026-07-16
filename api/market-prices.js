@@ -1,4 +1,4 @@
-const API_VERSION = '5.7.0';
+const API_VERSION = '5.7.2';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -51,6 +51,29 @@ const GEM_RULES = {
   cooldown: { label: '작열', names: ['작열'], icon: 'https://cdn-lostark.game.onstove.com/efui_iconatlas/use/use_9_71.png' }
 };
 
+const T4_MATERIAL_GROUPS = [
+  {
+    group: '기본 강화 재료',
+    items: ['운명의 파편 주머니', '운명의 돌파석', '위대한 운명의 돌파석', '운명의 파괴석', '운명의 파괴석 결정', '운명의 수호석', '운명의 수호석 결정']
+  },
+  {
+    group: '융화 재료',
+    items: ['아비도스 융화제', '상급 아비도스 융화제']
+  },
+  {
+    group: '숨결',
+    items: ['빙하의 숨결', '용암의 숨결']
+  },
+  {
+    group: '재봉술',
+    items: ['재봉술 : 업화 [11-14]', '재봉술 : 업화 [15-18]', '재봉술 : 업화 [19-20]', '장인의 재봉술 1단계', '장인의 재봉술 2단계', '장인의 재봉술 3단계', '장인의 재봉술 4단계']
+  },
+  {
+    group: '야금술',
+    items: ['야금술 : 업화 [11-14]', '야금술 : 업화 [15-18]', '야금술 : 업화 [19-20]', '장인의 야금술 1단계', '장인의 야금술 2단계', '장인의 야금술 3단계', '장인의 야금술 4단계']
+  }
+];
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   try {
@@ -62,8 +85,9 @@ export default async function handler(req, res) {
     if (mode === 'gemList') return res.status(200).json(await searchGemList(apiKey, req.query));
     if (mode === 'engraving') return res.status(200).json(await searchEngraving(apiKey, req.query));
     if (mode === 'engravingList') return res.status(200).json(await searchEngravingList(apiKey, req.query));
+    if (mode === 't4Materials') return res.status(200).json(await searchT4Materials(apiKey, req.query));
     if (mode === 'auctionOptions') return res.status(200).json(await getAuctionOptions(apiKey));
-    return res.status(400).json({ ok: false, error: 'mode는 accessory/gem/gemList/engraving/engravingList/auctionOptions 중 하나여야 합니다.' });
+    return res.status(400).json({ ok: false, error: 'mode는 accessory/gem/gemList/engraving/engravingList/t4Materials/auctionOptions 중 하나여야 합니다.' });
   } catch (error) {
     return res.status(500).json({ ok: false, apiVersion: API_VERSION, error: '시세 조회 실패', message: error?.message || String(error) });
   }
@@ -219,7 +243,7 @@ async function searchAccessory(apiKey, query) {
     updatedAt: indexResult.updatedAt,
     index: indexResult.index,
     accessoryDebug: {
-      note: 'v5.7.0 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
+      note: 'v5.7.2 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
       requestPayloads: indexResult.requestPayloads.slice(0, 14),
       filterStats: indexResult.filterStats,
       samples: indexResult.samples
@@ -553,6 +577,76 @@ async function searchEngravingListFresh(apiKey, maxPages) {
   }
   const items = [...seen.values()].sort((a, b) => b.price - a.price);
   return { ok: true, apiVersion: API_VERSION, source: 'markets/items', mode: 'engravingList', sort: 'price-desc', items, tried, updatedAt: new Date().toISOString() };
+}
+
+async function searchT4Materials(apiKey, query) {
+  const force = String(query.force || '') === '1';
+  const cacheKey = 't4Materials:v1';
+  return getCachedMarketList(cacheKey, force, async () => searchT4MaterialsFresh(apiKey));
+}
+
+async function searchT4MaterialsFresh(apiKey) {
+  const rows = [];
+  const tried = [];
+  for (const group of T4_MATERIAL_GROUPS) {
+    const settled = await Promise.allSettled(group.items.map(name => searchMarketMaterial(apiKey, name, group.group)));
+    for (const entry of settled) {
+      if (entry.status === 'fulfilled') {
+        rows.push(entry.value.item);
+        tried.push(...entry.value.tried);
+      } else {
+        rows.push({ group: group.group, name: '조회 실패', price: 0, unitPrice: 0, bundleCount: 1, error: entry.reason?.message || String(entry.reason || '조회 실패') });
+        tried.push({ group: group.group, error: entry.reason?.message || String(entry.reason || '조회 실패') });
+      }
+    }
+  }
+  return { ok: true, apiVersion: API_VERSION, source: 'markets/items', mode: 't4Materials', groups: T4_MATERIAL_GROUPS.map(group => group.group), items: rows, tried, updatedAt: new Date().toISOString() };
+}
+
+async function searchMarketMaterial(apiKey, name, group) {
+  const tried = [];
+  const matched = [];
+  const aliases = materialSearchAliases(name);
+  for (const keyword of aliases) {
+    for (const categoryCode of [50000, 50010, 50020, 50030, 50040, null]) {
+      const payload = { Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode ?? undefined, ItemName: keyword, PageNo: 1 };
+      stripUndefined(payload);
+      const result = await fetchMarketPage(apiKey, payload);
+      tried.push({ group, name, keyword, categoryCode, count: result.items.length, totalCount: result.totalCount, error: result.error || null });
+      for (const raw of result.items) {
+        const item = normalizeMarketItem(raw);
+        if (!item.price) continue;
+        const itemText = normalizeText(`${item.name} ${item.fullText}`);
+        if (!isMaterialNameMatch(itemText, name, keyword)) continue;
+        matched.push({ ...item, group, requestedName: name, unitPrice: materialUnitPrice(item) });
+      }
+      if (matched.length) break;
+    }
+    if (matched.length) break;
+  }
+  matched.sort((a, b) => a.unitPrice - b.unitPrice || a.price - b.price);
+  const item = matched[0] || { group, requestedName: name, name, price: 0, unitPrice: 0, bundleCount: 1, icon: '', grade: '', missing: true };
+  return { item: { ...item, group, requestedName: name }, tried };
+}
+
+function materialSearchAliases(name) {
+  const base = String(name || '').trim();
+  const aliases = [base];
+  if (/^장인의\s*재봉술\s*\d단계$/.test(base)) aliases.push(base.replace(/(\d단계)$/, ': $1'));
+  if (/^장인의\s*야금술\s*\d단계$/.test(base)) aliases.push(base.replace(/(\d단계)$/, ': $1'));
+  return [...new Set(aliases)];
+}
+
+function isMaterialNameMatch(itemText, targetName, keyword) {
+  const compactText = normalizeText(itemText).replace(/\s+/g, '');
+  const target = normalizeText(targetName).replace(/\s+/g, '');
+  const key = normalizeText(keyword).replace(/\s+/g, '');
+  return compactText.includes(target) || compactText.includes(key);
+}
+
+function materialUnitPrice(item) {
+  const bundle = Number(item.bundleCount || 1) || 1;
+  return Math.round((Number(item.price || 0) / bundle) * 100) / 100;
 }
 
 async function getCachedMarketList(cacheKey, force, loader) {

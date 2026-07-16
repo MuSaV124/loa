@@ -1,4 +1,4 @@
-const VERSION = '5.7.0';
+const VERSION = '5.7.2';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1619,6 +1619,7 @@ function renderMarketSubTab() {
     accessory: $('marketAccessoryPanel'),
     engraving: $('marketEngravingPanel'),
     gem: $('marketGemPanel'),
+    material: $('marketMaterialPanel'),
   };
   Object.entries(panels).forEach(([key, el]) => {
     if (!el) return;
@@ -1640,6 +1641,7 @@ function autoLoadMarketSubTab() {
   if (!document.body.classList.contains('marketMode')) return;
   if (selectedMarketTab === 'gem') loadMarketGemList();
   if (selectedMarketTab === 'engraving') loadMarketEngravingList();
+  if (selectedMarketTab === 'material') loadMarketMaterialList();
 }
 
 function initMarketTabs() {
@@ -1755,7 +1757,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.7.0',
+    apiVersion: '5.7.2',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -1826,6 +1828,7 @@ function initMarketPriceTab() {
   $('accSearchButton')?.addEventListener('click', searchMarketAccessory);
   $('gemListButton')?.addEventListener('click', loadMarketGemList);
   $('engravingListButton')?.addEventListener('click', loadMarketEngravingList);
+  $('materialListButton')?.addEventListener('click', () => loadMarketMaterialList(true));
   $('accPartSelect')?.addEventListener('change', renderAccessoryRuleHint);
   $('accComboSelect')?.addEventListener('change', renderAccessoryRuleHint);
   renderAccessoryRuleHint();
@@ -1914,6 +1917,21 @@ async function loadMarketEngravingList() {
   try {
     const data = await fetchMarketJson(`/api/market-prices?mode=engravingList&_=${Date.now()}`);
     renderEngravingPriceGrid(resultEl, data);
+  } catch (error) {
+    renderMarketError(resultEl, error.message);
+  } finally {
+    if (button) { button.disabled = false; button.textContent = '새로고침'; }
+  }
+}
+
+async function loadMarketMaterialList(force = false) {
+  const button = $('materialListButton');
+  const resultEl = $('materialMarketResult');
+  if (button) { button.disabled = true; button.textContent = '조회 중'; }
+  if (resultEl) resultEl.innerHTML = '거래소에서 4티어 강화 재료 최저가를 조회하는 중입니다.';
+  try {
+    const data = await fetchMarketJson(`/api/market-prices?mode=t4Materials${force ? '&force=1' : ''}&_=${Date.now()}`);
+    renderMaterialPriceGrid(resultEl, data);
   } catch (error) {
     renderMarketError(resultEl, error.message);
   } finally {
@@ -2019,7 +2037,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.7.0</summary>
+      <summary>악세 디버그 보기 · v5.7.2</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>
@@ -2062,4 +2080,41 @@ if (!window.__lostarkCalculatorBootedV506) {
   setActiveTab('calculator');
   loadLostarkNoticeCard();
   loadDb().catch((error) => setMessage(error.message || '진화 노드 데이터를 불러오지 못했습니다.'));
+}
+
+function renderMaterialPriceGrid(container, data) {
+  if (!container) return;
+  const items = Array.isArray(data?.items) ? data.items : [];
+  if (!items.length) return renderMarketError(container, '4티어 재료 시세를 찾지 못했습니다.');
+  const grouped = new Map();
+  for (const item of items) {
+    const group = item.group || '기타';
+    if (!grouped.has(group)) grouped.set(group, []);
+    grouped.get(group).push(item);
+  }
+  container.innerHTML = `<div class="marketResultList">
+    <div class="marketRuleHint"><b>4티어 강화 재료</b> · 거래소 최저가 · ${escapeHtml(formatMarketUpdatedAt(data.updatedAt))}${data.cached ? ' · 캐시' : ''}</div>
+    ${[...grouped.entries()].map(([group, rows]) => `
+      <section class="materialPriceGroup">
+        <h3>${escapeHtml(group)}</h3>
+        <div class="materialPriceGrid">${rows.map(materialPriceCard).join('')}</div>
+      </section>
+    `).join('')}
+  </div>`;
+}
+
+function materialPriceCard(item) {
+  const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="">` : `<div class="marketIconFallback">재</div>`;
+  const missing = item.missing || !Number(item.price || 0);
+  const price = missing ? '매물 없음' : formatGold(item.price);
+  const bundle = Number(item.bundleCount || 1) || 1;
+  const unit = !missing && bundle > 1 ? `개당 ${formatGold(item.unitPrice)}` : '';
+  return `<article class="materialPriceCard ${missing ? 'missing' : ''}">
+    ${icon}
+    <div>
+      <b>${escapeHtml(item.requestedName || item.name || '-')}</b>
+      <small>${escapeHtml([item.name && item.name !== item.requestedName ? item.name : '', bundle > 1 ? `${bundle.toLocaleString('ko-KR')}개 묶음` : '', unit].filter(Boolean).join(' · ') || '거래소 최저가')}</small>
+    </div>
+    <strong>${escapeHtml(price)}</strong>
+  </article>`;
 }
