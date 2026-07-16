@@ -1,4 +1,4 @@
-const VERSION = '5.7.38';
+const VERSION = '5.7.39';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1439,7 +1439,10 @@ function formatSpecGold(value) {
   return `${Math.round(n).toLocaleString('ko-KR')}G`;
 }
 function specEfficiencyReason(row) {
-  if (row?.category === 'accessory' || row?.category === 'gem' || row?.category === 'engraving') return row.reason || '시세 기반 추정';
+  if (row?.category === 'accessory' || row?.category === 'gem' || row?.category === 'engraving') {
+    const reason = row.reason || '시세 기반 추정';
+    return reason.includes('추정') ? reason : `${reason} · 전투력 추정`;
+  }
   if (row?.available && !Number(row.expectedCost?.ratePercent || 0)) return '강화 확률 미확인';
   if (!row?.available) return row.reason || '비용표 없음';
   const missing = (row.cost?.rows || []).filter(item => item.missingPrice).map(item => item.name);
@@ -1450,6 +1453,21 @@ function specEfficiencyReason(row) {
   if (confidence === 'estimated') return row.hasGrowth ? '추정 전투력 · 장비 성장 포함' : '추정 전투력';
   if (row.hasGrowth) return '전투력 미검증 · 장비 성장 포함';
   return '전투력 미검증';
+}
+function combatPowerAccuracyHint() {
+  const training = state.combatPowerModel?.training || {};
+  const median = Number(training.medianAbsError || 0);
+  const p90 = Number(training.p90AbsError || 0);
+  const modelText = median > 0 && p90 > 0
+    ? `강화 변화량 모델은 샘플 기준 중앙 오차 ${median.toFixed(1)}, p90 오차 ${p90.toFixed(1)} 전투력입니다.`
+    : '현재 전투력은 공식 API 값을 사용합니다.';
+  return `${modelText} 악세/보석/각인서는 공식 변화식이 공개되지 않아 약값으로 표시합니다.`;
+}
+function specPowerDeltaText(row, powerDelta) {
+  if (!(powerDelta > 0)) return '전투력 -';
+  const confidence = row?.powerEstimate?.confidence;
+  const exact = confidence === 'verified';
+  return `${exact ? '전투력 +' : '전투력 약 +'}${powerDelta.toFixed(1)}`;
 }
 function renderSpecEfficiencyTable() {
   const el = $('specEfficiencyTable');
@@ -1485,7 +1503,7 @@ function renderSpecEfficiencyTable() {
         : expectedGold > 0
         ? `최저가: ${supportLabel} · 평균 ${formatGold(expectedGold)} · 장기백 ${formatGold((expected.pityAttempts || 0) * totalGold)}`
         : `1회 ${formatGold(totalGold)} · 거래 ${formatGold(tradeGold)} · 고정 ${formatGold(fixedGold)} · 실링 ${formatNumber(silver)}`;
-      const powerText = powerDelta > 0 ? `전투력 +${powerDelta.toFixed(1)}` : '전투력 -';
+      const powerText = specPowerDeltaText(row, powerDelta);
       const stepMainText = row.stepLabel || `+${Number(row.from || item.honingLevel || 0)} → +${Number(row.to || 0)}`;
       const upgradeDetailText = row.stepDetail || stepMainText;
       const powerDeltaText = powerText;
@@ -1512,7 +1530,7 @@ function renderSpecEfficiencyTable() {
   el.innerHTML = `<div class="specEfficiencyHeader">
     <span>스펙업 목표</span><span>효율</span><span>비용</span><span>비용/효율</span>
   </div>${rows}
-  <p class="powerCostHint">효율은 현재 전투력 대비 상승률(%), 비용/효율은 1% 상승당 기대 골드로 계산합니다. 강화는 장인의 기운 기대 비용, 악세/보석/각인서는 현재 시세와 전투력 변화량 추정치를 사용합니다.</p>`;
+  <p class="powerCostHint">효율은 현재 전투력 대비 상승률(%), 비용/효율은 1% 상승당 기대 골드로 계산합니다. ${escapeHtml(combatPowerAccuracyHint())}</p>`;
 }
 function renderAdvancedHoningAttemptCostTable() {
   const renderRows = (rows = []) => rows.map(row => {
