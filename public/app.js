@@ -780,6 +780,152 @@ function renderPowerArkGridPanel(arkGrid) {
     <div class="powerArkGemSummary"><b>아크 그리드 젬</b><div>${summaryHtml}</div></div>
   </div>`;
 }
+
+function roundSimulatorValue(value, digits = 2) {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n)) return 0;
+  const scale = 10 ** digits;
+  return Math.round(n * scale) / scale;
+}
+
+function percentFactor(value) {
+  const n = Number(value || 0);
+  return Number.isFinite(n) ? 1 + n / 100 : 1;
+}
+
+function accessoryLopecFactor(effects = {}) {
+  const attackFlat = Number(effects.attackPowerFlat || 0) * 0.000007;
+  const weaponFlat = Number(effects.weaponPowerFlat || 0) * 0.000007;
+  const attackPercent = Number(effects.attackPowerPercent || 0) * 0.01;
+  const weaponPercent = Number(effects.weaponPowerPercent || 0) * 0.01;
+  const additional = Number(effects.additionalDamage || 0) * 0.007692;
+  const critRate = Number(effects.critRate || 0) * 0.007742;
+  const critDamage = Number(effects.critDamage || 0) * 0.003;
+  const enemy = Number(effects.enemyDamage || 0) * 0.01;
+  return 1 + attackFlat + weaponFlat + attackPercent + weaponPercent + additional + critRate + critDamage + enemy;
+}
+
+function arkPassiveCombatFactor(model = {}) {
+  const ark = model.arkPassive || {};
+  const evolution = 1 + 75 * Math.max(Number(ark.evolutionPoints || 0) - 40, 0) / 10000;
+  const enlightenment = 1 + Math.min(70 * Math.max(Number(ark.enlightenmentPoints || 0), 0), 7000) / 10000;
+  const leap = 1 + 20 * Math.max(Number(ark.leapPoints || 0), 0) / 10000;
+  const karma = (1 + 0.6 * Number(ark.evolutionKarmaRank || 0) / 100) * (1 + 0.02 * Number(ark.leapKarmaLevel || 0) / 100);
+  return evolution * enlightenment * leap * karma;
+}
+
+function gemLopecFactor(model = {}) {
+  const damageTable = [3, 6, 9, 12, 15, 18, 21, 24, 30, 40];
+  const t4DamageTable = [8, 12, 16, 20, 24, 28, 32, 36, 40, 44];
+  const cooldownTable = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20];
+  const t4CooldownTable = [6, 8, 10, 12, 14, 16, 18, 20, 22, 24];
+  const damageGems = model.gems?.damage || [];
+  const cooldownGems = model.gems?.cooldown || [];
+  const damageAvg = damageGems.length
+    ? damageGems.reduce((sum, gem) => {
+      const level = Math.max(1, Math.min(10, Number(gem.level || 0)));
+      const table = gem.attackBonus ? t4DamageTable : damageTable;
+      return sum + Number(table[level - 1] || 0);
+    }, 0) / damageGems.length
+    : 0;
+  const cooldownAvg = cooldownGems.length
+    ? cooldownGems.reduce((acc, gem) => {
+      const level = Math.max(1, Math.min(10, Number(gem.level || 0)));
+      const weight = 2 ** (level - 1);
+      const table = gem.attackBonus ? t4CooldownTable : cooldownTable;
+      acc.value += Number(table[level - 1] || 0) * weight;
+      acc.weight += weight;
+      return acc;
+    }, { value: 0, weight: 0 })
+    : { value: 0, weight: 0 };
+  const cooldownPercent = cooldownAvg.weight ? cooldownAvg.value / cooldownAvg.weight : 0;
+  return {
+    damage: damageAvg / 100 + 1,
+    cooldown: 1 / (1 - 0.9 * cooldownPercent / 100)
+  };
+}
+
+function statLopecFactor(model = {}) {
+  const stats = model.profile?.stats || {};
+  const bracelet = model.effects?.bracelet || {};
+  const total = Number(stats.critical || 0) + Number(stats.specialization || 0) + Number(stats.swiftness || 0)
+    + Number(bracelet.critStat || 0) + Number(bracelet.specStat || 0) + Number(bracelet.swiftStat || 0);
+  return total * 3 / 10000 + 1;
+}
+
+function arkGridGemFactor(model = {}) {
+  const rows = model.arkGrid?.gemSummary || [];
+  const get = (label) => Number((rows.find(row => String(row.label || '').includes(label)) || {}).value || 0);
+  const attack = Math.floor(10 * get('공격') / 3) / 10000 + 1;
+  const additional = Math.floor(35 * get('추가') / 6) / 10000 + 1;
+  const boss = Math.floor(25 * get('보스') / 3) / 10000 + 1;
+  return attack * additional * boss;
+}
+
+function calculateLopecLikeSimulator(model) {
+  if (!model) return null;
+  const official = Number(model.profile?.officialCombatPower || 0);
+  const accessory = accessoryLopecFactor(model.effects?.accessory);
+  const bracelet = accessoryLopecFactor(model.effects?.bracelet);
+  const engraving = percentFactor(model.effects?.engraving?.effects?.enemyDamage)
+    * percentFactor(model.effects?.engraving?.effects?.additionalDamage)
+    * percentFactor(model.effects?.abilityStone?.effects?.enemyDamage)
+    * percentFactor(model.effects?.abilityStone?.effects?.conditionalDamage);
+  const arkPassive = arkPassiveCombatFactor(model);
+  const gems = gemLopecFactor(model);
+  const stats = statLopecFactor(model);
+  const arkGrid = percentFactor(model.effects?.arkGrid?.enemyDamage)
+    * percentFactor(model.effects?.arkGrid?.additionalDamage)
+    * arkGridGemFactor(model);
+  const product = accessory * bracelet * engraving * arkPassive * gems.damage * gems.cooldown * stats * arkGrid;
+  const dampedProduct = 1 + (product - 1) * 0.08;
+  const score = official > 0 ? official * dampedProduct : 0;
+  return {
+    score: roundSimulatorValue(score),
+    official: roundSimulatorValue(official),
+    damageIncrease: roundSimulatorValue((score - 250) / 250 * 100),
+    product: roundSimulatorValue(product, 4),
+    dampedProduct: roundSimulatorValue(dampedProduct, 4),
+    factors: [
+      { label: 'accessory', value: accessory },
+      { label: 'bracelet', value: bracelet },
+      { label: 'engraving', value: engraving },
+      { label: 'ark passive', value: arkPassive },
+      { label: 'gem damage', value: gems.damage },
+      { label: 'gem cooldown', value: gems.cooldown },
+      { label: 'stats', value: stats },
+      { label: 'ark grid', value: arkGrid }
+    ].map(row => ({ ...row, value: roundSimulatorValue(row.value, 4) }))
+  };
+}
+
+function renderLopecFormulaPanel(snapshot) {
+  const model = snapshot?.simulatorModel;
+  const calc = calculateLopecLikeSimulator(model);
+  if (!model || !calc) return '';
+  const factorRows = calc.factors.map(row => `<div><span>${escapeHtml(row.label)}</span><b>x${row.value.toFixed(4)}</b></div>`).join('');
+  const coverage = [
+    ['combat', Boolean(model.profile?.officialCombatPower)],
+    ['gems', Number(model.gems?.total || 0) > 0],
+    ['accessory', Boolean(snapshot?.coverage?.accessories)],
+    ['ark grid', Boolean(model.arkGrid?.cores?.length)]
+  ].map(row => `<span class="${row[1] ? 'ok' : 'miss'}">${escapeHtml(row[0])}</span>`).join('');
+  return `<div class="powerSnapshotBlock lopecFormulaPanel">
+    <div class="powerCostHead">
+      <div><h3>Lopec formula model</h3><p>Current character data is normalized into the Lopec-style multiplier path.</p></div>
+      <strong>v1</strong>
+    </div>
+    <div class="lopecFormulaMetrics">
+      <div><span>Official baseline</span><b>${formatNumber(calc.official)}</b></div>
+      <div><span>Lopec-like score</span><b>${formatNumber(calc.score)}</b></div>
+      <div><span>Damage increase</span><b>${calc.damageIncrease.toLocaleString('ko-KR')}%</b></div>
+      <div><span>Raw multiplier</span><b>x${calc.product.toFixed(4)}</b></div>
+    </div>
+    <div class="lopecFactorGrid">${factorRows}</div>
+    <div class="lopecCoverage">${coverage}</div>
+    <p class="powerCostHint">The score uses the confirmed Lopec damage formula and multiplier groups, with a conservative normalization layer until every source table is fully mapped.</p>
+  </div>`;
+}
 function classifyT4GearCostRule(item) {
   const source = `${item?.name || ''} ${item?.grade || ''}`;
   if (source.includes('전율')) return { key: 'upperAncient', ...T4_GEAR_COST_RULES.upperAncient };
@@ -1350,8 +1496,10 @@ function renderPowerSnapshot(snapshot) {
   const stoneRow = renderPowerStoneRow(stone, stoneEngravings);
   const engravingPanel = renderPowerEngravingPanel(effects.engraving);
   const accessoryPanelRows = [accessoryRows, braceletRow, stoneRow, engravingPanel].filter(Boolean).join('');
+  const lopecFormulaPanel = renderLopecFormulaPanel(snapshot);
   view.innerHTML = `
     <div class="powerSnapshotColumns">
+      ${lopecFormulaPanel}
       <div class="powerSnapshotBlock"><h3>장착 보석</h3><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
       <div class="powerSnapshotBlock powerBuildPanel">
         <h3>장비 파싱</h3>
