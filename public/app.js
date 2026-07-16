@@ -1,4 +1,4 @@
-const VERSION = '5.7.20';
+const VERSION = '5.7.27';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -105,6 +105,29 @@ const T4_NORMAL_GEAR_GROWTH_COSTS = {
     ]
   }
 };
+const T4_NORMAL_HONING_BASE_RATES = {
+  10: 10,
+  11: 10,
+  12: 5,
+  13: 5,
+  14: 4,
+  15: 4,
+  16: 3,
+  17: 3,
+  18: 3,
+  19: 1.5,
+  20: 1.5,
+  21: 1,
+  22: 1,
+  23: 0.5,
+  24: 0.5
+};
+const T4_NORMAL_HONING_FAIL_BONUS_RATE = 0.1;
+const T4_NORMAL_HONING_MAX_RATE_MULTIPLIER = 2;
+const T4_NORMAL_HONING_ARTISAN_FACTOR = 0.46511;
+const T4_NORMAL_HONING_ARTISAN_LIMIT = 100;
+const T4_NORMAL_HONING_BOOK_BONUS_MULTIPLIER = 1;
+const T4_NORMAL_HONING_FULL_BREATH_BONUS_MULTIPLIER = 1;
 const T4_NORMAL_REFINE_ATTEMPT_COSTS = {
   ancient: {
     label: '에기르 고대 장비',
@@ -220,6 +243,10 @@ function effectFullText(effect) {
 function num(v, fallback = 0) { const n = Number(String(v ?? '').replace(/,/g, '')); return Number.isFinite(n) ? n : fallback; }
 function pct(v) { return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`; }
 function fmt(v) { return Number(v || 0).toFixed(2); }
+function round2(v) {
+  const n = Number(v || 0);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+}
 function formatNumber(v) { const n = Number(v); return Number.isFinite(n) ? n.toLocaleString('ko-KR') : '-'; }
 function item(label, value) { return `<div class="cell"><b>${label}</b><span>${escapeHtml(value ?? '-')}</span></div>`; }
 function setMessage(text) { const el = $('message'); if (!text) { el.classList.add('hidden'); el.textContent = ''; return; } el.classList.remove('hidden'); el.textContent = text; }
@@ -903,6 +930,128 @@ function calculateMaterialGoldCost(materials, priceMap) {
   }
   return { rows, tradeGold, fixedGold, silver, totalGold: tradeGold + fixedGold };
 }
+function normalHoningBaseRatePercent(next) {
+  const from = Number(next?.from || 0);
+  const rate = Number(T4_NORMAL_HONING_BASE_RATES[from] || 0);
+  return Number.isFinite(rate) && rate > 0 ? rate : 0;
+}
+function normalHoningAttemptRatePercent(ratePercent, attempt, supportRatePercent = 0) {
+  const base = Number(ratePercent || 0);
+  const support = Number(supportRatePercent || 0);
+  const turn = Math.max(1, Math.floor(Number(attempt || 1)));
+  if (!Number.isFinite(base) || base <= 0) return 0;
+  const bonus = base * T4_NORMAL_HONING_FAIL_BONUS_RATE * (turn - 1);
+  return Math.min(base * T4_NORMAL_HONING_MAX_RATE_MULTIPLIER, base + bonus) + (Number.isFinite(support) && support > 0 ? support : 0);
+}
+function normalHoningArtisanGainPercent(attemptRatePercent) {
+  const gain = Number(attemptRatePercent || 0) * T4_NORMAL_HONING_ARTISAN_FACTOR;
+  return Number.isFinite(gain) && gain > 0 ? gain : 0;
+}
+function normalHoningPityAttempts(ratePercent, supportRatePercent = 0) {
+  if (!Number.isFinite(Number(ratePercent)) || Number(ratePercent) <= 0) return 0;
+  let artisan = 0;
+  for (let attempt = 1; attempt < 10000; attempt += 1) {
+    artisan += normalHoningArtisanGainPercent(normalHoningAttemptRatePercent(ratePercent, attempt, supportRatePercent));
+    if (artisan >= T4_NORMAL_HONING_ARTISAN_LIMIT) return attempt + 1;
+  }
+  return 0;
+}
+function buildNormalHoningRateSchedule(ratePercent, pityAttempts, supportRatePercent = 0) {
+  const cap = Math.floor(Number(pityAttempts || 0));
+  if (!cap) return [];
+  return Array.from({ length: cap }, (_, index) => round2(normalHoningAttemptRatePercent(ratePercent, index + 1, supportRatePercent)));
+}
+function expectedAttemptsWithPity(ratePercent, pityAttempts, supportRatePercent = 0) {
+  const cap = Math.floor(Number(pityAttempts || 0));
+  if (!Number.isFinite(cap) || cap <= 0) return 0;
+  let expected = 0;
+  let survive = 1;
+  for (let attempt = 1; attempt <= cap; attempt += 1) {
+    expected += survive;
+    if (attempt === cap) break;
+    const p = normalHoningAttemptRatePercent(ratePercent, attempt, supportRatePercent) / 100;
+    if (!Number.isFinite(p) || p <= 0) return 0;
+    survive *= Math.max(0, 1 - p);
+  }
+  return expected;
+}
+function normalHoningOptionalNames(materials) {
+  const names = Object.keys(materials || {});
+  return {
+    breathName: names.find(name => name.includes('숨결')) || '',
+    bookName: names.find(name => name.includes('재봉술') || name.includes('야금술')) || ''
+  };
+}
+function cloneMaterialsWithoutOptional(materials, optional) {
+  const copy = { ...(materials || {}) };
+  if (optional?.breathName) delete copy[optional.breathName];
+  if (optional?.bookName) delete copy[optional.bookName];
+  return copy;
+}
+function normalHoningSupportRatePercent(ratePercent, strategy) {
+  const base = Number(ratePercent || 0);
+  if (!Number.isFinite(base) || base <= 0) return 0;
+  const maxBreath = Number(strategy?.maxBreath || 0);
+  const breathCount = Number(strategy?.breathCount || 0);
+  const breathRatio = maxBreath > 0 ? Math.max(0, Math.min(maxBreath, breathCount)) / maxBreath : 0;
+  const breathBonus = base * T4_NORMAL_HONING_FULL_BREATH_BONUS_MULTIPLIER * breathRatio;
+  const bookBonus = strategy?.useBook ? base * T4_NORMAL_HONING_BOOK_BONUS_MULTIPLIER : 0;
+  return breathBonus + bookBonus;
+}
+function buildNormalHoningStrategyMaterials(baseMaterials, optional, strategy) {
+  const materials = { ...(baseMaterials || {}) };
+  if (optional?.breathName && Number(strategy?.breathCount || 0) > 0) {
+    addMaterialAmount(materials, optional.breathName, Math.floor(Number(strategy.breathCount || 0)));
+  }
+  if (optional?.bookName && strategy?.useBook) addMaterialAmount(materials, optional.bookName, 1);
+  return materials;
+}
+function describeNormalHoningStrategy(strategy) {
+  const parts = [];
+  if (Number(strategy?.maxBreath || 0) > 0) parts.push(`숨결 ${formatNumber(strategy.breathCount || 0)}/${formatNumber(strategy.maxBreath || 0)}`);
+  if (strategy?.bookName) parts.push(strategy.useBook ? '책 사용' : '책 미사용');
+  return parts.length ? parts.join(' · ') : '보조재료 없음';
+}
+function calculateNormalHoningExpectedCostForStrategy(cost, next, strategy = {}) {
+  const ratePercent = normalHoningBaseRatePercent(next);
+  const supportRatePercent = normalHoningSupportRatePercent(ratePercent, strategy);
+  const pityAttempts = normalHoningPityAttempts(ratePercent, supportRatePercent);
+  const expectedAttempts = expectedAttemptsWithPity(ratePercent, pityAttempts, supportRatePercent);
+  const rateSchedule = buildNormalHoningRateSchedule(ratePercent, Math.min(pityAttempts, 11), supportRatePercent);
+  const totalGold = Number(cost?.totalGold || 0);
+  return {
+    ratePercent,
+    supportRatePercent,
+    pityAttempts,
+    expectedAttempts,
+    maxRatePercent: normalHoningAttemptRatePercent(ratePercent, 11, supportRatePercent),
+    rateSchedule,
+    expectedGold: totalGold > 0 && expectedAttempts > 0 ? totalGold * expectedAttempts : 0,
+    basis: ratePercent > 0 ? 'support-optimized-fail-bonus-with-artisan' : 'missing-base-rate'
+  };
+}
+function calculateNormalHoningExpectedCost(baseMaterials, next, priceMap) {
+  const optional = normalHoningOptionalNames(next.materials);
+  const maxBreath = Math.floor(Number(optional.breathName ? next.materials?.[optional.breathName] : 0) || 0);
+  const bookOptions = optional.bookName ? [false, true] : [false];
+  const rows = [];
+  const breathOptions = maxBreath > 0 ? [0, maxBreath] : [0];
+  for (const breathCount of breathOptions) {
+    for (const useBook of bookOptions) {
+      const strategy = { breathCount, maxBreath, useBook, bookName: optional.bookName };
+      const materials = buildNormalHoningStrategyMaterials(baseMaterials, optional, strategy);
+      const cost = calculateMaterialGoldCost(materials, priceMap);
+      const expected = calculateNormalHoningExpectedCostForStrategy(cost, next, strategy);
+      rows.push({ strategy, materials, cost, expectedCost: expected, label: describeNormalHoningStrategy(strategy) });
+    }
+  }
+  rows.sort((a, b) => {
+    const av = Number(a.expectedCost?.expectedGold || 0) || Infinity;
+    const bv = Number(b.expectedCost?.expectedGold || 0) || Infinity;
+    return av - bv;
+  });
+  return rows[0] || null;
+}
 let combatPowerModelPromise = null;
 async function loadCombatPowerModel() {
   if (state.combatPowerModel) return state.combatPowerModel;
@@ -1050,9 +1199,13 @@ function calculateNextNormalRefineEstimates(snapshot, priceMap) {
         to: Number(item?.honingLevel || 0) + 1
       };
     }
-    const cost = calculateMaterialGoldCost(next.materials, priceMap);
+    const optional = normalHoningOptionalNames(next.materials);
+    const baseMaterials = cloneMaterialsWithoutOptional(next.materials, optional);
+    const optimized = calculateNormalHoningExpectedCost(baseMaterials, next, priceMap);
+    const cost = optimized?.cost || calculateMaterialGoldCost(baseMaterials, priceMap);
     const powerEstimate = estimateNormalHoningPowerDelta(item, snapshot, next);
-    return { item, available: true, ...next, cost, powerDelta: powerEstimate.value, powerEstimate };
+    const expectedCost = optimized?.expectedCost || calculateNormalHoningExpectedCostForStrategy(cost, next);
+    return { item, available: true, ...next, cost, expectedCost, supportStrategy: optimized?.strategy || null, supportLabel: optimized?.label || '보조재료 없음', powerDelta: powerEstimate.value, powerEstimate };
   });
 }
 function storePowerCostEstimates(priceMap) {
@@ -1063,8 +1216,8 @@ function storePowerCostEstimates(priceMap) {
 function renderSpecEfficiencyShell() {
   return `<div class="powerSnapshotBlock powerEfficiencyPanel">
     <div class="powerCostHead">
-      <div><h3>전투력 변화량 효율표</h3><p>시세탭 재료 가격으로 다음 일반 재련 1회 비용을 계산하고, 골드 대비 전투력 변화량 효율로 정렬합니다.</p></div>
-      <strong>골드 / 전투력</strong>
+      <div><h3>전투력 변화량 효율표</h3><p>시세탭 재료 가격과 실패 누적 확률 증가, 장기백 상한을 반영해 성공 1회 기대 비용 기준으로 정렬합니다.</p></div>
+      <strong>기대 골드 / 전투력</strong>
     </div>
     <div id="specEfficiencyTable" class="specEfficiencyTable">
       <p class="powerCostHint">재료 시세를 불러오는 중입니다.</p>
@@ -1072,13 +1225,13 @@ function renderSpecEfficiencyShell() {
   </div>`;
 }
 function specEfficiencyScore(row) {
-  const cost = row?.cost || {};
-  const totalGold = Number(cost.totalGold || 0);
+  const expectedGold = Number(row?.expectedCost?.expectedGold || 0);
   const powerDelta = Number(row?.powerDelta || 0);
-  if (!row?.available || totalGold <= 0 || powerDelta <= 0) return Infinity;
-  return totalGold / powerDelta;
+  if (!row?.available || expectedGold <= 0 || powerDelta <= 0) return Infinity;
+  return expectedGold / powerDelta;
 }
 function specEfficiencyReason(row) {
+  if (row?.available && !Number(row.expectedCost?.ratePercent || 0)) return '강화 확률 미확인';
   if (!row?.available) return row.reason || '비용표 없음';
   const missing = (row.cost?.rows || []).filter(item => item.missingPrice).map(item => item.name);
   if (missing.length) return `시세 없음: ${missing.slice(0, 2).join(', ')}${missing.length > 2 ? ' 외' : ''}`;
@@ -1106,9 +1259,18 @@ function renderSpecEfficiencyTable() {
       const tradeGold = Number(cost.tradeGold || 0);
       const fixedGold = Number(cost.fixedGold || 0);
       const silver = Number(cost.silver || 0);
+      const expected = row.expectedCost || {};
+      const expectedGold = Number(expected.expectedGold || 0);
+      const ratePercent = Number(expected.ratePercent || 0);
+      const pityAttempts = Number(expected.pityAttempts || 0);
+      const expectedAttempts = Number(expected.expectedAttempts || 0);
+      const supportLabel = row.supportLabel || '보조재료 없음';
       const rank = row.available && Number.isFinite(specEfficiencyScore(row)) ? index + 1 : '-';
       const powerDelta = Number(row.powerDelta || 0);
-      const scoreText = row.available && totalGold > 0 && powerDelta > 0 ? `${formatGold(totalGold / powerDelta)} / CP` : '-';
+      const scoreText = row.available && expectedGold > 0 && powerDelta > 0 ? `${formatGold(expectedGold / powerDelta)} / CP` : '-';
+      const costDetailText = expectedGold > 0
+        ? `예상 ${formatGold(expectedGold)} · 1회 ${formatGold(totalGold)} · ${supportLabel} · 성공률 ${ratePercent.toFixed(2)}~${Number(expected.maxRatePercent || ratePercent).toFixed(2)}% · 평균 ${expectedAttempts.toFixed(1)}회 · 장기백 ${formatNumber(pityAttempts)}회`
+        : `1회 ${formatGold(totalGold)} · 거래 ${formatGold(tradeGold)} · 고정 ${formatGold(fixedGold)} · 실링 ${formatNumber(silver)}`;
       const deltaPercent = Number(row.powerEstimate?.percent || 0);
       const percentText = deltaPercent > 0 ? ` · ${deltaPercent.toFixed(2)}%` : '';
       const powerText = powerDelta > 0 ? `CP +${powerDelta.toFixed(1)}${percentText}` : 'CP -';
@@ -1124,15 +1286,15 @@ function renderSpecEfficiencyTable() {
         <div class="specEfficiencyStep"><b>+${Number(row.from || item.honingLevel || 0)}</b><span>→ +${Number(row.to || 0)} · ${escapeHtml(powerText)}</span></div>
         <div class="specEfficiencyCost">
           <b>${escapeHtml(scoreText)}</b>
-          <span>거래 ${formatGold(tradeGold)} · 고정 ${formatGold(fixedGold)} · 실링 ${formatNumber(silver)}</span>
+          <span>${escapeHtml(costDetailText)}</span>
         </div>
         <div class="specEfficiencyNote">${escapeHtml(specEfficiencyReason(row))}</div>
       </div>`;
     }).join('');
   el.innerHTML = `<div class="specEfficiencyHeader">
-    <span>순위</span><span>대상</span><span>구간</span><span>골드 / 전투력</span><span>비고</span>
+    <span>순위</span><span>대상</span><span>구간</span><span>기대 골드 / 전투력</span><span>비고</span>
   </div>${rows}
-  <p class="powerCostHint">최종 전투력 전체를 예측하지 않고, 공식 API 샘플로 검증한 업그레이드별 전투력 변화율(%)을 우선 사용합니다. 검증값이 없으면 현재 공식 전투력에 무기/방어구 기본 변화율을 곱해 골드 대비 효율을 계산합니다.</p>`;
+  <p class="powerCostHint">전투력 변화량은 공식 API 샘플 기반 변화율(%)을 우선 사용하고, 비용은 노숨/풀숨과 책 사용 여부를 비교해 장인의 기운 누적 확정 성공까지 반영한 기대 성공 비용이 가장 낮은 조합으로 계산합니다.</p>`;
 }
 function renderAdvancedHoningAttemptCostTable() {
   const renderRows = (rows = []) => rows.map(row => {
