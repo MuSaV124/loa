@@ -335,8 +335,11 @@ const ARK_GRID_CORE_ORDER = [
 function extractArkGridSnapshot(arkGrid) {
   const slots = Array.isArray(arkGrid?.Slots) ? arkGrid.Slots : [];
   if (!slots.length) return { slots: [], gemSummary: [] };
+  const usedSlotIndexes = new Set();
   const rows = ARK_GRID_CORE_ORDER.map((order, index) => {
-    const slot = findArkGridSlot(slots, order, index);
+    const found = findArkGridSlot(slots, order, index, usedSlotIndexes);
+    const slot = found?.slot || null;
+    if (Number.isInteger(found?.index)) usedSlotIndexes.add(found.index);
     const text = arkGridTooltipText(slot?.Tooltip);
     const activeTexts = activeArkGridOptionTexts(text, Number(slot?.Point || 0));
     const name = cleanArkGridCoreName(stripHtml(slot?.Name || ''), order);
@@ -359,20 +362,32 @@ function extractArkGridSnapshot(arkGrid) {
 function cleanArkGridCoreName(name, order) {
   const fallback = `${order.side} ${order.symbol}`;
   const cleaned = stripHtml(name || '')
-    .replace(/\b(?:질서|혼돈)\b/g, '')
-    .replace(/\b(?:해|달|별)\b/g, '')
-    .replace(/\b(?:코어|아크\s*그리드)\b/g, '')
+    .replace(/(?:질서|혼돈)\s*의?\s*(?:해|달|별)\s*코어/g, '')
+    .replace(/^(?:질서|혼돈)\s*의?\s*(?:해|달|별)\s*[-:·|]?\s*/g, '')
+    .replace(/^(?:질서|혼돈)\s*[-:·|]?\s*/g, '')
+    .replace(/\s*(?:해|달|별)\s*코어\s*$/g, '')
+    .replace(/\s*코어\s*$/g, '')
+    .replace(/^[\s\-:·|]+|[\s\-:·|]+$/g, '')
     .replace(/\s+/g, ' ')
     .trim();
   return cleaned || fallback;
 }
 
-function findArkGridSlot(slots, order, fallbackIndex) {
-  const match = slots.find(slot => {
-    const text = `${slot?.Name || ''} ${slot?.Grade || ''} ${arkGridTooltipText(slot?.Tooltip)}`;
-    return text.includes(order.side) && text.includes(order.symbol);
-  });
-  return match || slots[fallbackIndex] || null;
+function findArkGridSlot(slots, order, fallbackIndex, usedSlotIndexes = new Set()) {
+  const indexed = slots.map((slot, index) => ({ slot, index })).filter(row => !usedSlotIndexes.has(row.index));
+  const nameMatch = indexed.find(({ slot }) => isArkGridCoreMatch(`${slot?.Name || ''} ${slot?.Grade || ''}`, order));
+  if (nameMatch) return nameMatch;
+  const textMatch = indexed.find(({ slot }) => isArkGridCoreMatch(`${slot?.Name || ''} ${slot?.Grade || ''} ${arkGridTooltipText(slot?.Tooltip)}`, order));
+  if (textMatch) return textMatch;
+  if (!usedSlotIndexes.has(fallbackIndex) && slots[fallbackIndex]) return { slot: slots[fallbackIndex], index: fallbackIndex };
+  return indexed[0] || null;
+}
+
+function isArkGridCoreMatch(text, order) {
+  const source = stripHtml(text || '').replace(/\s+/g, ' ');
+  const side = escapeRegExp(order.side);
+  const symbol = escapeRegExp(order.symbol);
+  return new RegExp(`${side}\\s*의?\\s*${symbol}\\s*코어|${side}.{0,12}${symbol}|${symbol}\\s*코어.{0,12}${side}`).test(source);
 }
 
 function parseArkGridGemSummary(arkGrid, rows) {
