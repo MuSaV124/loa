@@ -339,10 +339,11 @@ function extractArkGridSnapshot(arkGrid) {
     const slot = findArkGridSlot(slots, order, index);
     const text = arkGridTooltipText(slot?.Tooltip);
     const activeTexts = activeArkGridOptionTexts(text, Number(slot?.Point || 0));
+    const name = cleanArkGridCoreName(stripHtml(slot?.Name || ''), order);
     return {
       side: order.side,
       symbol: order.symbol,
-      name: stripHtml(slot?.Name || `${order.side} ${order.symbol}`),
+      name,
       grade: slot?.Grade || '',
       point: firstFiniteNumber([slot?.Point, matchNumber(text, [/([0-9]+)\s*P/])]) || 0,
       icon: normalizeIconUrl(slot?.Icon || slot?.IconPath || findIconPath(slot?.Tooltip) || ''),
@@ -352,7 +353,18 @@ function extractArkGridSnapshot(arkGrid) {
       rawKnownKeys: Object.keys(slot || {}).sort()
     };
   });
-  return { slots: rows, gemSummary: parseArkGridGemSummary(rows) };
+  return { slots: rows, gemSummary: parseArkGridGemSummary(arkGrid, rows) };
+}
+
+function cleanArkGridCoreName(name, order) {
+  const fallback = `${order.side} ${order.symbol}`;
+  const cleaned = stripHtml(name || '')
+    .replace(/\b(?:질서|혼돈)\b/g, '')
+    .replace(/\b(?:해|달|별)\b/g, '')
+    .replace(/\b(?:코어|아크\s*그리드)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned || fallback;
 }
 
 function findArkGridSlot(slots, order, fallbackIndex) {
@@ -363,21 +375,49 @@ function findArkGridSlot(slots, order, fallbackIndex) {
   return match || slots[fallbackIndex] || null;
 }
 
-function parseArkGridGemSummary(rows) {
-  const text = rows.flatMap(row => row.activeTexts || []).join(' ');
+function parseArkGridGemSummary(arkGrid, rows) {
+  const text = [
+    ...collectAllTextDeep(arkGrid),
+    ...rows.flatMap(row => row.activeTexts || [])
+  ].join(' ');
   const entries = [
-    ['공격력', [/(?<!무기\s*)공격력(?:이|가)?\s*(?:\+)?([0-9,.]+)/g]],
-    ['보스 피해', [/보스(?:에게)?\s*(?:주는\s*)?피해(?:량)?(?:이|가)?\s*(?:\+)?([0-9,.]+)/g]],
-    ['추가 피해', [/추가\s*피해(?:가)?\s*(?:\+)?([0-9,.]+)/g]],
-    ['아군 공격 강화', [/아군\s*공격력\s*강화\s*효과(?:가)?\s*(?:\+)?([0-9,.]+)/g]],
-    ['아군 피해 강화', [/아군\s*피해량\s*강화\s*효과(?:가)?\s*(?:\+)?([0-9,.]+)/g]],
-    ['낙인력', [/낙인력(?:이)?\s*(?:\+)?([0-9,.]+)/g]]
+    ['공격력', [/(?<!무기\s*)공격력(?:\s*강화)?(?:이|가)?\s*(?:\+)?([0-9,.]+)/g, /([0-9,.]+)\s*(?:의\s*)?공격력(?:\s*강화)?/g]],
+    ['보스 피해', [/보스(?:에게)?\s*(?:주는\s*)?피해(?:량)?(?:이|가)?\s*(?:\+)?([0-9,.]+)/g, /([0-9,.]+)\s*보스\s*피해/g]],
+    ['추가 피해', [/추가\s*피해(?:가)?\s*(?:\+)?([0-9,.]+)/g, /([0-9,.]+)\s*추가\s*피해/g]],
+    ['아군 공격 강화', [/아군\s*공격력\s*강화\s*효과?(?:가)?\s*(?:\+)?([0-9,.]+)/g, /([0-9,.]+)\s*아군\s*공격\s*강화/g]],
+    ['아군 피해 강화', [/아군\s*피해량?\s*강화\s*효과?(?:가)?\s*(?:\+)?([0-9,.]+)/g, /([0-9,.]+)\s*아군\s*피해\s*강화/g]],
+    ['낙인력', [/낙인력(?:이)?\s*(?:\+)?([0-9,.]+)/g, /([0-9,.]+)\s*낙인력/g]]
   ];
   return entries.map(([label, regexList]) => ({ label, value: sumRegexNumbers(text, regexList) })).filter(row => Number(row.value || 0) > 0);
 }
 
+function collectAllTextDeep(value, bucket = []) {
+  if (value == null) return bucket;
+  if (typeof value === 'string') {
+    const clean = stripHtml(value);
+    if (clean) bucket.push(clean);
+    const trimmed = value.trim();
+    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+      try { collectAllTextDeep(JSON.parse(trimmed), bucket); } catch {}
+    }
+    return bucket;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    bucket.push(String(value));
+    return bucket;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectAllTextDeep(item, bucket);
+    return bucket;
+  }
+  if (typeof value === 'object') {
+    for (const item of Object.values(value)) collectAllTextDeep(item, bucket);
+  }
+  return bucket;
+}
+
 function sumRegexNumbers(text, regexList) {
-  let total = 0;
+  let best = 0;
   const seen = new Set();
   for (const re of regexList) {
     re.lastIndex = 0;
@@ -386,10 +426,10 @@ function sumRegexNumbers(text, regexList) {
       const token = `${match.index}:${match[0]}`;
       if (seen.has(token)) continue;
       seen.add(token);
-      total += parseNumber(match[1]);
+      best = Math.max(best, Number(parseNumber(match[1]) || 0));
     }
   }
-  return round2(total);
+  return round2(best);
 }
 
 function findQualityValue(value) {
@@ -931,10 +971,7 @@ function parseAccessoryText(text, itemType = '', itemGrade = '') {
     /보호\s*효과가\s*적용된\s*대상이\s*\d+초\s*동안\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
   ], source, itemType, itemGrade);
 
-  addMatches(out, 'maxHp', source, [
-    /최대\s*생명력\s*(?:\+)?(\d[\d,]*)/g,
-    /체력\s*(?:\+)?(\d[\d,]*)/g
-  ], source, itemType, itemGrade);
+  addMaxHpMatches(out, source, itemType, itemGrade);
 
   addMatches(out, 'maxMana', source, [
     /최대\s*마나\s*(?:\+)?(\d[\d,]*)/g
@@ -994,6 +1031,7 @@ function parseAccessoryText(text, itemType = '', itemGrade = '') {
     /방향성\s*공격이\s*아닌\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
   ], enemyDamageSource, itemType, itemGrade);
 
+  if (itemType === '팔찌') adjustBraceletStackedEffects(source, out);
   if (itemType === '팔찌') out.optionSlots = extractBraceletOptionSlots(source, out, itemGrade);
 
   for (const key of Object.keys(out)) {
@@ -1003,10 +1041,56 @@ function parseAccessoryText(text, itemType = '', itemGrade = '') {
   return out;
 }
 
+function adjustBraceletStackedEffects(source, out) {
+  const sixStack = source.match(/매\s*초\s*마다.{0,40}무기\s*공격력(?:이)?\s*(?:\+)?(\d[\d,]*).{0,80}공격\s*및\s*이동\s*속도(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%.{0,80}최대\s*6\s*중첩/s);
+  if (sixStack) {
+    const weapon = Number(String(sixStack[1]).replace(/,/g, ''));
+    const speed = Number(sixStack[2]);
+    if (Number.isFinite(weapon)) out.weaponPowerFlat += weapon * 5;
+    if (Number.isFinite(speed)) out.attackMoveSpeed += speed * 5;
+  }
+  const thirtyStack = source.match(/무기\s*공격력(?:이)?\s*(?:\+)?(\d[\d,]*).{0,120}무기\s*공격력(?:이)?\s*(?:\+)?(\d[\d,]*).{0,80}최대\s*30\s*중첩/s);
+  if (thirtyStack) {
+    const perStack = Number(String(thirtyStack[2]).replace(/,/g, ''));
+    if (Number.isFinite(perStack)) out.weaponPowerFlat += perStack * 29;
+  }
+}
+
+function addMaxHpMatches(out, source, itemType = '', itemGrade = '') {
+  const regexList = itemType === '팔찌'
+    ? [/최대\s*생명력\s*(?:\+)?(\d[\d,]*)/g, /체력\s*(?:\+)?(\d[\d,]*)/g]
+    : [/최대\s*생명력\s*(?:\+)?(\d[\d,]*)/g];
+  const seen = new Set();
+  for (const re of regexList) {
+    re.lastIndex = 0;
+    let match;
+    while ((match = re.exec(source)) !== null) {
+      if (itemType !== '팔찌' && !isAccessoryRefiningContext(source, match.index)) continue;
+      const value = Number(String(match[1] || 0).replace(/,/g, ''));
+      if (!Number.isFinite(value)) continue;
+      const token = `${match.index}:${match[0]}`;
+      if (seen.has(token)) continue;
+      seen.add(token);
+      out.maxHp += value;
+      const grade = optionGradeByValue('maxHp', value, itemType, itemGrade) || optionGradeNearMatch(source, match.index);
+      if (grade && !out.optionGrades.maxHp) out.optionGrades.maxHp = grade;
+    }
+  }
+}
+
+function isAccessoryRefiningContext(text, index) {
+  const start = Math.max(0, Number(index || 0) - 160);
+  const end = Math.min(String(text || '').length, Number(index || 0) + 160);
+  const near = String(text || '').slice(start, end);
+  if (/연마|옵션|상\s*옵션|중\s*옵션|하\s*옵션|ACCESSORY_UPGRADE/i.test(near)) return true;
+  return Boolean(optionGradeNearMatch(text, index));
+}
+
 function extractBraceletOptionSlots(text, effects, itemGrade = '') {
   const source = String(text || '');
   const slots = [];
   const push = (key, label, value, gradeKey = key, extraText = '') => {
+    if (slots.some(slot => slot.key === key && slot.text.includes(label))) return;
     const grade = optionGradeByValue(gradeKey, value, '팔찌', itemGrade) || effects?.optionGrades?.[gradeKey] || '';
     const isFlat = key.endsWith('Flat') || ['maxHp', 'maxMana', 'critStat', 'swiftStat', 'specStat', 'strength', 'dexterity', 'intelligence'].includes(key);
     const main = isFlat ? `${label} +${Number(value).toLocaleString('ko-KR')}` : `${label} ${pctForServer(value)}`;
@@ -1031,11 +1115,21 @@ function extractBraceletOptionSlots(text, effects, itemGrade = '') {
     push('critDamage', '치피', critDamage, 'critDamage', bonus ? `치명타 적중 주피 ${pctForServer(bonus)}` : '');
   }
 
+  const cooldownEnemyDamage = firstMatchNumber(source, [/재사용\s*대기시간(?:이)?\s*\d+(?:\.\d+)?%\s*증가하지만.{0,50}적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
+  if (cooldownEnemyDamage) push('enemyDamage', '쿨증 적주피', cooldownEnemyDamage, 'enemyDamage');
+
   const enemyDamage = firstMatchNumber(source, [/(?<!무력화\s*상태의\s*)적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*증가한다/i]);
   if (enemyDamage) {
     const stagger = firstMatchNumber(source, [/무력화\s*상태의\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
     push('enemyDamage', '적주피', enemyDamage, 'enemyDamage', stagger ? `무력화 피해 ${pctForServer(stagger)}` : '');
   }
+
+  const backAttack = firstMatchNumber(source, [/백어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
+  if (backAttack) push('enemyDamage', '백어택 주피', backAttack, 'enemyDamage');
+  const headAttack = firstMatchNumber(source, [/헤드어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
+  if (headAttack) push('enemyDamage', '헤드어택 주피', headAttack, 'enemyDamage');
+  const nonDirectional = firstMatchNumber(source, [/방향성\s*공격이\s*아닌\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
+  if (nonDirectional) push('enemyDamage', '비방향성 주피', nonDirectional, 'enemyDamage');
 
   const additional = firstMatchNumber(source, [/추가\s*피해(?:가|\s*\+)?\s*(?:\+)?(\d+(?:\.\d+)?)\s*%/i]);
   if (additional) {
@@ -1065,12 +1159,21 @@ function extractBraceletOptionSlots(text, effects, itemGrade = '') {
     .map(match => Number(String(match[1]).replace(/,/g, '')))
     .filter(Number.isFinite);
   if (weaponValues.length) {
-    const main = weaponValues[0];
+    const stacked = braceletStackedWeaponPower(source, weaponValues);
+    const main = stacked || weaponValues[0];
     const extra = weaponValues.slice(1).map(v => `조건부 무공 +${v.toLocaleString('ko-KR')}`).join(' / ');
     push('weaponPowerFlat', '무공', main, 'weaponPowerFlat', extra);
   }
 
   return slots;
+}
+
+function braceletStackedWeaponPower(source, weaponValues) {
+  const six = source.match(/최대\s*6\s*중첩/);
+  if (six && weaponValues[0]) return weaponValues[0] * 6;
+  const thirty = source.match(/최대\s*30\s*중첩/);
+  if (thirty && weaponValues.length >= 2) return weaponValues[0] + weaponValues[1] * 30;
+  return 0;
 }
 
 function firstMatchNumber(text, regexList) {
