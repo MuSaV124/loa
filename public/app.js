@@ -1,4 +1,4 @@
-const VERSION = '5.7.36';
+const VERSION = '5.7.37';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1276,7 +1276,7 @@ async function calculateAccessorySpecEstimates() {
         powerEstimate: { confidence: 'estimated', basis: 'market accessory option coefficient model' },
         supportLabel: `${candidate.label} ${candidate.comboLabel} 최저가`,
         stepLabel: candidate.label,
-        stepDetail: `${candidate.comboLabel} · CP +${powerDelta.toFixed(1)}`,
+        stepDetail: candidate.comboLabel,
         reason: price > 0 ? '악세 시세 기반 추정' : '악세 시세 없음'
       };
     } catch (error) {
@@ -1326,7 +1326,7 @@ async function calculateGemSpecEstimates(snapshot) {
       powerEstimate: { confidence: 'estimated', basis: 'gem average combat-power coefficient model' },
       supportLabel: `${kind} ${currentLevel}레벨 최저가 × ${buyCount}개`,
       stepLabel: `${kind} 보석`,
-      stepDetail: `Lv.${nextLevel - 1} → Lv.${nextLevel} · CP +${powerDelta.toFixed(1)}`,
+      stepDetail: `Lv.${nextLevel - 1} → Lv.${nextLevel}`,
       reason: price > 0 ? '보석 합성 3개 기준' : '보석 시세 없음'
     };
   });
@@ -1431,9 +1431,10 @@ function renderSpecEfficiencyTable() {
         : expectedGold > 0
         ? `최저가: ${supportLabel} · 평균 ${formatGold(expectedGold)} · 장기백 ${formatGold((expected.pityAttempts || 0) * totalGold)}`
         : `1회 ${formatGold(totalGold)} · 거래 ${formatGold(tradeGold)} · 고정 ${formatGold(fixedGold)} · 실링 ${formatNumber(silver)}`;
-      const powerText = powerDelta > 0 ? `CP +${powerDelta.toFixed(1)}` : 'CP -';
+      const powerText = powerDelta > 0 ? `전투력 +${powerDelta.toFixed(1)}` : '전투력 -';
       const stepMainText = row.stepLabel || `+${Number(row.from || item.honingLevel || 0)} → +${Number(row.to || 0)}`;
-      const stepSubText = row.stepDetail || powerText;
+      const upgradeDetailText = row.stepDetail || stepMainText;
+      const powerDeltaText = powerText;
       return `<div class="specEfficiencyRow ${row.available ? '' : 'disabled'}">
         <div class="specEfficiencyTarget">
           ${powerItemIcon(item)}
@@ -1442,7 +1443,7 @@ function renderSpecEfficiencyTable() {
             <span>${escapeHtml(item.name || '-')} · ${escapeHtml(stepMainText)}</span>
           </div>
         </div>
-        <div class="specEfficiencyStep"><b>${escapeHtml(efficiencyText)}</b><span>${escapeHtml(stepSubText)}</span></div>
+        <div class="specEfficiencyStep"><b>${escapeHtml(efficiencyText)}</b><span>${escapeHtml(powerDeltaText)}</span></div>
         <div class="specEfficiencyExpected">
           <b>${escapeHtml(expectedGoldText)}</b>
           <span>기대 비용</span>
@@ -1451,7 +1452,7 @@ function renderSpecEfficiencyTable() {
           <b>${escapeHtml(scoreText)}</b>
           <span>1% 상승당</span>
         </div>
-        <div class="specEfficiencyDetail">${escapeHtml(expectedDetailText)} · ${escapeHtml(specEfficiencyReason(row))}</div>
+        <div class="specEfficiencyDetail">${escapeHtml(upgradeDetailText)} · ${escapeHtml(expectedDetailText)} · ${escapeHtml(specEfficiencyReason(row))}</div>
       </div>`;
     }).join('');
   el.innerHTML = `<div class="specEfficiencyHeader">

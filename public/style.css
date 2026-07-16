@@ -213,9 +213,15 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .specEfficiencyCost {
   min-width: 0;
 }
+.specEfficiencyStep {
+  display: grid;
+  gap: 5px;
+}
 .specEfficiencyExpected {
   min-width: 0;
 }
+.specEfficiencyStep b,
+.specEfficiencyStep span,
 .specEfficiencyExpected b,
 .specEfficiencyExpected span,
 .specEfficiencyCost b,
@@ -226,11 +232,13 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .specEfficiencyExpected b,
 .specEfficiencyCost b {
   font-size: 15px;
+  line-height: 1.15;
   text-align: right;
 }
 .specEfficiencyStep span,
 .specEfficiencyExpected span,
 .specEfficiencyCost span {
+  line-height: 1.2;
   text-align: right;
 }
 .specEfficiencyDetail {
