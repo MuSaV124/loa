@@ -23,6 +23,7 @@ function emptyEngravingState() {
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] }, powerSnapshot: null };
+let simulatorRendered = false;
 
 const T4_GEAR_COST_RULES = {
   standard: {
@@ -361,10 +362,23 @@ function renderCharacter(profile) {
   `;
   el.classList.remove('hidden');
   $('simulatorJumpButton')?.addEventListener('click', () => {
-    const target = $('powerSnapshotPanel');
-    if (!target || target.classList.contains('hidden')) return;
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    openSimulatorPage();
   });
+}
+function openSimulatorPage() {
+  if (!state.powerSnapshot) return setMessage('캐릭터 검색 후 시뮬레이터를 열 수 있습니다.');
+  if (!simulatorRendered) renderPowerSnapshot(state.powerSnapshot);
+  document.body.classList.add('simulatorMode');
+  document.body.classList.remove('marketMode', 'avatarMode');
+  document.querySelectorAll('.tabButton').forEach(btn => btn.classList.remove('active'));
+  $('powerSnapshotPanel')?.classList.remove('hidden');
+  $('powerSnapshotPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function closeSimulatorPage() {
+  document.body.classList.remove('simulatorMode');
+  $('powerSnapshotPanel')?.classList.add('hidden');
+  document.querySelector('[data-tab="calculator"]')?.classList.add('active');
+  $('characterCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function gearQualityClass(value) {
   const quality = Number(value);
@@ -814,9 +828,11 @@ function renderPowerSnapshot(snapshot) {
   if (!snapshot) {
     panel.classList.add('hidden');
     view.innerHTML = '';
+    simulatorRendered = false;
     return;
   }
-  panel.classList.remove('hidden');
+  simulatorRendered = true;
+  panel.classList.toggle('hidden', !document.body.classList.contains('simulatorMode'));
   const equipment = snapshot.equipment || {};
   const combat = equipment.combat || [];
   const accessories = equipment.accessories || [];
@@ -1793,6 +1809,8 @@ async function searchCharacter(name) {
   state.engraving = emptyEngravingState();
   state.arkGrid = { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   state.enlightenment = { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
+  simulatorRendered = false;
+  document.body.classList.remove('simulatorMode');
   try {
     const res = await fetch(`/api/character?name=${encodeURIComponent(name)}`);
     const data = await res.json();
@@ -1826,6 +1844,7 @@ $('searchForm').addEventListener('submit', (event) => {
   if (!name) return setMessage('캐릭터명을 입력하세요.');
   searchCharacter(name);
 });
+$('simulatorBackButton')?.addEventListener('click', closeSimulatorPage);
 ['extraCritRate','extraCritDamage','extraEvolutionDamage','extraAdditionalDamage','extraEnemyDamage','extraAttackSpeed','extraMoveSpeed','adrenalineCritRate','adrenalineAttackPower','adrenalineReplacementDamage'].forEach(id => $(id).addEventListener('input', calculateAndRender));
 $('adrenalineEnabled').addEventListener('change', () => { updateAdrenalineReplacementVisibility(); calculateAndRender(); });
 $('critSynergyEnabled').addEventListener('change', calculateAndRender);
@@ -1872,6 +1891,8 @@ function setActiveTab(tabName) {
   document.querySelectorAll('.tabButton').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
   const isMarket = tabName === 'market';
   const isAvatar = isMarket && selectedMarketTab === 'avatar';
+  document.body.classList.remove('simulatorMode');
+  $('powerSnapshotPanel')?.classList.add('hidden');
   document.body.classList.toggle('marketMode', isMarket);
   document.body.classList.toggle('avatarMode', isAvatar);
   document.querySelectorAll('.calcTabPanel').forEach(el => {

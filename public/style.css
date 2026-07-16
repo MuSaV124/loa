@@ -977,6 +977,21 @@ body {
   background: rgba(251, 191, 36, .14);
   color: #ffe2a3;
 }
+.simulatorBackButton {
+  min-height: 36px;
+  border: 1px solid rgba(148, 163, 184, .22);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, .66);
+  color: #dbeafe;
+  padding: 0 14px;
+  font-weight: 950;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.simulatorBackButton:hover {
+  border-color: rgba(96, 165, 250, .46);
+  background: rgba(96, 165, 250, .12);
+}
 #summaryPanel {
   grid-column: 2;
   grid-row: 3 / span 4;
@@ -2181,6 +2196,26 @@ body.marketMode .tabNav,
 body.marketMode #marketPanel,
 body.marketMode #legendAvatarPanel { grid-column: 1 / -1; }
 body.marketMode:not(.avatarMode) #legendAvatarPanel { display: none !important; }
+body.simulatorMode .hero,
+body.simulatorMode #characterCard,
+body.simulatorMode .calcTabPanel,
+body.simulatorMode #marketPanel,
+body.simulatorMode #legendAvatarPanel {
+  display: none !important;
+}
+body.simulatorMode #powerSnapshotPanel {
+  display: block !important;
+  grid-column: 1 / -1;
+}
+body.simulatorMode .wrap {
+  display: grid;
+  grid-template-columns: 1fr;
+  max-width: 1180px;
+}
+body.simulatorMode .tabNav,
+body.simulatorMode #powerSnapshotPanel {
+  grid-column: 1 / -1;
+}
 @media (max-width: 760px) {
   .marketCardGrid { grid-template-columns: 1fr; }
   .marketSubNav { flex-direction: column; align-items: stretch; }
