@@ -971,10 +971,13 @@ function normalHoningFallback(snapshot, item) {
   const classFallback = normal.classFallbacks?.[className] || normal.byClass?.[className] || null;
   const classSlotValue = Number(classFallback?.[slot] ?? classFallback?.[group]);
   if (Number.isFinite(classSlotValue) && classSlotValue > 0) {
+    const confidence = classFallback?.confidence || 'estimated';
     return {
       value: classSlotValue,
-      confidence: classFallback?.confidence || 'class-estimated',
-      basis: classFallback?.basis || 'class fallback from official combat-power samples'
+      confidence,
+      basis: classFallback?.basis || (confidence === 'class-estimated'
+        ? 'class fallback from official combat-power samples'
+        : 'shared fallback until class-specific samples are verified')
     };
   }
   const slotValue = Number(normal.slotDefaults?.[slot] ?? normal[group]);

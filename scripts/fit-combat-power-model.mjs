@@ -310,11 +310,12 @@ async function main() {
   const ridgeEvaluation = evaluate(rows, ridgeModel);
   const nonNegativeEvaluation = evaluate(rows, nonNegativeModel);
   const forceFit = process.env.LOA_MODEL_FORCE_FIT || '';
+  const allowNegativeFit = process.env.LOA_MODEL_ALLOW_NEGATIVE === '1';
   const model = forceFit === 'ridge'
     ? ridgeModel
     : forceFit === 'non-negative-ridge'
       ? nonNegativeModel
-      : nonNegativeEvaluation.mae <= ridgeEvaluation.mae * 1.18 ? nonNegativeModel : ridgeModel;
+      : allowNegativeFit && nonNegativeEvaluation.mae > ridgeEvaluation.mae * 1.18 ? ridgeModel : nonNegativeModel;
   const evaluation = evaluate(rows, model);
   const output = {
     version: MODEL_VERSION,
@@ -332,6 +333,9 @@ async function main() {
     },
     model: {
       fit: model.nonNegative ? 'non-negative-ridge' : 'ridge',
+      selectionPolicy: allowNegativeFit
+        ? 'allow-ridge-when-non-negative-fit-is-much-worse'
+        : 'prefer-monotonic-non-negative-fit',
       intercept: model.weights[0],
       lambda: model.lambda,
       features: model.featureDefs.map(([name], index) => ({
