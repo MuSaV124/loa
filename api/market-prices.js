@@ -1,4 +1,4 @@
-const API_VERSION = '5.7.14';
+const API_VERSION = '5.7.30';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -590,8 +590,8 @@ async function searchEngravingListFresh(apiKey, maxPages) {
 
 async function searchT4Materials(apiKey, query) {
   const force = String(query.force || '') === '1';
-  const cacheKey = 't4Materials:v7';
-  return getCachedMarketList(cacheKey, force, async () => searchT4MaterialsFresh(apiKey));
+  const cacheKey = 't4Materials:v8';
+  return getCachedMarketList(cacheKey, force, async () => searchT4MaterialsFresh(apiKey), isUsableT4MaterialList);
 }
 
 async function searchT4MaterialsFresh(apiKey) {
@@ -611,6 +611,15 @@ async function searchT4MaterialsFresh(apiKey) {
     }
   }
   return { ok: true, apiVersion: API_VERSION, source: 'markets/items', mode: 't4Materials', groups: T4_MATERIAL_GROUPS.map(group => group.group), items: rows, tried, updatedAt: new Date().toISOString() };
+}
+
+function isUsableT4MaterialList(data) {
+  const items = Array.isArray(data?.items) ? data.items : [];
+  if (!items.length) return false;
+  const missingCount = items.filter(item => item?.missing || !Number(item?.price || 0)).length;
+  const importantNames = new Set(['아비도스 융화제', '상급 아비도스 융화제', '빙하의 숨결', '용암의 숨결']);
+  const importantMissing = items.some(item => importantNames.has(item?.requestedName || item?.name || '') && (item?.missing || !Number(item?.price || 0)));
+  return !importantMissing && missingCount < Math.max(3, Math.ceil(items.length * 0.25));
 }
 
 async function searchMarketMaterial(apiKey, name, group) {
@@ -730,16 +739,17 @@ function applyMaterialUnitMeta(item, requestedName) {
   };
 }
 
-async function getCachedMarketList(cacheKey, force, loader) {
+async function getCachedMarketList(cacheKey, force, loader, isUsable = () => true) {
   const now = Date.now();
   const cached = marketListCache.get(cacheKey);
-  if (!force && cached && cached.expiresAt > now) return { ...cached.data, cached: true };
+  if (!force && cached && cached.expiresAt > now && isUsable(cached.data)) return { ...cached.data, cached: true };
+  if (!force && cached && cached.expiresAt > now && !isUsable(cached.data)) marketListCache.delete(cacheKey);
   if (!force && marketListInflight.has(cacheKey)) {
     const data = await marketListInflight.get(cacheKey);
-    return { ...data, cached: true, joinedInflight: true };
+    return { ...data, cached: isUsable(data), joinedInflight: true };
   }
   const promise = loader().then(data => {
-    marketListCache.set(cacheKey, { expiresAt: Date.now() + MARKET_LIST_CACHE_TTL_MS, data });
+    if (isUsable(data)) marketListCache.set(cacheKey, { expiresAt: Date.now() + MARKET_LIST_CACHE_TTL_MS, data });
     return data;
   }).finally(() => marketListInflight.delete(cacheKey));
   marketListInflight.set(cacheKey, promise);
