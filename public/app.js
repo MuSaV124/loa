@@ -1,4 +1,4 @@
-const VERSION = '5.7.27';
+const VERSION = '5.7.28';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2605,6 +2605,7 @@ function formatGold(value) {
 
 let selectedMarketTab = 'accessory';
 let lostarkNoticeLoaded = false;
+const marketListLoadState = { gem: 'idle', engraving: 'idle', material: 'idle' };
 
 function setActiveTab(tabName) {
   document.querySelectorAll('.tabButton').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
@@ -2633,6 +2634,7 @@ function setActiveTab(tabName) {
   if (isMarket) {
     loadLostarkNoticeCard();
     renderMarketSubTab();
+    preloadMarketPriceLists();
   }
   if (isAvatar) prepareLegendAvatarTab();
 }
@@ -2666,6 +2668,12 @@ function autoLoadMarketSubTab() {
   if (selectedMarketTab === 'gem') loadMarketGemList();
   if (selectedMarketTab === 'engraving') loadMarketEngravingList();
   if (selectedMarketTab === 'material') loadMarketMaterialList();
+}
+
+function preloadMarketPriceLists() {
+  loadMarketEngravingList();
+  loadMarketGemList();
+  loadMarketMaterialList();
 }
 
 function initMarketTabs() {
@@ -2852,8 +2860,8 @@ const MARKET_ACCESSORY_RULES = {
 
 function initMarketPriceTab() {
   $('accSearchButton')?.addEventListener('click', searchMarketAccessory);
-  $('gemListButton')?.addEventListener('click', loadMarketGemList);
-  $('engravingListButton')?.addEventListener('click', loadMarketEngravingList);
+  $('gemListButton')?.addEventListener('click', () => loadMarketGemList(true));
+  $('engravingListButton')?.addEventListener('click', () => loadMarketEngravingList(true));
   $('materialListButton')?.addEventListener('click', () => loadMarketMaterialList(true));
   $('accPartSelect')?.addEventListener('change', renderAccessoryRuleHint);
   $('accComboSelect')?.addEventListener('change', renderAccessoryRuleHint);
@@ -2920,30 +2928,40 @@ async function searchMarketAccessory() {
   }
 }
 
-async function loadMarketGemList() {
+async function loadMarketGemList(force = false) {
+  if (!force && marketListLoadState.gem === 'loaded') return;
+  if (!force && marketListLoadState.gem === 'loading') return;
+  marketListLoadState.gem = 'loading';
   const button = $('gemListButton');
   const resultEl = $('gemMarketResult');
   if (button) { button.disabled = true; button.textContent = '조회 중'; }
   if (resultEl) resultEl.innerHTML = '경매장에서 5~10레벨 겁화/작열 최저가를 조회하는 중입니다.';
   try {
-    const data = await fetchMarketJson(`/api/market-prices?mode=gemList&_=${Date.now()}`);
+    const data = await fetchMarketJson(`/api/market-prices?mode=gemList${force ? '&force=1' : ''}&_=${Date.now()}`);
     renderGemPriceGrid(resultEl, data);
+    marketListLoadState.gem = 'loaded';
   } catch (error) {
+    marketListLoadState.gem = 'idle';
     renderMarketError(resultEl, error.message);
   } finally {
     if (button) { button.disabled = false; button.textContent = '새로고침'; }
   }
 }
 
-async function loadMarketEngravingList() {
+async function loadMarketEngravingList(force = false) {
+  if (!force && marketListLoadState.engraving === 'loaded') return;
+  if (!force && marketListLoadState.engraving === 'loading') return;
+  marketListLoadState.engraving = 'loading';
   const button = $('engravingListButton');
   const resultEl = $('engravingMarketResult');
   if (button) { button.disabled = true; button.textContent = '조회 중'; }
   if (resultEl) resultEl.innerHTML = '거래소에서 전체 유물 각인서 최저가를 조회하는 중입니다.';
   try {
-    const data = await fetchMarketJson(`/api/market-prices?mode=engravingList&_=${Date.now()}`);
+    const data = await fetchMarketJson(`/api/market-prices?mode=engravingList${force ? '&force=1' : ''}&_=${Date.now()}`);
     renderEngravingPriceGrid(resultEl, data);
+    marketListLoadState.engraving = 'loaded';
   } catch (error) {
+    marketListLoadState.engraving = 'idle';
     renderMarketError(resultEl, error.message);
   } finally {
     if (button) { button.disabled = false; button.textContent = '새로고침'; }
@@ -2951,6 +2969,9 @@ async function loadMarketEngravingList() {
 }
 
 async function loadMarketMaterialList(force = false) {
+  if (!force && marketListLoadState.material === 'loaded') return;
+  if (!force && marketListLoadState.material === 'loading') return;
+  marketListLoadState.material = 'loading';
   const button = $('materialListButton');
   const resultEl = $('materialMarketResult');
   if (button) { button.disabled = true; button.textContent = '조회 중'; }
@@ -2958,7 +2979,9 @@ async function loadMarketMaterialList(force = false) {
   try {
     const data = await fetchMarketJson(`/api/market-prices?mode=t4Materials${force ? '&force=1' : ''}&_=${Date.now()}`);
     renderMaterialPriceGrid(resultEl, data);
+    marketListLoadState.material = 'loaded';
   } catch (error) {
+    marketListLoadState.material = 'idle';
     renderMarketError(resultEl, error.message);
   } finally {
     if (button) { button.disabled = false; button.textContent = '새로고침'; }
