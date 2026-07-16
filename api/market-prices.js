@@ -1,4 +1,4 @@
-const API_VERSION = '5.7.11';
+const API_VERSION = '5.7.12';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -66,15 +66,15 @@ const T4_MATERIAL_GROUPS = [
   },
   {
     group: '재봉술',
-    items: ['재봉술 : 업화 [11-14]', '재봉술 : 업화 [15-18]', '재봉술 : 업화 [19-20]', '장인의 재봉술 1단계', '장인의 재봉술 2단계', '장인의 재봉술 3단계', '장인의 재봉술 4단계']
+    items: ['재봉술 : 업화 [11-14]', '재봉술 : 업화 [15-18]', '재봉술 : 업화 [19-20]', '장인의 재봉술 : 1단계', '장인의 재봉술 : 2단계', '장인의 재봉술 : 3단계', '장인의 재봉술 : 4단계']
   },
   {
     group: '야금술',
-    items: ['야금술 : 업화 [11-14]', '야금술 : 업화 [15-18]', '야금술 : 업화 [19-20]', '장인의 야금술 1단계', '장인의 야금술 2단계', '장인의 야금술 3단계', '장인의 야금술 4단계']
+    items: ['야금술 : 업화 [11-14]', '야금술 : 업화 [15-18]', '야금술 : 업화 [19-20]', '장인의 야금술 : 1단계', '장인의 야금술 : 2단계', '장인의 야금술 : 3단계', '장인의 야금술 : 4단계']
   },
   {
     group: '아크그리드 젬',
-    items: ['질서 안정 젬', '질서 견고 젬', '질서 불변 젬', '혼돈 침식 젬', '혼돈 왜곡 젬', '혼돈 붕괴 젬']
+    items: ['질서의 젬 : 안정', '질서의 젬 : 견고', '질서의 젬 : 불변', '혼돈의 젬 : 침식', '혼돈의 젬 : 왜곡', '혼돈의 젬 : 붕괴']
   }
 ];
 const DESTINY_SHARD_POUCH_COUNTS = {
@@ -252,7 +252,7 @@ async function searchAccessory(apiKey, query) {
     updatedAt: indexResult.updatedAt,
     index: indexResult.index,
     accessoryDebug: {
-      note: 'v5.7.11 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
+      note: 'v5.7.12 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
       requestPayloads: indexResult.requestPayloads.slice(0, 14),
       filterStats: indexResult.filterStats,
       samples: indexResult.samples
@@ -590,7 +590,7 @@ async function searchEngravingListFresh(apiKey, maxPages) {
 
 async function searchT4Materials(apiKey, query) {
   const force = String(query.force || '') === '1';
-  const cacheKey = 't4Materials:v5';
+  const cacheKey = 't4Materials:v6';
   return getCachedMarketList(cacheKey, force, async () => searchT4MaterialsFresh(apiKey));
 }
 
@@ -648,7 +648,7 @@ async function searchArkGridGemAuction(apiKey, name, group) {
   const aliases = materialSearchAliases(name);
   for (const keyword of aliases) {
     for (const categoryCode of [null, 210000, 210010, 210020]) {
-      const payload = { Sort: 'BUY_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode ?? undefined, ItemTier: 4, ItemName: keyword, PageNo: 1 };
+      const payload = { Sort: 'BUY_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode ?? undefined, ItemName: keyword, PageNo: 1 };
       stripUndefined(payload);
       const result = await fetchAuctionPage(apiKey, payload);
       tried.push({ group, name, keyword, categoryCode, source: 'auction', count: result.items.length, totalCount: result.totalCount, error: result.error || null });
@@ -690,18 +690,30 @@ function materialSearchAliases(name) {
   if (base === '상급 아비도스 융화제') {
     aliases.push('상급 아비도스 융화 재료', '상급 아비도스 융화재료');
   }
-  if (/^장인의\s*재봉술\s*\d단계$/.test(base)) aliases.push(base.replace(/(\d단계)$/, ': $1'));
-  if (/^장인의\s*야금술\s*\d단계$/.test(base)) aliases.push(base.replace(/(\d단계)$/, ': $1'));
-  const arkGridGem = base.match(/^(질서|혼돈)(?:의)?\s*(안정|견고|불변|침식|왜곡|붕괴)\s*젬$/);
+  const artisanBook = base.match(/^장인의\s*(재봉술|야금술)\s*:?\s*(\d)단계$/);
+  if (artisanBook) {
+    const [, type, stage] = artisanBook;
+    aliases.push(`장인의 ${type} : ${stage}단계`, `장인의 ${type}: ${stage}단계`, `장인의 ${type} ${stage} 단계`, `장인의 ${type} : 업화 ${stage}단계`, `장인의 ${type}: 업화 ${stage}단계`, `장인의 ${type} 업화 ${stage}단계`);
+  }
+  const arkGridGem = parseArkGridGemName(base);
   if (arkGridGem) {
-    const [, order, type] = arkGridGem;
-    aliases.push(`${order}의 ${type} 젬`, `${order}의 ${type}`, `${order} ${type}`, `아크그리드 ${order} ${type}`, `아크 그리드 ${order} ${type}`);
+    const { order, type } = arkGridGem;
+    aliases.push(`${order}의 젬 : ${type}`, `${order}의 젬: ${type}`, `${order}의 젬 ${type}`, `${order} 젬 ${type}`, `${order} ${type}`, `아크그리드 ${order} ${type}`, `아크 그리드 ${order} ${type}`);
   }
   return [...new Set(aliases)];
 }
 
 function isArkGridGemName(name) {
-  return /^(질서|혼돈)(?:의)?\s*(안정|견고|불변|침식|왜곡|붕괴)\s*젬$/.test(String(name || '').trim());
+  return Boolean(parseArkGridGemName(name));
+}
+
+function parseArkGridGemName(name) {
+  const text = String(name || '').trim();
+  const exact = text.match(/^(질서|혼돈)의?\s*젬\s*:?\s*(안정|견고|불변|침식|왜곡|붕괴)$/);
+  if (exact) return { order: exact[1], type: exact[2] };
+  const short = text.match(/^(질서|혼돈)(?:의)?\s*(안정|견고|불변|침식|왜곡|붕괴)\s*젬?$/);
+  if (short) return { order: short[1], type: short[2] };
+  return null;
 }
 
 function isMaterialNameMatch(itemText, targetName, keyword) {
@@ -710,10 +722,14 @@ function isMaterialNameMatch(itemText, targetName, keyword) {
   const key = normalizeText(keyword).replace(/\s+/g, '');
   const sizeMatch = targetName.match(/운명의\s*파편\s*주머니\((소|중|대)\)/);
   if (sizeMatch) return compactText.includes('운명의파편주머니') && compactText.includes(sizeMatch[1]);
-  const arkGridGem = targetName.match(/^(질서|혼돈)(?:의)?\s*(안정|견고|불변|침식|왜곡|붕괴)\s*젬$/);
+  const artisanBook = targetName.match(/^장인의\s*(재봉술|야금술)\s*:?\s*(\d)단계$/);
+  if (artisanBook) {
+    const [, type, stage] = artisanBook;
+    return compactText.includes('장인의') && compactText.includes(type) && compactText.includes(`${stage}단계`);
+  }
+  const arkGridGem = parseArkGridGemName(targetName);
   if (arkGridGem) {
-    const [, order, type] = arkGridGem;
-    return compactText.includes(order) && compactText.includes(type) && compactText.includes('젬');
+    return compactText.includes(arkGridGem.order) && compactText.includes(arkGridGem.type) && compactText.includes('젬');
   }
   return compactText.includes(target) || compactText.includes(key);
 }
