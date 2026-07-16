@@ -133,74 +133,6 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   display: grid;
   gap: 10px;
 }
-.lopecFormulaPanel {
-  display: grid;
-  gap: 12px;
-  border-color: rgba(96, 165, 250, .28);
-  background: linear-gradient(180deg, rgba(15, 23, 42, .86), rgba(2, 6, 23, .46));
-}
-.lopecFormulaMetrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-.lopecFormulaMetrics > div,
-.lopecFactorGrid > div {
-  min-width: 0;
-  border: 1px solid rgba(148, 163, 184, .12);
-  border-radius: 9px;
-  background: rgba(15, 23, 42, .58);
-  padding: 10px;
-}
-.lopecFormulaMetrics span,
-.lopecFactorGrid span {
-  display: block;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-.lopecFormulaMetrics b {
-  display: block;
-  margin-top: 5px;
-  color: #e0f2fe;
-  font-size: 20px;
-  letter-spacing: -.02em;
-}
-.lopecFactorGrid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-.lopecFactorGrid b {
-  display: block;
-  margin-top: 4px;
-  color: #bfdbfe;
-  font-size: 13px;
-}
-.lopecCoverage {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.lopecCoverage span {
-  border: 1px solid rgba(148, 163, 184, .16);
-  border-radius: 999px;
-  padding: 5px 8px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 900;
-}
-.lopecCoverage .ok {
-  border-color: rgba(34, 197, 94, .28);
-  background: rgba(34, 197, 94, .12);
-  color: #bbf7d0;
-}
-.lopecCoverage .miss {
-  border-color: rgba(239, 68, 68, .28);
-  background: rgba(239, 68, 68, .1);
-  color: #fecaca;
-}
 .specEfficiencyTable {
   display: grid;
   gap: 8px;
@@ -2847,10 +2779,6 @@ select {
   word-break: keep-all;
 }
 @media (max-width: 760px) {
-  .lopecFormulaMetrics,
-  .lopecFactorGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .hero {
     padding: 17px;
   }

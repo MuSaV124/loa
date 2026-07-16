@@ -69,7 +69,7 @@ async function loadCharacterData(name, apiKey) {
   const abilityStoneEffects = extractAbilityStoneEffects(equipment);
   const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
   const arkGridEffects = extractArkGridEffects(arkGrid.data);
-  const powerSnapshot = buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, arkGrid: arkGrid.data, arkPassive });
+  const powerSnapshot = buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, arkGrid: arkGrid.data });
 
   return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, powerSnapshot, raw: data };
 }
@@ -154,11 +154,10 @@ function parseTooltip(tooltip) {
 const COMBAT_EQUIPMENT_TYPES = new Set(['무기', '투구', '상의', '하의', '장갑', '어깨']);
 const ACCESSORY_EQUIPMENT_TYPES = new Set(['목걸이', '귀걸이', '반지']);
 
-function buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, arkGrid, arkPassive }) {
+function buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, arkGrid }) {
   const equipmentSnapshot = extractEquipmentSnapshot(equipment);
   const gemSnapshot = extractGemSnapshot(gems);
   const arkGridSnapshot = extractArkGridSnapshot(arkGrid);
-  const simulatorModel = buildSimulatorModel({ profile, equipmentSnapshot, gemSnapshot, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, arkGridSnapshot, arkPassive });
   return {
     version: API_VERSION,
     source: 'lostark-open-api',
@@ -186,7 +185,6 @@ function buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, bracel
       engraving: engravingEffects,
       arkGrid: arkGridEffects
     },
-    simulatorModel,
     coverage: {
       officialCombatPower: Boolean(profile?.CombatPower),
       combatEquipment: equipmentSnapshot.combat.length,
@@ -200,138 +198,6 @@ function buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, bracel
         '공식 전투력 산식은 공개값이 아니므로 profile.CombatPower와 샘플 오차 검증으로 보정해야 합니다.'
       ]
     }
-  };
-}
-
-function buildSimulatorModel({ profile, equipmentSnapshot, gemSnapshot, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, arkGridSnapshot, arkPassive }) {
-  const profileStats = profileStatsMap(profile);
-  const combat = Array.isArray(equipmentSnapshot?.combat) ? equipmentSnapshot.combat : [];
-  const weapon = combat.find(item => /무기|臾닿린/.test(`${item?.type || ''} ${item?.name || ''}`)) || null;
-  const armor = combat.filter(item => item !== weapon);
-  const gems = Array.isArray(gemSnapshot?.items) ? gemSnapshot.items : [];
-  const damageGems = gems.filter(gem => gem.kind === 'damage');
-  const cooldownGems = gems.filter(gem => gem.kind === 'cooldown');
-  const arkGridGemSummary = Array.isArray(arkGridSnapshot?.gemSummary) ? arkGridSnapshot.gemSummary : [];
-  const arkPassiveModel = normalizeArkPassiveForSimulator(arkPassive);
-  const access = accessoryEffects || {};
-  const bracelet = braceletEffects || {};
-  const stone = abilityStoneEffects || {};
-  const engraving = engravingEffects || {};
-  return {
-    version: 'lopec-like-v1',
-    source: 'lostark-open-api-normalized',
-    profile: {
-      name: profile?.CharacterName || '',
-      className: profile?.CharacterClassName || '',
-      itemLevel: parseNumber(profile?.ItemAvgLevel),
-      officialCombatPower: parseNumber(profile?.CombatPower),
-      level: parseNumber(profile?.CharacterLevel),
-      stats: profileStats
-    },
-    equipment: {
-      weapon: weapon ? {
-        name: weapon.name,
-        grade: weapon.grade,
-        quality: Number(weapon.quality || 0),
-        honingLevel: Number(weapon.honingLevel || 0),
-        advancedHoningLevel: Number(weapon.advancedHoningLevel || 0),
-        itemLevel: Number(weapon.itemLevel || 0),
-        weaponPower: Number(weapon.weaponPower || 0)
-      } : null,
-      armor: armor.map(item => ({
-        type: item.type,
-        grade: item.grade,
-        quality: Number(item.quality || 0),
-        honingLevel: Number(item.honingLevel || 0),
-        advancedHoningLevel: Number(item.advancedHoningLevel || 0),
-        itemLevel: Number(item.itemLevel || 0)
-      }))
-    },
-    arkPassive: arkPassiveModel,
-    effects: {
-      accessory: pickSimulatorEffectFields(access),
-      bracelet: pickSimulatorEffectFields(bracelet),
-      abilityStone: {
-        attackPower: Number(stone.attackPower || 0),
-        effects: pickSimulatorEffectFields(stone.effects || {}),
-        engravings: Array.isArray(stone.engravings) ? stone.engravings : []
-      },
-      engraving: {
-        effects: pickSimulatorEffectFields(engraving.effects || {}),
-        adrenaline: engraving.adrenaline || null,
-        items: Array.isArray(engraving.items) ? engraving.items.map(item => ({
-          name: item.name,
-          grade: item.grade,
-          bookLevel: item.bookLevel,
-          effects: pickSimulatorEffectFields(item.effects || {})
-        })) : []
-      },
-      arkGrid: pickSimulatorEffectFields(arkGridEffects || {})
-    },
-    gems: {
-      total: gems.length,
-      damage: damageGems.map(normalizeSimulatorGem),
-      cooldown: cooldownGems.map(normalizeSimulatorGem),
-      summary: gemSnapshot?.summary || {}
-    },
-    arkGrid: {
-      cores: Array.isArray(arkGridSnapshot?.slots) ? arkGridSnapshot.slots.map(slot => ({
-        name: slot.name,
-        grade: slot.grade,
-        point: Number(slot.point || 0),
-        activeTexts: slot.activeTexts || []
-      })) : [],
-      gemSummary: arkGridGemSummary.map(row => ({ label: row.label, value: Number(row.value || 0) }))
-    }
-  };
-}
-
-function profileStatsMap(profile) {
-  const result = { critical: 0, specialization: 0, swiftness: 0 };
-  for (const row of Array.isArray(profile?.Stats) ? profile.Stats : []) {
-    const type = stripHtml(row?.Type || row?.type || '');
-    const value = Number(parseNumber(row?.Value ?? row?.value) || 0);
-    if (type.includes('치명') || type.includes('移섎챸')) result.critical = value;
-    if (type.includes('특화') || type.includes('뱁솕')) result.specialization = value;
-    if (type.includes('신속') || type.includes('좎냽')) result.swiftness = value;
-  }
-  return result;
-}
-
-function normalizeArkPassiveForSimulator(arkPassive) {
-  const groups = Array.isArray(arkPassive?.Effects) ? arkPassive.Effects : [];
-  const asText = (value) => stripHtml(typeof value === 'string' ? value : JSON.stringify(value || ''));
-  const findGroup = (patterns) => groups.find(group => patterns.some(pattern => pattern.test(asText(group))));
-  const groupPoints = (group) => firstFiniteNumber([
-    group?.Point,
-    group?.Points,
-    group?.TotalPoint,
-    matchNumber(asText(group), [/(\d+)\s*P/, /포인트\s*(\d+)/])
-  ]) || 0;
-  const evolution = findGroup([/진화|吏꾪솕|evolution/i]);
-  const enlightenment = findGroup([/깨달|寃⑤떖|enlightenment/i]);
-  const leap = findGroup([/도약|꾩빟|leap/i]);
-  return {
-    evolutionPoints: groupPoints(evolution),
-    enlightenmentPoints: groupPoints(enlightenment),
-    leapPoints: groupPoints(leap),
-    evolutionKarmaRank: firstFiniteNumber([arkPassive?.EvolutionKarmaRank, arkPassive?.evolutionKarmaRank]) || 0,
-    leapKarmaLevel: firstFiniteNumber([arkPassive?.LeapKarmaLevel, arkPassive?.leapKarmaLevel]) || 0
-  };
-}
-
-function pickSimulatorEffectFields(source) {
-  const keys = ['critRate', 'critDamage', 'critHitDamage', 'enemyDamage', 'additionalDamage', 'attackPower', 'attackPowerFlat', 'attackPowerPercent', 'weaponPowerFlat', 'weaponPowerPercent', 'critStat', 'swiftStat', 'specStat', 'attackSpeed', 'moveSpeed', 'attackMoveSpeed', 'resourceRecovery', 'conditionalDamage'];
-  return Object.fromEntries(keys.map(key => [key, round2(Number(source?.[key] || 0))]));
-}
-
-function normalizeSimulatorGem(gem) {
-  return {
-    level: Number(gem.level || 0),
-    kind: gem.kind || 'unknown',
-    skillName: gem.skillName || gem.name || '',
-    attackBonus: /겁화|작열|T4|겁|작/i.test(`${gem.name || ''} ${gem.grade || ''}`),
-    valid: Number(gem.level || 0) > 0
   };
 }
 
