@@ -1,4 +1,4 @@
-const VERSION = '5.7.40';
+const VERSION = '5.7.41';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1097,6 +1097,26 @@ function currentSnapshotCombatGear(snapshot, item) {
 function normalizePowerModelText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
+function externalSpecCalibration(category, key) {
+  const table = state.combatPowerModel?.externalSpecUpCalibrations?.[category] || {};
+  return table[key] || null;
+}
+function calibrationPowerEstimate(category, key, snapshot = state.powerSnapshot) {
+  const row = externalSpecCalibration(category, key);
+  if (!row) return null;
+  const official = snapshotOfficialCombatPower(snapshot);
+  const percent = Number(row.percent || 0);
+  const delta = Number(row.delta || 0);
+  const value = official > 0 && percent > 0 ? official * percent / 100 : delta;
+  if (!(value > 0)) return null;
+  return {
+    value: round2(value),
+    percent: percent > 0 ? round2(percent) : official > 0 ? round2((value / official) * 100) : 0,
+    confidence: row.confidence || 'verified',
+    basis: row.basis || row.source || 'external spec-up calibration',
+    source: row.source || ''
+  };
+}
 function normalHoningCalibrationKey(snapshot, item, next = null) {
   const profile = snapshot?.profile || {};
   const arkGridSlots = Array.isArray(snapshot?.arkGrid?.slots) ? snapshot.arkGrid.slots : [];
@@ -1262,7 +1282,24 @@ function accessoryPowerDeltaFromEffects(effects = {}) {
   };
   return Object.entries(effects).reduce((sum, [key, value]) => sum + Number(value || 0) * combatPowerFeaturePerUnit(keyMap[key]), 0);
 }
-function engravingPowerEstimateFromEffects(effects = {}, snapshot = state.powerSnapshot) {
+function accessoryPowerEstimate(candidate, snapshot = state.powerSnapshot) {
+  const calibration = calibrationPowerEstimate('accessory', `${candidate.part}:${candidate.combo}`, snapshot);
+  if (calibration) return calibration;
+  const value = round2(accessoryPowerDeltaFromEffects(candidate.effects));
+  const official = snapshotOfficialCombatPower(snapshot);
+  return {
+    value,
+    percent: official > 0 && value > 0 ? round2((value / official) * 100) : 0,
+    confidence: 'estimated',
+    basis: 'market accessory option coefficient model'
+  };
+}
+function engravingPowerEstimateFromEffects(effects = {}, snapshot = state.powerSnapshot, book = null) {
+  const bookName = normalizePowerModelText(book?.name);
+  const from = Number(book?.bookLevel || 0);
+  const to = Number(book?.nextBookLevel || 0);
+  const calibration = bookName && from && to ? calibrationPowerEstimate('engraving', `${bookName}:${from}:${to}`, snapshot) : null;
+  if (calibration) return calibration;
   const official = snapshotOfficialCombatPower(snapshot);
   const modelDelta =
     Number(effects.attackPower || 0) * combatPowerFeaturePerUnit('engravingAttackPower') +
@@ -1295,7 +1332,8 @@ async function calculateAccessorySpecEstimates() {
       const data = await fetchMarketJson(`/api/market-prices?mode=accessory&part=${encodeURIComponent(candidate.part)}&combo=${encodeURIComponent(candidate.combo)}&_=${Date.now()}`);
       const item = data.lowest || data.items?.[0] || null;
       const price = Number(item?.price || 0);
-      const powerDelta = round2(accessoryPowerDeltaFromEffects(candidate.effects));
+      const powerEstimate = accessoryPowerEstimate(candidate, state.powerSnapshot);
+      const powerDelta = round2(powerEstimate.value);
       return {
         category: 'accessory',
         item: { type: candidate.label, name: `${candidate.label} ${candidate.comboLabel}`, icon: item?.icon || '', quality: item?.quality },
@@ -1305,7 +1343,7 @@ async function calculateAccessorySpecEstimates() {
         cost: specMarketCost(price, item?.pheonCost || 0),
         expectedCost: { expectedGold: specMarketCost(price, item?.pheonCost || 0).totalGold },
         powerDelta,
-        powerEstimate: { confidence: 'estimated', basis: 'market accessory option coefficient model' },
+        powerEstimate,
         supportLabel: `${candidate.label} ${candidate.comboLabel} 최저가`,
         stepLabel: candidate.label,
         stepDetail: candidate.comboLabel,
@@ -1336,7 +1374,6 @@ async function calculateGemSpecEstimates(snapshot) {
   try { data = await fetchMarketJson(`/api/market-prices?mode=gemList&_=${Date.now()}`); } catch (error) {
     return [{ category: 'gem', item: { type: '보석', name: '보석 시세' }, available: false, reason: error.message || '보석 시세 조회 실패', powerDelta: 0, cost: {}, expectedCost: {} }];
   }
-  const perGemDelta = combatPowerFeaturePerUnit('gemAverage') / Math.max(1, gems.length || 11);
   return [...counts.entries()].map(([key, count]) => {
     const [kind, nextLevelText] = key.split(':');
     const nextLevel = Number(nextLevelText || 0);
@@ -1345,7 +1382,12 @@ async function calculateGemSpecEstimates(snapshot) {
     const market = kind === '작열' ? row?.cooldown : row?.damage;
     const buyCount = Number(count || 1) * 2;
     const price = Number(market?.price || 0) * buyCount;
+    const calibration = calibrationPowerEstimate('gem', `${kind}:${currentLevel}:${nextLevel}`, snapshot);
+    const perGemDelta = calibration?.value || combatPowerFeaturePerUnit('gemAverage') / Math.max(1, gems.length || 11);
     const powerDelta = round2(perGemDelta * Number(count || 1));
+    const powerEstimate = calibration
+      ? { ...calibration, value: powerDelta, percent: round2(Number(calibration.percent || 0) * Number(count || 1)) }
+      : { confidence: 'estimated', basis: 'gem average combat-power coefficient model' };
     return {
       category: 'gem',
       item: { type: '보석', name: `${kind} ${nextLevel - 1}→${nextLevel}레벨 ${count}개`, icon: market?.icon || '' },
@@ -1355,7 +1397,7 @@ async function calculateGemSpecEstimates(snapshot) {
       cost: specMarketCost(price, 0),
       expectedCost: { expectedGold: price },
       powerDelta,
-      powerEstimate: { confidence: 'estimated', basis: 'gem average combat-power coefficient model' },
+      powerEstimate,
       supportLabel: `${kind} ${currentLevel}레벨 최저가 × ${buyCount}개`,
       stepLabel: `${kind} 보석`,
       stepDetail: `Lv.${nextLevel - 1} → Lv.${nextLevel}`,
@@ -1374,7 +1416,7 @@ async function calculateEngravingSpecEstimates(snapshot) {
       const unitPrice = Number(item?.price || 0);
       const buyCount = 5;
       const price = unitPrice * buyCount;
-      const powerEstimate = engravingPowerEstimateFromEffects(book.deltaEffects, snapshot);
+      const powerEstimate = engravingPowerEstimateFromEffects(book.deltaEffects, snapshot, book);
       const powerDelta = round2(powerEstimate.value);
       return {
         category: 'engraving',
@@ -1474,7 +1516,7 @@ function combatPowerAccuracyHint() {
   const modelText = median > 0 && p90 > 0
     ? `강화 변화량 모델은 샘플 기준 중앙 오차 ${median.toFixed(1)}, p90 오차 ${p90.toFixed(1)} 전투력입니다.`
     : '현재 전투력은 공식 API 값을 사용합니다.';
-  return `${modelText} 악세/보석/각인서는 공식 변화식이 공개되지 않아 약값으로 표시합니다.`;
+  return `${modelText} 로아업/로펙/로아와/로아랩 보정값이 있으면 우선 적용하고, 없으면 약값으로 표시합니다.`;
 }
 function specPowerDeltaText(row, powerDelta) {
   if (!(powerDelta > 0)) return '전투력 -';

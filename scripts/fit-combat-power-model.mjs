@@ -17,6 +17,29 @@ const NORMAL_HONING_SLOT_LEVEL_PERCENT = {
   'gloves:21:22': { percent: 0.274, confidence: 'verified', basis: 'Loaup Musav spec-up sample; shared by all classes until broader samples are collected.' },
   'shoulder:20:21': { percent: 0.237, confidence: 'verified', basis: 'Loaup Musav spec-up sample; shared by all classes until broader samples are collected.' }
 };
+const CALIBRATION_SOURCES = {
+  loaup: {
+    url: 'https://loaup.com/character/%EB%AC%B4%EC%82%AC%EB%B8%8C?tab=specup',
+    role: 'spec-up efficiency percent calibration'
+  },
+  lopec: {
+    url: 'https://lopec.kr/character/simulator/%EB%AC%B4%EC%82%AC%EB%B8%8C',
+    role: 'simulator before-after delta verification'
+  },
+  loawa: {
+    url: 'https://loawa.com/rank',
+    role: 'cross-class official combat-power sample coverage'
+  },
+  loalab: {
+    url: 'https://lo4.app/',
+    role: 'honing and efficiency calculator cross-check'
+  }
+};
+const EXTERNAL_SPEC_UP_CALIBRATIONS = {
+  accessory: {},
+  gem: {},
+  engraving: {}
+};
 
 const ALL_CLASS_NAMES = [
   '디스트로이어', '발키리', '버서커', '슬레이어', '워로드', '홀리나이트',
@@ -368,6 +391,8 @@ async function main() {
       },
       worst: evaluation.predictions.slice(0, 12)
     },
+    calibrationSources: CALIBRATION_SOURCES,
+    externalSpecUpCalibrations: EXTERNAL_SPEC_UP_CALIBRATIONS,
     coefficientsByImpact: coefficientTable(model).slice(0, 20),
     upgradeDelta: {
       normalHoning: {

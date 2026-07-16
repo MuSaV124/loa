@@ -12,6 +12,29 @@
     "p90AbsError": 142.99765826961846,
     "note": "Primary model is upgrade-by-upgrade CombatPower delta. Absolute profile.CombatPower fit is kept only as a reference for sample sanity checks."
   },
+  "calibrationSources": {
+    "loaup": {
+      "url": "https://loaup.com/character/%EB%AC%B4%EC%82%AC%EB%B8%8C?tab=specup",
+      "role": "spec-up efficiency percent calibration"
+    },
+    "lopec": {
+      "url": "https://lopec.kr/character/simulator/%EB%AC%B4%EC%82%AC%EB%B8%8C",
+      "role": "simulator before-after delta verification"
+    },
+    "loawa": {
+      "url": "https://loawa.com/rank",
+      "role": "cross-class official combat-power sample coverage"
+    },
+    "loalab": {
+      "url": "https://lo4.app/",
+      "role": "honing and efficiency calculator cross-check"
+    }
+  },
+  "externalSpecUpCalibrations": {
+    "accessory": {},
+    "gem": {},
+    "engraving": {}
+  },
   "features": {
     "itemAvgLevel": {
       "mean": 1779.6498888888868,
