@@ -1,4 +1,4 @@
-const API_VERSION = '5.7.2';
+const API_VERSION = '5.7.3';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -54,7 +54,7 @@ const GEM_RULES = {
 const T4_MATERIAL_GROUPS = [
   {
     group: '기본 강화 재료',
-    items: ['운명의 파편 주머니', '운명의 돌파석', '위대한 운명의 돌파석', '운명의 파괴석', '운명의 파괴석 결정', '운명의 수호석', '운명의 수호석 결정']
+    items: ['운명의 파편 주머니(소)', '운명의 파편 주머니(중)', '운명의 파편 주머니(대)', '운명의 돌파석', '위대한 운명의 돌파석', '운명의 파괴석', '운명의 파괴석 결정', '운명의 수호석', '운명의 수호석 결정']
   },
   {
     group: '융화 재료',
@@ -243,7 +243,7 @@ async function searchAccessory(apiKey, query) {
     updatedAt: indexResult.updatedAt,
     index: indexResult.index,
     accessoryDebug: {
-      note: 'v5.7.2 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
+      note: 'v5.7.3 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
       requestPayloads: indexResult.requestPayloads.slice(0, 14),
       filterStats: indexResult.filterStats,
       samples: indexResult.samples
@@ -632,6 +632,17 @@ async function searchMarketMaterial(apiKey, name, group) {
 function materialSearchAliases(name) {
   const base = String(name || '').trim();
   const aliases = [base];
+  if (/운명의\s*파편\s*주머니\((소|중|대)\)/.test(base)) {
+    const size = base.match(/\((소|중|대)\)/)?.[1] || '';
+    aliases.push(`운명의 파편 주머니 ${size}`);
+    aliases.push(`운명의 파편 주머니`);
+  }
+  if (base === '아비도스 융화제') {
+    aliases.push('아비도스 융화 재료', '아비도스 융화재료');
+  }
+  if (base === '상급 아비도스 융화제') {
+    aliases.push('상급 아비도스 융화 재료', '상급 아비도스 융화재료');
+  }
   if (/^장인의\s*재봉술\s*\d단계$/.test(base)) aliases.push(base.replace(/(\d단계)$/, ': $1'));
   if (/^장인의\s*야금술\s*\d단계$/.test(base)) aliases.push(base.replace(/(\d단계)$/, ': $1'));
   return [...new Set(aliases)];
@@ -641,6 +652,8 @@ function isMaterialNameMatch(itemText, targetName, keyword) {
   const compactText = normalizeText(itemText).replace(/\s+/g, '');
   const target = normalizeText(targetName).replace(/\s+/g, '');
   const key = normalizeText(keyword).replace(/\s+/g, '');
+  const sizeMatch = targetName.match(/운명의\s*파편\s*주머니\((소|중|대)\)/);
+  if (sizeMatch) return compactText.includes('운명의파편주머니') && compactText.includes(sizeMatch[1]);
   return compactText.includes(target) || compactText.includes(key);
 }
 

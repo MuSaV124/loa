@@ -2192,7 +2192,7 @@ select {
   }
 }
 
-/* v5.7.2 search-first calculator entry */
+/* v5.7.3 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
 body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,
