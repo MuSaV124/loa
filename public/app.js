@@ -1,4 +1,4 @@
-const VERSION = '5.7.4';
+const VERSION = '5.7.6';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -51,8 +51,17 @@ const T4_GEAR_COST_RULES = {
 };
 const T4_SHARED_COST_MATERIALS = ['운명의 파편 주머니(대)', '빙하의 숨결', '용암의 숨결'];
 const BOUND_ONLY_MATERIALS = new Set(['고통의 가시']);
+const DEFAULT_PHEON_CRYSTAL_PER_ONE = 8.5;
+const PHEON_COST_RULES = [
+  { label: '어빌리티 스톤', cost: 9, note: '경매장 구매' },
+  { label: '고대 악세', cost: 35, note: '목걸이/귀걸이/반지 부위당' },
+  { label: '영웅 아바타', cost: 10, note: '거래횟수 2회 이하' },
+  { label: '전설 아바타', cost: 30, note: '거래횟수 2회 이하' }
+];
 let t4MaterialPriceCache = null;
 let t4MaterialPriceInflight = null;
+let crystalPriceCache = null;
+let crystalPriceInflight = null;
 
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
 function escapeRegExp(v) { return String(v || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -507,6 +516,27 @@ function renderPowerStoneRow(item, engravings = '') {
     </div>
   </div>`;
 }
+function renderPowerEngravingPanel(engraving = {}) {
+  const items = Array.isArray(engraving?.items) ? engraving.items : [];
+  const rows = items
+    .filter(item => item?.name)
+    .map(item => {
+      const grade = item.grade ? `${item.grade}` : '';
+      const level = item.bookLevel != null ? `Lv.${item.bookLevel}` : '';
+      const meta = [grade, level].filter(Boolean).join(' ');
+      const gradeClass = grade === '영웅' ? 'gradeHero' : grade === '전설' ? 'gradeLegend' : grade === '유물' ? 'gradeRelic' : '';
+      return `<div class="powerEngravingItem ${gradeClass}">
+        <b>${escapeHtml(item.name)}</b>
+        ${meta ? `<span>${escapeHtml(meta)}</span>` : ''}
+      </div>`;
+    })
+    .join('');
+  if (!rows) return '';
+  return `<div class="powerEngravingPanel">
+    <div class="powerBuildHeader"><b>장착 각인서</b><span>API 파싱</span></div>
+    <div class="powerEngravingList">${rows}</div>
+  </div>`;
+}
 function renderPowerBraceletRow(item, effects) {
   if (!item) return '';
   const allRows = powerEffectRows(effects);
@@ -655,6 +685,16 @@ function renderPowerCostPrep(snapshot) {
       <div><h3>T4 비용 계산 준비</h3><p>강화 골드와 실링, 장비성장/한계돌파 실링, 재료 시세를 분리해서 계산하도록 준비했습니다.</p></div>
       <strong>수량표 대기</strong>
     </div>
+    <div class="powerPheonPanel">
+      <div class="powerBuildHeader"><b>페온/크리스탈 기준</b><span>LOSPI 최신 1시간 close</span></div>
+      <div class="powerPheonGrid">
+        <label><span>100 크리스탈당 골드</span><input id="crystalGoldPer100Input" type="number" min="0" step="1" value="" placeholder="불러오는 중" /></label>
+        <label><span>페온 1개당 크리스탈</span><input id="pheonCrystalPerOneInput" type="number" min="0" step="0.1" value="${DEFAULT_PHEON_CRYSTAL_PER_ONE}" /></label>
+        <div class="powerPheonResult"><span>페온 1개 환산</span><b id="pheonGoldPerOneText">-</b></div>
+      </div>
+      <div class="powerPheonRules">${PHEON_COST_RULES.map(rule => `<span><b>${escapeHtml(rule.label)}</b>${Number(rule.cost).toLocaleString('ko-KR')}페온<small>${escapeHtml(rule.note)}</small></span>`).join('')}</div>
+      <p id="crystalPriceSourceText" class="powerCostHint">보석 제외 경매장 구매 비용 계산용입니다. 아바타는 거래 가능 횟수 3이면 페온 제외로 처리할 예정입니다.</p>
+    </div>
     <div class="powerCostGrid">
       <div>
         <h4>현재 장비 규칙</h4>
@@ -683,6 +723,50 @@ async function loadT4MaterialPriceMap() {
     .finally(() => { t4MaterialPriceInflight = null; });
   return t4MaterialPriceInflight;
 }
+async function loadCrystalPrice() {
+  if (crystalPriceCache) return crystalPriceCache;
+  if (crystalPriceInflight) return crystalPriceInflight;
+  crystalPriceInflight = fetchMarketJson(`/api/crystal-price?_=${Date.now()}`)
+    .then(data => {
+      crystalPriceCache = data;
+      return data;
+    })
+    .finally(() => { crystalPriceInflight = null; });
+  return crystalPriceInflight;
+}
+function updatePheonGoldSummary() {
+  const crystalInput = $('crystalGoldPer100Input');
+  const pheonInput = $('pheonCrystalPerOneInput');
+  const text = $('pheonGoldPerOneText');
+  if (!crystalInput || !pheonInput || !text) return;
+  const crystalGoldPer100 = Number(crystalInput.value || 0);
+  const pheonCrystalPerOne = Number(pheonInput.value || DEFAULT_PHEON_CRYSTAL_PER_ONE);
+  const pheonGold = crystalGoldPer100 > 0 && pheonCrystalPerOne > 0 ? (crystalGoldPer100 / 100) * pheonCrystalPerOne : 0;
+  text.textContent = pheonGold > 0 ? `${formatGold(pheonGold)} / 페온` : '-';
+}
+async function hydrateCrystalPrice() {
+  const crystalInput = $('crystalGoldPer100Input');
+  const pheonInput = $('pheonCrystalPerOneInput');
+  const sourceText = $('crystalPriceSourceText');
+  if (!crystalInput || !pheonInput) return;
+  const onInput = () => updatePheonGoldSummary();
+  crystalInput.addEventListener('input', onInput);
+  pheonInput.addEventListener('input', onInput);
+  try {
+    const data = await loadCrystalPrice();
+    const value = Number(data?.crystalGoldPer100 || 0);
+    if (value > 0) {
+      crystalInput.value = String(Math.round(value));
+      if (sourceText) {
+        const latestTime = data?.latest?.dt ? ` · 기준 ${data.latest.dt}` : '';
+        sourceText.textContent = `LOSPI 1시간 OHLC 최신 종가 기준${latestTime}. 실패하거나 맞지 않으면 직접 수정할 수 있습니다.`;
+      }
+    }
+  } catch {
+    if (sourceText) sourceText.textContent = 'LOSPI 시세를 불러오지 못했습니다. 100 크리스탈당 골드를 직접 입력하면 페온 비용을 계산합니다.';
+  }
+  updatePheonGoldSummary();
+}
 async function hydratePowerCostMaterialPrices() {
   const list = $('powerCostMaterialList');
   if (!list) return;
@@ -699,7 +783,11 @@ async function hydratePowerCostMaterialPrices() {
         row.classList.add('missing');
         return;
       }
-      const unit = Number(item.unitPrice || item.price || 0);
+      if (Number(item.shardCount || 0) && Number(item.shardUnitPrice || 0)) {
+        small.textContent = `파편 1개당 ${formatGold(item.shardUnitPrice)} · 주머니당 파편 ${Number(item.shardCount).toLocaleString('ko-KR')}개 기준 · 체크 해제 시 귀속재료로 간주해 0골드`;
+        return;
+      }
+      const unit = Number(item.effectiveUnitPrice || item.unitPrice || item.price || 0);
       small.textContent = `단가 ${formatGold(unit)} · 체크 해제 시 귀속재료로 간주해 0골드`;
     });
   } catch {
@@ -742,7 +830,8 @@ function renderPowerSnapshot(snapshot) {
   const stone = equipment.abilityStone;
   const stoneEngravings = (effects.abilityStone?.items?.[0]?.engravings || effects.abilityStone?.engravings || []).map(e => `${e.name} Lv.${e.level}`).join(' · ');
   const stoneRow = renderPowerStoneRow(stone, stoneEngravings);
-  const accessoryPanelRows = [accessoryRows, braceletRow, stoneRow].filter(Boolean).join('');
+  const engravingPanel = renderPowerEngravingPanel(effects.engraving);
+  const accessoryPanelRows = [accessoryRows, braceletRow, stoneRow, engravingPanel].filter(Boolean).join('');
   view.innerHTML = `
     <div class="powerSnapshotColumns">
       <div class="powerSnapshotBlock"><h3>장착 보석</h3><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
@@ -764,6 +853,7 @@ function renderPowerSnapshot(snapshot) {
     <p class="powerSnapshotNote">이 카드는 전투력 계산식 투입 전 검증용입니다. 강화/상급재련은 API Tooltip 문구 기반이라 실제 캐릭터 샘플로 오차를 확인해야 합니다.</p>
   `;
   hydratePowerCostMaterialPrices();
+  hydrateCrystalPrice();
 }
 function renderSummary(profile, arkPassive) {
   $('summaryPanel').classList.remove('hidden');
@@ -1759,7 +1849,9 @@ const LOSTARK_JOB_GROUPS = [
 
 function formatGold(value) {
   const n = Number(value || 0);
-  return Number.isFinite(n) && n > 0 ? `${n.toLocaleString('ko-KR')}G` : '-';
+  if (!Number.isFinite(n) || n <= 0) return '-';
+  const digits = n < 1 ? 4 : n < 10 ? 2 : 0;
+  return `${n.toLocaleString('ko-KR', { maximumFractionDigits: digits })}G`;
 }
 
 let selectedMarketTab = 'accessory';
@@ -1894,12 +1986,14 @@ function avatarPartCard(part, item) {
     return `<article class="avatarPart missing"><div class="avatarThumb empty">?</div><div><b>${escapeHtml(part)}</b><span>매물 없음</span><small>현재 조회 범위에서 ${escapeHtml(part)} 부위를 찾지 못했습니다.</small></div></article>`;
   }
   const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="" loading="lazy" />` : `<span>${escapeHtml(part.slice(0, 1))}</span>`;
+  const pheonText = Number(item.pheonCost || 0) > 0 ? ` · ${Number(item.pheonCost).toLocaleString('ko-KR')}페온` : '';
+  const tradeText = item.tradeRemainCount != null ? `거래 ${Number(item.tradeRemainCount || 0).toLocaleString('ko-KR')}회` : '';
   return `<article class="avatarPart">
     <div class="avatarThumb">${icon}</div>
     <div class="avatarPartInfo">
       <b>${escapeHtml(part)}</b>
       <span>${formatGold(item.price)}</span>
-      <small>${escapeHtml(item.name || '-')}</small>
+      <small>${escapeHtml(`${item.name || '-'}${tradeText ? ` · ${tradeText}` : ''}${pheonText}`)}</small>
     </div>
   </article>`;
 }
@@ -1938,7 +2032,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.7.4',
+    apiVersion: '5.7.6',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -2218,7 +2312,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.7.4</summary>
+      <summary>악세 디버그 보기 · v5.7.6</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>
@@ -2228,7 +2322,8 @@ function accessoryDebugHtml(data) {
 
 function marketResultItemHtml(item) {
   const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="">` : `<div class="marketIconFallback">?</div>`;
-  const meta = [item.grade, item.part, item.combo, item.refineCount ? `${item.refineCount}연마` : '', item.gem ? `${item.gem} ${item.level}레벨` : '', item.quality ? `품질 ${item.quality}` : ''].filter(Boolean).join(' · ');
+  const pheonMeta = Number(item.pheonCost || 0) > 0 ? `${Number(item.pheonCost).toLocaleString('ko-KR')}페온` : '';
+  const meta = [item.grade, item.part, item.combo, item.refineCount ? `${item.refineCount}연마` : '', item.gem ? `${item.gem} ${item.level}레벨` : '', item.quality ? `품질 ${item.quality}` : '', pheonMeta].filter(Boolean).join(' · ');
   return `<article class="marketResultItem">
     ${icon}
     <div><b>${escapeHtml(item.name || '이름 없음')}</b><small>${escapeHtml(meta || '현재 매물')}</small></div>
@@ -2289,12 +2384,18 @@ function materialPriceCard(item) {
   const missing = item.missing || !Number(item.price || 0);
   const price = missing ? '매물 없음' : formatGold(item.price);
   const bundle = Number(item.bundleCount || 1) || 1;
-  const unit = !missing && bundle > 1 ? `개당 ${formatGold(item.unitPrice)}` : '';
+  const unit = !missing && bundle > 1 ? `주머니 개당 ${formatGold(item.unitPrice)}` : '';
+  const shardUnit = !missing && Number(item.shardCount || 0) && Number(item.shardUnitPrice || 0)
+    ? `파편 1개당 ${formatGold(item.shardUnitPrice)}`
+    : '';
+  const shardCount = !missing && Number(item.shardCount || 0)
+    ? `주머니당 ${Number(item.shardCount).toLocaleString('ko-KR')}개`
+    : '';
   return `<article class="materialPriceCard ${missing ? 'missing' : ''}">
     ${icon}
     <div>
       <b>${escapeHtml(item.requestedName || item.name || '-')}</b>
-      <small>${escapeHtml([item.name && item.name !== item.requestedName ? item.name : '', bundle > 1 ? `${bundle.toLocaleString('ko-KR')}개 묶음` : '', unit].filter(Boolean).join(' · ') || '거래소 최저가')}</small>
+      <small>${escapeHtml([item.name && item.name !== item.requestedName ? item.name : '', bundle > 1 ? `${bundle.toLocaleString('ko-KR')}개 묶음` : '', unit, shardCount, shardUnit].filter(Boolean).join(' · ') || '거래소 최저가')}</small>
     </div>
     <strong>${escapeHtml(price)}</strong>
   </article>`;

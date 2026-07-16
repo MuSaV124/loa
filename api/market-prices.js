@@ -1,4 +1,4 @@
-const API_VERSION = '5.7.4';
+const API_VERSION = '5.7.6';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -73,6 +73,11 @@ const T4_MATERIAL_GROUPS = [
     items: ['야금술 : 업화 [11-14]', '야금술 : 업화 [15-18]', '야금술 : 업화 [19-20]', '장인의 야금술 1단계', '장인의 야금술 2단계', '장인의 야금술 3단계', '장인의 야금술 4단계']
   }
 ];
+const DESTINY_SHARD_POUCH_COUNTS = {
+  '소': 1000,
+  '중': 2000,
+  '대': 3000
+};
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -243,7 +248,7 @@ async function searchAccessory(apiKey, query) {
     updatedAt: indexResult.updatedAt,
     index: indexResult.index,
     accessoryDebug: {
-      note: 'v5.7.4 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
+      note: 'v5.7.6 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
       requestPayloads: indexResult.requestPayloads.slice(0, 14),
       filterStats: indexResult.filterStats,
       samples: indexResult.samples
@@ -581,7 +586,7 @@ async function searchEngravingListFresh(apiKey, maxPages) {
 
 async function searchT4Materials(apiKey, query) {
   const force = String(query.force || '') === '1';
-  const cacheKey = 't4Materials:v1';
+  const cacheKey = 't4Materials:v2';
   return getCachedMarketList(cacheKey, force, async () => searchT4MaterialsFresh(apiKey));
 }
 
@@ -618,14 +623,14 @@ async function searchMarketMaterial(apiKey, name, group) {
         if (!item.price) continue;
         const itemText = normalizeText(`${item.name} ${item.fullText}`);
         if (!isMaterialNameMatch(itemText, name, keyword)) continue;
-        matched.push({ ...item, group, requestedName: name, unitPrice: materialUnitPrice(item) });
+        matched.push(applyMaterialUnitMeta({ ...item, group, requestedName: name }, name));
       }
       if (matched.length) break;
     }
     if (matched.length) break;
   }
-  matched.sort((a, b) => a.unitPrice - b.unitPrice || a.price - b.price);
-  const item = matched[0] || { group, requestedName: name, name, price: 0, unitPrice: 0, bundleCount: 1, icon: '', grade: '', missing: true };
+  matched.sort((a, b) => a.effectiveUnitPrice - b.effectiveUnitPrice || a.unitPrice - b.unitPrice || a.price - b.price);
+  const item = matched[0] || applyMaterialUnitMeta({ group, requestedName: name, name, price: 0, unitPrice: 0, bundleCount: 1, icon: '', grade: '', missing: true }, name);
   return { item: { ...item, group, requestedName: name }, tried };
 }
 
@@ -660,6 +665,25 @@ function isMaterialNameMatch(itemText, targetName, keyword) {
 function materialUnitPrice(item) {
   const bundle = Number(item.bundleCount || 1) || 1;
   return Math.round((Number(item.price || 0) / bundle) * 100) / 100;
+}
+
+function destinyShardPouchCount(name) {
+  const size = String(name || '').match(/운명의\s*파편\s*주머니\((소|중|대)\)/)?.[1];
+  return size ? DESTINY_SHARD_POUCH_COUNTS[size] || 0 : 0;
+}
+
+function applyMaterialUnitMeta(item, requestedName) {
+  const unitPrice = Number(item.unitPrice || materialUnitPrice(item) || 0);
+  const shardCount = destinyShardPouchCount(requestedName);
+  if (!shardCount) return { ...item, unitPrice, effectiveUnitPrice: unitPrice };
+  const shardUnitPrice = Math.round((unitPrice / shardCount) * 10000) / 10000;
+  return {
+    ...item,
+    unitPrice,
+    shardCount,
+    shardUnitPrice,
+    effectiveUnitPrice: shardUnitPrice
+  };
 }
 
 async function getCachedMarketList(cacheKey, force, loader) {
@@ -722,21 +746,50 @@ function normalizeAuctionItem(item) {
   const price = Number(auctionInfo.BuyPrice || item.BuyPrice || item.CurrentMinPrice || item.LowestPrice || 0);
   const fullText = normalizeText([item.Name, item.Grade, item.Tier, item.Level, JSON.stringify(item.Options || ''), JSON.stringify(item.EtcOptions || ''), tooltipText(item.Tooltip)].join(' '));
   const upgradeOptions = extractAccessoryUpgradeOptions(item.Options, fullText);
+  const grade = item.Grade || '';
+  const explicitPheonCost = extractPheonCost(item, fullText);
   return {
     id: item.Id || item.ItemId || null,
     name: item.Name || '',
-    grade: item.Grade || '',
+    grade,
     tier: Number(item.Tier || 0),
     level: Number(item.Level || 0),
     icon: normalizeIconUrl(item.Icon || item.IconPath || findIconPath(item.Tooltip) || ''),
     price,
     bidStartPrice: Number(auctionInfo.BidStartPrice || 0),
     tradeAllowCount: Number(item.TradeAllowCount ?? item.TradeRemainCount ?? 0),
+    pheonCost: explicitPheonCost || defaultAuctionPheonCost(grade, fullText),
     quality: findQuality(item, fullText),
     refineCount: upgradeOptions.length,
     upgradeOptions,
     fullText
   };
+}
+
+function extractPheonCost(item, fullText = '') {
+  const auctionInfo = item?.AuctionInfo || {};
+  const direct = [
+    item?.Pheon,
+    item?.Pheons,
+    item?.PheonCost,
+    item?.PheonPrice,
+    item?.PheonCount,
+    auctionInfo?.Pheon,
+    auctionInfo?.Pheons,
+    auctionInfo?.PheonCost,
+    auctionInfo?.PheonPrice,
+    auctionInfo?.PheonCount
+  ].map(Number).find(value => Number.isFinite(value) && value > 0);
+  if (direct) return direct;
+  const match = String(fullText || '').match(/페온[^0-9]{0,8}([0-9]{1,4})/);
+  return match ? Number(match[1]) : 0;
+}
+
+function defaultAuctionPheonCost(grade, fullText = '') {
+  const text = normalizeText(`${grade} ${fullText}`);
+  if (/어빌리티\s*스톤|어빌리티스톤/.test(text)) return 9;
+  if (/고대/.test(text) && /목걸이|귀걸이|반지/.test(text)) return 35;
+  return 0;
 }
 
 function normalizeMarketItem(item) {

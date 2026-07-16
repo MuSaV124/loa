@@ -1,4 +1,4 @@
-const API_VERSION = '5.0.9';
+const API_VERSION = '5.7.6';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 
@@ -270,19 +270,29 @@ function isAvatarPart(item, part) {
 
 function normalizeAvatarItem(item, part) {
   const price = marketPrice(item);
+  const grade = item.Grade || '전설';
+  const tradeRemainCount = Number(item.TradeRemainCount ?? item.TradeCount ?? 0);
   return {
     id: item.Id || item.ItemId || null,
     name: item.Name || '',
-    grade: item.Grade || '전설',
+    grade,
     part,
     price,
     icon: normalizeIconUrl(item.Icon || item.IconPath || item.Image || findIconPath(item.Tooltip) || ''),
     yDayAvgPrice: Number(item.YDayAvgPrice || item.YesterdayAvgPrice || 0),
     recentPrice: Number(item.RecentPrice || 0),
     bundleCount: Number(item.BundleCount || 1),
-    tradeRemainCount: Number(item.TradeRemainCount ?? item.TradeCount ?? 0),
+    tradeRemainCount,
+    pheonCost: avatarPheonCost(grade, tradeRemainCount),
     rawType: item.Type || item.ItemType || findTitleText(item.Tooltip) || ''
   };
+}
+
+function avatarPheonCost(grade, tradeRemainCount) {
+  if (Number(tradeRemainCount || 0) >= 3) return 0;
+  if (/영웅/.test(String(grade || ''))) return 10;
+  if (/전설/.test(String(grade || ''))) return 30;
+  return 0;
 }
 
 function marketPrice(item) {
