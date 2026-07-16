@@ -1,4 +1,4 @@
-const VERSION = '5.7.3';
+const VERSION = '5.7.4';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -23,6 +23,36 @@ function emptyEngravingState() {
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] }, powerSnapshot: null };
+
+const T4_GEAR_COST_RULES = {
+  standard: {
+    label: '결단/업화',
+    names: ['결단', '업화'],
+    stone: { weapon: '운명의 파괴석', armor: '운명의 수호석' },
+    leapstone: '운명의 돌파석',
+    fusion: '아비도스 융화제',
+    growthLabel: '장비 성장',
+    books: {
+      weapon: ['야금술 : 업화 [11-14]', '야금술 : 업화 [15-18]', '야금술 : 업화 [19-20]'],
+      armor: ['재봉술 : 업화 [11-14]', '재봉술 : 업화 [15-18]', '재봉술 : 업화 [19-20]']
+    }
+  },
+  upperAncient: {
+    label: '전율',
+    names: ['전율'],
+    stone: { weapon: '운명의 파괴석 결정', armor: '운명의 수호석 결정' },
+    leapstone: '위대한 운명의 돌파석',
+    fusion: '상급 아비도스 융화제',
+    growthLabel: '장비 성장',
+    limitBreakLabel: '한계돌파',
+    limitBreakMaterials: ['고통의 가시'],
+    books: { weapon: [], armor: [] }
+  }
+};
+const T4_SHARED_COST_MATERIALS = ['운명의 파편 주머니(대)', '빙하의 숨결', '용암의 숨결'];
+const BOUND_ONLY_MATERIALS = new Set(['고통의 가시']);
+let t4MaterialPriceCache = null;
+let t4MaterialPriceInflight = null;
 
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
 function escapeRegExp(v) { return String(v || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -534,6 +564,150 @@ function renderPowerAccessoryRow(item, effects, extra = '', options = {}) {
     </div>
   </div>`;
 }
+function sortCombatEquipmentForDisplay(items = []) {
+  const order = { '투구': 0, '머리장식': 0, '어깨': 1, '견갑': 1, '상의': 2, '하의': 3, '장갑': 4, '무기': 5 };
+  return items.slice().sort((a, b) => {
+    const av = order[a?.type] ?? 99;
+    const bv = order[b?.type] ?? 99;
+    return av - bv;
+  });
+}
+function renderPowerArkGridPanel(arkGrid) {
+  const slots = Array.isArray(arkGrid?.slots) ? arkGrid.slots : [];
+  const summary = Array.isArray(arkGrid?.gemSummary) ? arkGrid.gemSummary : [];
+  if (!slots.length && !summary.length) return '';
+  const coreHtml = slots.map(slot => {
+    const label = slot?.name || `${slot?.side || ''} ${slot?.symbol || ''}`.trim() || '-';
+    const gemTitle = [slot?.gemName, ...(slot?.activeTexts || [])].filter(Boolean).join(' · ');
+    const icon = slot?.icon ? `<img src="${escapeHtml(slot.icon)}" alt="">` : `<i>${escapeHtml(slot?.symbol || '?')}</i>`;
+    return `<div class="powerArkCore" title="${escapeHtml(gemTitle || label)}">
+      <div>${icon}</div>
+      <b>${escapeHtml(label)}</b>
+      <span>${Number(slot?.point || 0)}P</span>
+    </div>`;
+  }).join('');
+  const summaryHtml = summary.length
+    ? summary.map(row => `<div><span>${escapeHtml(row.label)}</span><b>${formatNumber(row.value)}</b></div>`).join('')
+    : '<p>아크 그리드 젬 수치를 찾지 못했습니다.</p>';
+  return `<div class="powerArkGridPanel">
+    <h4>아크그리드</h4>
+    <div class="powerArkCoreList">${coreHtml}</div>
+    <div class="powerArkGemSummary"><b>아크 그리드 젬</b><div>${summaryHtml}</div></div>
+  </div>`;
+}
+function classifyT4GearCostRule(item) {
+  const source = `${item?.name || ''} ${item?.grade || ''}`;
+  if (source.includes('전율')) return { key: 'upperAncient', ...T4_GEAR_COST_RULES.upperAncient };
+  if (source.includes('결단') || source.includes('업화')) return { key: 'standard', ...T4_GEAR_COST_RULES.standard };
+  return { key: 'unknown', label: '미분류', names: [], stone: {}, leapstone: '', fusion: '', books: { weapon: [], armor: [] } };
+}
+function isWeaponGear(item) {
+  return String(item?.type || item?.name || '').includes('무기');
+}
+function isLimitBreakGrowth(item, rule) {
+  return rule?.key === 'upperAncient' && Number(item?.honingLevel || 0) === 20;
+}
+function costMaterialNamesForGear(item) {
+  const rule = classifyT4GearCostRule(item);
+  const slot = isWeaponGear(item) ? 'weapon' : 'armor';
+  if (isLimitBreakGrowth(item, rule)) return [...(rule.limitBreakMaterials || [])];
+  const names = [...T4_SHARED_COST_MATERIALS, rule.stone?.[slot], rule.leapstone, rule.fusion, ...(rule.books?.[slot] || [])];
+  return [...new Set(names.filter(Boolean))];
+}
+function buildT4CostPrep(snapshot) {
+  const combat = snapshot?.equipment?.combat || [];
+  const gear = combat.map(item => {
+    const rule = classifyT4GearCostRule(item);
+    return {
+      item,
+      rule,
+      slot: isWeaponGear(item) ? 'weapon' : 'armor',
+      growthLabel: isLimitBreakGrowth(item, rule) ? rule.limitBreakLabel : (rule.growthLabel || '장비 성장'),
+      materials: costMaterialNamesForGear(item)
+    };
+  });
+  const materialNames = [...new Set(gear.flatMap(row => row.materials).filter(name => !BOUND_ONLY_MATERIALS.has(name)))];
+  const boundMaterialNames = [...new Set(gear.flatMap(row => row.materials).filter(name => BOUND_ONLY_MATERIALS.has(name)))];
+  return { gear, materialNames, boundMaterialNames };
+}
+function renderPowerCostPrep(snapshot) {
+  const prep = buildT4CostPrep(snapshot);
+  const gearRows = prep.gear.map(row => {
+    const item = row.item || {};
+    const honing = item.honingLevel != null ? `+${item.honingLevel}` : '+?';
+    const materialText = row.materials.length ? row.materials.join(' · ') : '수량표 입력 대기';
+    return `<div class="powerCostGearRow">
+      <b>${escapeHtml(item.type || '-')}</b>
+      <span>${escapeHtml(row.rule.label)} · ${escapeHtml(honing)} · ${escapeHtml(row.growthLabel)}</span>
+      <small>${escapeHtml(materialText)}</small>
+    </div>`;
+  }).join('');
+  const materialRows = prep.materialNames.map(name => `<label class="powerCostMaterial" data-material-name="${escapeHtml(name)}">
+    <input type="checkbox" checked />
+    <span><b>${escapeHtml(name)}</b><small>단가 확인 중 · 체크 해제 시 귀속재료로 간주해 0골드</small></span>
+  </label>`).join('');
+  const boundRows = prep.boundMaterialNames.map(name => `<div class="powerCostMaterial boundOnly">
+    <input type="checkbox" checked disabled />
+    <span><b>${escapeHtml(name)}</b><small>그림자 레이드 세르카 귀속 재료 · 골드 비용 0</small></span>
+  </div>`).join('');
+  return `<div class="powerSnapshotBlock powerCostPrep">
+    <div class="powerCostHead">
+      <div><h3>T4 비용 계산 준비</h3><p>강화 골드와 실링, 장비성장/한계돌파 실링, 재료 시세를 분리해서 계산하도록 준비했습니다.</p></div>
+      <strong>수량표 대기</strong>
+    </div>
+    <div class="powerCostGrid">
+      <div>
+        <h4>현재 장비 규칙</h4>
+        <div class="powerCostGearList">${gearRows || '<p>전투 장비를 찾지 못했습니다.</p>'}</div>
+      </div>
+      <div>
+        <h4>재료 비용 적용</h4>
+        <div id="powerCostMaterialList" class="powerCostMaterialList">${[materialRows, boundRows].filter(Boolean).join('') || '<p>적용할 재료가 없습니다.</p>'}</div>
+        <p class="powerCostHint">장비성장은 모든 구간에 있으며 골드는 들지 않고 실링만 계산합니다. 전율 20강 이후 한계돌파는 고통의 가시(귀속) + 실링 규칙으로 분리했습니다.</p>
+      </div>
+    </div>
+  </div>`;
+}
+async function loadT4MaterialPriceMap() {
+  if (t4MaterialPriceCache) return t4MaterialPriceCache;
+  if (t4MaterialPriceInflight) return t4MaterialPriceInflight;
+  t4MaterialPriceInflight = fetchMarketJson(`/api/market-prices?mode=t4Materials&_=${Date.now()}`)
+    .then(data => {
+      const map = new Map();
+      for (const item of data?.items || []) {
+        map.set(item.requestedName || item.name, item);
+      }
+      t4MaterialPriceCache = map;
+      return map;
+    })
+    .finally(() => { t4MaterialPriceInflight = null; });
+  return t4MaterialPriceInflight;
+}
+async function hydratePowerCostMaterialPrices() {
+  const list = $('powerCostMaterialList');
+  if (!list) return;
+  try {
+    const priceMap = await loadT4MaterialPriceMap();
+    list.querySelectorAll('.powerCostMaterial').forEach(row => {
+      const name = row.dataset.materialName || '';
+      if (!name || BOUND_ONLY_MATERIALS.has(name)) return;
+      const item = priceMap.get(name);
+      const small = row.querySelector('small');
+      if (!small) return;
+      if (!item || item.missing || !Number(item.price || 0)) {
+        small.textContent = '시세 없음 · 체크 해제 시 귀속재료로 간주해 0골드';
+        row.classList.add('missing');
+        return;
+      }
+      const unit = Number(item.unitPrice || item.price || 0);
+      small.textContent = `단가 ${formatGold(unit)} · 체크 해제 시 귀속재료로 간주해 0골드`;
+    });
+  } catch {
+    list.querySelectorAll('.powerCostMaterial small').forEach(small => {
+      small.textContent = '시세 확인 실패 · 시세탭 재료에서 다시 확인 가능';
+    });
+  }
+}
 function renderPowerSnapshot(snapshot) {
   const panel = $('powerSnapshotPanel');
   const view = $('powerSnapshotView');
@@ -559,7 +733,8 @@ function renderPowerSnapshot(snapshot) {
       return `<span title="${escapeHtml(label)} Lv.${Number(gem.level || 0)} ${escapeHtml(gem.skillName || gem.name || '-')}">${icon}<b>${Number(gem.level || 0)}</b></span>`;
     })
     .join('');
-  const gearRows = combat.map(renderPowerEquipmentRow).join('');
+  const gearRows = sortCombatEquipmentForDisplay(combat).map(renderPowerEquipmentRow).join('');
+  const arkGridPanel = renderPowerArkGridPanel(snapshot.arkGrid);
   const accessoryEffectItems = effects.accessory?.items || [];
   const accessoryRows = accessories.map((item, index) => renderPowerAccessoryRow(item, accessoryEffectItems[index]?.effects)).join('');
   const braceletEffects = effects.bracelet?.items?.[0]?.effects || effects.bracelet || {};
@@ -576,7 +751,7 @@ function renderPowerSnapshot(snapshot) {
         <div class="powerBuildGrid">
           <div class="powerBuildColumn">
             <div class="powerBuildHeader"><b>장비</b><span>아바타 제외</span></div>
-            <div class="powerEquipmentList">${gearRows || '<p>전투 장비를 찾지 못했습니다.</p>'}</div>
+            <div class="powerEquipmentList">${gearRows || '<p>전투 장비를 찾지 못했습니다.</p>'}${arkGridPanel}</div>
           </div>
           <div class="powerBuildColumn">
             <div class="powerBuildHeader"><b>악세사리</b><span>팔찌/어빌리티 스톤 포함</span></div>
@@ -584,9 +759,11 @@ function renderPowerSnapshot(snapshot) {
           </div>
         </div>
       </div>
+      ${renderPowerCostPrep(snapshot)}
     </div>
     <p class="powerSnapshotNote">이 카드는 전투력 계산식 투입 전 검증용입니다. 강화/상급재련은 API Tooltip 문구 기반이라 실제 캐릭터 샘플로 오차를 확인해야 합니다.</p>
   `;
+  hydratePowerCostMaterialPrices();
 }
 function renderSummary(profile, arkPassive) {
   $('summaryPanel').classList.remove('hidden');
@@ -723,11 +900,12 @@ function getBaseStats(selection = state.selected) {
   const baseSpeed = 114;
   const enlightenmentAttackSpeed = num(state.enlightenment.attackSpeed);
   const enlightenmentMoveSpeed = num(state.enlightenment.moveSpeed);
+  const braceletAttackMoveSpeed = num(state.bracelet.attackMoveSpeed);
   const arkGridAttackSpeed = num(state.arkGrid.attackSpeed);
   const arkGridMoveSpeed = num(state.arkGrid.moveSpeed);
   const engravingAttackSpeed = num(state.engraving?.effects?.attackSpeed);
-  const attackSpeed = baseSpeed + swiftSpeedBonus + enlightenmentAttackSpeed + arkGridAttackSpeed + engravingAttackSpeed + extraAttackSpeed;
-  const moveSpeed = baseSpeed + swiftSpeedBonus + enlightenmentMoveSpeed + arkGridMoveSpeed + extraMoveSpeed;
+  const attackSpeed = baseSpeed + swiftSpeedBonus + enlightenmentAttackSpeed + braceletAttackMoveSpeed + arkGridAttackSpeed + engravingAttackSpeed + extraAttackSpeed;
+  const moveSpeed = baseSpeed + swiftSpeedBonus + enlightenmentMoveSpeed + braceletAttackMoveSpeed + arkGridMoveSpeed + extraMoveSpeed;
   let dynamicEnlightenmentCritRate = 0;
   let dynamicEnlightenmentCritDamage = 0;
   for (const item of state.enlightenment.items || []) {
@@ -785,6 +963,7 @@ function getBaseStats(selection = state.selected) {
     swiftSpeedBonus,
     enlightenmentAttackSpeed,
     enlightenmentMoveSpeed,
+    braceletAttackMoveSpeed,
     arkGridAttackSpeed,
     arkGridMoveSpeed,
     engravingAttackSpeed,
@@ -808,7 +987,7 @@ function applyEffect(stats, effect, sourceLabel = '진화') {
   const out = { ...stats };
   if (effect.manaConditionNote) out.manaConditionNotes = [...(out.manaConditionNotes || []), { label: sourceLabel, note: effect.manaConditionNote }];
   if (effect.critStat) { out.critStat = (out.critStat || 0) + effect.critStat; out.statCritRate = critRateFromStat(out.critStat); out.critRate += critRateFromStat(effect.critStat); }
-  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.attackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentAttackSpeed || 0) + (out.arkGridAttackSpeed || 0) + (out.engravingAttackSpeed || 0) + (out.extraAttackSpeed || 0); out.moveSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentMoveSpeed || 0) + (out.arkGridMoveSpeed || 0) + (out.extraMoveSpeed || 0); out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
+  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.attackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentAttackSpeed || 0) + (out.braceletAttackMoveSpeed || 0) + (out.arkGridAttackSpeed || 0) + (out.engravingAttackSpeed || 0) + (out.extraAttackSpeed || 0); out.moveSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentMoveSpeed || 0) + (out.braceletAttackMoveSpeed || 0) + (out.arkGridMoveSpeed || 0) + (out.extraMoveSpeed || 0); out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
   if (effect.critRate) out.critRate += effect.critRate;
   if (effect.critDamage) out.critDamage += effect.critDamage;
   if (effect.critHitDamage) {
@@ -1098,6 +1277,8 @@ function buildSourceSummary(current) {
   }
   if (base.enlightenmentAttackSpeed) attackSpeedLines.push(sourceLine('깨달음', base.enlightenmentAttackSpeed));
   if (base.enlightenmentMoveSpeed) moveSpeedLines.push(sourceLine('깨달음', base.enlightenmentMoveSpeed));
+  if (base.braceletAttackMoveSpeed) attackSpeedLines.push(sourceLine('팔찌', base.braceletAttackMoveSpeed));
+  if (base.braceletAttackMoveSpeed) moveSpeedLines.push(sourceLine('팔찌', base.braceletAttackMoveSpeed));
   if (base.arkGridAttackSpeed) attackSpeedLines.push(sourceLine('아크그리드', base.arkGridAttackSpeed));
   if (base.arkGridMoveSpeed) moveSpeedLines.push(sourceLine('아크그리드', base.arkGridMoveSpeed));
   if (base.engravingAttackSpeed) attackSpeedLines.push(sourceLine('각인서/API', base.engravingAttackSpeed));
@@ -1757,7 +1938,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.7.3',
+    apiVersion: '5.7.4',
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -2037,7 +2218,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.7.3</summary>
+      <summary>악세 디버그 보기 · v5.7.4</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>

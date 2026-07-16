@@ -1,4 +1,4 @@
-const API_VERSION = '5.7.3';
+const API_VERSION = '5.7.4';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = 60 * 1000;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -69,7 +69,7 @@ async function loadCharacterData(name, apiKey) {
   const abilityStoneEffects = extractAbilityStoneEffects(equipment);
   const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
   const arkGridEffects = extractArkGridEffects(arkGrid.data);
-  const powerSnapshot = buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects });
+  const powerSnapshot = buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, arkGrid: arkGrid.data });
 
   return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, powerSnapshot, raw: data };
 }
@@ -154,9 +154,10 @@ function parseTooltip(tooltip) {
 const COMBAT_EQUIPMENT_TYPES = new Set(['무기', '투구', '상의', '하의', '장갑', '어깨']);
 const ACCESSORY_EQUIPMENT_TYPES = new Set(['목걸이', '귀걸이', '반지']);
 
-function buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects }) {
+function buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, arkGrid }) {
   const equipmentSnapshot = extractEquipmentSnapshot(equipment);
   const gemSnapshot = extractGemSnapshot(gems);
+  const arkGridSnapshot = extractArkGridSnapshot(arkGrid);
   return {
     version: API_VERSION,
     source: 'lostark-open-api',
@@ -176,6 +177,7 @@ function buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, bracel
     },
     equipment: equipmentSnapshot,
     gems: gemSnapshot,
+    arkGrid: arkGridSnapshot,
     effects: {
       accessory: accessoryEffects,
       bracelet: braceletEffects,
@@ -321,6 +323,75 @@ function parseGemSkillName(text) {
   return match ? match[1].trim() : '';
 }
 
+const ARK_GRID_CORE_ORDER = [
+  { side: '질서', symbol: '해' },
+  { side: '질서', symbol: '달' },
+  { side: '질서', symbol: '별' },
+  { side: '혼돈', symbol: '해' },
+  { side: '혼돈', symbol: '달' },
+  { side: '혼돈', symbol: '별' }
+];
+
+function extractArkGridSnapshot(arkGrid) {
+  const slots = Array.isArray(arkGrid?.Slots) ? arkGrid.Slots : [];
+  if (!slots.length) return { slots: [], gemSummary: [] };
+  const rows = ARK_GRID_CORE_ORDER.map((order, index) => {
+    const slot = findArkGridSlot(slots, order, index);
+    const text = arkGridTooltipText(slot?.Tooltip);
+    const activeTexts = activeArkGridOptionTexts(text, Number(slot?.Point || 0));
+    return {
+      side: order.side,
+      symbol: order.symbol,
+      name: stripHtml(slot?.Name || `${order.side} ${order.symbol}`),
+      grade: slot?.Grade || '',
+      point: firstFiniteNumber([slot?.Point, matchNumber(text, [/([0-9]+)\s*P/])]) || 0,
+      icon: normalizeIconUrl(slot?.Icon || slot?.IconPath || findIconPath(slot?.Tooltip) || ''),
+      gemName: stripHtml(slot?.GemName || slot?.JewelName || slot?.Gem?.Name || slot?.Jewel?.Name || ''),
+      gemIcon: normalizeIconUrl(slot?.GemIcon || slot?.JewelIcon || slot?.Gem?.Icon || slot?.Jewel?.Icon || ''),
+      activeTexts: activeTexts.map(row => row.slice(0, 180)),
+      rawKnownKeys: Object.keys(slot || {}).sort()
+    };
+  });
+  return { slots: rows, gemSummary: parseArkGridGemSummary(rows) };
+}
+
+function findArkGridSlot(slots, order, fallbackIndex) {
+  const match = slots.find(slot => {
+    const text = `${slot?.Name || ''} ${slot?.Grade || ''} ${arkGridTooltipText(slot?.Tooltip)}`;
+    return text.includes(order.side) && text.includes(order.symbol);
+  });
+  return match || slots[fallbackIndex] || null;
+}
+
+function parseArkGridGemSummary(rows) {
+  const text = rows.flatMap(row => row.activeTexts || []).join(' ');
+  const entries = [
+    ['공격력', [/(?<!무기\s*)공격력(?:이|가)?\s*(?:\+)?([0-9,.]+)/g]],
+    ['보스 피해', [/보스(?:에게)?\s*(?:주는\s*)?피해(?:량)?(?:이|가)?\s*(?:\+)?([0-9,.]+)/g]],
+    ['추가 피해', [/추가\s*피해(?:가)?\s*(?:\+)?([0-9,.]+)/g]],
+    ['아군 공격 강화', [/아군\s*공격력\s*강화\s*효과(?:가)?\s*(?:\+)?([0-9,.]+)/g]],
+    ['아군 피해 강화', [/아군\s*피해량\s*강화\s*효과(?:가)?\s*(?:\+)?([0-9,.]+)/g]],
+    ['낙인력', [/낙인력(?:이)?\s*(?:\+)?([0-9,.]+)/g]]
+  ];
+  return entries.map(([label, regexList]) => ({ label, value: sumRegexNumbers(text, regexList) })).filter(row => Number(row.value || 0) > 0);
+}
+
+function sumRegexNumbers(text, regexList) {
+  let total = 0;
+  const seen = new Set();
+  for (const re of regexList) {
+    re.lastIndex = 0;
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      const token = `${match.index}:${match[0]}`;
+      if (seen.has(token)) continue;
+      seen.add(token);
+      total += parseNumber(match[1]);
+    }
+  }
+  return round2(total);
+}
+
 function findQualityValue(value) {
   const candidates = [];
   const visit = (current, key = '') => {
@@ -418,7 +489,7 @@ function extractAccessoryEffects(equipment) {
 }
 
 function extractBraceletEffects(equipment) {
-  const result = { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, attackPowerFlat: 0, weaponPowerFlat: 0, attackPowerPercent: 0, weaponPowerPercent: 0, strength: 0, dexterity: 0, intelligence: 0, critStat: 0, swiftStat: 0, specStat: 0, items: [] };
+  const result = { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, attackPowerFlat: 0, weaponPowerFlat: 0, attackPowerPercent: 0, weaponPowerPercent: 0, strength: 0, dexterity: 0, intelligence: 0, critStat: 0, swiftStat: 0, specStat: 0, attackMoveSpeed: 0, resourceRecovery: 0, maxHp: 0, items: [] };
   for (const item of Array.isArray(equipment) ? equipment : []) {
     if (item?.Type !== '팔찌') continue;
     const text = tooltipText(item.Tooltip);
@@ -438,9 +509,12 @@ function extractBraceletEffects(equipment) {
     result.critStat += effects.critStat;
     result.swiftStat += effects.swiftStat;
     result.specStat += effects.specStat;
+    result.attackMoveSpeed += effects.attackMoveSpeed;
+    result.resourceRecovery += effects.resourceRecovery;
+    result.maxHp += effects.maxHp;
     result.items.push({ type: item.Type, name: item.Name, grade: item.Grade, effects });
   }
-  for (const key of ['critRate', 'critDamage', 'critHitDamage', 'enemyDamage', 'additionalDamage', 'attackPowerFlat', 'weaponPowerFlat', 'attackPowerPercent', 'weaponPowerPercent', 'strength', 'dexterity', 'intelligence', 'critStat', 'swiftStat', 'specStat']) result[key] = Math.round(result[key] * 100) / 100;
+  for (const key of ['critRate', 'critDamage', 'critHitDamage', 'enemyDamage', 'additionalDamage', 'attackPowerFlat', 'weaponPowerFlat', 'attackPowerPercent', 'weaponPowerPercent', 'strength', 'dexterity', 'intelligence', 'critStat', 'swiftStat', 'specStat', 'attackMoveSpeed', 'resourceRecovery', 'maxHp']) result[key] = Math.round(result[key] * 100) / 100;
   return result;
 }
 
@@ -698,6 +772,8 @@ const BRACELET_OPTION_GRADE_VALUES = {
   relic: {
     critRate: [{ high: 4.20, mid: 3.40, low: 2.60 }],
     critDamage: [{ high: 8.40, mid: 6.80, low: 5.20 }],
+    attackMoveSpeed: [{ high: 6.00, mid: 5.00, low: 4.00 }],
+    resourceRecovery: [{ high: 12.00, mid: 10.00, low: 8.00 }],
     enemyDamage: [
       { high: 2.50, mid: 2.00, low: 1.50 },
       { high: 5.00, mid: 4.50, low: 4.00 },
@@ -718,6 +794,8 @@ const BRACELET_OPTION_GRADE_VALUES = {
   ancient: {
     critRate: [{ high: 5.00, mid: 4.20, low: 3.40 }],
     critDamage: [{ high: 10.00, mid: 8.40, low: 6.80 }],
+    attackMoveSpeed: [{ high: 6.00, mid: 5.00, low: 4.00 }],
+    resourceRecovery: [{ high: 12.00, mid: 10.00, low: 8.00 }],
     enemyDamage: [
       { high: 3.00, mid: 2.50, low: 2.00 },
       { high: 5.50, mid: 5.00, low: 4.50 },
@@ -738,6 +816,8 @@ const BRACELET_OPTION_GRADE_VALUES = {
   common: {
     critRate: [{ high: 5.00, mid: 4.20, low: 3.40 }, { high: 4.20, mid: 3.40, low: 2.60 }],
     critDamage: [{ high: 10.00, mid: 8.40, low: 6.80 }, { high: 8.40, mid: 6.80, low: 5.20 }],
+    attackMoveSpeed: [{ high: 6.00, mid: 5.00, low: 4.00 }],
+    resourceRecovery: [{ high: 12.00, mid: 10.00, low: 8.00 }],
     enemyDamage: [
       { high: 3.00, mid: 2.50, low: 2.00 },
       { high: 2.50, mid: 2.00, low: 1.50 },
@@ -852,7 +932,8 @@ function parseAccessoryText(text, itemType = '', itemGrade = '') {
   ], source, itemType, itemGrade);
 
   addMatches(out, 'maxHp', source, [
-    /최대\s*생명력\s*(?:\+)?(\d[\d,]*)/g
+    /최대\s*생명력\s*(?:\+)?(\d[\d,]*)/g,
+    /체력\s*(?:\+)?(\d[\d,]*)/g
   ], source, itemType, itemGrade);
 
   addMatches(out, 'maxMana', source, [
@@ -868,7 +949,8 @@ function parseAccessoryText(text, itemType = '', itemGrade = '') {
   ], source, itemType, itemGrade);
 
   addMatches(out, 'attackMoveSpeed', source, [
-    /공격\s*및\s*이동\s*속도(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+    /공격\s*및\s*이동\s*속도(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
+    /공이속\s*(?:\+)?(\d+(?:\.\d+)?)%/g
   ], source, itemType, itemGrade);
 
   addMatches(out, 'seedDamage', source, [
@@ -888,7 +970,8 @@ function parseAccessoryText(text, itemType = '', itemGrade = '') {
   ], source, itemType, itemGrade);
 
   addMatches(out, 'resourceRecovery', source, [
-    /전투자원\s*자연\s*회복량\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
+    /전투\s*자원\s*(?:자연\s*)?회복량(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
+    /전투자원회복량\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
   ], source, itemType, itemGrade);
 
   addMatches(out, 'spaceCooldown', source, [
@@ -925,7 +1008,8 @@ function extractBraceletOptionSlots(text, effects, itemGrade = '') {
   const slots = [];
   const push = (key, label, value, gradeKey = key, extraText = '') => {
     const grade = optionGradeByValue(gradeKey, value, '팔찌', itemGrade) || effects?.optionGrades?.[gradeKey] || '';
-    const main = key.endsWith('Flat') ? `${label} +${Number(value).toLocaleString('ko-KR')}` : `${label} ${pctForServer(value)}`;
+    const isFlat = key.endsWith('Flat') || ['maxHp', 'maxMana', 'critStat', 'swiftStat', 'specStat', 'strength', 'dexterity', 'intelligence'].includes(key);
+    const main = isFlat ? `${label} +${Number(value).toLocaleString('ko-KR')}` : `${label} ${pctForServer(value)}`;
     slots.push({ key, text: extraText ? `${main} / ${extraText}` : main, grade });
   };
 
@@ -935,7 +1019,7 @@ function extractBraceletOptionSlots(text, effects, itemGrade = '') {
   ]);
   if (critRate) {
     const bonus = firstMatchNumber(source, [/치명타로\s*적중\s*시\s*(?:적에게\s*주는\s*)?피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
-    push('critRate', '치적', critRate, 'critRate', bonus ? `치명타 피해 ${pctForServer(bonus)}` : '');
+    push('critRate', '치적', critRate, 'critRate', bonus ? `치명타 적중 주피 ${pctForServer(bonus)}` : '');
   }
 
   const critDamage = firstMatchNumber(source, [
@@ -944,7 +1028,7 @@ function extractBraceletOptionSlots(text, effects, itemGrade = '') {
   ]);
   if (critDamage) {
     const bonus = firstMatchNumber(source, [/치명타로\s*적중\s*시\s*(?:적에게\s*주는\s*)?피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
-    push('critDamage', '치피', critDamage, 'critDamage', bonus ? `치명타 피해 ${pctForServer(bonus)}` : '');
+    push('critDamage', '치피', critDamage, 'critDamage', bonus ? `치명타 적중 주피 ${pctForServer(bonus)}` : '');
   }
 
   const enemyDamage = firstMatchNumber(source, [/(?<!무력화\s*상태의\s*)적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*증가한다/i]);
@@ -958,6 +1042,24 @@ function extractBraceletOptionSlots(text, effects, itemGrade = '') {
     const demon = firstMatchNumber(source, [/악마\s*및\s*대악마\s*계열\s*피해량(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
     push('additionalDamage', '추피', additional, 'additionalDamage', demon ? `악마 피해 ${pctForServer(demon)}` : '');
   }
+
+  const attackMoveSpeed = firstMatchNumber(source, [
+    /공격\s*및\s*이동\s*속도(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/i,
+    /공이속\s*(?:\+)?(\d+(?:\.\d+)?)%/i
+  ]);
+  if (attackMoveSpeed) push('attackMoveSpeed', '공이속', attackMoveSpeed, 'attackMoveSpeed');
+
+  const resourceRecovery = firstMatchNumber(source, [
+    /전투\s*자원\s*(?:자연\s*)?회복량(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/i,
+    /전투자원회복량\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/i
+  ]);
+  if (resourceRecovery) push('resourceRecovery', '자원 회복', resourceRecovery, 'resourceRecovery');
+
+  const maxHp = firstMatchNumber(source, [
+    /최대\s*생명력\s*(?:\+)?(\d[\d,]*)/i,
+    /체력\s*(?:\+)?(\d[\d,]*)/i
+  ]);
+  if (maxHp) push('maxHp', '체력', maxHp, 'maxHp');
 
   const weaponValues = [...source.matchAll(/무기\s*공격력(?:이)?\s*(?:\+)?(\d[\d,]*)(?![\d,.]*\s*%)/g)]
     .map(match => Number(String(match[1]).replace(/,/g, '')))

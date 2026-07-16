@@ -144,6 +144,105 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .powerEquipmentRow {
   grid-template-columns: 54px minmax(0, 1fr);
 }
+.powerArkGridPanel {
+  border: 1px solid rgba(148, 163, 184, .12);
+  border-radius: 9px;
+  background: rgba(2, 6, 23, .46);
+  padding: 10px;
+}
+.powerArkGridPanel h4 {
+  margin: 0 0 9px;
+  color: #e2e8f0;
+  font-size: 13px;
+}
+.powerArkCoreList {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+  align-items: start;
+}
+.powerArkCore {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  text-align: center;
+}
+.powerArkCore div {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+}
+.powerArkCore img,
+.powerArkCore i {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: rgba(255, 255, 255, .06);
+}
+.powerArkCore i {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(251, 191, 36, .28);
+  color: #fbbf24;
+  font-style: normal;
+  font-weight: 1000;
+}
+.powerArkCore b {
+  max-width: 100%;
+  color: #f97316;
+  font-size: 10px;
+  line-height: 1.12;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.powerArkCore span {
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 950;
+}
+.powerArkGemSummary {
+  margin-top: 10px;
+  border: 1px solid rgba(148, 163, 184, .10);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, .55);
+  padding: 8px;
+}
+.powerArkGemSummary > b {
+  display: block;
+  margin-bottom: 7px;
+  color: #dbeafe;
+  font-size: 12px;
+}
+.powerArkGemSummary > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 12px;
+}
+.powerArkGemSummary div div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+.powerArkGemSummary span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.powerArkGemSummary b {
+  color: #f8fafc;
+}
+.powerArkGemSummary p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
 .powerAccessoryRow.extraRow {
   margin-top: 2px;
 }
@@ -488,6 +587,103 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   margin: 0;
   font-size: 12px;
   font-weight: 800;
+}
+.powerCostPrep {
+  display: grid;
+  gap: 12px;
+}
+.powerCostHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.powerCostHead h3,
+.powerCostGrid h4 {
+  margin: 0;
+  color: #e2e8f0;
+}
+.powerCostHead p,
+.powerCostHint {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.powerCostHead strong {
+  border: 1px solid rgba(251, 191, 36, .32);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, .08);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.powerCostGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.powerCostGearList,
+.powerCostMaterialList {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+.powerCostGearRow,
+.powerCostMaterial {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, .14);
+  border-radius: 9px;
+  background: rgba(15, 23, 42, .48);
+  padding: 8px 9px;
+}
+.powerCostGearRow {
+  display: grid;
+  gap: 3px;
+}
+.powerCostGearRow b {
+  color: #fbbf24;
+}
+.powerCostGearRow span {
+  color: #dbeafe;
+  font-size: 12px;
+  font-weight: 850;
+}
+.powerCostGearRow small,
+.powerCostMaterial small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.powerCostMaterial {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.powerCostMaterial input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: var(--amber);
+}
+.powerCostMaterial b {
+  display: block;
+  color: #f8fafc;
+  font-size: 12px;
+}
+.powerCostMaterial.missing b {
+  color: #cbd5e1;
+}
+.powerCostMaterial.boundOnly {
+  border-color: rgba(74, 222, 128, .20);
+  background: rgba(22, 101, 52, .12);
+}
+.powerCostMaterial.boundOnly input {
+  opacity: .55;
+}
+.powerCostMaterial.boundOnly small {
+  color: #86efac;
 }
 @media (max-width: 980px) {
   .grid, .manualGrid, .effectList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2192,7 +2388,7 @@ select {
   }
 }
 
-/* v5.7.3 search-first calculator entry */
+/* v5.7.4 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
 body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,
@@ -2218,6 +2414,9 @@ body:not(.calculatorReady):not(.marketMode) #keenPanel {
   }
   .powerAccessoryOptions {
     grid-column: 1 / 3;
+  }
+  .powerCostGrid {
+    grid-template-columns: 1fr;
   }
 }
 body:not(.calculatorReady):not(.marketMode) .wrap {
