@@ -1,4 +1,4 @@
-const API_VERSION = '5.7.6';
+const API_VERSION = '5.7.9';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -71,6 +71,10 @@ const T4_MATERIAL_GROUPS = [
   {
     group: '야금술',
     items: ['야금술 : 업화 [11-14]', '야금술 : 업화 [15-18]', '야금술 : 업화 [19-20]', '장인의 야금술 1단계', '장인의 야금술 2단계', '장인의 야금술 3단계', '장인의 야금술 4단계']
+  },
+  {
+    group: '아크그리드 젬',
+    items: ['질서의 해 젬', '질서의 달 젬', '질서의 별 젬', '혼돈의 해 젬', '혼돈의 달 젬', '혼돈의 별 젬']
   }
 ];
 const DESTINY_SHARD_POUCH_COUNTS = {
@@ -248,7 +252,7 @@ async function searchAccessory(apiKey, query) {
     updatedAt: indexResult.updatedAt,
     index: indexResult.index,
     accessoryDebug: {
-      note: 'v5.7.6 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
+      note: 'v5.7.9 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
       requestPayloads: indexResult.requestPayloads.slice(0, 14),
       filterStats: indexResult.filterStats,
       samples: indexResult.samples
@@ -586,7 +590,7 @@ async function searchEngravingListFresh(apiKey, maxPages) {
 
 async function searchT4Materials(apiKey, query) {
   const force = String(query.force || '') === '1';
-  const cacheKey = 't4Materials:v2';
+  const cacheKey = 't4Materials:v3';
   return getCachedMarketList(cacheKey, force, async () => searchT4MaterialsFresh(apiKey));
 }
 
@@ -650,6 +654,11 @@ function materialSearchAliases(name) {
   }
   if (/^장인의\s*재봉술\s*\d단계$/.test(base)) aliases.push(base.replace(/(\d단계)$/, ': $1'));
   if (/^장인의\s*야금술\s*\d단계$/.test(base)) aliases.push(base.replace(/(\d단계)$/, ': $1'));
+  const arkGridGem = base.match(/^(질서|혼돈)의\s*(해|달|별)\s*젬$/);
+  if (arkGridGem) {
+    const [, order, shape] = arkGridGem;
+    aliases.push(`${order}의 ${shape}`, `${order} ${shape} 젬`, `${order} ${shape}`, `아크그리드 ${order} ${shape}`, `아크 그리드 ${order} ${shape}`);
+  }
   return [...new Set(aliases)];
 }
 
@@ -659,6 +668,11 @@ function isMaterialNameMatch(itemText, targetName, keyword) {
   const key = normalizeText(keyword).replace(/\s+/g, '');
   const sizeMatch = targetName.match(/운명의\s*파편\s*주머니\((소|중|대)\)/);
   if (sizeMatch) return compactText.includes('운명의파편주머니') && compactText.includes(sizeMatch[1]);
+  const arkGridGem = targetName.match(/^(질서|혼돈)의\s*(해|달|별)\s*젬$/);
+  if (arkGridGem) {
+    const [, order, shape] = arkGridGem;
+    return compactText.includes(order) && compactText.includes(shape) && compactText.includes('젬');
+  }
   return compactText.includes(target) || compactText.includes(key);
 }
 

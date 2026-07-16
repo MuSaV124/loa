@@ -1,4 +1,4 @@
-const VERSION = '5.7.6';
+const VERSION = '5.7.9';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -22,7 +22,7 @@ function emptyEngravingState() {
 
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
-const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] }, powerSnapshot: null };
+const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] }, powerSnapshot: null, powerCostEstimates: [] };
 let simulatorRendered = false;
 
 const T4_GEAR_COST_RULES = {
@@ -52,12 +52,142 @@ const T4_GEAR_COST_RULES = {
 };
 const T4_SHARED_COST_MATERIALS = ['운명의 파편 주머니(대)', '빙하의 숨결', '용암의 숨결'];
 const BOUND_ONLY_MATERIALS = new Set(['고통의 가시']);
+const T4_ADVANCED_HONING_ATTEMPT_COSTS = {
+  armor: [
+    { stage: 1, materials: { '운명의 수호석': 150, '운명의 돌파석': 4, '아비도스 융화제': 5, '운명의 파편': 300, '골드': 475, '빙하의 숨결': 4, '장인의 재봉술 1단계': 1 } },
+    { stage: 2, materials: { '운명의 수호석': 270, '운명의 돌파석': 5, '아비도스 융화제': 5, '운명의 파편': 600, '골드': 900, '빙하의 숨결': 6, '장인의 재봉술 2단계': 1 } },
+    { stage: 3, materials: { '운명의 수호석': 1000, '운명의 돌파석': 18, '아비도스 융화제': 17, '운명의 파편': 7000, '골드': 2000, '빙하의 숨결': 20, '장인의 재봉술 3단계': 1 } },
+    { stage: 4, materials: { '운명의 수호석': 1200, '운명의 돌파석': 23, '아비도스 융화제': 19, '운명의 파편': 8000, '골드': 2400, '빙하의 숨결': 24, '장인의 재봉술 4단계': 1 } }
+  ],
+  weapon: [
+    { stage: 1, materials: { '운명의 파괴석': 180, '운명의 돌파석': 5, '아비도스 융화제': 8, '운명의 파편': 500, '골드': 563, '용암의 숨결': 4, '장인의 야금술 1단계': 1 } },
+    { stage: 2, materials: { '운명의 파괴석': 330, '운명의 돌파석': 7, '아비도스 융화제': 9, '운명의 파편': 1000, '골드': 1250, '용암의 숨결': 6, '장인의 야금술 2단계': 1 } },
+    { stage: 3, materials: { '운명의 파괴석': 1200, '운명의 돌파석': 25, '아비도스 융화제': 28, '운명의 파편': 11500, '골드': 3000, '용암의 숨결': 20, '장인의 야금술 3단계': 1 } },
+    { stage: 4, materials: { '운명의 파괴석': 1400, '운명의 돌파석': 32, '아비도스 융화제': 30, '운명의 파편': 13000, '골드': 4000, '용암의 숨결': 24, '장인의 야금술 4단계': 1 } }
+  ]
+};
+const T4_NORMAL_GEAR_GROWTH_COSTS = {
+  ancient: {
+    label: '고대 장비',
+    armor: [
+      { from: 10, to: 11, fragment: 12000, silver: 300000 },
+      { from: 11, to: 12, fragment: 13000, silver: 325000 },
+      { from: 12, to: 13, fragment: 19000, silver: 475000 },
+      { from: 13, to: 14, fragment: 22000, silver: 550000 },
+      { from: 14, to: 15, fragment: 25000, silver: 625000 },
+      { from: 15, to: 16, fragment: 29000, silver: 725000 },
+      { from: 16, to: 17, fragment: 39000, silver: 975000 },
+      { from: 17, to: 18, fragment: 45000, silver: 1125000 },
+      { from: 18, to: 19, fragment: 51000, silver: 1173000 },
+      { from: 19, to: 20, fragment: 63000, silver: 1149000 },
+      { from: 20, to: 21, fragment: 72000, silver: 1440000 },
+      { from: 21, to: 22, fragment: 81000, silver: 1620000 },
+      { from: 22, to: 23, fragment: 91000, silver: 1820000 },
+      { from: 23, to: 24, fragment: 102000, silver: 2040000 },
+      { from: 24, to: 25, fragment: 114000, silver: 2280000 }
+    ],
+    weapon: [
+      { from: 10, to: 11, fragment: 21000, silver: 525000 },
+      { from: 11, to: 12, fragment: 23000, silver: 575000 },
+      { from: 12, to: 13, fragment: 33000, silver: 825000 },
+      { from: 13, to: 14, fragment: 38000, silver: 950000 },
+      { from: 14, to: 15, fragment: 43000, silver: 1075000 },
+      { from: 15, to: 16, fragment: 49000, silver: 1225000 },
+      { from: 16, to: 17, fragment: 66000, silver: 1655000 },
+      { from: 17, to: 18, fragment: 75000, silver: 1875000 },
+      { from: 18, to: 19, fragment: 85000, silver: 1953000 },
+      { from: 19, to: 20, fragment: 106000, silver: 2438000 },
+      { from: 20, to: 21, fragment: 120000, silver: 2400000 },
+      { from: 21, to: 22, fragment: 135000, silver: 2700000 },
+      { from: 22, to: 23, fragment: 152000, silver: 3040000 },
+      { from: 23, to: 24, fragment: 170000, silver: 3400000 },
+      { from: 24, to: 25, fragment: 190000, silver: 3800000 }
+    ]
+  }
+};
+const T4_NORMAL_REFINE_ATTEMPT_COSTS = {
+  ancient: {
+    label: '에기르 고대 장비',
+    armor: [
+      { from: 10, to: 11, materials: { '운명의 수호석': 750, '운명의 돌파석': 11, '아비도스 융화제': 7, '운명의 파편': 3000, '골드': 970, '실링': 33000, '빙하의 숨결': 20, '재봉술 : 업화 [11-14]': 1 } },
+      { from: 11, to: 12, materials: { '운명의 수호석': 780, '운명의 돌파석': 13, '아비도스 융화제': 7, '운명의 파편': 3180, '골드': 1070, '실링': 33000, '빙하의 숨결': 20, '재봉술 : 업화 [11-14]': 1 } },
+      { from: 12, to: 13, materials: { '운명의 수호석': 840, '운명의 돌파석': 14, '아비도스 융화제': 9, '운명의 파편': 4560, '골드': 1190, '실링': 33000, '빙하의 숨결': 20, '재봉술 : 업화 [11-14]': 1 } },
+      { from: 13, to: 14, materials: { '운명의 수호석': 930, '운명의 돌파석': 16, '아비도스 융화제': 9, '운명의 파편': 4920, '골드': 1320, '실링': 33000, '빙하의 숨결': 20, '재봉술 : 업화 [11-14]': 1 } },
+      { from: 14, to: 15, materials: { '운명의 수호석': 1020, '운명의 돌파석': 18, '아비도스 융화제': 11, '운명의 파편': 5280, '골드': 1460, '실링': 33000, '빙하의 숨결': 20, '재봉술 : 업화 [15-18]': 1 } },
+      { from: 15, to: 16, materials: { '운명의 수호석': 1170, '운명의 돌파석': 20, '아비도스 융화제': 11, '운명의 파편': 5640, '골드': 1600, '실링': 33000, '빙하의 숨결': 20, '재봉술 : 업화 [15-18]': 1 } },
+      { from: 16, to: 17, materials: { '운명의 수호석': 1320, '운명의 돌파석': 22, '아비도스 융화제': 15, '운명의 파편': 7200, '골드': 1760, '실링': 39000, '빙하의 숨결': 20, '재봉술 : 업화 [15-18]': 1 } },
+      { from: 17, to: 18, materials: { '운명의 수호석': 1470, '운명의 돌파석': 23, '아비도스 융화제': 15, '운명의 파편': 7740, '골드': 1930, '실링': 39000, '빙하의 숨결': 20, '재봉술 : 업화 [15-18]': 1 } },
+      { from: 18, to: 19, materials: { '운명의 수호석': 1620, '운명의 돌파석': 25, '아비도스 융화제': 15, '운명의 파편': 8220, '골드': 2110, '실링': 39000, '빙하의 숨결': 20, '재봉술 : 업화 [19-20]': 1 } },
+      { from: 19, to: 20, materials: { '운명의 수호석': 1770, '운명의 돌파석': 27, '아비도스 융화제': 21, '운명의 파편': 9600, '골드': 2300, '실링': 54000, '빙하의 숨결': 25, '재봉술 : 업화 [19-20]': 1 } },
+      { from: 20, to: 21, materials: { '운명의 수호석': 1920, '운명의 돌파석': 29, '아비도스 융화제': 21, '운명의 파편': 10260, '골드': 2500, '실링': 54000, '빙하의 숨결': 25 } },
+      { from: 21, to: 22, materials: { '운명의 수호석': 2220, '운명의 돌파석': 31, '아비도스 융화제': 21, '운명의 파편': 10920, '골드': 2710, '실링': 72000, '빙하의 숨결': 25 } },
+      { from: 22, to: 23, materials: { '운명의 수호석': 2400, '운명의 돌파석': 34, '아비도스 융화제': 21, '운명의 파편': 11520, '골드': 2920, '실링': 72000, '빙하의 숨결': 25 } },
+      { from: 23, to: 24, materials: { '운명의 수호석': 2520, '운명의 돌파석': 36, '아비도스 융화제': 30, '운명의 파편': 12240, '골드': 3150, '실링': 90000, '빙하의 숨결': 50 } },
+      { from: 24, to: 25, materials: { '운명의 수호석': 2700, '운명의 돌파석': 40, '아비도스 융화제': 30, '운명의 파편': 12900, '골드': 3390, '실링': 90000, '빙하의 숨결': 50 } }
+    ],
+    weapon: [
+      { from: 10, to: 11, materials: { '운명의 파괴석': 1250, '운명의 돌파석': 18, '아비도스 융화제': 12, '운명의 파편': 5000, '골드': 1620, '실링': 55000, '용암의 숨결': 20, '야금술 : 업화 [11-14]': 1 } },
+      { from: 11, to: 12, materials: { '운명의 파괴석': 1300, '운명의 돌파석': 21, '아비도스 융화제': 12, '운명의 파편': 5300, '골드': 1790, '실링': 55000, '용암의 숨결': 20, '야금술 : 업화 [11-14]': 1 } },
+      { from: 12, to: 13, materials: { '운명의 파괴석': 1400, '운명의 돌파석': 24, '아비도스 융화제': 15, '운명의 파편': 7600, '골드': 1990, '실링': 55000, '용암의 숨결': 20, '야금술 : 업화 [11-14]': 1 } },
+      { from: 13, to: 14, materials: { '운명의 파괴석': 1550, '운명의 돌파석': 27, '아비도스 융화제': 15, '운명의 파편': 8200, '골드': 2200, '실링': 55000, '용암의 숨결': 20, '야금술 : 업화 [11-14]': 1 } },
+      { from: 14, to: 15, materials: { '운명의 파괴석': 1700, '운명의 돌파석': 30, '아비도스 융화제': 18, '운명의 파편': 8800, '골드': 2430, '실링': 55000, '용암의 숨결': 20, '야금술 : 업화 [15-18]': 1 } },
+      { from: 15, to: 16, materials: { '운명의 파괴석': 1950, '운명의 돌파석': 33, '아비도스 융화제': 18, '운명의 파편': 9400, '골드': 2670, '실링': 55000, '용암의 숨결': 20, '야금술 : 업화 [15-18]': 1 } },
+      { from: 16, to: 17, materials: { '운명의 파괴석': 2200, '운명의 돌파석': 36, '아비도스 융화제': 25, '운명의 파편': 12000, '골드': 2940, '실링': 65000, '용암의 숨결': 20, '야금술 : 업화 [15-18]': 1 } },
+      { from: 17, to: 18, materials: { '운명의 파괴석': 2450, '운명의 돌파석': 39, '아비도스 융화제': 25, '운명의 파편': 12900, '골드': 3220, '실링': 65000, '용암의 숨결': 20, '야금술 : 업화 [15-18]': 1 } },
+      { from: 18, to: 19, materials: { '운명의 파괴석': 2700, '운명의 돌파석': 42, '아비도스 융화제': 25, '운명의 파편': 13700, '골드': 3510, '실링': 65000, '용암의 숨결': 20, '야금술 : 업화 [19-20]': 1 } },
+      { from: 19, to: 20, materials: { '운명의 파괴석': 2950, '운명의 돌파석': 45, '아비도스 융화제': 35, '운명의 파편': 16000, '골드': 3830, '실링': 90000, '용암의 숨결': 25, '야금술 : 업화 [19-20]': 1 } },
+      { from: 20, to: 21, materials: { '운명의 파괴석': 3200, '운명의 돌파석': 48, '아비도스 융화제': 35, '운명의 파편': 17100, '골드': 4160, '실링': 90000, '용암의 숨결': 25 } },
+      { from: 21, to: 22, materials: { '운명의 파괴석': 3700, '운명의 돌파석': 52, '아비도스 융화제': 35, '운명의 파편': 18200, '골드': 4510, '실링': 120000, '용암의 숨결': 25 } },
+      { from: 22, to: 23, materials: { '운명의 파괴석': 4000, '운명의 돌파석': 56, '아비도스 융화제': 35, '운명의 파편': 19200, '골드': 4870, '실링': 120000, '용암의 숨결': 25 } },
+      { from: 23, to: 24, materials: { '운명의 파괴석': 4200, '운명의 돌파석': 60, '아비도스 융화제': 50, '운명의 파편': 20400, '골드': 5250, '실링': 150000, '용암의 숨결': 50 } },
+      { from: 24, to: 25, materials: { '운명의 파괴석': 4500, '운명의 돌파석': 65, '아비도스 융화제': 50, '운명의 파편': 21500, '골드': 5650, '실링': 150000, '용암의 숨결': 50 } }
+    ]
+  },
+  upperAncient: {
+    label: '세르카 상위고대 장비',
+    armor: [
+      { from: 11, to: 12, materials: { '운명의 수호석 결정': 930, '위대한 운명의 돌파석': 11, '상급 아비도스 융화제': 11, '운명의 파편': 9570, '골드': 2450, '실링': 13200, '빙하의 숨결': 20 } },
+      { from: 12, to: 13, materials: { '운명의 수호석 결정': 1030, '위대한 운명의 돌파석': 12, '상급 아비도스 융화제': 12, '운명의 파편': 10540, '골드': 2700, '실링': 13200, '빙하의 숨결': 20 } },
+      { from: 13, to: 14, materials: { '운명의 수호석 결정': 1120, '위대한 운명의 돌파석': 13, '상급 아비도스 융화제': 13, '운명의 파편': 11520, '골드': 2950, '실링': 13200, '빙하의 숨결': 20 } },
+      { from: 14, to: 15, materials: { '운명의 수호석 결정': 1240, '위대한 운명의 돌파석': 14, '상급 아비도스 융화제': 15, '운명의 파편': 12690, '골드': 3250, '실링': 13200, '빙하의 숨결': 20 } },
+      { from: 15, to: 16, materials: { '운명의 수호석 결정': 1330, '위대한 운명의 돌파석': 15, '상급 아비도스 융화제': 16, '운명의 파편': 13670, '골드': 3500, '실링': 13200, '빙하의 숨결': 20 } },
+      { from: 16, to: 17, materials: { '운명의 수호석 결정': 1450, '위대한 운명의 돌파석': 17, '상급 아비도스 융화제': 17, '운명의 파편': 14840, '골드': 3800, '실링': 15600, '빙하의 숨결': 20 } },
+      { from: 17, to: 18, materials: { '운명의 수호석 결정': 1560, '위대한 운명의 돌파석': 18, '상급 아비도스 융화제': 19, '운명의 파편': 16010, '골드': 4100, '실링': 15600, '빙하의 숨결': 20 } },
+      { from: 18, to: 19, materials: { '운명의 수호석 결정': 1700, '위대한 운명의 돌파석': 20, '상급 아비도스 융화제': 20, '운명의 파편': 17380, '골드': 4450, '실링': 15600, '빙하의 숨결': 20 } },
+      { from: 19, to: 20, materials: { '운명의 수호석 결정': 1810, '위대한 운명의 돌파석': 21, '상급 아비도스 융화제': 22, '운명의 파편': 18550, '골드': 4750, '실링': 21600, '빙하의 숨결': 25 } },
+      { from: 20, to: 21, materials: { '운명의 수호석 결정': 1950, '위대한 운명의 돌파석': 23, '상급 아비도스 융화제': 23, '운명의 파편': 19920, '골드': 5100, '실링': 21600, '빙하의 숨결': 25 } },
+      { from: 21, to: 22, materials: { '운명의 수호석 결정': 2080, '위대한 운명의 돌파석': 24, '상급 아비도스 융화제': 25, '운명의 파편': 21280, '골드': 5450, '실링': 28800, '빙하의 숨결': 25 } },
+      { from: 22, to: 23, materials: { '운명의 수호석 결정': 2200, '위대한 운명의 돌파석': 26, '상급 아비도스 융화제': 26, '운명의 파편': 22460, '골드': 5750, '실링': 28800, '빙하의 숨결': 25 } },
+      { from: 23, to: 24, materials: { '운명의 수호석 결정': 2330, '위대한 운명의 돌파석': 27, '상급 아비도스 융화제': 28, '운명의 파편': 23820, '골드': 6100, '실링': 36000, '빙하의 숨결': 50 } },
+      { from: 24, to: 25, materials: { '운명의 수호석 결정': 2450, '위대한 운명의 돌파석': 29, '상급 아비도스 융화제': 30, '운명의 파편': 25000, '골드': 6400, '실링': 36000, '빙하의 숨결': 50 } }
+    ],
+    weapon: [
+      { from: 11, to: 12, materials: { '운명의 파괴석 결정': 1700, '위대한 운명의 돌파석': 17, '상급 아비도스 융화제': 18, '운명의 파편': 15890, '골드': 4050, '실링': 22000, '용암의 숨결': 20 } },
+      { from: 12, to: 13, materials: { '운명의 파괴석 결정': 1890, '위대한 운명의 돌파석': 19, '상급 아비도스 융화제': 21, '운명의 파편': 17660, '골드': 4500, '실링': 22000, '용암의 숨결': 20 } },
+      { from: 13, to: 14, materials: { '운명의 파괴석 결정': 2080, '위대한 운명의 돌파석': 21, '상급 아비도스 융화제': 23, '운명의 파편': 19420, '골드': 4950, '실링': 22000, '용암의 숨결': 20 } },
+      { from: 14, to: 15, materials: { '운명의 파괴석 결정': 2270, '위대한 운명의 돌파석': 23, '상급 아비도스 융화제': 25, '운명의 파편': 21190, '골드': 5400, '실링': 22000, '용암의 숨결': 20 } },
+      { from: 15, to: 16, materials: { '운명의 파괴석 결정': 2460, '위대한 운명의 돌파석': 25, '상급 아비도스 융화제': 27, '운명의 파편': 22960, '골드': 5850, '실링': 22000, '용암의 숨결': 20 } },
+      { from: 16, to: 17, materials: { '운명의 파괴석 결정': 2690, '위대한 운명의 돌파석': 28, '상급 아비도스 융화제': 29, '운명의 파편': 25120, '골드': 6400, '실링': 26000, '용암의 숨결': 20 } },
+      { from: 17, to: 18, materials: { '운명의 파괴석 결정': 2900, '위대한 운명의 돌파석': 30, '상급 아비도스 융화제': 32, '운명의 파편': 27080, '골드': 6900, '실링': 26000, '용암의 숨결': 20 } },
+      { from: 18, to: 19, materials: { '운명의 파괴석 결정': 3110, '위대한 운명의 돌파석': 32, '상급 아비도스 융화제': 34, '운명의 파편': 29040, '골드': 7400, '실링': 26000, '용암의 숨결': 20 } },
+      { from: 19, to: 20, materials: { '운명의 파괴석 결정': 3340, '위대한 운명의 돌파석': 34, '상급 아비도스 융화제': 37, '운명의 파편': 31200, '골드': 7950, '실링': 36000, '용암의 숨결': 25 } },
+      { from: 20, to: 21, materials: { '운명의 파괴석 결정': 3570, '위대한 운명의 돌파석': 37, '상급 아비도스 융화제': 39, '운명의 파편': 33360, '골드': 8500, '실링': 36000, '용암의 숨결': 25 } },
+      { from: 21, to: 22, materials: { '운명의 파괴석 결정': 3800, '위대한 운명의 돌파석': 39, '상급 아비도스 융화제': 42, '운명의 파편': 35520, '골드': 9050, '실링': 48000, '용암의 숨결': 25 } },
+      { from: 22, to: 23, materials: { '운명의 파괴석 결정': 4030, '위대한 운명의 돌파석': 42, '상급 아비도스 융화제': 44, '운명의 파편': 37680, '골드': 9600, '실링': 48000, '용암의 숨결': 25 } },
+      { from: 23, to: 24, materials: { '운명의 파괴석 결정': 4260, '위대한 운명의 돌파석': 44, '상급 아비도스 융화제': 47, '운명의 파편': 39840, '골드': 10150, '실링': 60000, '용암의 숨결': 50 } },
+      { from: 24, to: 25, materials: { '운명의 파괴석 결정': 4500, '위대한 운명의 돌파석': 47, '상급 아비도스 융화제': 50, '운명의 파편': 42000, '골드': 10700, '실링': 60000, '용암의 숨결': 50 } }
+    ]
+  }
+};
 const DEFAULT_PHEON_CRYSTAL_PER_ONE = 8.5;
 const PHEON_COST_RULES = [
   { label: '어빌리티 스톤', cost: 9, note: '경매장 구매' },
   { label: '고대 악세', cost: 35, note: '목걸이/귀걸이/반지 부위당' },
   { label: '영웅 아바타', cost: 10, note: '거래횟수 2회 이하' },
-  { label: '전설 아바타', cost: 30, note: '거래횟수 2회 이하' }
+  { label: '전설 아바타', cost: 30, note: '거래횟수 2회 이하' },
+  { label: '아크그리드 젬 고급', cost: 3, note: '거래소 구매' },
+  { label: '아크그리드 젬 희귀', cost: 6, note: '거래소 구매' },
+  { label: '아크그리드 젬 영웅', cost: 12, note: '거래소 구매' }
 ];
 let t4MaterialPriceCache = null;
 let t4MaterialPriceInflight = null;
@@ -685,6 +815,213 @@ function buildT4CostPrep(snapshot) {
   const boundMaterialNames = [...new Set(gear.flatMap(row => row.materials).filter(name => BOUND_ONLY_MATERIALS.has(name)))];
   return { gear, materialNames, boundMaterialNames };
 }
+function normalRefineCostSetForGear(item) {
+  const rule = classifyT4GearCostRule(item);
+  if (rule.key === 'standard') return T4_NORMAL_REFINE_ATTEMPT_COSTS.ancient;
+  if (rule.key === 'upperAncient') return T4_NORMAL_REFINE_ATTEMPT_COSTS.upperAncient;
+  return null;
+}
+function normalGrowthCostSetForGear(item) {
+  const rule = classifyT4GearCostRule(item);
+  if (rule.key === 'standard') return T4_NORMAL_GEAR_GROWTH_COSTS.ancient;
+  return null;
+}
+function normalCostRowForGear(item, table) {
+  if (!table) return null;
+  const rows = isWeaponGear(item) ? table.weapon : table.armor;
+  const from = Number(item?.honingLevel || 0);
+  return (rows || []).find(row => Number(row.from) === from) || null;
+}
+function addMaterialAmount(target, name, amount) {
+  const qty = Number(amount || 0);
+  if (!name || !Number.isFinite(qty) || qty <= 0) return;
+  target[name] = Number(target[name] || 0) + qty;
+}
+function mergedNextNormalRefineMaterials(item) {
+  const attemptRow = normalCostRowForGear(item, normalRefineCostSetForGear(item));
+  if (!attemptRow) return null;
+  const materials = {};
+  for (const [name, amount] of Object.entries(attemptRow.materials || {})) addMaterialAmount(materials, name, amount);
+  const growthRow = normalCostRowForGear(item, normalGrowthCostSetForGear(item));
+  if (growthRow) {
+    addMaterialAmount(materials, '운명의 파편', growthRow.fragment);
+    addMaterialAmount(materials, '실링', growthRow.silver);
+  }
+  return { from: attemptRow.from, to: attemptRow.to, materials, hasGrowth: Boolean(growthRow) };
+}
+function materialCostCheckboxNames(name) {
+  if (name === '운명의 파편') return ['운명의 파편 주머니(소)', '운명의 파편 주머니(중)', '운명의 파편 주머니(대)'];
+  return [name];
+}
+function isMaterialCostEnabled(name) {
+  const rows = materialCostCheckboxNames(name)
+    .map(key => document.querySelector(`.powerCostMaterial[data-material-name="${CSS.escape(key)}"] input`))
+    .filter(Boolean);
+  if (!rows.length) return true;
+  return rows.some(input => input.checked);
+}
+function marketItemForMaterial(priceMap, name) {
+  if (!priceMap) return null;
+  if (name === '운명의 파편') {
+    const pouchItems = ['운명의 파편 주머니(소)', '운명의 파편 주머니(중)', '운명의 파편 주머니(대)']
+      .map(key => priceMap.get(key))
+      .filter(item => item && !item.missing && Number(item.shardUnitPrice || 0) > 0);
+    pouchItems.sort((a, b) => Number(a.shardUnitPrice || 0) - Number(b.shardUnitPrice || 0));
+    return pouchItems[0] || null;
+  }
+  return priceMap.get(name) || null;
+}
+function unitGoldForMaterial(priceMap, name) {
+  const item = marketItemForMaterial(priceMap, name);
+  if (!item || item.missing) return 0;
+  if (name === '운명의 파편') return Number(item.shardUnitPrice || 0);
+  return Number(item.effectiveUnitPrice || item.unitPrice || item.price || 0);
+}
+function calculateMaterialGoldCost(materials, priceMap) {
+  const rows = [];
+  let tradeGold = 0;
+  let fixedGold = 0;
+  let silver = 0;
+  for (const [name, amount] of Object.entries(materials || {})) {
+    const qty = Number(amount || 0);
+    if (!qty) continue;
+    if (name === '골드') {
+      fixedGold += qty;
+      rows.push({ name, required: qty, unitGold: 1, gold: qty, fixed: true });
+      continue;
+    }
+    if (name === '실링') {
+      silver += qty;
+      rows.push({ name, required: qty, unitGold: 0, gold: 0, silver: true });
+      continue;
+    }
+    const enabled = isMaterialCostEnabled(name);
+    const unitGold = enabled ? unitGoldForMaterial(priceMap, name) : 0;
+    const gold = qty * unitGold;
+    tradeGold += gold;
+    rows.push({ name, required: qty, unitGold, gold, enabled, missingPrice: enabled && !unitGold });
+  }
+  return { rows, tradeGold, fixedGold, silver, totalGold: tradeGold + fixedGold };
+}
+function calculateNextNormalRefineEstimates(snapshot, priceMap) {
+  const combat = snapshot?.equipment?.combat || [];
+  return combat.map(item => {
+    const next = mergedNextNormalRefineMaterials(item);
+    if (!next) {
+      return {
+        item,
+        available: false,
+        reason: '해당 강화 구간 비용표 없음',
+        from: Number(item?.honingLevel || 0),
+        to: Number(item?.honingLevel || 0) + 1
+      };
+    }
+    const cost = calculateMaterialGoldCost(next.materials, priceMap);
+    return { item, available: true, ...next, cost };
+  });
+}
+function storePowerCostEstimates(priceMap) {
+  state.powerCostEstimates = calculateNextNormalRefineEstimates(state.powerSnapshot, priceMap);
+  return state.powerCostEstimates;
+}
+function renderAdvancedHoningAttemptCostTable() {
+  const renderRows = (rows = []) => rows.map(row => {
+    const materialHtml = Object.entries(row.materials || {}).map(([name, amount]) => `
+      <span class="advancedCostItem">
+        <b>${escapeHtml(name)}</b>
+        <em>${formatNumber(amount)}</em>
+      </span>
+    `).join('');
+    return `<div class="advancedCostStage">
+      <strong>${row.stage}단계</strong>
+      <div>${materialHtml}</div>
+    </div>`;
+  }).join('');
+  return `<div class="advancedHoningCostTable">
+    <div class="powerBuildHeader"><b>상급 재련 1회 재료</b><span>제보 이미지 기준 · 1~4단계</span></div>
+    <div class="advancedHoningColumns">
+      <section>
+        <h4>방어구</h4>
+        ${renderRows(T4_ADVANCED_HONING_ATTEMPT_COSTS.armor)}
+      </section>
+      <section>
+        <h4>무기</h4>
+        ${renderRows(T4_ADVANCED_HONING_ATTEMPT_COSTS.weapon)}
+      </section>
+    </div>
+    <p class="powerCostHint">운명의 파편은 주머니 단가를 1개당 가격으로 환산해 비용 계산에 연결할 예정입니다. 선조의 가호는 재료가 아니라 상급 재련 기대값 보정으로 따로 계산합니다.</p>
+  </div>`;
+}
+function renderNormalGearGrowthCostTable() {
+  const data = T4_NORMAL_GEAR_GROWTH_COSTS.ancient;
+  const renderRows = (rows = []) => rows.map(row => `
+    <tr>
+      <td>${row.from}→${row.to}</td>
+      <td>${formatNumber(row.fragment)}</td>
+      <td>${formatNumber(row.silver)}</td>
+    </tr>
+  `).join('');
+  const renderTable = (title, rows) => `<section>
+    <h4>${escapeHtml(title)}</h4>
+    <div class="normalGrowthScroll">
+      <table class="normalGrowthTable">
+        <thead><tr><th>구간</th><th>운명의 파편</th><th>실링</th></tr></thead>
+        <tbody>${renderRows(rows)}</tbody>
+      </table>
+    </div>
+  </section>`;
+  return `<div class="advancedHoningCostTable normalGrowthCostTable">
+    <div class="powerBuildHeader"><b>일반 재련 장비 성장</b><span>${escapeHtml(data.label)} · 성장 재료</span></div>
+    <div class="advancedHoningColumns">
+      ${renderTable('방어구', data.armor)}
+      ${renderTable('무기', data.weapon)}
+    </div>
+    <p class="powerCostHint">장비 성장은 골드 없이 운명의 파편과 실링만 사용합니다. 이후 1회 재련 재료표와 합쳐서 총 강화 비용으로 계산할 예정입니다.</p>
+  </div>`;
+}
+function renderNormalRefineAttemptCostTable() {
+  const ruleSets = [
+    {
+      data: T4_NORMAL_REFINE_ATTEMPT_COSTS.ancient,
+      armorColumns: ['운명의 수호석', '운명의 돌파석', '아비도스 융화제', '운명의 파편', '골드', '실링', '빙하의 숨결'],
+      weaponColumns: ['운명의 파괴석', '운명의 돌파석', '아비도스 융화제', '운명의 파편', '골드', '실링', '용암의 숨결']
+    },
+    {
+      data: T4_NORMAL_REFINE_ATTEMPT_COSTS.upperAncient,
+      armorColumns: ['운명의 수호석 결정', '위대한 운명의 돌파석', '상급 아비도스 융화제', '운명의 파편', '골드', '실링', '빙하의 숨결'],
+      weaponColumns: ['운명의 파괴석 결정', '위대한 운명의 돌파석', '상급 아비도스 융화제', '운명의 파편', '골드', '실링', '용암의 숨결']
+    }
+  ];
+  const renderRows = (rows = [], columns = []) => rows.map(row => {
+    const book = Object.keys(row.materials || {}).find(name => name.includes('재봉술') || name.includes('야금술'));
+    return `<tr>
+      <td>${row.from}→${row.to}</td>
+      ${columns.map(name => `<td>${formatNumber(row.materials?.[name] || 0)}</td>`).join('')}
+      <td>${book ? escapeHtml(book.replace(' : 업화 ', ' ')) : '-'}</td>
+    </tr>`;
+  }).join('');
+  const renderTable = (title, rows, columns) => `<section>
+    <h4>${escapeHtml(title)}</h4>
+    <div class="normalGrowthScroll normalRefineScroll">
+      <table class="normalGrowthTable normalRefineTable">
+        <thead><tr><th>구간</th>${columns.map(name => `<th>${escapeHtml(name.replace('운명의 ', '').replace('아비도스 ', ''))}</th>`).join('')}<th>책</th></tr></thead>
+        <tbody>${renderRows(rows, columns)}</tbody>
+      </table>
+    </div>
+  </section>`;
+  const renderRuleSet = ({ data, armorColumns, weaponColumns }) => `<div class="normalRefineRuleSet">
+    <div class="powerBuildHeader"><b>${escapeHtml(data.label)}</b><span>성장 재료 미포함</span></div>
+    <div class="advancedHoningColumns">
+      ${renderTable('방어구', data.armor, armorColumns)}
+      ${data.weapon?.length ? renderTable('무기', data.weapon, weaponColumns) : '<section><h4>무기</h4><p class="powerCostHint">데이터 입력 대기</p></section>'}
+    </div>
+  </div>`;
+  return `<div class="advancedHoningCostTable normalRefineCostTable">
+    <div class="powerBuildHeader"><b>일반 재련 1회 재료</b><span>성장 재료 미포함</span></div>
+    ${ruleSets.map(renderRuleSet).join('')}
+    <p class="powerCostHint">세르카 무기 표는 데이터가 들어오는 대로 같은 구조에 추가합니다.</p>
+  </div>`;
+}
 function renderPowerCostPrep(snapshot) {
   const prep = buildT4CostPrep(snapshot);
   const gearRows = prep.gear.map(row => {
@@ -708,7 +1045,7 @@ function renderPowerCostPrep(snapshot) {
   return `<div class="powerSnapshotBlock powerCostPrep">
     <div class="powerCostHead">
       <div><h3>T4 비용 계산 준비</h3><p>강화 골드와 실링, 장비성장/한계돌파 실링, 재료 시세를 분리해서 계산하도록 준비했습니다.</p></div>
-      <strong>수량표 대기</strong>
+      <strong>시세 계산 연결</strong>
     </div>
     <div class="powerPheonPanel">
       <div class="powerBuildHeader"><b>페온/크리스탈 기준</b><span>LOSPI 최신 1시간 close</span></div>
@@ -728,7 +1065,7 @@ function renderPowerCostPrep(snapshot) {
       <div>
         <h4>재료 비용 적용</h4>
         <div id="powerCostMaterialList" class="powerCostMaterialList">${[materialRows, boundRows].filter(Boolean).join('') || '<p>적용할 재료가 없습니다.</p>'}</div>
-        <p class="powerCostHint">장비성장은 모든 구간에 있으며 골드는 들지 않고 실링만 계산합니다. 전율 20강 이후 한계돌파는 고통의 가시(귀속) + 실링 규칙으로 분리했습니다.</p>
+        <p class="powerCostHint">원자료 표는 화면에 표시하지 않고, 현재 장비의 다음 재련 비용 계산에만 사용합니다. 체크 해제한 재료는 귀속으로 간주해 골드 비용에서 제외합니다.</p>
       </div>
     </div>
   </div>`;
@@ -815,7 +1152,12 @@ async function hydratePowerCostMaterialPrices() {
       const unit = Number(item.effectiveUnitPrice || item.unitPrice || item.price || 0);
       small.textContent = `단가 ${formatGold(unit)} · 체크 해제 시 귀속재료로 간주해 0골드`;
     });
+    storePowerCostEstimates(priceMap);
+    list.querySelectorAll('.powerCostMaterial input').forEach(input => {
+      input.addEventListener('change', () => storePowerCostEstimates(priceMap));
+    });
   } catch {
+    state.powerCostEstimates = [];
     list.querySelectorAll('.powerCostMaterial small').forEach(small => {
       small.textContent = '시세 확인 실패 · 시세탭 재료에서 다시 확인 가능';
     });
@@ -829,6 +1171,7 @@ function renderPowerSnapshot(snapshot) {
     panel.classList.add('hidden');
     view.innerHTML = '';
     simulatorRendered = false;
+    state.powerCostEstimates = [];
     return;
   }
   simulatorRendered = true;
@@ -1805,6 +2148,7 @@ async function searchCharacter(name) {
   state.selected = {};
   state.apiSelected = {};
   state.powerSnapshot = null;
+  state.powerCostEstimates = [];
   state.abilityStone = { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
   state.engraving = emptyEngravingState();
   state.arkGrid = { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
@@ -2064,7 +2408,7 @@ async function loadLegendAvatarSet(job, force = false) {
   const order = ['머리', '상의', '하의', '무기'];
   const partial = {
     ok: true,
-    apiVersion: '5.7.6',
+    apiVersion: VERSION,
     source: 'markets/items',
     mode: 'part-split',
     job,
@@ -2344,7 +2688,7 @@ function accessoryDebugHtml(data) {
   const statRows = Object.entries(stats).sort((a, b) => Number(b[1]) - Number(a[1])).map(([k, v]) => `<li>${escapeHtml(k)}: ${Number(v).toLocaleString('ko-KR')}건</li>`).join('') || '<li>필터 제외 사유 없음</li>';
   return `<div class="marketDebugPanel">
     <details open>
-      <summary>악세 디버그 보기 · v5.7.6</summary>
+      <summary>악세 디버그 보기 · v${escapeHtml(VERSION)}</summary>
       <div class="marketDebugSection"><b>필터 제외 사유</b><ul>${statRows}</ul></div>
       <div class="marketDebugSection"><b>REQUEST payload</b><pre>${escapeHtml(JSON.stringify(payloads, null, 2))}</pre></div>
       <div class="marketDebugSection"><b>RESPONSE 샘플 5개</b><pre>${escapeHtml(JSON.stringify(samples, null, 2))}</pre></div>
@@ -2401,7 +2745,7 @@ function renderMaterialPriceGrid(container, data) {
     grouped.get(group).push(item);
   }
   container.innerHTML = `<div class="marketResultList">
-    <div class="marketRuleHint"><b>4티어 강화 재료</b> · 거래소 최저가 · ${escapeHtml(formatMarketUpdatedAt(data.updatedAt))}${data.cached ? ' · 캐시' : ''}</div>
+    <div class="marketRuleHint"><b>4티어 재료/아크그리드 젬</b> · 거래소 최저가 · ${escapeHtml(formatMarketUpdatedAt(data.updatedAt))}${data.cached ? ' · 캐시' : ''}</div>
     ${[...grouped.entries()].map(([group, rows]) => `
       <section class="materialPriceGroup">
         <h3>${escapeHtml(group)}</h3>
