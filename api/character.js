@@ -381,14 +381,14 @@ function parseArkGridGemSummary(arkGrid, rows) {
     ...rows.flatMap(row => row.activeTexts || [])
   ].join(' ');
   const entries = [
-    ['공격력', [/(?<!무기\s*)공격력(?:\s*강화)?(?:이|가)?\s*(?:\+)?([0-9,.]+)/g, /([0-9,.]+)\s*(?:의\s*)?공격력(?:\s*강화)?/g]],
-    ['보스 피해', [/보스(?:에게)?\s*(?:주는\s*)?피해(?:량)?(?:이|가)?\s*(?:\+)?([0-9,.]+)/g, /([0-9,.]+)\s*보스\s*피해/g]],
-    ['추가 피해', [/추가\s*피해(?:가)?\s*(?:\+)?([0-9,.]+)/g, /([0-9,.]+)\s*추가\s*피해/g]],
-    ['아군 공격 강화', [/아군\s*공격력\s*강화\s*효과?(?:가)?\s*(?:\+)?([0-9,.]+)/g, /([0-9,.]+)\s*아군\s*공격\s*강화/g]],
-    ['아군 피해 강화', [/아군\s*피해량?\s*강화\s*효과?(?:가)?\s*(?:\+)?([0-9,.]+)/g, /([0-9,.]+)\s*아군\s*피해\s*강화/g]],
-    ['낙인력', [/낙인력(?:이)?\s*(?:\+)?([0-9,.]+)/g, /([0-9,.]+)\s*낙인력/g]]
+    ['공격력', [/아크\s*그리드\s*젬.{0,120}(?<!무기\s*)공격력\s*(\d{1,2})(?![\d.%])/g, /(?<!무기\s*)공격력\s*(\d{1,2})(?![\d.%])/g]],
+    ['보스 피해', [/보스\s*피해\s*(\d{1,2})(?![\d.%])/g, /(\d{1,2})(?![\d.%])\s*보스\s*피해/g]],
+    ['추가 피해', [/추가\s*피해\s*(\d{1,2})(?![\d.%])/g, /(\d{1,2})(?![\d.%])\s*추가\s*피해/g]],
+    ['아군 공격 강화', [/아군\s*공격(?:력)?\s*강화\s*(\d{1,2})(?![\d.%])/g, /(\d{1,2})(?![\d.%])\s*아군\s*공격(?:력)?\s*강화/g]],
+    ['아군 피해 강화', [/아군\s*피해(?:량)?\s*강화\s*(\d{1,2})(?![\d.%])/g, /(\d{1,2})(?![\d.%])\s*아군\s*피해(?:량)?\s*강화/g]],
+    ['낙인력', [/낙인력\s*(\d{1,2})(?![\d.%])/g, /(\d{1,2})(?![\d.%])\s*낙인력/g]]
   ];
-  return entries.map(([label, regexList]) => ({ label, value: sumRegexNumbers(text, regexList) })).filter(row => Number(row.value || 0) > 0);
+  return entries.map(([label, regexList]) => ({ label, value: maxIntegerRegexValue(text, regexList) }));
 }
 
 function collectAllTextDeep(value, bucket = []) {
@@ -430,6 +430,24 @@ function sumRegexNumbers(text, regexList) {
     }
   }
   return round2(best);
+}
+
+function maxIntegerRegexValue(text, regexList) {
+  let best = 0;
+  const seen = new Set();
+  for (const re of regexList) {
+    re.lastIndex = 0;
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      const token = `${match.index}:${match[0]}`;
+      if (seen.has(token)) continue;
+      seen.add(token);
+      const value = Number(String(match[1] || '').replace(/,/g, ''));
+      if (!Number.isInteger(value) || value < 0 || value > 99) continue;
+      best = Math.max(best, value);
+    }
+  }
+  return best;
 }
 
 function findQualityValue(value) {
@@ -1090,38 +1108,40 @@ function extractBraceletOptionSlots(text, effects, itemGrade = '') {
   const source = String(text || '');
   const slots = [];
   const push = (key, label, value, gradeKey = key, extraText = '') => {
-    if (slots.some(slot => slot.key === key && slot.text.includes(label))) return;
     const grade = optionGradeByValue(gradeKey, value, '팔찌', itemGrade) || effects?.optionGrades?.[gradeKey] || '';
     const isFlat = key.endsWith('Flat') || ['maxHp', 'maxMana', 'critStat', 'swiftStat', 'specStat', 'strength', 'dexterity', 'intelligence'].includes(key);
     const main = isFlat ? `${label} +${Number(value).toLocaleString('ko-KR')}` : `${label} ${pctForServer(value)}`;
-    slots.push({ key, text: extraText ? `${main} / ${extraText}` : main, grade });
+    const text = extraText ? `${main} / ${extraText}` : main;
+    if (slots.some(slot => slot.key === key && slot.text === text)) return;
+    slots.push({ key, text, grade });
   };
 
-  const critRate = firstMatchNumber(source, [
-    /치명타\s*적중률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*증가한다\.\s*공격이\s*치명타로\s*적중\s*시\s*(?:적에게\s*주는\s*)?피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i,
-    /치명타\s*적중률\s*\+\s*(\d+(?:\.\d+)?)\s*%/i
-  ]);
-  if (critRate) {
-    const bonus = firstMatchNumber(source, [/치명타로\s*적중\s*시\s*(?:적에게\s*주는\s*)?피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
-    push('critRate', '치적', critRate, 'critRate', bonus ? `치명타 적중 주피 ${pctForServer(bonus)}` : '');
+  for (const match of source.matchAll(/치명타\s*적중률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*증가한다\.\s*공격이\s*치명타로\s*적중\s*시\s*(?:적에게\s*주는\s*)?피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/gi)) {
+    push('critRate', '이중 치적', Number(match[1]), 'critRate', `치명타 적중 주피 ${pctForServer(Number(match[2]))}`);
+  }
+  for (const match of source.matchAll(/치명타\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*증가한다\.\s*공격이\s*치명타로\s*적중\s*시\s*(?:적에게\s*주는\s*)?피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/gi)) {
+    push('critDamage', '이중 치피', Number(match[1]), 'critDamage', `치명타 적중 주피 ${pctForServer(Number(match[2]))}`);
   }
 
-  const critDamage = firstMatchNumber(source, [
-    /치명타\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*증가한다\.\s*공격이\s*치명타로\s*적중\s*시\s*(?:적에게\s*주는\s*)?피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i,
-    /치명타\s*피해\s*\+\s*(\d+(?:\.\d+)?)\s*%/i
-  ]);
-  if (critDamage) {
-    const bonus = firstMatchNumber(source, [/치명타로\s*적중\s*시\s*(?:적에게\s*주는\s*)?피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
-    push('critDamage', '치피', critDamage, 'critDamage', bonus ? `치명타 적중 주피 ${pctForServer(bonus)}` : '');
+  const sourceWithoutDualCrit = source
+    .replace(/치명타\s*적중률(?:이)?\s*(?:\+)?\d+(?:\.\d+)?%\s*증가한다\.\s*공격이\s*치명타로\s*적중\s*시\s*(?:적에게\s*주는\s*)?피해(?:가)?\s*(?:\+)?\d+(?:\.\d+)?%/gi, '')
+    .replace(/치명타\s*피해(?:가)?\s*(?:\+)?\d+(?:\.\d+)?%\s*증가한다\.\s*공격이\s*치명타로\s*적중\s*시\s*(?:적에게\s*주는\s*)?피해(?:가)?\s*(?:\+)?\d+(?:\.\d+)?%/gi, '');
+  for (const match of sourceWithoutDualCrit.matchAll(/치명타\s*적중률(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/gi)) {
+    push('critRate', '치적', Number(match[1]), 'critRate');
+  }
+  for (const match of sourceWithoutDualCrit.matchAll(/치명타\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/gi)) {
+    push('critDamage', '치피', Number(match[1]), 'critDamage');
   }
 
   const cooldownEnemyDamage = firstMatchNumber(source, [/재사용\s*대기시간(?:이)?\s*\d+(?:\.\d+)?%\s*증가하지만.{0,50}적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
   if (cooldownEnemyDamage) push('enemyDamage', '쿨증 적주피', cooldownEnemyDamage, 'enemyDamage');
 
-  const enemyDamage = firstMatchNumber(source, [/(?<!무력화\s*상태의\s*)적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*증가한다/i]);
-  if (enemyDamage) {
-    const stagger = firstMatchNumber(source, [/무력화\s*상태의\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
-    push('enemyDamage', '적주피', enemyDamage, 'enemyDamage', stagger ? `무력화 피해 ${pctForServer(stagger)}` : '');
+  for (const match of source.matchAll(/적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*증가하며\s*,?\s*무력화\s*상태의\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/gi)) {
+    push('enemyDamage', '이중 적주피', Number(match[1]), 'enemyDamage', `무력화 피해 ${pctForServer(Number(match[2]))}`);
+  }
+  const sourceWithoutDualEnemy = source.replace(/적에게\s*주는\s*피해(?:가)?\s*(?:\+)?\d+(?:\.\d+)?%\s*증가하며\s*,?\s*무력화\s*상태의\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?\d+(?:\.\d+)?%/gi, '');
+  for (const match of sourceWithoutDualEnemy.matchAll(/(?<!무력화\s*상태의\s*)적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/gi)) {
+    push('enemyDamage', '적주피', Number(match[1]), 'enemyDamage');
   }
 
   const backAttack = firstMatchNumber(source, [/백어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
@@ -1131,10 +1151,10 @@ function extractBraceletOptionSlots(text, effects, itemGrade = '') {
   const nonDirectional = firstMatchNumber(source, [/방향성\s*공격이\s*아닌\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
   if (nonDirectional) push('enemyDamage', '비방향성 주피', nonDirectional, 'enemyDamage');
 
-  const additional = firstMatchNumber(source, [/추가\s*피해(?:가|\s*\+)?\s*(?:\+)?(\d+(?:\.\d+)?)\s*%/i]);
-  if (additional) {
-    const demon = firstMatchNumber(source, [/악마\s*및\s*대악마\s*계열\s*피해량(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
-    push('additionalDamage', '추피', additional, 'additionalDamage', demon ? `악마 피해 ${pctForServer(demon)}` : '');
+  for (const match of source.matchAll(/추가\s*피해(?:가|\s*\+)?\s*(?:\+)?(\d+(?:\.\d+)?)\s*%/gi)) {
+    const near = source.slice(match.index, Math.min(source.length, match.index + 120));
+    const demon = firstMatchNumber(near, [/악마\s*및\s*대악마\s*계열\s*피해량(?:이)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
+    push('additionalDamage', '추피', Number(match[1]), 'additionalDamage', demon ? `악마 피해 ${pctForServer(demon)}` : '');
   }
 
   const attackMoveSpeed = firstMatchNumber(source, [
@@ -1162,7 +1182,8 @@ function extractBraceletOptionSlots(text, effects, itemGrade = '') {
     const stacked = braceletStackedWeaponPower(source, weaponValues);
     const main = stacked || weaponValues[0];
     const extra = weaponValues.slice(1).map(v => `조건부 무공 +${v.toLocaleString('ko-KR')}`).join(' / ');
-    push('weaponPowerFlat', '무공', main, 'weaponPowerFlat', extra);
+    const label = stacked ? '이중 무공' : '무공';
+    push('weaponPowerFlat', label, main, 'weaponPowerFlat', extra);
   }
 
   return slots;

@@ -195,9 +195,8 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   color: #f97316;
   font-size: 10px;
   line-height: 1.12;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 .powerArkCore span {
   color: #f8fafc;
