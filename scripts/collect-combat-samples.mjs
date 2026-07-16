@@ -5,7 +5,7 @@ const API_BASE = process.env.LOA_SAMPLE_API_BASE || 'https://loa-beige.vercel.ap
 const OUTPUT = resolve(process.env.LOA_SAMPLE_OUTPUT || 'tmp/combat-samples.json');
 const RANK_INPUT = process.env.LOA_RANK_INPUT ? resolve(process.env.LOA_RANK_INPUT) : '';
 
-const referenceName = process.env.LOA_REFERENCE_NAME || '무사브';
+const referenceName = (process.env.LOA_REFERENCE_NAME || '').trim();
 const defaultSampleNames = [
   '최이들', '월명BB', '페스', '오르띠뚜', '실링상자', '나우보리', '액션쾌감브레이커',
   '행무띠', '권따닝', '권시안', '날개달린곰', '로우프', '쬬꼬댱', '과격한자식',
@@ -133,6 +133,9 @@ async function fetchCharacter(name) {
 async function main() {
   const sampleNames = await loadNames();
   const names = [...new Set([referenceName, ...sampleNames].map(name => name.trim()).filter(Boolean))];
+  if (!names.length) {
+    throw new Error('No sample names. Set SAMPLE_NAMES, LOA_RANK_INPUT, or LOA_REFERENCE_NAME.');
+  }
   const rows = [];
 
   for (let i = 0; i < names.length; i += 1) {
@@ -149,7 +152,7 @@ async function main() {
     await sleep(Number(process.env.LOA_SAMPLE_DELAY_MS || 350));
   }
 
-  const reference = rows.find(row => row.name === referenceName) || null;
+  const reference = referenceName ? rows.find(row => row.name === referenceName) || null : null;
   const sameClass = reference?.className ? rows.filter(row => row.ok && row.className === reference.className) : [];
   const payload = {
     collectedAt: new Date().toISOString(),

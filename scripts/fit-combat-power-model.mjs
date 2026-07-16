@@ -7,6 +7,18 @@ const OUTPUT = resolve(process.env.LOA_MODEL_OUTPUT || 'tmp/combat-power-model.j
 const MODEL_VERSION = 'combat-power-linear-v1';
 const MIN_COMBAT_POWER = Number(process.env.LOA_MODEL_MIN_CP || 5000);
 const MAX_COMBAT_POWER = Number(process.env.LOA_MODEL_MAX_CP || 6500);
+const NORMAL_HONING_WEAPON_DELTA = Number(process.env.LOA_NORMAL_HONING_WEAPON_DELTA || 25);
+const NORMAL_HONING_ARMOR_DELTA = Number(process.env.LOA_NORMAL_HONING_ARMOR_DELTA || 6);
+
+const ALL_CLASS_NAMES = [
+  '디스트로이어', '발키리', '버서커', '슬레이어', '워로드', '홀리나이트',
+  '기공사', '배틀마스터', '브레이커', '스트라이커', '인파이터', '창술사',
+  '건슬링어', '데빌헌터', '블래스터', '스카우터', '호크아이',
+  '바드', '서머너', '소서리스', '아르카나',
+  '데모닉', '리퍼', '블레이드', '소울이터',
+  '기상술사', '도화가', '차원술사', '환수사',
+  '가디언나이트'
+];
 
 const FEATURE_DEFS = [
   ['itemAvgLevel', row => row.itemAvgLevel],
@@ -257,6 +269,35 @@ function coefficientTable(model) {
   }).sort((a, b) => Math.abs(b.standardizedWeight) - Math.abs(a.standardizedWeight));
 }
 
+function classSampleCounts(rows) {
+  const counts = new Map();
+  for (const row of rows) {
+    const className = row.className || '';
+    if (!className) continue;
+    counts.set(className, (counts.get(className) || 0) + 1);
+  }
+  return counts;
+}
+
+function buildNormalHoningFallbacks(rows) {
+  const counts = classSampleCounts(rows);
+  const classNames = [...new Set([...ALL_CLASS_NAMES, ...counts.keys()])].sort((a, b) => a.localeCompare(b, 'ko'));
+  const classFallbacks = {};
+  for (const className of classNames) {
+    const sampleCount = counts.get(className) || 0;
+    classFallbacks[className] = {
+      weapon: NORMAL_HONING_WEAPON_DELTA,
+      armor: NORMAL_HONING_ARMOR_DELTA,
+      sampleCount,
+      confidence: sampleCount >= Number(process.env.LOA_MODEL_MIN_CLASS_COUNT || 4) ? 'class-estimated' : 'estimated',
+      basis: sampleCount
+        ? 'Class is present in the official combat-power sample set; delta uses shared honing fallback until before/after samples exist.'
+        : 'Loawa rank class coverage placeholder; delta uses shared honing fallback until samples exist.'
+    };
+  }
+  return classFallbacks;
+}
+
 async function main() {
   const payload = JSON.parse(await readFile(INPUT, 'utf8'));
   const allRows = Array.isArray(payload?.rows) ? payload.rows : [];
@@ -313,7 +354,26 @@ async function main() {
       },
       worst: evaluation.predictions.slice(0, 12)
     },
-    coefficientsByImpact: coefficientTable(model).slice(0, 20)
+    coefficientsByImpact: coefficientTable(model).slice(0, 20),
+    upgradeDelta: {
+      normalHoning: {
+        weapon: NORMAL_HONING_WEAPON_DELTA,
+        armor: NORMAL_HONING_ARMOR_DELTA,
+        slotDefaults: {
+          weapon: NORMAL_HONING_WEAPON_DELTA,
+          head: NORMAL_HONING_ARMOR_DELTA,
+          top: NORMAL_HONING_ARMOR_DELTA,
+          bottom: NORMAL_HONING_ARMOR_DELTA,
+          gloves: NORMAL_HONING_ARMOR_DELTA,
+          shoulder: NORMAL_HONING_ARMOR_DELTA,
+          armor: NORMAL_HONING_ARMOR_DELTA
+        },
+        classFallbacks: buildNormalHoningFallbacks(rows),
+        coverage: 'all-loawa-rank-classes',
+        confidence: 'estimated',
+        basis: 'Shared fallback for all classes. Replace each class/slot with verified before-after official CombatPower samples as they are collected.'
+      }
+    }
   };
 
   await mkdir(dirname(OUTPUT), { recursive: true });

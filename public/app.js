@@ -921,8 +921,17 @@ async function loadCombatPowerModel() {
   return combatPowerModelPromise;
 }
 function isPowerWeaponItem(item) {
+  return powerGearSlot(item) === 'weapon';
+}
+function powerGearSlot(item) {
   const text = `${item?.type || ''} ${item?.name || ''}`;
-  return text.includes('무기') || text.includes('臾닿린');
+  if (text.includes('무기') || text.includes('臾닿린')) return 'weapon';
+  if (text.includes('투구') || text.includes('머리') || text.includes('?ш뎄')) return 'head';
+  if (text.includes('상의') || text.includes('?곸쓽')) return 'top';
+  if (text.includes('하의') || text.includes('?섏쓽')) return 'bottom';
+  if (text.includes('장갑') || text.includes('?κ컩')) return 'gloves';
+  if (text.includes('어깨') || text.includes('견갑') || text.includes('?닿묠')) return 'shoulder';
+  return 'armor';
 }
 function snapshotOfficialCombatPower(snapshot) {
   const value = Number(snapshot?.profile?.combatPower || snapshot?.accuracyTarget?.officialCombatPower || 0);
@@ -949,10 +958,34 @@ function normalHoningCalibrationKey(snapshot, item, next = null) {
     normalizePowerModelText(profile.className),
     normalizePowerModelText(profile.secondClass),
     coreKey,
-    isPowerWeaponItem(item) ? 'weapon' : 'armor',
+    powerGearSlot(item),
     Number(next?.from ?? item?.honingLevel ?? 0),
     Number(next?.to ?? Number(item?.honingLevel || 0) + 1)
   ].join('||');
+}
+function normalHoningFallback(snapshot, item) {
+  const normal = state.combatPowerModel?.upgradeDelta?.normalHoning || {};
+  const className = normalizePowerModelText(snapshot?.profile?.className);
+  const slot = powerGearSlot(item);
+  const group = slot === 'weapon' ? 'weapon' : 'armor';
+  const classFallback = normal.classFallbacks?.[className] || normal.byClass?.[className] || null;
+  const classSlotValue = Number(classFallback?.[slot] ?? classFallback?.[group]);
+  if (Number.isFinite(classSlotValue) && classSlotValue > 0) {
+    return {
+      value: classSlotValue,
+      confidence: classFallback?.confidence || 'class-estimated',
+      basis: classFallback?.basis || 'class fallback from official combat-power samples'
+    };
+  }
+  const slotValue = Number(normal.slotDefaults?.[slot] ?? normal[group]);
+  if (Number.isFinite(slotValue) && slotValue > 0) {
+    return {
+      value: slotValue,
+      confidence: normal.confidence || 'estimated',
+      basis: normal.basis || 'all-class official combat-power sample model'
+    };
+  }
+  return null;
 }
 function findNormalHoningCalibration(snapshot, item, next = null) {
   const model = state.combatPowerModel;
@@ -973,13 +1006,12 @@ function estimateNormalHoningPowerDelta(item, snapshot, next = null) {
       basis: calibration.basis || 'build-specific verified'
     };
   }
-  const normal = state.combatPowerModel?.upgradeDelta?.normalHoning || {};
-  const fallback = Number(isPowerWeaponItem(item) ? normal.weapon : normal.armor);
-  if (Number.isFinite(fallback) && fallback > 0) {
+  const fallback = normalHoningFallback(snapshot, item);
+  if (fallback) {
     return {
-      value: round2(fallback),
-      confidence: 'estimated',
-      basis: normal.basis || 'official combat-power sample model'
+      value: round2(fallback.value),
+      confidence: fallback.confidence,
+      basis: fallback.basis
     };
   }
   return {
@@ -1035,6 +1067,7 @@ function specEfficiencyReason(row) {
   if (missing.length) return `시세 없음: ${missing.slice(0, 2).join(', ')}${missing.length > 2 ? ' 외' : ''}`;
   const confidence = row.powerEstimate?.confidence;
   if (confidence === 'verified') return row.hasGrowth ? '검증 전투력 · 장비 성장 포함' : '검증 전투력';
+  if (confidence === 'class-estimated') return row.hasGrowth ? '직업별 추정 · 장비 성장 포함' : '직업별 추정';
   if (confidence === 'estimated') return row.hasGrowth ? '추정 전투력 · 장비 성장 포함' : '추정 전투력';
   if (row.hasGrowth) return '전투력 미검증 · 장비 성장 포함';
   return '전투력 미검증';
