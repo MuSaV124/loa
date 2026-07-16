@@ -2723,7 +2723,7 @@ select {
   }
 }
 
-/* v5.7.10 search-first calculator entry */
+/* v5.7.11 search-first calculator entry */
 body:not(.calculatorReady):not(.marketMode) #characterCard,
 body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
 body:not(.calculatorReady):not(.marketMode) #summaryPanel,

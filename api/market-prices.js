@@ -1,4 +1,4 @@
-const API_VERSION = '5.7.10';
+const API_VERSION = '5.7.11';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -252,7 +252,7 @@ async function searchAccessory(apiKey, query) {
     updatedAt: indexResult.updatedAt,
     index: indexResult.index,
     accessoryDebug: {
-      note: 'v5.7.10 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
+      note: 'v5.7.11 악세 디버그: 검증된 공식 연마 옵션 코드와 EtcValues.Value(예: 2.00% => 200)를 사용해 목걸이/귀걸이/반지 공통으로 정확 2옵션 검색을 수행합니다. 최종 통과는 ACCESSORY_UPGRADE가 정확히 3개이면서 목표 옵션 2개가 순서와 관계없이 포함된 경우만 허용합니다.',
       requestPayloads: indexResult.requestPayloads.slice(0, 14),
       filterStats: indexResult.filterStats,
       samples: indexResult.samples
@@ -590,23 +590,27 @@ async function searchEngravingListFresh(apiKey, maxPages) {
 
 async function searchT4Materials(apiKey, query) {
   const force = String(query.force || '') === '1';
-  const cacheKey = 't4Materials:v4';
+  const cacheKey = 't4Materials:v5';
   return getCachedMarketList(cacheKey, force, async () => searchT4MaterialsFresh(apiKey));
 }
 
 async function searchT4MaterialsFresh(apiKey) {
+  const tasks = T4_MATERIAL_GROUPS.flatMap(group => group.items.map(name => ({ group: group.group, name })));
+  const results = await mapWithConcurrency(tasks, 8, task => {
+    if (isArkGridGemName(task.name)) return searchArkGridGemAuction(apiKey, task.name, task.group);
+    return searchMarketMaterial(apiKey, task.name, task.group);
+  });
   const rows = [];
   const tried = [];
-  for (const group of T4_MATERIAL_GROUPS) {
-    const settled = await Promise.allSettled(group.items.map(name => searchMarketMaterial(apiKey, name, group.group)));
-    for (const entry of settled) {
-      if (entry.status === 'fulfilled') {
-        rows.push(entry.value.item);
-        tried.push(...entry.value.tried);
-      } else {
-        rows.push({ group: group.group, name: '조회 실패', price: 0, unitPrice: 0, bundleCount: 1, error: entry.reason?.message || String(entry.reason || '조회 실패') });
-        tried.push({ group: group.group, error: entry.reason?.message || String(entry.reason || '조회 실패') });
-      }
+  for (let i = 0; i < results.length; i += 1) {
+    const entry = results[i];
+    const task = tasks[i];
+    if (entry.status === 'fulfilled') {
+      rows.push(entry.value.item);
+      tried.push(...entry.value.tried);
+    } else {
+      rows.push({ group: task.group, requestedName: task.name, name: task.name, price: 0, unitPrice: 0, bundleCount: 1, error: entry.reason?.message || String(entry.reason || '조회 실패') });
+      tried.push({ group: task.group, name: task.name, error: entry.reason?.message || String(entry.reason || '조회 실패') });
     }
   }
   return { ok: true, apiVersion: API_VERSION, source: 'markets/items', mode: 't4Materials', groups: T4_MATERIAL_GROUPS.map(group => group.group), items: rows, tried, updatedAt: new Date().toISOString() };
@@ -617,7 +621,7 @@ async function searchMarketMaterial(apiKey, name, group) {
   const matched = [];
   const aliases = materialSearchAliases(name);
   for (const keyword of aliases) {
-    for (const categoryCode of [50000, 50010, 50020, 50030, 50040, null]) {
+    for (const categoryCode of [null, 50000, 50010, 50020, 50030, 50040]) {
       const payload = { Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode ?? undefined, ItemName: keyword, PageNo: 1 };
       stripUndefined(payload);
       const result = await fetchMarketPage(apiKey, payload);
@@ -635,6 +639,40 @@ async function searchMarketMaterial(apiKey, name, group) {
   }
   matched.sort((a, b) => a.effectiveUnitPrice - b.effectiveUnitPrice || a.unitPrice - b.unitPrice || a.price - b.price);
   const item = matched[0] || applyMaterialUnitMeta({ group, requestedName: name, name, price: 0, unitPrice: 0, bundleCount: 1, icon: '', grade: '', missing: true }, name);
+  return { item: { ...item, group, requestedName: name }, tried };
+}
+
+async function searchArkGridGemAuction(apiKey, name, group) {
+  const tried = [];
+  const matched = [];
+  const aliases = materialSearchAliases(name);
+  for (const keyword of aliases) {
+    for (const categoryCode of [null, 210000, 210010, 210020]) {
+      const payload = { Sort: 'BUY_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode ?? undefined, ItemTier: 4, ItemName: keyword, PageNo: 1 };
+      stripUndefined(payload);
+      const result = await fetchAuctionPage(apiKey, payload);
+      tried.push({ group, name, keyword, categoryCode, source: 'auction', count: result.items.length, totalCount: result.totalCount, error: result.error || null });
+      for (const raw of result.items) {
+        const item = normalizeAuctionItem(raw);
+        if (!item.price) continue;
+        const itemText = normalizeText(`${item.name} ${item.fullText}`);
+        if (!isMaterialNameMatch(itemText, name, keyword)) continue;
+        matched.push({
+          ...item,
+          group,
+          requestedName: name,
+          source: 'auctions/items',
+          unitPrice: item.price,
+          effectiveUnitPrice: item.price,
+          pheonCost: item.pheonCost || defaultArkGridGemPheonCost(item.grade)
+        });
+      }
+      if (matched.length) break;
+    }
+    if (matched.length) break;
+  }
+  matched.sort((a, b) => a.price - b.price);
+  const item = matched[0] || { group, requestedName: name, name, price: 0, unitPrice: 0, effectiveUnitPrice: 0, bundleCount: 1, icon: '', grade: '', missing: true, source: 'auctions/items' };
   return { item: { ...item, group, requestedName: name }, tried };
 }
 
@@ -662,6 +700,10 @@ function materialSearchAliases(name) {
   return [...new Set(aliases)];
 }
 
+function isArkGridGemName(name) {
+  return /^(질서|혼돈)(?:의)?\s*(안정|견고|불변|침식|왜곡|붕괴)\s*젬$/.test(String(name || '').trim());
+}
+
 function isMaterialNameMatch(itemText, targetName, keyword) {
   const compactText = normalizeText(itemText).replace(/\s+/g, '');
   const target = normalizeText(targetName).replace(/\s+/g, '');
@@ -674,6 +716,14 @@ function isMaterialNameMatch(itemText, targetName, keyword) {
     return compactText.includes(order) && compactText.includes(type) && compactText.includes('젬');
   }
   return compactText.includes(target) || compactText.includes(key);
+}
+
+function defaultArkGridGemPheonCost(grade) {
+  const text = normalizeText(grade);
+  if (text.includes('영웅')) return 12;
+  if (text.includes('희귀')) return 6;
+  if (text.includes('고급')) return 3;
+  return 0;
 }
 
 function materialUnitPrice(item) {
@@ -714,6 +764,24 @@ async function getCachedMarketList(cacheKey, force, loader) {
   }).finally(() => marketListInflight.delete(cacheKey));
   marketListInflight.set(cacheKey, promise);
   return promise;
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let next = 0;
+  const workerCount = Math.min(Math.max(Number(limit || 1), 1), items.length || 1);
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      try {
+        results[index] = { status: 'fulfilled', value: await mapper(items[index], index) };
+      } catch (error) {
+        results[index] = { status: 'rejected', reason: error };
+      }
+    }
+  }));
+  return results;
 }
 
 async function getAuctionOptions(apiKey) {

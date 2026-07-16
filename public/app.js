@@ -1,4 +1,4 @@
-const VERSION = '5.7.10';
+const VERSION = '5.7.11';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2579,7 +2579,7 @@ async function loadMarketMaterialList(force = false) {
   const button = $('materialListButton');
   const resultEl = $('materialMarketResult');
   if (button) { button.disabled = true; button.textContent = '조회 중'; }
-  if (resultEl) resultEl.innerHTML = '거래소에서 4티어 강화 재료 최저가를 조회하는 중입니다.';
+  if (resultEl) resultEl.innerHTML = '거래소/경매장에서 4티어 재료와 아크그리드 젬 최저가를 조회하는 중입니다.';
   try {
     const data = await fetchMarketJson(`/api/market-prices?mode=t4Materials${force ? '&force=1' : ''}&_=${Date.now()}`);
     renderMaterialPriceGrid(resultEl, data);
@@ -2745,7 +2745,7 @@ function renderMaterialPriceGrid(container, data) {
     grouped.get(group).push(item);
   }
   container.innerHTML = `<div class="marketResultList">
-    <div class="marketRuleHint"><b>4티어 재료/아크그리드 젬</b> · 거래소 최저가 · ${escapeHtml(formatMarketUpdatedAt(data.updatedAt))}${data.cached ? ' · 캐시' : ''}</div>
+    <div class="marketRuleHint"><b>4티어 재료/아크그리드 젬</b> · 거래소/경매장 최저가 · ${escapeHtml(formatMarketUpdatedAt(data.updatedAt))}${data.cached ? ' · 캐시' : ''}</div>
     ${[...grouped.entries()].map(([group, rows]) => `
       <section class="materialPriceGroup">
         <h3>${escapeHtml(group)}</h3>
@@ -2767,11 +2767,13 @@ function materialPriceCard(item) {
   const shardCount = !missing && Number(item.shardCount || 0)
     ? `주머니당 ${Number(item.shardCount).toLocaleString('ko-KR')}개`
     : '';
+  const source = item.source === 'auctions/items' ? '경매장' : '거래소';
+  const pheon = !missing && Number(item.pheonCost || 0) > 0 ? `${Number(item.pheonCost).toLocaleString('ko-KR')}페온` : '';
   return `<article class="materialPriceCard ${missing ? 'missing' : ''}">
     ${icon}
     <div>
       <b>${escapeHtml(item.requestedName || item.name || '-')}</b>
-      <small>${escapeHtml([item.name && item.name !== item.requestedName ? item.name : '', bundle > 1 ? `${bundle.toLocaleString('ko-KR')}개 묶음` : '', unit, shardCount, shardUnit].filter(Boolean).join(' · ') || '거래소 최저가')}</small>
+      <small>${escapeHtml([source, item.grade, item.name && item.name !== item.requestedName ? item.name : '', bundle > 1 ? `${bundle.toLocaleString('ko-KR')}개 묶음` : '', unit, shardCount, shardUnit, pheon].filter(Boolean).join(' · ') || '최저가')}</small>
     </div>
     <strong>${escapeHtml(price)}</strong>
   </article>`;
