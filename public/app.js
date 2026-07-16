@@ -1,4 +1,4 @@
-const VERSION = '5.7.17';
+const VERSION = '5.7.19';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -965,27 +965,30 @@ function normalHoningCalibrationKey(snapshot, item, next = null) {
 }
 function normalHoningFallback(snapshot, item) {
   const normal = state.combatPowerModel?.upgradeDelta?.normalHoning || {};
+  const official = snapshotOfficialCombatPower(snapshot);
   const className = normalizePowerModelText(snapshot?.profile?.className);
   const slot = powerGearSlot(item);
   const group = slot === 'weapon' ? 'weapon' : 'armor';
   const classFallback = normal.classFallbacks?.[className] || normal.byClass?.[className] || null;
-  const classSlotValue = Number(classFallback?.[slot] ?? classFallback?.[group]);
-  if (Number.isFinite(classSlotValue) && classSlotValue > 0) {
+  const classPercent = Number(classFallback?.[`${slot}Percent`] ?? classFallback?.[`${group}Percent`]);
+  if (official > 0 && Number.isFinite(classPercent) && classPercent > 0) {
     const confidence = classFallback?.confidence || 'estimated';
     return {
-      value: classSlotValue,
+      value: official * classPercent / 100,
+      percent: classPercent,
       confidence,
       basis: classFallback?.basis || (confidence === 'class-estimated'
         ? 'class fallback from official combat-power samples'
         : 'shared fallback until class-specific samples are verified')
     };
   }
-  const slotValue = Number(normal.slotDefaults?.[slot] ?? normal[group]);
-  if (Number.isFinite(slotValue) && slotValue > 0) {
+  const slotPercent = Number(normal.percentDefaults?.[slot] ?? normal[`${group}Percent`]);
+  if (official > 0 && Number.isFinite(slotPercent) && slotPercent > 0) {
     return {
-      value: slotValue,
+      value: official * slotPercent / 100,
+      percent: slotPercent,
       confidence: normal.confidence || 'estimated',
-      basis: normal.basis || 'all-class official combat-power sample model'
+      basis: normal.basis || 'all-class official combat-power percent model'
     };
   }
   return null;
@@ -1003,6 +1006,16 @@ function findNormalHoningCalibration(snapshot, item, next = null) {
 function estimateNormalHoningPowerDelta(item, snapshot, next = null) {
   const calibration = findNormalHoningCalibration(snapshot, item, next);
   if (calibration) {
+    const official = snapshotOfficialCombatPower(snapshot);
+    const deltaPercent = Number(calibration.deltaPercent);
+    if (official > 0 && Number.isFinite(deltaPercent) && deltaPercent > 0) {
+      return {
+        value: round2(official * deltaPercent / 100),
+        percent: round2(deltaPercent),
+        confidence: calibration.confidence || 'verified',
+        basis: calibration.basis || 'build-specific verified percent'
+      };
+    }
     return {
       value: round2(Number(calibration.delta)),
       confidence: calibration.confidence || 'verified',
@@ -1013,6 +1026,7 @@ function estimateNormalHoningPowerDelta(item, snapshot, next = null) {
   if (fallback) {
     return {
       value: round2(fallback.value),
+      percent: round2(fallback.percent),
       confidence: fallback.confidence,
       basis: fallback.basis
     };
@@ -1049,7 +1063,7 @@ function storePowerCostEstimates(priceMap) {
 function renderSpecEfficiencyShell() {
   return `<div class="powerSnapshotBlock powerEfficiencyPanel">
     <div class="powerCostHead">
-      <div><h3>공식 전투력 효율표</h3><p>시세탭 재료 가격으로 다음 일반 재련 1회 비용을 계산하고, 골드 대비 전투력 상승 효율로 정렬합니다.</p></div>
+      <div><h3>전투력 변화량 효율표</h3><p>시세탭 재료 가격으로 다음 일반 재련 1회 비용을 계산하고, 골드 대비 전투력 변화량 효율로 정렬합니다.</p></div>
       <strong>골드 / 전투력</strong>
     </div>
     <div id="specEfficiencyTable" class="specEfficiencyTable">
@@ -1095,7 +1109,9 @@ function renderSpecEfficiencyTable() {
       const rank = row.available && Number.isFinite(specEfficiencyScore(row)) ? index + 1 : '-';
       const powerDelta = Number(row.powerDelta || 0);
       const scoreText = row.available && totalGold > 0 && powerDelta > 0 ? `${formatGold(totalGold / powerDelta)} / CP` : '-';
-      const powerText = powerDelta > 0 ? `CP +${powerDelta.toFixed(1)}` : 'CP -';
+      const deltaPercent = Number(row.powerEstimate?.percent || 0);
+      const percentText = deltaPercent > 0 ? ` · ${deltaPercent.toFixed(2)}%` : '';
+      const powerText = powerDelta > 0 ? `CP +${powerDelta.toFixed(1)}${percentText}` : 'CP -';
       return `<div class="specEfficiencyRow ${row.available ? '' : 'disabled'}">
         <div class="specEfficiencyRank">${escapeHtml(rank)}</div>
         <div class="specEfficiencyTarget">
@@ -1116,7 +1132,7 @@ function renderSpecEfficiencyTable() {
   el.innerHTML = `<div class="specEfficiencyHeader">
     <span>순위</span><span>대상</span><span>구간</span><span>골드 / 전투력</span><span>비고</span>
   </div>${rows}
-  <p class="powerCostHint">공식 API 전투력을 기준으로 합니다. 검증 샘플이 있는 장비는 검증값을 우선 사용하고, 없는 장비는 무기/방어구 기본 추정값으로 골드 대비 전투력 효율을 계산합니다.</p>`;
+  <p class="powerCostHint">최종 전투력 전체를 예측하지 않고, 공식 API 샘플로 검증한 업그레이드별 전투력 변화율(%)을 우선 사용합니다. 검증값이 없으면 현재 공식 전투력에 무기/방어구 기본 변화율을 곱해 골드 대비 효율을 계산합니다.</p>`;
 }
 function renderAdvancedHoningAttemptCostTable() {
   const renderRows = (rows = []) => rows.map(row => {

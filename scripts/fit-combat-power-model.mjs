@@ -4,11 +4,11 @@ import { dirname, resolve } from 'node:path';
 const INPUT = resolve(process.env.LOA_SAMPLE_INPUT || 'tmp/combat-samples-loawa-around.json');
 const OUTPUT = resolve(process.env.LOA_MODEL_OUTPUT || 'tmp/combat-power-model.json');
 
-const MODEL_VERSION = 'combat-power-linear-v1';
+const MODEL_VERSION = 'combat-power-delta-v1';
 const MIN_COMBAT_POWER = Number(process.env.LOA_MODEL_MIN_CP || 5000);
 const MAX_COMBAT_POWER = Number(process.env.LOA_MODEL_MAX_CP || 6500);
-const NORMAL_HONING_WEAPON_DELTA = Number(process.env.LOA_NORMAL_HONING_WEAPON_DELTA || 25);
-const NORMAL_HONING_ARMOR_DELTA = Number(process.env.LOA_NORMAL_HONING_ARMOR_DELTA || 6);
+const NORMAL_HONING_WEAPON_PERCENT = Number(process.env.LOA_NORMAL_HONING_WEAPON_PERCENT || 0.46);
+const NORMAL_HONING_ARMOR_PERCENT = Number(process.env.LOA_NORMAL_HONING_ARMOR_PERCENT || 0.11);
 
 const ALL_CLASS_NAMES = [
   '디스트로이어', '발키리', '버서커', '슬레이어', '워로드', '홀리나이트',
@@ -286,13 +286,13 @@ function buildNormalHoningFallbacks(rows) {
   for (const className of classNames) {
     const sampleCount = counts.get(className) || 0;
     classFallbacks[className] = {
-      weapon: NORMAL_HONING_WEAPON_DELTA,
-      armor: NORMAL_HONING_ARMOR_DELTA,
+      weaponPercent: NORMAL_HONING_WEAPON_PERCENT,
+      armorPercent: NORMAL_HONING_ARMOR_PERCENT,
       sampleCount,
       confidence: sampleCount >= Number(process.env.LOA_MODEL_MIN_CLASS_COUNT || 4) ? 'class-estimated' : 'estimated',
       basis: sampleCount
-        ? 'Class is present in the official combat-power sample set; delta uses shared honing fallback until before/after samples exist.'
-        : 'Loawa rank class coverage placeholder; delta uses shared honing fallback until samples exist.'
+        ? 'Class is present in the official combat-power sample set; deltaPercent uses shared honing fallback until before/after samples exist.'
+        : 'Loawa rank class coverage placeholder; deltaPercent uses shared honing fallback until samples exist.'
     };
   }
   return classFallbacks;
@@ -319,6 +319,7 @@ async function main() {
   const evaluation = evaluate(rows, model);
   const output = {
     version: MODEL_VERSION,
+    mode: 'upgrade-delta',
     createdAt: new Date().toISOString(),
     source: INPUT,
     filter: {
@@ -326,7 +327,8 @@ async function main() {
       maxCombatPower: MAX_COMBAT_POWER,
       itemAvgLevel: [1765, 1795]
     },
-    target: 'profile.CombatPower',
+    target: 'upgradeDelta.normalHoning',
+    referenceTarget: 'profile.CombatPower',
     rowCount: {
       input: allRows.length,
       training: rows.length
@@ -361,21 +363,21 @@ async function main() {
     coefficientsByImpact: coefficientTable(model).slice(0, 20),
     upgradeDelta: {
       normalHoning: {
-        weapon: NORMAL_HONING_WEAPON_DELTA,
-        armor: NORMAL_HONING_ARMOR_DELTA,
-        slotDefaults: {
-          weapon: NORMAL_HONING_WEAPON_DELTA,
-          head: NORMAL_HONING_ARMOR_DELTA,
-          top: NORMAL_HONING_ARMOR_DELTA,
-          bottom: NORMAL_HONING_ARMOR_DELTA,
-          gloves: NORMAL_HONING_ARMOR_DELTA,
-          shoulder: NORMAL_HONING_ARMOR_DELTA,
-          armor: NORMAL_HONING_ARMOR_DELTA
+        weaponPercent: NORMAL_HONING_WEAPON_PERCENT,
+        armorPercent: NORMAL_HONING_ARMOR_PERCENT,
+        percentDefaults: {
+          weapon: NORMAL_HONING_WEAPON_PERCENT,
+          head: NORMAL_HONING_ARMOR_PERCENT,
+          top: NORMAL_HONING_ARMOR_PERCENT,
+          bottom: NORMAL_HONING_ARMOR_PERCENT,
+          gloves: NORMAL_HONING_ARMOR_PERCENT,
+          shoulder: NORMAL_HONING_ARMOR_PERCENT,
+          armor: NORMAL_HONING_ARMOR_PERCENT
         },
         classFallbacks: buildNormalHoningFallbacks(rows),
         coverage: 'all-loawa-rank-classes',
         confidence: 'estimated',
-        basis: 'Shared fallback for all classes. Replace each class/slot with verified before-after official CombatPower samples as they are collected.'
+        basis: 'Shared percent fallback for all classes. Replace each class/slot with verified before-after official CombatPower deltaPercent samples as they are collected.'
       }
     }
   };

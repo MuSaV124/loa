@@ -1,15 +1,16 @@
 {
-  "version": "combat-power-linear-v1",
+  "version": "combat-power-delta-v1",
+  "mode": "upgrade-delta",
   "fit": "non-negative-ridge",
   "generatedAt": "2026-07-16T07:43:26.673Z",
   "training": {
     "input": 211,
     "rows": 180,
-    "target": "profile.CombatPower",
+    "target": "upgradeDelta.normalHoning",
     "mae": 71.63522543885058,
     "medianAbsError": 39.15346051556935,
     "p90AbsError": 142.99765826961846,
-    "note": "Public first-pass model. Deltas are more reliable than absolute combat-power predictions."
+    "note": "Primary model is upgrade-by-upgrade CombatPower delta. Absolute profile.CombatPower fit is kept only as a reference for sample sanity checks."
   },
   "features": {
     "itemAvgLevel": {
@@ -207,57 +208,25 @@
   },
   "upgradeDelta": {
     "normalHoning": {
-      "weapon": 25,
-      "armor": 6,
-      "slotDefaults": {
-        "weapon": 25,
-        "head": 6,
-        "top": 6,
-        "bottom": 6,
-        "gloves": 6,
-        "shoulder": 6,
-        "armor": 6
-      },
-      "classFallbacks": {
-        "디스트로이어": { "weapon": 25, "armor": 6 },
-        "발키리": { "weapon": 25, "armor": 6 },
-        "버서커": { "weapon": 25, "armor": 6 },
-        "슬레이어": { "weapon": 25, "armor": 6 },
-        "워로드": { "weapon": 25, "armor": 6 },
-        "홀리나이트": { "weapon": 25, "armor": 6 },
-        "기공사": { "weapon": 25, "armor": 6 },
-        "배틀마스터": { "weapon": 25, "armor": 6 },
-        "브레이커": { "weapon": 25, "armor": 6 },
-        "스트라이커": { "weapon": 25, "armor": 6 },
-        "인파이터": { "weapon": 25, "armor": 6 },
-        "창술사": { "weapon": 25, "armor": 6 },
-        "건슬링어": { "weapon": 25, "armor": 6 },
-        "데빌헌터": { "weapon": 25, "armor": 6 },
-        "블래스터": { "weapon": 25, "armor": 6 },
-        "스카우터": { "weapon": 25, "armor": 6 },
-        "호크아이": { "weapon": 25, "armor": 6 },
-        "바드": { "weapon": 25, "armor": 6 },
-        "서머너": { "weapon": 25, "armor": 6 },
-        "소서리스": { "weapon": 25, "armor": 6 },
-        "아르카나": { "weapon": 25, "armor": 6 },
-        "데모닉": { "weapon": 25, "armor": 6 },
-        "리퍼": { "weapon": 25, "armor": 6 },
-        "블레이드": { "weapon": 25, "armor": 6 },
-        "소울이터": { "weapon": 25, "armor": 6 },
-        "기상술사": { "weapon": 25, "armor": 6 },
-        "도화가": { "weapon": 25, "armor": 6 },
-        "차원술사": { "weapon": 25, "armor": 6 },
-        "환수사": { "weapon": 25, "armor": 6 },
-        "가디언나이트": { "weapon": 25, "armor": 6 }
+      "weaponPercent": 0.46,
+      "armorPercent": 0.11,
+      "percentDefaults": {
+        "weapon": 0.46,
+        "head": 0.11,
+        "top": 0.11,
+        "bottom": 0.11,
+        "gloves": 0.11,
+        "shoulder": 0.11,
+        "armor": 0.11
       },
       "coverage": "all-loawa-rank-classes",
       "confidence": "estimated",
-      "basis": "Hybrid from all-class common model and breaker-nearby validation samples. Used only for next-honing efficiency sorting."
+      "basis": "Percent fallback from current official CombatPower. Used only until before/after upgrade deltaPercent samples are verified."
     },
     "advancedHoning": {
-      "weapon": 10,
-      "armor": 3,
-      "basis": "Placeholder until enough before/after advanced honing samples are collected."
+      "weaponPercent": 0.18,
+      "armorPercent": 0.06,
+      "basis": "Percent placeholder until enough before/after advanced honing samples are collected."
     }
   }
 }
