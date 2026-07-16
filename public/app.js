@@ -1,4 +1,4 @@
-const VERSION = '5.7.28';
+const VERSION = '5.7.29';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2977,7 +2977,11 @@ async function loadMarketMaterialList(force = false) {
   if (button) { button.disabled = true; button.textContent = '조회 중'; }
   if (resultEl) resultEl.innerHTML = '거래소에서 4티어 재료와 아크그리드 젬 최저가를 조회하는 중입니다.';
   try {
-    const data = await fetchMarketJson(`/api/market-prices?mode=t4Materials${force ? '&force=1' : ''}&_=${Date.now()}`);
+    let data = await fetchMarketJson(`/api/market-prices?mode=t4Materials${force ? '&force=1' : ''}&_=${Date.now()}`);
+    if (!force && shouldForceRefreshMaterialPrices(data)) {
+      if (resultEl) resultEl.innerHTML = '캐시된 재료 시세에 매물 없음이 많아 최신 시세로 다시 조회하는 중입니다.';
+      data = await fetchMarketJson(`/api/market-prices?mode=t4Materials&force=1&_=${Date.now()}`);
+    }
     renderMaterialPriceGrid(resultEl, data);
     marketListLoadState.material = 'loaded';
   } catch (error) {
@@ -2986,6 +2990,15 @@ async function loadMarketMaterialList(force = false) {
   } finally {
     if (button) { button.disabled = false; button.textContent = '새로고침'; }
   }
+}
+
+function shouldForceRefreshMaterialPrices(data) {
+  const items = Array.isArray(data?.items) ? data.items : [];
+  if (!items.length) return true;
+  const missingCount = items.filter(item => item?.missing || !Number(item?.price || 0)).length;
+  const importantNames = ['아비도스 융화제', '상급 아비도스 융화제', '빙하의 숨결', '용암의 숨결'];
+  const importantMissing = items.some(item => importantNames.includes(item?.requestedName || item?.name || '') && (item?.missing || !Number(item?.price || 0)));
+  return importantMissing || missingCount >= Math.max(3, Math.ceil(items.length * 0.25));
 }
 
 async function fetchMarketJson(url) {
