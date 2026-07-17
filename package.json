@@ -1,6 +1,6 @@
 {
   "name": "lostark-node-recommend-calculator",
-  "version": "5.7.43",
+  "version": "5.7.44",
   "private": true,
   "type": "module",
   "scripts": {

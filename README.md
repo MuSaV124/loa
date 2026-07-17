@@ -1,4 +1,7 @@
-# Lost Ark Node Recommend Calculator v5.7.43
+# Lost Ark Node Recommend Calculator v5.7.44
+
+## v5.7.44
+- 전투력 변화량 효율표의 전투력 상승값을 소수점 둘째 자리까지 표시합니다.
 
 ## v5.7.43
 - 전투력 변화량 효율표의 모든 항목에서 품질 배지를 제거했습니다.

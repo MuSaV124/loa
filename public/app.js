@@ -1,4 +1,4 @@
-const VERSION = '5.7.43';
+const VERSION = '5.7.44';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1612,7 +1612,7 @@ function specPowerDeltaText(row, powerDelta) {
   if (!(powerDelta > 0)) return '전투력 -';
   const confidence = row?.powerEstimate?.confidence;
   const exact = confidence === 'verified';
-  return `${exact ? '전투력 +' : '전투력 약 +'}${powerDelta.toFixed(1)}`;
+  return `${exact ? '전투력 +' : '전투력 약 +'}${powerDelta.toFixed(2)}`;
 }
 function renderSpecEfficiencyTable() {
   const el = $('specEfficiencyTable');
