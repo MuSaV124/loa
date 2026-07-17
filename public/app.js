@@ -1,6 +1,6 @@
-import { calculateBluntSpike, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.46';
+import { calculateBluntSpike, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.47';
 
-const VERSION = '5.7.46';
+const VERSION = '5.7.47';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2430,13 +2430,11 @@ function buildSourceSummary(current) {
     if (eff.critHitDamage) critHitEvolution.push(sourceLine(label + ' 치명타 적중 주피', eff.critHitDamage));
     if (eff.evolutionDamage) evoEvolution.push(sourceLine(label, eff.evolutionDamage));
     if (eff.sonicBreak) {
-      const attackIncrease = Math.max(0, (current.stats.attackSpeed || current.stats.moveAttackSpeed || 100) - 100);
-      const moveIncrease = Math.max(0, (current.stats.moveSpeed || current.stats.moveAttackSpeed || 100) - 100);
-      const speedIncrease = attackIncrease + moveIncrease;
-      const overCap = Math.max(0, (current.stats.attackSpeed || current.stats.moveAttackSpeed || 100) - 140) + Math.max(0, (current.stats.moveSpeed || current.stats.moveAttackSpeed || 100) - 140);
-      let sonicDamage = speedIncrease * Number(eff.sonicBreak.rate || 0);
-      if (overCap > 0) sonicDamage += Number(eff.sonicBreak.overCapBonus || 0) + overCap * Number(eff.sonicBreak.overCapRate || 0);
-      sonicDamage = Math.min(sonicDamage, Number(eff.sonicBreak.maxEvolutionDamage ?? Infinity));
+      const sonicDamage = calculateSonicBreakEvolutionDamage(
+        current.stats.attackSpeed || current.stats.moveAttackSpeed || 100,
+        current.stats.moveSpeed || current.stats.moveAttackSpeed || 100,
+        eff.sonicBreak
+      );
       if (sonicDamage) evoEvolution.push(sourceLine(label + ' 음속 전환', sonicDamage));
     }
     if (eff.additionalDamage) addEvolution.push(sourceLine(label, eff.additionalDamage));

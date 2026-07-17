@@ -1,4 +1,7 @@
-# Lost Ark Node Recommend Calculator v5.7.46
+# Lost Ark Node Recommend Calculator v5.7.47
+
+## v5.7.47
+- 음속 돌파의 추천 기대값과 진피 상세 내역이 동일한 공통 계산식을 사용하도록 통일합니다.
 
 ## v5.7.46
 - 2/4/5티어가 모두 현재 선택과 같을 때만 추천표에 `현재 조합`을 표시합니다.
