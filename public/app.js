@@ -1,4 +1,4 @@
-const VERSION = '5.7.42';
+const VERSION = '5.7.43';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1654,7 +1654,7 @@ function renderSpecEfficiencyTable() {
       const powerDeltaText = powerText;
       return `<div class="specEfficiencyRow ${row.available ? '' : 'disabled'}">
         <div class="specEfficiencyTarget">
-          ${powerItemIcon(item)}
+          ${powerItemIcon(item, { hideQuality: true })}
           <div>
             <b>${escapeHtml(item.type || '-')}</b>
             <span>${escapeHtml(item.name || '-')} · ${escapeHtml(stepMainText)}</span>
