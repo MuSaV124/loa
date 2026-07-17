@@ -34,3 +34,61 @@ export function calculateSonicBreakEvolutionDamage(attackSpeed, moveSpeed, effec
 
   return Math.min(damage, Number(effect.maxEvolutionDamage ?? Infinity));
 }
+
+const MANA_STABILITY_BONUS = {
+  '끝없는 마나': { 1: 0.5, 2: 1.0 },
+  '금단의 주문': { 1: 0.3, 2: 0.6 },
+  '무한한 마력': { 1: 0.4, 2: 0.8 }
+};
+
+export function calculatePracticalRecommendationScore({
+  expectedValue,
+  rawCritRate,
+  fiveName,
+  selection = {},
+  singleHitMainSkill = false,
+  manaShortageClass = false,
+  noManaMainSkill = false
+} = {}) {
+  const expected = Number(expectedValue || 0);
+  const critRate = Number(rawCritRate || 0);
+  let multiplier = 1;
+  const details = {
+    singleHitPenalty: 0,
+    critLowPenalty: 0,
+    critOverPenalty: 0,
+    manaStabilityBonus: 0
+  };
+
+  if (critRate < 95) {
+    details.critLowPenalty = 0.5;
+    multiplier *= 0.995;
+  }
+
+  const usefulCritCap = fiveName === '뭉툭한 가시' ? 120 : 100;
+  const overCrit = Math.max(0, critRate - usefulCritCap);
+  if (overCrit > 0) {
+    details.critOverPenalty = overCrit * 0.5;
+    multiplier *= Math.max(0, 1 - details.critOverPenalty / 100);
+  }
+
+  if (singleHitMainSkill && fiveName === '뭉툭한 가시') {
+    details.singleHitPenalty = 2.5;
+    multiplier *= 0.975;
+  }
+
+  if (manaShortageClass && !noManaMainSkill) {
+    for (const [name, levels] of Object.entries(MANA_STABILITY_BONUS)) {
+      const level = Math.max(0, Math.min(Number(selection?.[name]?.level || 0), 2));
+      details.manaStabilityBonus += Number(levels[level] || 0);
+    }
+    if (details.manaStabilityBonus > 0) multiplier *= 1 + details.manaStabilityBonus / 100;
+  }
+
+  return {
+    value: expected * multiplier,
+    expectedValue: expected,
+    multiplier,
+    ...details
+  };
+}

@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { calculateBluntSpike, calculateSonicBreakEvolutionDamage } from '../public/evolution-math.js';
+import {
+  calculateBluntSpike,
+  calculatePracticalRecommendationScore,
+  calculateSonicBreakEvolutionDamage
+} from '../public/evolution-math.js';
 
 const evolution = JSON.parse(readFileSync(new URL('../public/data/evolution.json', import.meta.url), 'utf8'));
 const node = name => evolution.nodes.find(item => item.name === name);
@@ -52,5 +56,29 @@ const cappedBlunt = calculateBluntSpike(130, {
   overCritEvolutionDamageCap: 60
 });
 approx(cappedBlunt.convertedEvolutionDamage, 60);
+
+const practical = options => calculatePracticalRecommendationScore({ expectedValue: 100, ...options });
+approx(practical({ rawCritRate: 95, fiveName: '입식 타격가' }).value, 100);
+approx(practical({ rawCritRate: 94.9, fiveName: '입식 타격가' }).value, 99.5);
+approx(practical({ rawCritRate: 102, fiveName: '입식 타격가' }).value, 99);
+approx(practical({ rawCritRate: 121, fiveName: '뭉툭한 가시' }).value, 99.5);
+approx(practical({ rawCritRate: 100, fiveName: '뭉툭한 가시', singleHitMainSkill: true }).value, 97.5);
+approx(practical({
+  rawCritRate: 100,
+  fiveName: '입식 타격가',
+  manaShortageClass: true,
+  selection: {
+    '끝없는 마나': { level: 2 },
+    '금단의 주문': { level: 1 },
+    '무한한 마력': { level: 2 }
+  }
+}).value, 102.1);
+approx(practical({
+  rawCritRate: 100,
+  fiveName: '입식 타격가',
+  manaShortageClass: true,
+  noManaMainSkill: true,
+  selection: { '끝없는 마나': { level: 2 } }
+}).value, 100);
 
 console.log('2/4/5티어 진화 계산 테스트 통과');

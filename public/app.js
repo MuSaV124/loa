@@ -1,6 +1,6 @@
-import { calculateBluntSpike, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.47';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.48';
 
-const VERSION = '5.7.47';
+const VERSION = '5.7.48';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2592,6 +2592,31 @@ function sameNameSet(a, b) {
   return aa === bb;
 }
 
+function tier5NameFromSelection(selection) {
+  return selectedEntries(selection || {}).find(row => Number(row.tier) === 5)?.name || '';
+}
+
+function practicalRecommendationFor(fiveName, calc, selection) {
+  return calculatePracticalRecommendationScore({
+    expectedValue: calc?.result?.value,
+    rawCritRate: calc?.result?.critRate,
+    fiveName,
+    selection,
+    singleHitMainSkill: Boolean($('singleHitMainSkill')?.checked),
+    manaShortageClass: Boolean($('manaShortageClass')?.checked),
+    noManaMainSkill: Boolean($('noManaMainSkill')?.checked)
+  });
+}
+
+function practicalAdjustmentParts(adjustment) {
+  const parts = [];
+  if (adjustment?.critLowPenalty > 0) parts.push(`치적 95% 미만 -${fmt(adjustment.critLowPenalty)}%`);
+  if (adjustment?.critOverPenalty > 0) parts.push(`유효 치적 상한 초과 -${fmt(adjustment.critOverPenalty)}%`);
+  if (adjustment?.singleHitPenalty > 0) parts.push(`단타 뭉가 -${fmt(adjustment.singleHitPenalty)}%`);
+  if (adjustment?.manaStabilityBonus > 0) parts.push(`마나 안정성 +${fmt(adjustment.manaStabilityBonus)}%`);
+  return parts;
+}
+
 function manaConditionNoteText(calc) {
   const notes = calc?.stats?.manaConditionNotes || [];
   const text = [...new Set(notes.map(x => x.note).filter(Boolean))].join(' · ');
@@ -2647,17 +2672,27 @@ function candidateTag(c) {
   if (hasSameTier245(state.selected, c.tier2Entries, c.fourNames, c.fiveName)) tags.push('<em class="currentTag">현재</em>');
   return tags.join('');
 }
+function practicalNoteHtml(candidate) {
+  const parts = practicalAdjustmentParts(candidate);
+  return parts.length ? `<div class="practicalNote">${escapeHtml(parts.join(' · '))}</div>` : '';
+}
 function calculateAndRender() {
   const current = statsWithSelection(state.selected);
-  const apiBase = statsWithSelection(Object.keys(state.apiSelected || {}).length ? state.apiSelected : state.selected);
+  const apiSelection = Object.keys(state.apiSelected || {}).length ? state.apiSelected : state.selected;
+  const apiBase = statsWithSelection(apiSelection);
   renderCombatStats(current);
   renderKeenEfficiency(current);
   const apiBaseValue = Number(apiBase.result.value || 0);
   const currentValue = Number(current.result.value || 0);
-  const baseValue = apiBaseValue || currentValue || 1;
-  const currentDiff = ((currentValue / baseValue) - 1) * 100;
-  const candidates = [];
   const noManaMainSkill = Boolean($('noManaMainSkill')?.checked);
+  const manaShortageClass = Boolean($('manaShortageClass')?.checked) && !noManaMainSkill;
+  const apiAdjustment = practicalRecommendationFor(tier5NameFromSelection(apiSelection), apiBase, apiSelection);
+  const currentAdjustment = practicalRecommendationFor(tier5NameFromSelection(state.selected), current, state.selected);
+  const apiPracticalValue = Number(apiAdjustment.value);
+  const currentPracticalValue = Number(currentAdjustment.value);
+  const baseValue = apiPracticalValue > 0 ? apiPracticalValue : (apiBaseValue || currentPracticalValue || currentValue || 1);
+  const currentDiff = ((currentPracticalValue / baseValue) - 1) * 100;
+  const candidates = [];
   const excludeCooldown = isCooldownExcluded();
   const shareInput = $('mainSkillDamageShare');
   const shareControl = document.querySelector('.shareControl');
@@ -2676,7 +2711,7 @@ function calculateAndRender() {
   const tier2Candidates = tier2Allocations(tier2Options);
   const hasDealerEffect = name => Object.keys(getNode(name)?.levels || {}).length > 0;
   const tier4Options = allOptions(4).filter(hasDealerEffect);
-  const tier5Options = allOptions(5).filter(name => hasDealerEffect(name) && !(noManaMainSkill && name === '마나 용광로'));
+  const tier5Options = allOptions(5).filter(name => hasDealerEffect(name) && !((noManaMainSkill || manaShortageClass) && name === '마나 용광로'));
 
   const tier4Pairs = [];
   for (let i = 0; i < tier4Options.length; i++) {
@@ -2696,9 +2731,16 @@ function calculateAndRender() {
         for (const fourName of fourNames) next[fourName] = { level: fourLevel, source: 'candidate' };
         next[fiveName] = { level: fiveLevel, source: 'candidate' };
         const calc = statsWithSelection(next);
-        const recValue = Number(calc.result.value || 0);
+        const adjustment = practicalRecommendationFor(fiveName, calc, next);
+        const adjustedValue = Number(adjustment.value);
+        const recValue = Number.isFinite(adjustedValue) ? adjustedValue : Number(calc.result.value || 0);
         candidates.push({
           tier2Entries, fourNames, fourLevel, fiveName, fiveLevel, calc, recValue,
+          expectedValue: Number(calc.result.value || 0),
+          singleHitPenalty: adjustment.singleHitPenalty,
+          critOverPenalty: adjustment.critOverPenalty,
+          critLowPenalty: adjustment.critLowPenalty,
+          manaStabilityBonus: adjustment.manaStabilityBonus,
           diff: ((recValue / baseValue) - 1) * 100
         });
       }
@@ -2709,13 +2751,15 @@ function calculateAndRender() {
   const currentDiffText = `${currentDiff >= 0 ? '+' : ''}${currentDiff.toFixed(2)}%`;
   const apiManaConditionNote = manaConditionNoteText(apiBase);
   const currentManaConditionNote = manaConditionNoteText(current);
-  const apiManaLabel = apiManaConditionNote ? `<small>${escapeHtml(apiManaConditionNote)}</small>` : '';
-  const currentManaLabel = currentManaConditionNote ? `<small>${escapeHtml(currentManaConditionNote)}</small>` : '';
+  const apiPracticalParts = [...practicalAdjustmentParts(apiAdjustment), ...(apiManaConditionNote ? [apiManaConditionNote] : [])];
+  const currentPracticalParts = [...practicalAdjustmentParts(currentAdjustment), ...(currentManaConditionNote ? [currentManaConditionNote] : [])];
+  const apiPracticalLabel = `<small>실전 ${apiAdjustment.value.toFixed(4)}${apiPracticalParts.length ? ` · ${escapeHtml(apiPracticalParts.join(' · '))}` : ''}</small>`;
+  const currentPracticalLabel = `<small>실전 ${currentAdjustment.value.toFixed(4)}${currentPracticalParts.length ? ` · ${escapeHtml(currentPracticalParts.join(' · '))}` : ''}</small>`;
   $('currentScore').innerHTML = `<div class="apiBaselineRow">
-    <div><span>API 원본 기대값</span><b>${apiBaseValue.toFixed(4)}</b>${apiManaLabel}</div>
-    <div><span>현재 화면 선택값</span><b>${currentValue.toFixed(4)}</b>${currentManaLabel}</div>
-    <div><span>현재 대비</span><b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>
-    <p>치명 기대값과 진피·추피·적주피·공증·쿨감 환산을 직접 계산하며, 게임 효과에 없는 별도 추천 보정은 적용하지 않습니다.</p>
+    <div><span>API 기대값</span><b>${apiBaseValue.toFixed(4)}</b>${apiPracticalLabel}</div>
+    <div><span>현재 기대값</span><b>${currentValue.toFixed(4)}</b>${currentPracticalLabel}</div>
+    <div><span>실전값 API 대비</span><b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>
+    <p>기대값은 피해 공식만 계산하고, 실전 추천값은 치적 안정성·단타 주력기·마나 부족 설정을 별도 반영합니다.</p>
   </div>`;
   const apiManaDetail = apiManaConditionNote ? ` · ${escapeHtml(apiManaConditionNote)}` : '';
   $('baseInfo').innerHTML = `<b>API 기준 상세</b><span>치명 ${Math.round(apiBase.stats.critStat || 0)} · 최종치적 ${fmt(apiBase.result.critRate)}% · 치피 ${fmt(apiBase.result.critDamage)}% · 치적주피 ${fmt(apiBase.result.critHitDamage)}% · 진피 ${fmt(apiBase.result.evo)}% · 추피 ${fmt(apiBase.result.additionalDamage)}% · 적주피 ${fmt(apiBase.result.enemyDamage)}% · 공증 ${fmt(apiBase.result.attackPower)}%${apiManaDetail}</span>`;
@@ -2731,10 +2775,11 @@ function calculateAndRender() {
           <div class="tierLine"><span>5T</span><strong class="nodePill">${escapeHtml(c.fiveName)} Lv.${c.fiveLevel}</strong>${candidateTag(c)}</div>
         </div>
         <div class="comboMemo">${escapeHtml(memo)}</div>
+        ${practicalNoteHtml(c)}
       </div>
       <div class="rowMetrics">
-        <div class="rowMetric"><span>기대값</span><b>${c.recValue.toFixed(4)}</b></div>
-        <div class="rowMetric"><span>API 대비</span><b class="${cls}">${pct(c.diff)}</b></div>
+        <div class="rowMetric"><span>실전 추천값</span><b>${c.recValue.toFixed(4)}</b><small>기대값 ${c.expectedValue.toFixed(4)}</small></div>
+        <div class="rowMetric"><span>실전 API 대비</span><b class="${cls}">${pct(c.diff)}</b></div>
         <div class="rowMetric"><span>치적</span><b>${fmt(c.calc.result.critRate)}%</b></div>
       </div>
     </article>`;
@@ -2825,6 +2870,8 @@ $('critSynergyEnabled').addEventListener('change', calculateAndRender);
 $('backAttackEnabled').addEventListener('change', calculateAndRender);
 $('excludeCooldown')?.addEventListener('change', calculateAndRender);
 $('noManaMainSkill')?.addEventListener('change', calculateAndRender);
+$('singleHitMainSkill')?.addEventListener('change', calculateAndRender);
+$('manaShortageClass')?.addEventListener('change', calculateAndRender);
 $('mainSkillDamageShare')?.addEventListener('input', calculateAndRender);
 
 

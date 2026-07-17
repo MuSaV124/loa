@@ -2040,6 +2040,18 @@ select {
   line-height: 1.25;
   white-space: normal;
 }
+.practicalNote {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+  padding: 5px 8px;
+  border: 1px solid rgba(251, 191, 36, .24);
+  border-radius: 6px;
+  background: rgba(120, 53, 15, .18);
+  color: #fde68a;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.35;
+}
 .rowMetric {
   align-self: center;
 }
