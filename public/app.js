@@ -1,7 +1,7 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.50';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.7.50';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.51';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.7.51';
 
-const VERSION = '5.7.50';
+const VERSION = '5.7.51';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -835,6 +835,11 @@ function currentAdvancedHoningLevel(item) {
   const value = Number(item?.advancedHoningLevel);
   return Number.isFinite(value) && value >= 0 ? Math.min(40, Math.floor(value)) : 0;
 }
+function advancedHoningTargetLevel(item) {
+  const current = currentAdvancedHoningLevel(item);
+  if (current >= 40) return 40;
+  return Math.min(40, advancedHoningStageForLevel(current) * 10);
+}
 function isAdvancedHoningCandidate(item) {
   return !item?.advancedHoningExcluded
     && classifyT4GearCostRule(item).key === 'standard'
@@ -1340,7 +1345,8 @@ function calculateNextAdvancedHoningEstimates(snapshot, priceMap) {
     const optionalCosts = advancedHoningOptionalCosts(attemptRow.materials, priceMap);
     const baseMaterials = cloneMaterialsWithoutOptional(attemptRow.materials, optionalCosts.optional);
     const baseCost = calculateMaterialGoldCost(baseMaterials, priceMap);
-    const remainingLevels = Math.max(1, stage * 10 - current);
+    const target = advancedHoningTargetLevel(item);
+    const remainingLevels = Math.max(1, target - current);
     const optimized = optimizeAdvancedHoning({
       stage,
       levels: remainingLevels,
@@ -1352,8 +1358,8 @@ function calculateNextAdvancedHoningEstimates(snapshot, priceMap) {
       startExperience: 0,
       startOrbs: 0
     });
-    const expectedGold = Number(optimized.expectedGoldPerLevel || 0);
-    const powerEstimate = estimateAdvancedHoningPowerDelta(item, snapshot, 1);
+    const expectedGold = Number(optimized.expectedTotalGold || 0);
+    const powerEstimate = estimateAdvancedHoningPowerDelta(item, snapshot, remainingLevels);
     const tempering = current % 10 === 0 ? advancedHoningTemperingMaterial(item) : null;
     const supportLabel = summarizeAdvancedHoningStrategy(optimized.usage);
     return {
@@ -1361,13 +1367,15 @@ function calculateNextAdvancedHoningEstimates(snapshot, priceMap) {
       item,
       available: expectedGold > 0 && powerEstimate.value > 0,
       from: current,
-      to: current + 1,
+      to: target,
       cost: baseCost,
       expectedCost: {
         expectedGold,
-        expectedAttempts: Number(optimized.expectedAttemptsPerLevel || 0),
+        expectedAttempts: Number(optimized.expectedTotalAttempts || 0),
         expectedTotalGold: Number(optimized.expectedTotalGold || 0),
         expectedTotalAttempts: Number(optimized.expectedTotalAttempts || 0),
+        expectedGoldPerLevel: Number(optimized.expectedGoldPerLevel || 0),
+        expectedAttemptsPerLevel: Number(optimized.expectedAttemptsPerLevel || 0),
         remainingLevels,
         stage,
         ancestorOrbGain: optimized.ancestorOrbGain,
@@ -1377,8 +1385,8 @@ function calculateNextAdvancedHoningEstimates(snapshot, priceMap) {
       powerDelta: powerEstimate.value,
       powerEstimate,
       tempering,
-      stepLabel: `상재 ${current} → ${current + 1}`,
-      stepDetail: `상급 재련 ${stage}단계 · 남은 ${remainingLevels}레벨 구간 평균`,
+      stepLabel: `상재 ${current} → ${target}`,
+      stepDetail: `상급 재련 ${stage}단계 · 남은 ${remainingLevels}레벨 전체`,
       reason: '2026년 6월 완화 · 경험치/구슬 0 기준'
     };
   }).filter(Boolean);
@@ -1786,7 +1794,7 @@ function renderSpecEfficiencyTable() {
       const expectedGoldText = expectedGold > 0 ? formatSpecGold(expectedGold) : '-';
       const temperingText = row.tempering ? ` · 담금질 ${row.tempering.name} ${formatNumber(row.tempering.amount)}개` : '';
       const expectedDetailText = expectedGold > 0 && advancedHoningCostText
-        ? `최저가: ${supportLabel} · 구간 평균 ${expectedAttempts.toFixed(2)}회${temperingText}`
+        ? `최저가: ${supportLabel} · 총 기대 ${expectedAttempts.toFixed(2)}회${temperingText}`
         : expectedGold > 0 && marketCostText
         ? `최저가: ${supportLabel} · 거래 ${formatGold(tradeGold)}${fixedGold > 0 ? ` · 페온 ${formatGold(fixedGold)}` : ''}`
         : expectedGold > 0
@@ -1819,7 +1827,7 @@ function renderSpecEfficiencyTable() {
   el.innerHTML = `<div class="specEfficiencyHeader">
     <span>스펙업 목표</span><span>효율</span><span>비용</span><span>비용/효율</span>
   </div>${rows}
-  <p class="powerCostHint">효율은 현재 전투력 대비 상승률(%), 비용/효율은 1% 상승당 기대 골드입니다. 상급 재련은 API에 현재 경험치와 구슬이 없어 0에서 시작하는 남은 담금질 구간 평균을 사용합니다. ${escapeHtml(combatPowerAccuracyHint())}</p>`;
+  <p class="powerCostHint">효율은 현재 전투력 대비 상승률(%), 비용/효율은 1% 상승당 기대 골드입니다. 상급 재련은 현재 단계에서 다음 10단위 완료 지점까지의 총 기대비용을 사용하며, API에 현재 경험치와 구슬이 없어 경험치·구슬 0에서 계산합니다. ${escapeHtml(combatPowerAccuracyHint())}</p>`;
 }
 function renderAdvancedHoningAttemptCostTable() {
   const renderRows = (rows = []) => rows.map(row => {
@@ -1925,9 +1933,10 @@ function renderPowerCostPrep(snapshot) {
     const item = row.item || {};
     const honing = item.honingLevel != null ? `+${item.honingLevel}` : '+?';
     const advancedLevel = currentAdvancedHoningLevel(item);
+    const advancedTarget = advancedHoningTargetLevel(item);
     const advancedText = item.advancedHoningExcluded
       ? ' · 상재 40 계승 완료'
-      : isAdvancedHoningCandidate(item) ? ` · 상재 ${advancedLevel}→${advancedLevel + 1}` : '';
+      : isAdvancedHoningCandidate(item) ? ` · 상재 ${advancedLevel}→${advancedTarget}` : '';
     const materialText = row.materials.length ? row.materials.join(' · ') : '수량표 입력 대기';
     return `<div class="powerCostGearRow">
       <b>${escapeHtml(item.type || '-')}</b>

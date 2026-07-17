@@ -1,4 +1,7 @@
-# Lost Ark Node Recommend Calculator v5.7.50
+# Lost Ark Node Recommend Calculator v5.7.51
+
+## v5.7.51
+- 상급 재련 효율을 1레벨이 아닌 현재 단계에서 다음 10단위 완료 지점까지의 총 기대비용과 총 전투력 상승량으로 계산합니다.
 
 ## v5.7.50
 - 캐릭터 API가 일시적인 네트워크 오류나 429/5xx를 반환하면 검색 요청을 한 번 자동 재시도합니다.
