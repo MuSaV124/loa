@@ -1,7 +1,7 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.51';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.7.51';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.52';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.7.52';
 
-const VERSION = '5.7.51';
+const VERSION = '5.7.52';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1586,46 +1586,42 @@ function gemPowerEstimate(snapshot, currentLevel, nextLevel, count) {
 }
 async function calculateGemSpecEstimates(snapshot) {
   const gems = Array.isArray(snapshot?.gems?.items) ? snapshot.gems.items : [];
-  const counts = new Map();
-  for (const gem of gems) {
-    const level = Number(gem.level || 0);
-    if (level <= 0 || level >= 10) continue;
-    const key = `${gemKindLabel(gem)}:${level + 1}`;
-    counts.set(key, (counts.get(key) || 0) + 1);
-  }
-  if (!counts.size) return [];
+  const candidates = gems.filter(gem => Number(gem.level || 0) > 0 && Number(gem.level || 0) < 10);
+  if (!candidates.length) return [];
   let data = null;
   try { data = await fetchMarketJson(`/api/market-prices?mode=gemList&_=${Date.now()}`); } catch (error) {
     return [{ category: 'gem', item: { type: '보석', name: '보석 시세' }, available: false, reason: error.message || '보석 시세 조회 실패', powerDelta: 0, cost: {}, expectedCost: {} }];
   }
-  return [...counts.entries()].map(([key, count]) => {
-    const [kind, nextLevelText] = key.split(':');
-    const nextLevel = Number(nextLevelText || 0);
-    const currentLevel = nextLevel - 1;
+  return candidates.map(gem => {
+    const kind = gemKindLabel(gem);
+    const currentLevel = Number(gem.level || 0);
+    const nextLevel = currentLevel + 1;
     const row = (data.rows || []).find(item => Number(item.level || 0) === currentLevel);
     const market = kind === '작열' ? row?.cooldown : row?.damage;
-    const buyCount = Number(count || 1) * 2;
+    const buyCount = 2;
     const price = Number(market?.price || 0) * buyCount;
-    const calibration = gemPowerEstimate(snapshot, currentLevel, nextLevel, Number(count || 1));
+    const calibration = gemPowerEstimate(snapshot, currentLevel, nextLevel, 1);
     const perGemDelta = combatPowerFeaturePerUnit('gemAverage') / Math.max(1, gems.length || 11);
-    const powerDelta = calibration?.value || round2(perGemDelta * Number(count || 1));
+    const powerDelta = calibration?.value || round2(perGemDelta);
     const powerEstimate = calibration
       ? calibration
       : { confidence: 'estimated', basis: 'gem average combat-power coefficient model' };
+    const skillName = String(gem.skillName || '').trim();
+    const slotLabel = skillName || `보석 슬롯 ${Number(gem.slot || 0) + 1}`;
     return {
       category: 'gem',
-      item: { type: '보석', name: `${kind} ${nextLevel - 1}→${nextLevel}레벨 ${count}개`, icon: market?.icon || '' },
+      item: { type: '보석', name: `${slotLabel} ${kind} ${currentLevel}→${nextLevel}레벨`, icon: gem.icon || market?.icon || '' },
       available: price > 0 && powerDelta > 0,
-      from: nextLevel - 1,
+      from: currentLevel,
       to: nextLevel,
       cost: specMarketCost(price, 0),
       expectedCost: { expectedGold: price },
       powerDelta,
       powerEstimate,
-      supportLabel: `${kind} ${currentLevel}레벨 최저가 × ${buyCount}개`,
-      stepLabel: `${kind} 보석`,
-      stepDetail: `Lv.${nextLevel - 1} → Lv.${nextLevel}`,
-      reason: price > 0 ? '보석 합성 3개 기준' : '보석 시세 없음'
+      supportLabel: `${kind} ${currentLevel}레벨 최저가 × 2개`,
+      stepLabel: `${slotLabel} ${kind}`,
+      stepDetail: `Lv.${currentLevel} → Lv.${nextLevel}`,
+      reason: price > 0 ? '보유 1개 + 구매 2개 합성 기준' : '보석 시세 없음'
     };
   });
 }

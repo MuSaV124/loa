@@ -1,4 +1,4 @@
-const API_VERSION = '5.7.51';
+const API_VERSION = '5.7.52';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = 60 * 1000;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -257,7 +257,7 @@ function extractGemSnapshot(gemData) {
     const name = stripHtml(gem?.Name || '');
     const slot = Number(gem?.Slot ?? gem?.GemSlot ?? -1);
     const effect = bySlot.get(slot) || null;
-    const effectText = tooltipText(effect?.Tooltip || effect?.Description || effect);
+    const effectText = tooltipText(effect?.Description || effect?.Tooltip || effect);
     const level = firstFiniteNumber([
       gem?.Level,
       matchNumber(name, [/([0-9]+)\s*레벨/]),
@@ -306,7 +306,9 @@ function rawGemItems(gemData) {
 function rawGemEffects(gemData) {
   if (!gemData || Array.isArray(gemData)) return [];
   if (Array.isArray(gemData.Effects)) return gemData.Effects;
+  if (Array.isArray(gemData.Effects?.Skills)) return gemData.Effects.Skills;
   if (Array.isArray(gemData.effects)) return gemData.effects;
+  if (Array.isArray(gemData.effects?.skills)) return gemData.effects.skills;
   return [];
 }
 
