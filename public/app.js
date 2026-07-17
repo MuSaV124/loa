@@ -1,7 +1,7 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.49';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.7.49';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.50';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.7.50';
 
-const VERSION = '5.7.49';
+const VERSION = '5.7.50';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -225,6 +225,9 @@ let t4MaterialPriceCache = null;
 let t4MaterialPriceInflight = null;
 let crystalPriceCache = null;
 let crystalPriceInflight = null;
+const marketResponseCache = new Map();
+const marketRequestInflight = new Map();
+const MARKET_CLIENT_CACHE_TTL_MS = 60 * 1000;
 
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
 function escapeRegExp(v) { return String(v || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -2953,6 +2956,29 @@ function updateAdrenalineReplacementVisibility() {
   wrap.classList.toggle('hidden', !needsReplacement);
 }
 
+async function requestCharacterData(name, maxAttempts = 2) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const res = await fetch(`/api/character?name=${encodeURIComponent(name)}&_=${Date.now()}`, { cache: 'no-store' });
+      const body = await res.text();
+      let data = null;
+      try { data = body ? JSON.parse(body) : null; } catch {}
+      if (res.ok && data?.ok) return data;
+
+      const error = new Error(data?.error || data?.message || `캐릭터 검색 서버 오류 (${res.status})`);
+      error.retryable = !data || res.status === 429 || res.status >= 500;
+      throw error;
+    } catch (error) {
+      lastError = error;
+      const retryable = error?.retryable || error instanceof TypeError;
+      if (!retryable || attempt >= maxAttempts) throw error;
+      await new Promise(resolve => setTimeout(resolve, 800 * attempt));
+    }
+  }
+  throw lastError || new Error('검색 실패');
+}
+
 async function searchCharacter(name) {
   const button = $('searchButton');
   button.disabled = true; button.textContent = '검색...'; setMessage('');
@@ -2974,9 +3000,7 @@ async function searchCharacter(name) {
   simulatorRendered = false;
   document.body.classList.remove('simulatorMode');
   try {
-    const res = await fetch(`/api/character?name=${encodeURIComponent(name)}&_=${Date.now()}`, { cache: 'no-store' });
-    const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.error || data.message || '검색 실패');
+    const data = await requestCharacterData(name);
     if (!data.profile?.CharacterName) throw new Error('캐릭터 프로필을 가져오지 못했습니다.');
     state.accessory = data.accessoryEffects || { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
     state.bracelet = data.braceletEffects || { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
@@ -3444,19 +3468,42 @@ function shouldForceRefreshMaterialPrices(data) {
   return importantMissing || missingCount >= Math.max(3, Math.ceil(items.length * 0.25));
 }
 
+function marketRequestKey(url) {
+  const parsed = new URL(url, window.location.origin);
+  parsed.searchParams.delete('_');
+  parsed.searchParams.sort();
+  return `${parsed.pathname}?${parsed.searchParams.toString()}`;
+}
+
 async function fetchMarketJson(url) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 75000);
+  const key = marketRequestKey(url);
+  const force = new URL(url, window.location.origin).searchParams.get('force') === '1';
+  const cached = marketResponseCache.get(key);
+  if (!force && cached?.expiresAt > Date.now()) return cached.data;
+  if (marketRequestInflight.has(key)) return marketRequestInflight.get(key);
+
+  const request = (async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 75000);
+    try {
+      const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+      const data = await readJsonSafely(res);
+      if (!res.ok || !data?.ok) throw new Error(data?.error || data?.message || '시세 조회 실패');
+      if (!force) marketResponseCache.set(key, { data, expiresAt: Date.now() + MARKET_CLIENT_CACHE_TTL_MS });
+      return data;
+    } catch (error) {
+      if (error?.name === 'AbortError') throw new Error('조회 시간이 초과되었습니다. 잠시 뒤 다시 누르면 서버 캐시 또는 다음 조회에서 더 빨리 응답할 수 있습니다.');
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  })();
+
+  marketRequestInflight.set(key, request);
   try {
-    const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
-    const data = await readJsonSafely(res);
-    if (!res.ok || !data?.ok) throw new Error(data?.error || data?.message || '시세 조회 실패');
-    return data;
-  } catch (error) {
-    if (error?.name === 'AbortError') throw new Error('조회 시간이 초과되었습니다. 잠시 뒤 다시 누르면 서버 캐시 또는 다음 조회에서 더 빨리 응답할 수 있습니다.');
-    throw error;
+    return await request;
   } finally {
-    clearTimeout(timeout);
+    if (marketRequestInflight.get(key) === request) marketRequestInflight.delete(key);
   }
 }
 
