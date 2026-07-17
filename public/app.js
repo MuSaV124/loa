@@ -1,6 +1,6 @@
-import { calculateBluntSpike, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.45';
+import { calculateBluntSpike, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.46';
 
-const VERSION = '5.7.45';
+const VERSION = '5.7.46';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2571,9 +2571,6 @@ function renderKeenEfficiency(current) {
   const crit = Math.max(0, Math.min(100, Number(current?.result?.effectiveCritRate ?? current?.result?.critRate ?? 0)));
   el.innerHTML = `<div class="keenNote">계산 기준: 실제 치적 ${crit.toFixed(2)}% / 치피 ${Number(current?.result?.critDamage || 0).toFixed(2)}%</div>${rows}`;
 }
-function currentTierNames(tier) {
-  return selectedEntries().filter(row => Number(row.tier) === Number(tier)).map(row => row.name);
-}
 function shortNodeName(name) {
   const map = {
     '끝없는 마나': '끝마',
@@ -2602,11 +2599,9 @@ function manaConditionNoteText(calc) {
   const text = [...new Set(notes.map(x => x.note).filter(Boolean))].join(' · ');
   return text;
 }
-function candidateMemo(fourNames, fiveName, calc) {
-  const current4 = currentTierNames(4);
-  const current5 = currentTierNames(5).join(' + ') || '-';
+function candidateMemo(tier2Entries, fourNames, fiveName, calc) {
   const bits = [];
-  if (sameNameSet(fourNames, current4) && fiveName === current5) bits.push('현재 조합');
+  if (hasSameTier245(state.selected, tier2Entries, fourNames, fiveName)) bits.push('현재 조합');
   else bits.push(`${tier4PairLabel(fourNames)} / ${fiveName}`);
   if (calc?.result?.convertedEvolutionDamage > 0) bits.push(`뭉가 전환 ${fmt(calc.result.convertedEvolutionDamage)}%(기본 포함 총 ${fmt(calc.result.convertedEvolutionDamage + 15)}%)`);
   if (Boolean($('excludeCooldown')?.checked) && (calc?.result?.cooldownReduction || 0) === 0) bits.push('쿨감 제외');
@@ -2728,7 +2723,7 @@ function calculateAndRender() {
   $('baseInfo').innerHTML = `<b>API 기준 상세</b><span>치명 ${Math.round(apiBase.stats.critStat || 0)} · 최종치적 ${fmt(apiBase.result.critRate)}% · 치피 ${fmt(apiBase.result.critDamage)}% · 치적주피 ${fmt(apiBase.result.critHitDamage)}% · 진피 ${fmt(apiBase.result.evo)}% · 추피 ${fmt(apiBase.result.additionalDamage)}% · 적주피 ${fmt(apiBase.result.enemyDamage)}% · 공증 ${fmt(apiBase.result.attackPower)}%${apiManaDetail}</span>`;
   $('recommendList').innerHTML = top.length ? `<div class="comboRows">${top.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
-    const memo = candidateMemo(c.fourNames, c.fiveName, c.calc);
+    const memo = candidateMemo(c.tier2Entries, c.fourNames, c.fiveName, c.calc);
     return `<article class="comboRow ${i === 0 ? 'best' : ''}">
       <div class="rankBadge">${i + 1}</div>
       <div class="rowBuild">

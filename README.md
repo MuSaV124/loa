@@ -1,4 +1,7 @@
-# Lost Ark Node Recommend Calculator v5.7.45
+# Lost Ark Node Recommend Calculator v5.7.46
+
+## v5.7.46
+- 2/4/5티어가 모두 현재 선택과 같을 때만 추천표에 `현재 조합`을 표시합니다.
 
 ## v5.7.45
 - 2/4/5티어 추천에서 치적 95% 고정 감점, 초과 치적 감점, 단타 및 마나 안정성 임의 보정을 제거하고 실제 기대값으로만 정렬합니다.
