@@ -1,6 +1,7 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.48';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.49';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.7.49';
 
-const VERSION = '5.7.48';
+const VERSION = '5.7.49';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -53,7 +54,13 @@ const T4_GEAR_COST_RULES = {
   }
 };
 const T4_SHARED_COST_MATERIALS = ['운명의 파편 주머니(대)', '빙하의 숨결', '용암의 숨결'];
-const BOUND_ONLY_MATERIALS = new Set(['고통의 가시']);
+const BOUND_ONLY_MATERIALS = new Set(['고통의 가시', '아그리스의 비늘', '낙뢰의 뿔']);
+const T4_ADVANCED_HONING_TEMPERING_COSTS = {
+  1: { weapon: { name: '아그리스의 비늘', amount: 60 }, armor: { name: '아그리스의 비늘', amount: 24 } },
+  2: { weapon: { name: '아그리스의 비늘', amount: 60 }, armor: { name: '아그리스의 비늘', amount: 24 } },
+  3: { weapon: { name: '낙뢰의 뿔', amount: 120 }, armor: { name: '낙뢰의 뿔', amount: 48 } },
+  4: { weapon: { name: '낙뢰의 뿔', amount: 120 }, armor: { name: '낙뢰의 뿔', amount: 48 } }
+};
 const T4_ADVANCED_HONING_ATTEMPT_COSTS = {
   armor: [
     { stage: 1, materials: { '운명의 수호석': 150, '운명의 돌파석': 4, '아비도스 융화제': 5, '운명의 파편': 300, '골드': 475, '빙하의 숨결': 4, '장인의 재봉술 : 1단계': 1 } },
@@ -821,11 +828,44 @@ function isWeaponGear(item) {
 function isLimitBreakGrowth(item, rule) {
   return rule?.key === 'upperAncient' && Number(item?.honingLevel || 0) === 20;
 }
+function currentAdvancedHoningLevel(item) {
+  const value = Number(item?.advancedHoningLevel);
+  return Number.isFinite(value) && value >= 0 ? Math.min(40, Math.floor(value)) : 0;
+}
+function isAdvancedHoningCandidate(item) {
+  return !item?.advancedHoningExcluded
+    && classifyT4GearCostRule(item).key === 'standard'
+    && currentAdvancedHoningLevel(item) < 40;
+}
+function advancedHoningAttemptRowForGear(item) {
+  if (!isAdvancedHoningCandidate(item)) return null;
+  const slot = isWeaponGear(item) ? 'weapon' : 'armor';
+  const level = currentAdvancedHoningLevel(item);
+  const stage = advancedHoningStageForLevel(level);
+  return (T4_ADVANCED_HONING_ATTEMPT_COSTS[slot] || []).find(row => Number(row.stage) === stage) || null;
+}
+function advancedHoningTemperingMaterial(item) {
+  if (!isAdvancedHoningCandidate(item)) return null;
+  const stage = advancedHoningStageForLevel(currentAdvancedHoningLevel(item));
+  const slot = isWeaponGear(item) ? 'weapon' : 'armor';
+  return T4_ADVANCED_HONING_TEMPERING_COSTS[stage]?.[slot] || null;
+}
 function costMaterialNamesForGear(item) {
   const rule = classifyT4GearCostRule(item);
   const slot = isWeaponGear(item) ? 'weapon' : 'armor';
   if (isLimitBreakGrowth(item, rule)) return [...(rule.limitBreakMaterials || [])];
-  const names = [...T4_SHARED_COST_MATERIALS, rule.stone?.[slot], rule.leapstone, rule.fusion, ...(rule.books?.[slot] || [])];
+  const advancedRow = advancedHoningAttemptRowForGear(item);
+  const advancedNames = Object.keys(advancedRow?.materials || {}).filter(name => name !== '골드' && name !== '실링');
+  const tempering = advancedHoningTemperingMaterial(item);
+  const names = [
+    ...T4_SHARED_COST_MATERIALS,
+    rule.stone?.[slot],
+    rule.leapstone,
+    rule.fusion,
+    ...(rule.books?.[slot] || []),
+    ...advancedNames,
+    tempering?.name
+  ];
   return [...new Set(names.filter(Boolean))];
 }
 function buildT4CostPrep(snapshot) {
@@ -1253,6 +1293,93 @@ function calculateNextNormalRefineEstimates(snapshot, priceMap) {
     return { item, available: true, ...next, cost, expectedCost, supportStrategy: optimized?.strategy || null, supportLabel: optimized?.label || '보조재료 없음', powerDelta: powerEstimate.value, powerEstimate };
   });
 }
+function estimateAdvancedHoningPowerDelta(item, snapshot, levels = 1) {
+  const advanced = state.combatPowerModel?.upgradeDelta?.advancedHoning || {};
+  const official = snapshotOfficialCombatPower(snapshot);
+  const slot = powerGearSlot(item);
+  const group = slot === 'weapon' ? 'weapon' : 'armor';
+  const percentPerLevel = Number(advanced.percentBySlot?.[slot] ?? advanced[`${group}Percent`] ?? 0);
+  const count = Math.max(1, Number(levels || 1));
+  if (!(official > 0) || !(percentPerLevel > 0)) {
+    return { value: 0, percent: 0, confidence: 'unverified', basis: '상급 재련 전투력 변화량 표본 부족' };
+  }
+  const percent = (Math.pow(1 + percentPerLevel / 100, count) - 1) * 100;
+  return {
+    value: round2(official * percent / 100),
+    percent: round2(percent),
+    confidence: advanced.confidence || 'estimated',
+    basis: advanced.basis || '상급 재련 1레벨당 현재 공식 전투력 비율 추정'
+  };
+}
+function advancedHoningOptionalCosts(materials, priceMap) {
+  const optional = normalHoningOptionalNames(materials);
+  const breathAmount = Number(optional.breathName ? materials?.[optional.breathName] : 0) || 0;
+  const bookAmount = Number(optional.bookName ? materials?.[optional.bookName] : 0) || 0;
+  const breathCost = optional.breathName ? calculateMaterialGoldCost({ [optional.breathName]: breathAmount }, priceMap) : { totalGold: 0, rows: [] };
+  const bookCost = optional.bookName ? calculateMaterialGoldCost({ [optional.bookName]: bookAmount }, priceMap) : { totalGold: 0, rows: [] };
+  return {
+    optional,
+    breathAmount,
+    bookAmount,
+    breathGold: Number(breathCost.totalGold || 0),
+    bookGold: Number(bookCost.totalGold || 0),
+    allowBreath: Boolean(optional.breathName) && !(breathCost.rows || []).some(row => row.missingPrice),
+    allowBook: Boolean(optional.bookName) && !(bookCost.rows || []).some(row => row.missingPrice)
+  };
+}
+function calculateNextAdvancedHoningEstimates(snapshot, priceMap) {
+  const combat = snapshot?.equipment?.combat || [];
+  return combat.filter(isAdvancedHoningCandidate).map(item => {
+    const current = currentAdvancedHoningLevel(item);
+    const stage = advancedHoningStageForLevel(current);
+    const attemptRow = advancedHoningAttemptRowForGear(item);
+    if (!attemptRow) return null;
+    const optionalCosts = advancedHoningOptionalCosts(attemptRow.materials, priceMap);
+    const baseMaterials = cloneMaterialsWithoutOptional(attemptRow.materials, optionalCosts.optional);
+    const baseCost = calculateMaterialGoldCost(baseMaterials, priceMap);
+    const remainingLevels = Math.max(1, stage * 10 - current);
+    const optimized = optimizeAdvancedHoning({
+      stage,
+      levels: remainingLevels,
+      baseGold: baseCost.totalGold,
+      breathGold: optionalCosts.breathGold,
+      bookGold: optionalCosts.bookGold,
+      allowBreath: optionalCosts.allowBreath,
+      allowBook: optionalCosts.allowBook,
+      startExperience: 0,
+      startOrbs: 0
+    });
+    const expectedGold = Number(optimized.expectedGoldPerLevel || 0);
+    const powerEstimate = estimateAdvancedHoningPowerDelta(item, snapshot, 1);
+    const tempering = current % 10 === 0 ? advancedHoningTemperingMaterial(item) : null;
+    const supportLabel = summarizeAdvancedHoningStrategy(optimized.usage);
+    return {
+      category: 'advancedHoning',
+      item,
+      available: expectedGold > 0 && powerEstimate.value > 0,
+      from: current,
+      to: current + 1,
+      cost: baseCost,
+      expectedCost: {
+        expectedGold,
+        expectedAttempts: Number(optimized.expectedAttemptsPerLevel || 0),
+        expectedTotalGold: Number(optimized.expectedTotalGold || 0),
+        expectedTotalAttempts: Number(optimized.expectedTotalAttempts || 0),
+        remainingLevels,
+        stage,
+        ancestorOrbGain: optimized.ancestorOrbGain,
+        basis: '2026-06-24 선조 구슬 2개 및 선택재료 상태별 최저 기대 비용'
+      },
+      supportLabel,
+      powerDelta: powerEstimate.value,
+      powerEstimate,
+      tempering,
+      stepLabel: `상재 ${current} → ${current + 1}`,
+      stepDetail: `상급 재련 ${stage}단계 · 남은 ${remainingLevels}레벨 구간 평균`,
+      reason: '2026년 6월 완화 · 경험치/구슬 0 기준'
+    };
+  }).filter(Boolean);
+}
 const SPEC_ACCESSORY_CANDIDATES = [
   { part: 'necklace', label: '목걸이', combo: 'highHigh', comboLabel: '상상', gradePair: ['상', '상'], gradeKeys: ['enemyDamage', 'additionalDamage'], effects: { enemyDamage: 2.0, additionalDamage: 2.6 } },
   { part: 'necklace', label: '목걸이', combo: 'highMid', comboLabel: '상중', gradePair: ['상', '중'], gradeKeys: ['enemyDamage', 'additionalDamage'], effects: { enemyDamage: 2.0, additionalDamage: 1.6 } },
@@ -1535,13 +1662,15 @@ async function calculateMarketSpecEstimates(snapshot) {
 }
 async function storePowerCostEstimates(priceMap) {
   const honingRows = calculateNextNormalRefineEstimates(state.powerSnapshot, priceMap);
-  state.powerCostEstimates = honingRows;
+  const advancedHoningRows = calculateNextAdvancedHoningEstimates(state.powerSnapshot, priceMap);
+  const gearRows = [...honingRows, ...advancedHoningRows];
+  state.powerCostEstimates = gearRows;
   renderSpecEfficiencyTable();
   try {
     const marketRows = await calculateMarketSpecEstimates(state.powerSnapshot);
-    state.powerCostEstimates = [...honingRows, ...marketRows];
+    state.powerCostEstimates = [...gearRows, ...marketRows];
   } catch {
-    state.powerCostEstimates = honingRows;
+    state.powerCostEstimates = gearRows;
   }
   renderSpecEfficiencyTable();
   return state.powerCostEstimates;
@@ -1549,7 +1678,7 @@ async function storePowerCostEstimates(priceMap) {
 function renderSpecEfficiencyShell() {
   return `<div class="powerSnapshotBlock powerEfficiencyPanel">
     <div class="powerCostHead">
-      <div><h3>전투력 변화량 효율표</h3><p>시세탭 재료 가격과 실패 누적 확률 증가, 장기백 상한을 반영해 성공 1회 기대 비용 기준으로 정렬합니다.</p></div>
+      <div><h3>전투력 변화량 효율표</h3><p>일반 재련은 장기백, 상급 재련은 선조의 가호·강화 선조의 가호와 선택재료 최저 기대 비용을 반영합니다.</p></div>
       <strong>전투력 대비 사용 골드</strong>
     </div>
     <div id="specEfficiencyTable" class="specEfficiencyTable">
@@ -1586,6 +1715,12 @@ function specEfficiencyReason(row) {
     if (confidence === 'verified') return `${reason} · 검증 전투력`;
     if (confidence === 'class-estimated') return `${reason} · 직업별 추정 전투력`;
     return `${reason} · 추정 전투력`;
+  }
+  if (row?.category === 'advancedHoning') {
+    if (!row?.available) return row.reason || '상급 재련 비용 또는 전투력 변화량 미확인';
+    const missing = (row.cost?.rows || []).filter(item => item.missingPrice).map(item => item.name);
+    if (missing.length) return `시세 없음: ${missing.slice(0, 2).join(', ')}${missing.length > 2 ? ' 외' : ''}`;
+    return `${row.reason || '2026년 6월 완화'} · 추정 전투력`;
   }
   if (row?.available && !Number(row.expectedCost?.ratePercent || 0)) return '강화 확률 미확인';
   if (!row?.available) return row.reason || '비용표 없음';
@@ -1643,9 +1778,13 @@ function renderSpecEfficiencyTable() {
       const efficiencyPercent = specEfficiencyPercent(row);
       const efficiencyText = row.available && efficiencyPercent > 0 ? `${efficiencyPercent.toFixed(3)}%` : '-';
       const scoreText = row.available && expectedGold > 0 && efficiencyPercent > 0 ? formatSpecGold(expectedGold / efficiencyPercent) : '-';
-      const marketCostText = row.category && row.category !== 'honing';
+      const marketCostText = ['accessory', 'gem', 'engraving'].includes(row.category);
+      const advancedHoningCostText = row.category === 'advancedHoning';
       const expectedGoldText = expectedGold > 0 ? formatSpecGold(expectedGold) : '-';
-      const expectedDetailText = expectedGold > 0 && marketCostText
+      const temperingText = row.tempering ? ` · 담금질 ${row.tempering.name} ${formatNumber(row.tempering.amount)}개` : '';
+      const expectedDetailText = expectedGold > 0 && advancedHoningCostText
+        ? `최저가: ${supportLabel} · 구간 평균 ${expectedAttempts.toFixed(2)}회${temperingText}`
+        : expectedGold > 0 && marketCostText
         ? `최저가: ${supportLabel} · 거래 ${formatGold(tradeGold)}${fixedGold > 0 ? ` · 페온 ${formatGold(fixedGold)}` : ''}`
         : expectedGold > 0
         ? `최저가: ${supportLabel} · 평균 ${formatGold(expectedGold)} · 장기백 ${formatGold((expected.pityAttempts || 0) * totalGold)}`
@@ -1677,7 +1816,7 @@ function renderSpecEfficiencyTable() {
   el.innerHTML = `<div class="specEfficiencyHeader">
     <span>스펙업 목표</span><span>효율</span><span>비용</span><span>비용/효율</span>
   </div>${rows}
-  <p class="powerCostHint">효율은 현재 전투력 대비 상승률(%), 비용/효율은 1% 상승당 기대 골드로 계산합니다. ${escapeHtml(combatPowerAccuracyHint())}</p>`;
+  <p class="powerCostHint">효율은 현재 전투력 대비 상승률(%), 비용/효율은 1% 상승당 기대 골드입니다. 상급 재련은 API에 현재 경험치와 구슬이 없어 0에서 시작하는 남은 담금질 구간 평균을 사용합니다. ${escapeHtml(combatPowerAccuracyHint())}</p>`;
 }
 function renderAdvancedHoningAttemptCostTable() {
   const renderRows = (rows = []) => rows.map(row => {
@@ -1693,7 +1832,7 @@ function renderAdvancedHoningAttemptCostTable() {
     </div>`;
   }).join('');
   return `<div class="advancedHoningCostTable">
-    <div class="powerBuildHeader"><b>상급 재련 1회 재료</b><span>제보 이미지 기준 · 1~4단계</span></div>
+    <div class="powerBuildHeader"><b>상급 재련 1회 재료</b><span>2026-06-24 완화 기준 · 1~4단계</span></div>
     <div class="advancedHoningColumns">
       <section>
         <h4>방어구</h4>
@@ -1704,7 +1843,7 @@ function renderAdvancedHoningAttemptCostTable() {
         ${renderRows(T4_ADVANCED_HONING_ATTEMPT_COSTS.weapon)}
       </section>
     </div>
-    <p class="powerCostHint">운명의 파편은 주머니 단가를 1개당 가격으로 환산해 비용 계산에 연결할 예정입니다. 선조의 가호는 재료가 아니라 상급 재련 기대값 보정으로 따로 계산합니다.</p>
+    <p class="powerCostHint">운명의 파편은 가장 싼 주머니 단가로 환산하며, 선조의 가호와 3단계 이상 강화 선조의 가호까지 상태별 최저 기대 비용으로 계산합니다.</p>
   </div>`;
 }
 function renderNormalGearGrowthCostTable() {
@@ -1782,10 +1921,14 @@ function renderPowerCostPrep(snapshot) {
   const gearRows = prep.gear.map(row => {
     const item = row.item || {};
     const honing = item.honingLevel != null ? `+${item.honingLevel}` : '+?';
+    const advancedLevel = currentAdvancedHoningLevel(item);
+    const advancedText = item.advancedHoningExcluded
+      ? ' · 상재 40 계승 완료'
+      : isAdvancedHoningCandidate(item) ? ` · 상재 ${advancedLevel}→${advancedLevel + 1}` : '';
     const materialText = row.materials.length ? row.materials.join(' · ') : '수량표 입력 대기';
     return `<div class="powerCostGearRow">
       <b>${escapeHtml(item.type || '-')}</b>
-      <span>${escapeHtml(row.rule.label)} · ${escapeHtml(honing)} · ${escapeHtml(row.growthLabel)}</span>
+      <span>${escapeHtml(row.rule.label)} · ${escapeHtml(honing)} · ${escapeHtml(row.growthLabel)}${escapeHtml(advancedText)}</span>
       <small>${escapeHtml(materialText)}</small>
     </div>`;
   }).join('');
@@ -1795,11 +1938,11 @@ function renderPowerCostPrep(snapshot) {
   </label>`).join('');
   const boundRows = prep.boundMaterialNames.map(name => `<div class="powerCostMaterial boundOnly">
     <input type="checkbox" checked disabled />
-    <span><b>${escapeHtml(name)}</b><small>그림자 레이드 세르카 귀속 재료 · 골드 비용 0</small></span>
+    <span><b>${escapeHtml(name)}</b><small>${name === '고통의 가시' ? '그림자 레이드 세르카' : '상급 재련 담금질'} 귀속 재료 · 골드 비용 0</small></span>
   </div>`).join('');
   return `<div class="powerSnapshotBlock powerCostPrep">
     <div class="powerCostHead">
-      <div><h3>T4 비용 계산 준비</h3><p>강화 골드와 실링, 장비성장/한계돌파 실링, 재료 시세를 분리해서 계산하도록 준비했습니다.</p></div>
+      <div><h3>T4 비용 계산</h3><p>일반 재련과 상급 재련의 거래 재료·귀속 재료·고정 골드를 나눠 기대 비용을 계산합니다.</p></div>
       <strong>시세 계산 연결</strong>
     </div>
     <div class="powerPheonPanel">
@@ -1985,7 +2128,7 @@ function renderPowerSnapshot(snapshot) {
       ${renderPowerCostPrep(snapshot)}
       ${renderSpecEfficiencyShell()}
     </div>
-    <p class="powerSnapshotNote">이 카드는 전투력 계산식 투입 전 검증용입니다. 강화/상급재련은 API Tooltip 문구 기반이라 실제 캐릭터 샘플로 오차를 확인해야 합니다.</p>
+    <p class="powerSnapshotNote">일반/상급 재련 단계는 공식 API Tooltip에서 읽습니다. 상급 재련 전투력 상승량은 공개 산식이 없어 현재 공식 전투력 비율 기반 추정값으로 표시합니다.</p>
   `;
   hydratePowerCostMaterialPrices();
   hydrateCrystalPrice();

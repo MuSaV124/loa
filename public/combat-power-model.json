@@ -414,9 +414,19 @@
       "basis": "Percent fallback from current official CombatPower. Used only until before/after upgrade deltaPercent samples are verified."
     },
     "advancedHoning": {
-      "weaponPercent": 0.18,
-      "armorPercent": 0.06,
-      "basis": "Percent placeholder until enough before/after advanced honing samples are collected."
+      "weaponPercent": 0.369012,
+      "armorPercent": 0.06431,
+      "percentBySlot": {
+        "weapon": 0.369012,
+        "head": 0.065208,
+        "top": 0.052277,
+        "bottom": 0.056456,
+        "gloves": 0.078224,
+        "shoulder": 0.069383
+      },
+      "confidence": "estimated",
+      "coverage": "all-classes-current-official-combat-power-ratio",
+      "basis": "Slot-specific geometric percent per level calibrated from Loaup advanced honing 20-to-30 CombatPower deltas; still estimated because the official formula is unpublished."
     }
   }
 }

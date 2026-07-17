@@ -2924,6 +2924,13 @@ body:not(.calculatorReady):not(.marketMode) #keenPanel {
   .specEfficiencyTarget {
     grid-template-columns: 44px minmax(0, 1fr);
   }
+  .specEfficiencyTarget span,
+  .specEfficiencyDetail {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    line-height: 1.45;
+  }
 }
 body:not(.calculatorReady):not(.marketMode) .wrap {
   grid-template-columns: 1fr;

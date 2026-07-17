@@ -1,4 +1,4 @@
-const API_VERSION = '5.7.48';
+const API_VERSION = '5.7.49';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 
