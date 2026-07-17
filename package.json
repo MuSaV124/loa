@@ -1,11 +1,12 @@
 {
   "name": "lostark-node-recommend-calculator",
-  "version": "5.7.44",
+  "version": "5.7.45",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vercel dev",
-    "generate:inven": "node scripts/generate-inven-db.js"
+    "generate:inven": "node scripts/generate-inven-db.js",
+    "test:evolution": "node scripts/test-evolution-math.mjs"
   },
   "dependencies": {
     "cheerio": "^1.0.0"

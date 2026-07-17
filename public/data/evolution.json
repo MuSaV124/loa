@@ -1,8 +1,8 @@
 {
   "meta": {
-    "version": "3.4.0",
+    "version": "3.5.0",
     "source": "Lost Ark Ark Passive Evolution nodes",
-    "note": "진화 노드 전체 효과 정리: 치적/치피/진피/추피/적주피 및 뭉가/음속돌파 계산 반영."
+    "note": "진화 노드 전체 효과 정리: 치적/치피/진피/추피/적주피 및 뭉가/음속돌파 상한 계산 반영."
   },
   "group": "진화",
   "tiers": {
@@ -959,7 +959,7 @@
       "maxLevel": 2,
       "costPerLevel": 15,
       "icon": "💎",
-      "description": "공이속 조건을 만족한다고 가정한 최대 진화형 피해",
+      "description": "현재 공속/이속 증가량과 상한 초과분으로 진화형 피해 계산(최대 12%/24%)",
       "levels": {
         "1": {
           "sonicBreak": {
