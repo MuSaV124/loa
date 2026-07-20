@@ -1,8 +1,8 @@
 {
-  "version": "combat-power-delta-v2",
+  "version": "combat-power-delta-v3",
   "mode": "upgrade-delta",
   "fit": "non-negative-ridge",
-  "generatedAt": "2026-07-17T00:00:00.000Z",
+  "generatedAt": "2026-07-20T00:00:00.000Z",
   "training": {
     "input": 211,
     "rows": 180,
@@ -32,8 +32,8 @@
   },
   "validation": {
     "referenceCharacter": "무사브",
-    "officialCombatPower": 5376.19,
-    "lopecBaseline": 5376.19,
+    "officialCombatPower": 5412.97,
+    "lopecBaseline": 5412.97,
     "baselineError": 0,
     "accessory": {
       "samples": 5,
@@ -49,7 +49,10 @@
       "stepsPerName": 4
     },
     "honing": {
-      "verifiedRows": 6
+      "verifiedRows": 6,
+      "classSpecSamples": 30,
+      "sampledTransition": "head:24:25",
+      "sampledAt": "2026-07-20"
     }
   },
   "externalSpecUpCalibrations": {
@@ -78,37 +81,37 @@
         "percent": 0.749292,
         "referenceAverage": 8,
         "slopePerAverageLevel": 0,
-        "confidence": "verified"
+        "confidence": "estimated"
       },
       "dealer:7:8": {
         "percent": 0.790964,
         "referenceAverage": 8.090909,
         "slopePerAverageLevel": 0,
-        "confidence": "verified"
+        "confidence": "estimated"
       },
       "dealer:8:9": {
         "percent": 0.786803,
         "referenceAverage": 8.181818,
         "slopePerAverageLevel": -0.003446,
-        "confidence": "verified"
+        "confidence": "estimated"
       },
       "dealer:9:10": {
         "percent": 0.783059,
         "referenceAverage": 8.272727,
         "slopePerAverageLevel": -0.003557,
-        "confidence": "verified"
+        "confidence": "estimated"
       },
       "support:8:9": {
         "percent": 1.205008,
         "referenceAverage": 8.181818,
         "slopePerAverageLevel": 0,
-        "confidence": "verified"
+        "confidence": "estimated"
       },
       "support:9:10": {
         "percent": 1.193868,
         "referenceAverage": 8.272727,
         "slopePerAverageLevel": 0,
-        "confidence": "verified"
+        "confidence": "estimated"
       }
     },
     "engraving": {
@@ -380,36 +383,284 @@
       "percentBySlotLevel": {
         "weapon:23:24": {
           "percent": 1.241214,
-          "confidence": "verified",
+          "confidence": "reference-verified",
+          "scope": {
+            "referenceCharacter": "무사브",
+            "className": "브레이커",
+            "secondClass": "수라의 길",
+            "arkGridSignature": "그림자 주먹:고대:17|수라결:고대:18|수라:유물:20|현란한 공격:유물:18|불타는 일격:유물:17|무기:고대:17"
+          },
           "basis": "Lopec before-after official CombatPower; Loaup rounded value cross-check"
         },
         "head:20:21": {
           "percent": 0.222648,
-          "confidence": "verified",
+          "confidence": "reference-verified",
+          "scope": {
+            "referenceCharacter": "무사브",
+            "className": "브레이커",
+            "secondClass": "수라의 길",
+            "arkGridSignature": "그림자 주먹:고대:17|수라결:고대:18|수라:유물:20|현란한 공격:유물:18|불타는 일격:유물:17|무기:고대:17"
+          },
           "basis": "Lopec before-after official CombatPower; Loaup rounded value cross-check"
         },
         "top:20:21": {
           "percent": 0.178007,
-          "confidence": "verified",
+          "confidence": "reference-verified",
+          "scope": {
+            "referenceCharacter": "무사브",
+            "className": "브레이커",
+            "secondClass": "수라의 길",
+            "arkGridSignature": "그림자 주먹:고대:17|수라결:고대:18|수라:유물:20|현란한 공격:유물:18|불타는 일격:유물:17|무기:고대:17"
+          },
           "basis": "Lopec before-after official CombatPower; Loaup rounded value cross-check"
         },
         "bottom:20:21": {
           "percent": 0.19233,
-          "confidence": "verified",
+          "confidence": "reference-verified",
+          "scope": {
+            "referenceCharacter": "무사브",
+            "className": "브레이커",
+            "secondClass": "수라의 길",
+            "arkGridSignature": "그림자 주먹:고대:17|수라결:고대:18|수라:유물:20|현란한 공격:유물:18|불타는 일격:유물:17|무기:고대:17"
+          },
           "basis": "Lopec before-after official CombatPower; Loaup rounded value cross-check"
         },
         "gloves:21:22": {
           "percent": 0.273614,
-          "confidence": "verified",
+          "confidence": "reference-verified",
+          "scope": {
+            "referenceCharacter": "무사브",
+            "className": "브레이커",
+            "secondClass": "수라의 길",
+            "arkGridSignature": "그림자 주먹:고대:17|수라결:고대:18|수라:유물:20|현란한 공격:유물:18|불타는 일격:유물:17|무기:고대:17"
+          },
           "basis": "Lopec before-after official CombatPower; Loaup rounded value cross-check"
         },
         "shoulder:20:21": {
           "percent": 0.236971,
-          "confidence": "verified",
+          "confidence": "reference-verified",
+          "scope": {
+            "referenceCharacter": "무사브",
+            "className": "브레이커",
+            "secondClass": "수라의 길",
+            "arkGridSignature": "그림자 주먹:고대:17|수라결:고대:18|수라:유물:20|현란한 공격:유물:18|불타는 일격:유물:17|무기:고대:17"
+          },
           "basis": "Lopec before-after official CombatPower; Loaup rounded value cross-check"
         }
       },
-      "coverage": "all-loawa-rank-classes",
+      "percentByClassSpecSlotLevel": {
+        "디스트로이어||분노의 망치||head:24:25": {
+          "percent": 0.233097,
+          "confidence": "class-sampled",
+          "referenceCharacter": "흑인파워",
+          "arkGridSignature": "차원 붕괴:고대:20|몰아치는 해방:고대:20|중력 강화:고대:20|현란한 공격:고대:20|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "발키리||빛의 기사||head:24:25": {
+          "percent": 0.233867,
+          "confidence": "class-sampled",
+          "referenceCharacter": "겐시유",
+          "arkGridSignature": "속삭이는 검:고대:19|눈부신 정의:고대:20|강화된 정의:고대:20|현란한 공격:고대:20|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "버서커||광전사의 비기||head:24:25": {
+          "percent": 0.233525,
+          "confidence": "class-sampled",
+          "referenceCharacter": "마스터Asia",
+          "arkGridSignature": "콤비네이션:고대:20|피의 순환:고대:20|분쇄 폭풍:고대:20|현란한 공격:고대:20|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "슬레이어||포식자||head:24:25": {
+          "percent": 0.233299,
+          "confidence": "class-sampled",
+          "referenceCharacter": "만배",
+          "arkGridSignature": "회오리:고대:20|소용돌이:고대:20|파괴의 바람:고대:20|현란한 공격:고대:20|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "워로드||전투 태세||head:24:25": {
+          "percent": 0.234094,
+          "confidence": "class-sampled",
+          "referenceCharacter": "산타",
+          "arkGridSignature": "방패 연계:고대:20|방패술:유물:20|광역 낙뢰:고대:20|현란한 공격:고대:19|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "홀리나이트||축복의 오라||head:24:25": {
+          "percent": 0.219441,
+          "confidence": "class-sampled",
+          "referenceCharacter": "인성터진범고래",
+          "arkGridSignature": "천상의 대리인:고대:20|천상의 결의:고대:20|검의 기도:고대:17|신념의 강화:고대:20|낙인의 흔적:고대:20|무기:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "기공사||무상신공||head:24:25": {
+          "percent": 0.233051,
+          "confidence": "class-sampled",
+          "referenceCharacter": "게임할시간없음",
+          "arkGridSignature": "무상기연:고대:19|신장대멸겁:고대:20|불영세:고대:20|현란한 공격:고대:20|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "배틀마스터||초심||head:24:25": {
+          "percent": 0.233153,
+          "confidence": "class-sampled",
+          "referenceCharacter": "Goingyeo",
+          "arkGridSignature": "극의귀원:고대:20|초순환:고대:20|용류 강화:고대:20|현란한 공격:고대:20|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "브레이커||수라의 길||head:24:25": {
+          "percent": 0.263116,
+          "confidence": "class-sampled",
+          "referenceCharacter": "브커나은",
+          "arkGridSignature": "그림자 주먹:고대:20|수라결:고대:18|수라:고대:20|현란한 공격:고대:20|불타는 일격:고대:20|공격:고대:19",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "스트라이커||일격필살||head:24:25": {
+          "percent": 0.233291,
+          "confidence": "class-sampled",
+          "referenceCharacter": "본창",
+          "arkGridSignature": "뇌호:고대:20|벽뢰호각:고대:20|섬호뇌격:고대:20|현란한 공격:고대:20|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "인파이터||극의: 체술||head:24:25": {
+          "percent": 0.229736,
+          "confidence": "class-sampled",
+          "referenceCharacter": "쥐지잇",
+          "arkGridSignature": "대지 붕괴:고대:20|투지 강화:고대:19|대지 파괴:고대:20|현란한 공격:유물:20|불타는 일격:고대:20|공격:유물:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "창술사||절정||head:24:25": {
+          "percent": 0.233219,
+          "confidence": "class-sampled",
+          "referenceCharacter": "사과잼민이",
+          "arkGridSignature": "연가 창식:유물:20|청룡기:유물:18|맹룡 회도:유물:20|현란한 공격:고대:20|흡수의 일격:고대:20|공격:고대:19",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "건슬링어||피스메이커||head:24:25": {
+          "percent": 0.233995,
+          "confidence": "class-sampled",
+          "referenceCharacter": "아컁",
+          "arkGridSignature": "연회의 잔향:고대:18|체인지 암즈:고대:20|블로우 백:고대:20|현란한 공격:고대:20|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "데빌헌터||핸드거너||head:24:25": {
+          "percent": 0.233714,
+          "confidence": "class-sampled",
+          "referenceCharacter": "지현우",
+          "arkGridSignature": "섀도우 불릿:고대:20|긴박한 해결사:고대:20|불릿 샤워:고대:20|현란한 공격:유물:20|부수는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "블래스터||포격 강화||head:24:25": {
+          "percent": 0.2335,
+          "confidence": "class-sampled",
+          "referenceCharacter": "몽키",
+          "arkGridSignature": "포화 전차:고대:19|세이프 존:고대:20|초토화:고대:20|재빠른 공격:고대:20|불타는 일격:유물:20|공격:유물:19",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "스카우터||진화의 유산||head:24:25": {
+          "percent": 0.233673,
+          "confidence": "class-sampled",
+          "referenceCharacter": "꼬마완두",
+          "arkGridSignature": "타이탄 슈트:고대:18|어썰트 타이탄:유물:20|코어 리액터 증폭:고대:20|현란한 공격:고대:18|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "호크아이||죽음의 습격||head:24:25": {
+          "percent": 0.233787,
+          "confidence": "class-sampled",
+          "referenceCharacter": "이승건",
+          "arkGridSignature": "TA-09 피어싱 애로우:고대:20|HSU-13 특제 고폭약:고대:20|HSU-04 자동 제어 스코프:고대:20|현란한 공격:고대:20|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "바드||절실한 구원||head:24:25": {
+          "percent": 0.210844,
+          "confidence": "class-sampled",
+          "referenceCharacter": "쥬쥬",
+          "arkGridSignature": "브레이브 엑센트:고대:20|브레이브 펄스:고대:20|벅샷 가속:고대:17|신념의 강화:고대:20|낙인의 흔적:고대:20|무기:고대:19",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "서머너||상급 소환사||head:24:25": {
+          "percent": 0.233168,
+          "confidence": "class-sampled",
+          "referenceCharacter": "꺼억콩",
+          "arkGridSignature": "고대의 유산:유물:19|오쉬의 지원:유물:20|창세의 힘:유물:20|안정적인 공격:고대:20|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "소서리스||점화||head:24:25": {
+          "percent": 0.234044,
+          "confidence": "class-sampled",
+          "referenceCharacter": "doge125x",
+          "arkGridSignature": "종말의 시작:고대:20|반복된 종말:고대:20|종말의 시:고대:20|재빠른 공격:고대:20|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "아르카나||황제의 칙령||head:24:25": {
+          "percent": 0.233982,
+          "confidence": "class-sampled",
+          "referenceCharacter": "세윳",
+          "arkGridSignature": "인피니티 덱:고대:18|엣지 콤보:고대:20|루인 마이너셋:고대:20|현란한 공격:고대:18|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "데모닉||멈출 수 없는 충동||head:24:25": {
+          "percent": 0.233243,
+          "confidence": "class-sampled",
+          "referenceCharacter": "탄지로",
+          "arkGridSignature": "이터널 블러드:고대:20|고어 블리딩:고대:20|치명적인 할퀴기:고대:20|안정적인 공격:고대:18|불타는 일격:유물:20|공격:유물:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "리퍼||갈증||head:24:25": {
+          "percent": 0.233282,
+          "confidence": "class-sampled",
+          "referenceCharacter": "요호",
+          "arkGridSignature": "갈증의 악몽:고대:19|치명적 악몽:고대:20|치명적 연계:고대:20|현란한 공격:고대:20|불타는 일격:고대:20|공격:고대:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "블레이드||잔재된 기운||head:24:25": {
+          "percent": 0.235224,
+          "confidence": "class-sampled",
+          "referenceCharacter": "영루하",
+          "arkGridSignature": "일섬:고대:18|블레이드 웨이브:고대:20|죽음의 검기:고대:20|재빠른 공격:고대:20|불타는 일격:고대:19|무기:고대:18",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "소울이터||만월의 집행자||head:24:25": {
+          "percent": 0.233109,
+          "confidence": "class-sampled",
+          "referenceCharacter": "희영",
+          "arkGridSignature": "망자의 발걸음:고대:20|소울 코어:고대:20|빙의:유물:20|현란한 공격:유물:20|흡수의 일격:고대:20|공격:유물:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "기상술사||질풍노도||head:24:25": {
+          "percent": 0.23346,
+          "confidence": "class-sampled",
+          "referenceCharacter": "츄델",
+          "arkGridSignature": "비연참:고대:18|우산의 춤:유물:20|휘몰아치기:유물:20|재빠른 공격:고대:20|불타는 일격:유물:20|공격:고대:18",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "도화가||만개||head:24:25": {
+          "percent": 0.225587,
+          "confidence": "class-sampled",
+          "referenceCharacter": "너의작은도화지",
+          "arkGridSignature": "몽글몽글:고대:20|따뜻한 해:고대:19|붓 콩콩:고대:17|신념의 강화:고대:20|낙인의 흔적:고대:20|무기:유물:17",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "차원술사||시간 관리자||head:24:25": {
+          "percent": 0.228755,
+          "confidence": "class-sampled",
+          "referenceCharacter": "유우시",
+          "arkGridSignature": "타임 키퍼:유물:17|컴바인 웨폰:고대:17|결합 강화:유물:20|현란한 공격:유물:18|불타는 일격:유물:20|공격:고대:18",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "환수사||야성||head:24:25": {
+          "percent": 0.233019,
+          "confidence": "class-sampled",
+          "referenceCharacter": "곰라뎐",
+          "arkGridSignature": "곰은 사람을 찢어:고대:19|센 곰:고대:20|필살 곰:유물:20|안정적인 공격:고대:20|불타는 일격:고대:20|공격:유물:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        },
+        "가디언나이트||드레드 로어||head:24:25": {
+          "percent": 0.233491,
+          "confidence": "class-sampled",
+          "referenceCharacter": "xnaki",
+          "arkGridSignature": "차지 인핸스:고대:20|위압:고대:20|그랜드 피날레:고대:20|현란한 공격:유물:20|흡수의 일격:고대:20|공격:유물:20",
+          "basis": "Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample"
+        }
+      },
+      "coverage": "30 class/spec/Ark Grid Lopec UI samples for head 24-to-25; other specs, cores, slots and ranges remain estimated",
       "confidence": "estimated",
       "basis": "Percent fallback from current official CombatPower. Used only until before/after upgrade deltaPercent samples are verified."
     },

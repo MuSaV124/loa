@@ -1,8 +1,9 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.53';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.7.53';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.7.53';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.8.1';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.1';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.1';
+import { arkGridSignature, calibrationScopeMatches, classSpecSlotLevelKey, confidenceTier } from './combat-power-calibration.js?v=5.8.1';
 
-const VERSION = '5.7.53';
+const VERSION = '5.8.1';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -26,7 +27,7 @@ function emptyEngravingState() {
 
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
-const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] }, powerSnapshot: null, powerCostEstimates: [], combatPowerModel: null };
+const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] }, powerSnapshot: null, powerCostEstimates: [], combatPowerModel: null, specEfficiencyFilter: 'all' };
 let simulatorRendered = false;
 
 const T4_GEAR_COST_RULES = {
@@ -520,13 +521,13 @@ function classifyEvolution(effects) {
 }
 
 
-function renderCharacter(profile) {
+function renderCharacter(profile, arkPassive = null) {
   const el = $('characterCard');
   const image = profile?.CharacterImage || '';
   el.innerHTML = `
     <div class="characterIdentity">
       ${image ? `<img src="${escapeHtml(image)}" alt="" />` : ''}
-      <div><h2>${escapeHtml(profile?.CharacterName || '-')} / ${escapeHtml(profile?.CharacterClassName || '-')}</h2><p>서버 ${escapeHtml(profile?.ServerName || '-')} · 아이템 레벨 ${escapeHtml(profile?.ItemAvgLevel || '-')} · 전투력 ${escapeHtml(profile?.CombatPower || '-')}</p></div>
+      <div><div class="characterNameLine"><h2>${escapeHtml(profile?.CharacterName || '-')} / ${escapeHtml(profile?.CharacterClassName || '-')}</h2>${arkPassive?.Title ? `<span>${escapeHtml(arkPassive.Title)}</span>` : ''}</div><p>서버 ${escapeHtml(profile?.ServerName || '-')} · 아이템 레벨 ${escapeHtml(profile?.ItemAvgLevel || '-')} · 전투력 ${escapeHtml(profile?.CombatPower || '-')}</p></div>
     </div>
     <button id="simulatorJumpButton" class="simulatorJumpButton" type="button">시뮬레이터</button>
   `;
@@ -1153,7 +1154,7 @@ function externalSpecCalibration(category, key) {
   return table[key] || null;
 }
 function normalizeSpecCalibrationRow(row) {
-  if (typeof row === 'number') return { percent: row, confidence: 'verified' };
+  if (typeof row === 'number') return { percent: row, confidence: 'estimated' };
   return row && typeof row === 'object' ? row : null;
 }
 function calibrationPowerEstimate(category, key, snapshot = state.powerSnapshot) {
@@ -1170,10 +1171,14 @@ function calibrationPowerEstimate(category, key, snapshot = state.powerSnapshot)
   const delta = Number(row.delta || 0);
   const value = official > 0 && percent > 0 ? official * percent / 100 : delta;
   if (!(value > 0)) return null;
+  const requestedConfidence = row.confidence || 'estimated';
+  const confidence = confidenceTier(requestedConfidence) === 0 && !calibrationScopeMatches(row, snapshot)
+    ? 'estimated'
+    : requestedConfidence;
   return {
     value: round2(value),
     percent: percent > 0 ? round2(percent) : official > 0 ? round2((value / official) * 100) : 0,
-    confidence: row.confidence || 'verified',
+    confidence,
     basis: row.basis || row.source || 'external spec-up calibration',
     source: row.source || ''
   };
@@ -1202,13 +1207,28 @@ function normalHoningFallback(snapshot, item, next = null) {
   const fromLevel = Number(next?.from ?? item?.honingLevel ?? 0);
   const toLevel = Number(next?.to ?? fromLevel + 1);
   const slotLevelKey = `${slot}:${fromLevel}:${toLevel}`;
+  const classSpecKey = classSpecSlotLevelKey(snapshot, slot, fromLevel, toLevel);
+  const classSpecRow = normal.percentByClassSpecSlotLevel?.[classSpecKey];
+  const classSpecPercent = Number(classSpecRow?.percent ?? classSpecRow);
+  const classSpecArkGridMatches = !classSpecRow?.arkGridSignature
+    || arkGridSignature(snapshot) === normalizePowerModelText(classSpecRow.arkGridSignature);
+  if (classSpecArkGridMatches && official > 0 && Number.isFinite(classSpecPercent) && classSpecPercent > 0) {
+    return {
+      value: official * classSpecPercent / 100,
+      percent: classSpecPercent,
+      confidence: classSpecRow?.confidence || 'class-sampled',
+      basis: classSpecRow?.basis || 'Lopec class/spec/Ark Grid before-after sample'
+    };
+  }
   const slotLevel = normal.percentBySlotLevel?.[slotLevelKey];
   const slotLevelPercent = Number(slotLevel?.percent ?? slotLevel);
-  if (official > 0 && Number.isFinite(slotLevelPercent) && slotLevelPercent > 0) {
+  const slotLevelConfidence = slotLevel?.confidence || 'estimated';
+  const slotLevelAllowed = confidenceTier(slotLevelConfidence) > 0 || calibrationScopeMatches(slotLevel, snapshot);
+  if (slotLevelAllowed && official > 0 && Number.isFinite(slotLevelPercent) && slotLevelPercent > 0) {
     return {
       value: official * slotLevelPercent / 100,
       percent: slotLevelPercent,
-      confidence: slotLevel?.confidence || 'verified',
+      confidence: slotLevelConfidence,
       basis: slotLevel?.basis || 'slot and honing-level calibrated percent'
     };
   }
@@ -1286,6 +1306,7 @@ function calculateNextNormalRefineEstimates(snapshot, priceMap) {
     const next = mergedNextNormalRefineMaterials(item);
     if (!next) {
       return {
+        category: 'normalHoning',
         item,
         available: false,
         reason: '해당 강화 구간 비용표 없음',
@@ -1299,7 +1320,7 @@ function calculateNextNormalRefineEstimates(snapshot, priceMap) {
     const cost = optimized?.cost || calculateMaterialGoldCost(baseMaterials, priceMap);
     const powerEstimate = estimateNormalHoningPowerDelta(item, snapshot, next);
     const expectedCost = optimized?.expectedCost || calculateNormalHoningExpectedCostForStrategy(cost, next);
-    return { item, available: true, ...next, cost, expectedCost, supportStrategy: optimized?.strategy || null, supportLabel: optimized?.label || '보조재료 없음', powerDelta: powerEstimate.value, powerEstimate };
+    return { category: 'normalHoning', item, available: true, ...next, cost, expectedCost, supportStrategy: optimized?.strategy || null, supportLabel: optimized?.label || '보조재료 없음', powerDelta: powerEstimate.value, powerEstimate };
   });
 }
 function estimateAdvancedHoningPowerDelta(item, snapshot, levels = 1) {
@@ -1470,8 +1491,8 @@ function accessoryPowerEstimate(candidate, snapshot = state.powerSnapshot) {
   return {
     value: round2(official * percent / 100),
     percent: round2(percent),
-    confidence: 'verified',
-    basis: 'Lopec accessory option transition calibration; five dealer-class samples'
+    confidence: 'class-estimated',
+    basis: 'Lopec accessory option transition calibration; five dealer-class samples, build-specific estimate'
   };
 }
 function combatPowerFeaturePerUnit(key) {
@@ -1578,10 +1599,14 @@ function gemPowerEstimate(snapshot, currentLevel, nextLevel, count) {
     factor *= 1 + stepPercent / 100;
   }
   const percent = (factor - 1) * 100;
+  const requestedConfidence = row.confidence || 'estimated';
+  const confidence = confidenceTier(requestedConfidence) === 0 && !calibrationScopeMatches(row, snapshot)
+    ? 'estimated'
+    : requestedConfidence;
   return {
     value: round2(official * percent / 100),
     percent: round2(percent),
-    confidence: row.confidence || 'verified',
+    confidence,
     basis: row.basis || `Lopec ${role} gem level transition calibration`
   };
 }
@@ -1691,8 +1716,17 @@ async function storePowerCostEstimates(priceMap) {
 function renderSpecEfficiencyShell() {
   return `<div class="powerSnapshotBlock powerEfficiencyPanel">
     <div class="powerCostHead">
-      <div><h3>전투력 변화량 효율표</h3><p>일반 재련은 장기백, 상급 재련은 선조의 가호·강화 선조의 가호와 선택재료 최저 기대 비용을 반영합니다.</p></div>
-      <strong>전투력 대비 사용 골드</strong>
+      <div><h3>스펙업 효율 순위</h3><p>전투력 상승률과 기대 골드를 한 줄에서 비교합니다.</p></div>
+      <strong>낮을수록 효율적</strong>
+    </div>
+    <div id="combatPowerCoverage" class="combatPowerCoverage"></div>
+    <div class="specEfficiencyToolbar" role="group" aria-label="스펙업 종류">
+      <button type="button" data-spec-filter="all" class="specEfficiencyFilter active">전체</button>
+      <button type="button" data-spec-filter="normalHoning" class="specEfficiencyFilter">일반 재련</button>
+      <button type="button" data-spec-filter="advancedHoning" class="specEfficiencyFilter">상급 재련</button>
+      <button type="button" data-spec-filter="accessory" class="specEfficiencyFilter">악세</button>
+      <button type="button" data-spec-filter="gem" class="specEfficiencyFilter">보석</button>
+      <button type="button" data-spec-filter="engraving" class="specEfficiencyFilter">각인</button>
     </div>
     <div id="specEfficiencyTable" class="specEfficiencyTable">
       <p class="powerCostHint">재료 시세를 불러오는 중입니다.</p>
@@ -1726,6 +1760,7 @@ function specEfficiencyReason(row) {
     const reason = row.reason || '시세 기준';
     const confidence = row.powerEstimate?.confidence;
     if (confidence === 'verified') return `${reason} · 검증 전투력`;
+    if (confidence === 'class-sampled') return `${reason} · 동일 직업/세팅 표본`;
     if (confidence === 'class-estimated') return `${reason} · 직업별 추정 전투력`;
     return `${reason} · 추정 전투력`;
   }
@@ -1740,7 +1775,8 @@ function specEfficiencyReason(row) {
   const missing = (row.cost?.rows || []).filter(item => item.missingPrice).map(item => item.name);
   if (missing.length) return `시세 없음: ${missing.slice(0, 2).join(', ')}${missing.length > 2 ? ' 외' : ''}`;
   const confidence = row.powerEstimate?.confidence;
-  if (confidence === 'verified') return row.hasGrowth ? '검증 전투력 · 장비 성장 포함' : '검증 전투력';
+  if (confidence === 'verified' || confidence === 'reference-verified') return row.hasGrowth ? '검증 전투력 · 장비 성장 포함' : '검증 전투력';
+  if (confidence === 'class-sampled') return row.hasGrowth ? '동일 직업/세팅 표본 · 장비 성장 포함' : '동일 직업/세팅 표본';
   if (confidence === 'class-estimated') return row.hasGrowth ? '직업별 추정 · 장비 성장 포함' : '직업별 추정';
   if (confidence === 'estimated') return row.hasGrowth ? '추정 전투력 · 장비 성장 포함' : '추정 전투력';
   if (row.hasGrowth) return '전투력 미검증 · 장비 성장 포함';
@@ -1748,32 +1784,69 @@ function specEfficiencyReason(row) {
 }
 function combatPowerAccuracyHint() {
   const validation = state.combatPowerModel?.validation || {};
-  const baselineError = Number(validation.baselineError || 0);
-  const accessorySpread = Number(validation.accessory?.maxSpreadPercentPoints || 0);
-  const gemError = Number(validation.gem?.musavGroupedMaxAbsError || 0);
-  const details = [
-    `기준 전투력 오차 ${baselineError.toFixed(2)}`,
-    accessorySpread > 0 ? `악세 표본 최대 편차 ${accessorySpread.toFixed(4)}%p` : '',
-    gemError > 0 ? `보석 묶음 최대 오차 ${gemError.toFixed(2)}` : ''
-  ].filter(Boolean).join(' · ');
-  return `공식 API 현재 전투력과 로펙 전후값으로 검증합니다. ${details}. 보정값이 없는 구간만 추정값으로 표시합니다.`;
+  const classSamples = Number(validation.honing?.classSpecSamples || 0);
+  return `로펙 전후값 ${classSamples}개 직업·세팅 표본과 공식 API 현재 전투력을 대조합니다. 직업·세팅·아크그리드·부위·강화 구간이 모두 맞는 항목만 표본값으로 표시하고, 나머지는 추정값으로 분리합니다.`;
 }
 function specPowerDeltaText(row, powerDelta) {
   if (!(powerDelta > 0)) return '전투력 -';
   const confidence = row?.powerEstimate?.confidence;
-  const exact = confidence === 'verified';
-  return `${exact ? '전투력 +' : '전투력 약 +'}${powerDelta.toFixed(2)}`;
+  if (confidence === 'verified' || confidence === 'reference-verified') return `전투력 +${powerDelta.toFixed(2)}`;
+  if (confidence === 'class-sampled') return `표본 +${powerDelta.toFixed(2)}`;
+  return `전투력 약 +${powerDelta.toFixed(2)}`;
+}
+function specEfficiencyFilterMatches(row, filter) {
+  if (!filter || filter === 'all') return true;
+  return row?.category === filter;
+}
+function specConfidenceMeta(row) {
+  const confidence = row?.powerEstimate?.confidence || 'unverified';
+  if (confidence === 'verified' || confidence === 'reference-verified') return { className: 'verified', label: '검증' };
+  if (confidence === 'class-sampled') return { className: 'sampled', label: '직업 표본' };
+  if (confidence === 'estimated' || confidence === 'class-estimated') return { className: 'estimated', label: '추정' };
+  return { className: 'unverified', label: '미검증' };
+}
+function bindSpecEfficiencyFilters() {
+  document.querySelectorAll('[data-spec-filter]').forEach(button => {
+    const filter = button.dataset.specFilter || 'all';
+    button.classList.toggle('active', filter === state.specEfficiencyFilter);
+    button.onclick = () => {
+      state.specEfficiencyFilter = filter;
+      renderSpecEfficiencyTable();
+    };
+  });
+}
+function updateCombatPowerCoverage(estimates) {
+  const el = $('combatPowerCoverage');
+  if (!el) return;
+  const profile = state.powerSnapshot?.profile || {};
+  const confidenceValues = estimates.map(row => row?.powerEstimate?.confidence || 'unverified');
+  const verified = confidenceValues.filter(value => confidenceTier(value) === 0).length;
+  const sampled = confidenceValues.filter(value => value === 'class-sampled').length;
+  const status = verified > 0 ? 'verified' : sampled > 0 ? 'sampled' : 'estimated';
+  const label = verified > 0 ? '현재 빌드 검증값 있음' : sampled > 0 ? '동일 직업·세팅 표본 있음' : '현재 구간은 추정값';
+  el.className = `combatPowerCoverage ${status}`;
+  el.innerHTML = `<div><span>${escapeHtml(profile.className || '-')} · ${escapeHtml(profile.secondClass || '세팅 미확인')}</span><b>${escapeHtml(label)}</b></div><p>검증 ${verified} · 직업 표본 ${sampled} · 추정/미검증 ${Math.max(0, estimates.length - verified - sampled)}</p>`;
 }
 function renderSpecEfficiencyTable() {
   const el = $('specEfficiencyTable');
   if (!el) return;
-  const estimates = Array.isArray(state.powerCostEstimates) ? state.powerCostEstimates.slice() : [];
+  const allEstimates = Array.isArray(state.powerCostEstimates) ? state.powerCostEstimates.slice() : [];
+  updateCombatPowerCoverage(allEstimates);
+  bindSpecEfficiencyFilters();
+  const estimates = allEstimates.filter(row => specEfficiencyFilterMatches(row, state.specEfficiencyFilter));
   if (!estimates.length) {
-    el.innerHTML = '<p class="powerCostHint">재료 시세를 불러오는 중입니다.</p>';
+    el.innerHTML = `<p class="powerCostHint">${allEstimates.length ? '선택한 종류의 스펙업 후보가 없습니다.' : '재료 시세를 불러오는 중입니다.'}</p>`;
     return;
   }
-  const rows = estimates
-    .sort((a, b) => specEfficiencyScore(a) - specEfficiencyScore(b))
+  const sortedEstimates = estimates.sort((a, b) => {
+    const aScore = specEfficiencyScore(a);
+    const bScore = specEfficiencyScore(b);
+    if (aScore !== bScore) return aScore - bScore;
+    return confidenceTier(a?.powerEstimate?.confidence) - confidenceTier(b?.powerEstimate?.confidence);
+  });
+  const finiteScores = sortedEstimates.map(specEfficiencyScore).filter(Number.isFinite);
+  const bestScore = finiteScores.length ? Math.min(...finiteScores) : 0;
+  const rows = sortedEstimates
     .map((row, index) => {
       const item = row.item || {};
       const cost = row.cost || {};
@@ -1806,12 +1879,17 @@ function renderSpecEfficiencyTable() {
       const stepMainText = row.stepLabel || `+${Number(row.from || item.honingLevel || 0)} → +${Number(row.to || 0)}`;
       const upgradeDetailText = row.stepDetail || stepMainText;
       const powerDeltaText = powerText;
-      return `<div class="specEfficiencyRow ${row.available ? '' : 'disabled'}">
+      const score = specEfficiencyScore(row);
+      const meterWidth = bestScore > 0 && Number.isFinite(score) ? Math.max(8, Math.min(100, (bestScore / score) * 100)) : 0;
+      const confidenceMeta = specConfidenceMeta(row);
+      return `<div class="specEfficiencyRow ${row.available ? '' : 'disabled'} confidence-${confidenceMeta.className}" data-category="${escapeHtml(row.category || '')}">
         <div class="specEfficiencyTarget">
+          <span class="specEfficiencyRank">${index + 1}</span>
           ${powerItemIcon(item, { hideQuality: true })}
           <div>
-            <b>${escapeHtml(item.type || '-')}</b>
+            <div class="specEfficiencyTargetTitle"><b>${escapeHtml(item.type || '-')}</b><em class="confidencePill ${confidenceMeta.className}">${confidenceMeta.label}</em></div>
             <span>${escapeHtml(item.name || '-')} · ${escapeHtml(stepMainText)}</span>
+            <div class="efficiencyMeter"><i style="width:${meterWidth.toFixed(1)}%"></i></div>
           </div>
         </div>
         <div class="specEfficiencyStep"><b>${escapeHtml(efficiencyText)}</b><span>${escapeHtml(powerDeltaText)}</span></div>
@@ -1829,7 +1907,7 @@ function renderSpecEfficiencyTable() {
   el.innerHTML = `<div class="specEfficiencyHeader">
     <span>스펙업 목표</span><span>효율</span><span>비용</span><span>비용/효율</span>
   </div>${rows}
-  <p class="powerCostHint">효율은 현재 전투력 대비 상승률(%), 비용/효율은 1% 상승당 기대 골드입니다. 상급 재련은 현재 단계에서 다음 10단위 완료 지점까지의 총 기대비용을 사용하며, API에 현재 경험치와 구슬이 없어 경험치·구슬 0에서 계산합니다. ${escapeHtml(combatPowerAccuracyHint())}</p>`;
+  <p class="powerCostHint">1% 상승당 기대 골드가 낮은 순서로 정렬하고, 효율이 같으면 검증 범위가 높은 후보를 먼저 표시합니다. 상급 재련은 현재 단계에서 다음 10단위 완료 지점까지의 총 기대비용을 사용합니다. ${escapeHtml(combatPowerAccuracyHint())}</p>`;
 }
 function renderAdvancedHoningAttemptCostTable() {
   const renderRows = (rows = []) => rows.map(row => {
@@ -2125,6 +2203,11 @@ function renderPowerSnapshot(snapshot) {
   const accessoryPanelRows = [accessoryRows, braceletRow, stoneRow, engravingPanel].filter(Boolean).join('');
   view.innerHTML = `
     <div class="powerSnapshotColumns">
+      ${renderSpecEfficiencyShell()}
+      <div class="powerRawHeader">
+        <div><h3>현재 장비 분석</h3><p>효율 계산에 사용한 API 원자료를 확인합니다.</p></div>
+        <span>보석 · 장비 · 악세 · 아크그리드</span>
+      </div>
       <div class="powerSnapshotBlock"><h3>장착 보석</h3><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
       <div class="powerSnapshotBlock powerBuildPanel">
         <h3>장비 파싱</h3>
@@ -2140,7 +2223,6 @@ function renderPowerSnapshot(snapshot) {
         </div>
       </div>
       ${renderPowerCostPrep(snapshot)}
-      ${renderSpecEfficiencyShell()}
     </div>
     <p class="powerSnapshotNote">일반/상급 재련 단계는 공식 API Tooltip에서 읽습니다. 상급 재련 전투력 상승량은 공개 산식이 없어 현재 공식 전투력 비율 기반 추정값으로 표시합니다.</p>
   `;
@@ -2480,7 +2562,7 @@ function sourceLine(label, value, detail = '') {
 }
 function sourceGroup(title, colorClass, lines, total) {
   const body = lines.length ? lines.join('') : `<div class="sourceLine muted"><span>해당 없음</span><b>+0.00%</b></div>`;
-  return `<div class="sourceGroup ${colorClass}"><div class="sourceHead"><strong>${escapeHtml(title)}</strong><em>${pct(Number(total || 0))}</em></div>${body}</div>`;
+  return `<details class="sourceGroup ${colorClass}"><summary class="sourceHead"><strong>${escapeHtml(title)}</strong><em>${pct(Number(total || 0))}</em></summary><div class="sourceGroupBody">${body}</div></details>`;
 }
 function getStatNodeLine(name) {
   const lv = Number(state.selected?.[name]?.level || 0);
@@ -2567,7 +2649,7 @@ function engravingAppliedDetailHtml() {
   if (stoneEff.conditionalDamage) stoneEffParts.push(`조건부 피해 +${fmt(stoneEff.conditionalDamage)}%`);
   if (stoneEffParts.length) rows.push(`<div class="enlightenmentDetailLine"><b>스톤 각인 보너스</b><span>${escapeHtml(stoneEffParts.join(' / '))}</span></div>`);
   if (!rows.length) return `<details class="enlightenmentDetails"><summary>어빌리티 스톤 / 각인서 적용 내역</summary><div class="enlightenmentDetailBody"><div class="enlightenmentDetailLine muted"><span>API에서 파싱된 어빌리티 스톤/각인서 효과가 없습니다.</span></div></div></details>`;
-  return `<details class="enlightenmentDetails" open><summary>어빌리티 스톤 / 각인서 적용 내역</summary><div class="enlightenmentDetailBody">${rows.join('')}</div></details>`;
+  return `<details class="enlightenmentDetails"><summary>어빌리티 스톤 / 각인서 적용 내역</summary><div class="enlightenmentDetailBody">${rows.join('')}</div></details>`;
 }
 
 function buildSourceSummary(current) {
@@ -3019,8 +3101,11 @@ async function searchCharacter(name) {
     state.engraving = data.engravingEffects || emptyEngravingState();
     state.arkGrid = data.arkGridEffects || { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
     state.powerSnapshot = data.powerSnapshot || null;
+    if (state.powerSnapshot?.profile && !state.powerSnapshot.profile.secondClass) {
+      state.powerSnapshot.profile.secondClass = data.arkPassive?.Title || '';
+    }
     syncAdrenalineControlsFromEngraving();
-    renderCharacter(data.profile);
+    renderCharacter(data.profile, data.arkPassive);
     state.foundEffects = readEffects(data.arkPassive);
     state.enlightenment = extractEnlightenmentEffects(state.foundEffects);
     state.selected = classifyEvolution(state.foundEffects);

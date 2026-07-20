@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LOSTARK 진화 노드 추천 계산기</title>
-  <link rel="stylesheet" href="/style.css?v=5.7.53" />
+  <link rel="stylesheet" href="/style.css?v=5.8.1" />
 </head>
 <body>
   <main class="wrap">
@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v5.7.53 · 2/4/5티어 추천</span>
+        <span class="badge">v5.8.1 · UI/전투력 검증 개편</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -41,7 +41,7 @@
 
     <section id="powerSnapshotPanel" class="panel powerSnapshotPanel hidden simulatorPanel">
       <div class="sectionHead">
-        <div><h2>전투력 시뮬레이션 준비</h2><p class="hint">공식 전투력에 맞춰 검증할 장비/보석 원자료입니다.</p></div>
+        <div><h2>스펙업 효율 시뮬레이터</h2><p class="hint">현재 빌드의 전투력 상승량과 실시간 비용을 비교합니다.</p></div>
         <button id="simulatorBackButton" class="simulatorBackButton" type="button">계산기로 돌아가기</button>
       </div>
       <div id="powerSnapshotView" class="powerSnapshotView"></div>
@@ -51,11 +51,16 @@
       <div id="sourceSummary" class="sourceSummary"></div>
     </section>
 
-    <section id="inputPanel" class="calcTabPanel panel compactPanel">
-      <div class="sectionHead"><div><h2>추가 효과</h2><p class="hint">API가 못 읽는 버프/시너지만 추가로 넣습니다.</p></div></div>
-      <input id="baseCritStat" type="hidden" value="0" />
-      <input id="baseSwiftStat" type="hidden" value="0" />
-      <div class="manualGrid">
+    <section id="inputPanel" class="calcTabPanel panel compactPanel advancedInputPanel">
+      <details class="advancedInputDetails">
+        <summary>
+          <span><b>추가 효과</b><small>API가 못 읽는 버프와 시너지</small></span>
+          <em>고급 설정</em>
+        </summary>
+        <div class="advancedInputBody">
+          <input id="baseCritStat" type="hidden" value="0" />
+          <input id="baseSwiftStat" type="hidden" value="0" />
+          <div class="manualGrid">
         <label>추가 치명타 확률(%)<input id="extraCritRate" type="number" step="0.01" value="0" /></label>
         <label>추가 치명타 피해(%)<input id="extraCritDamage" type="number" step="0.01" value="0" /></label>
         <label>추가 진화형 피해, 진피(%)<input id="extraEvolutionDamage" type="number" step="0.01" value="0" /></label>
@@ -71,7 +76,9 @@
         <label id="adrenalineReplacementWrap" class="hidden">아드 대체 각인 효율 차감(%)<input id="adrenalineReplacementDamage" type="number" step="0.01" value="0" /></label>
         <div class="staticInfo"><b>기본 공이속</b><span>114% = 기본 100% + 만찬 5% + 서폿 진화 9%</span></div>
         <div class="staticInfo"><b>신속 공이속</b><span>신속 ÷ 58.21 로 자동 계산</span></div>
-      </div>
+          </div>
+        </div>
+      </details>
     </section>
 
     <section id="evolutionPanel" class="calcTabPanel panel">
@@ -195,7 +202,7 @@
 
   </main>
 
-  <div class="version">Version 5.7.53</div>
-  <script type="module" src="/app.js?v=5.7.53"></script>
+  <div class="version">Version 5.8.1</div>
+  <script type="module" src="/app.js?v=5.8.1"></script>
 </body>
 </html>

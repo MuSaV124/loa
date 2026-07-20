@@ -1,6 +1,6 @@
 import { isBoundGem } from '../public/gem-math.js';
 
-const API_VERSION = '5.7.53';
+const API_VERSION = '5.8.1';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = 60 * 1000;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -71,7 +71,7 @@ async function loadCharacterData(name, apiKey) {
   const abilityStoneEffects = extractAbilityStoneEffects(equipment);
   const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
   const arkGridEffects = extractArkGridEffects(arkGrid.data);
-  const powerSnapshot = buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, arkGrid: arkGrid.data });
+  const powerSnapshot = buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, arkGrid: arkGrid.data });
 
   return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, powerSnapshot, raw: data };
 }
@@ -156,7 +156,7 @@ function parseTooltip(tooltip) {
 const COMBAT_EQUIPMENT_TYPES = new Set(['무기', '투구', '상의', '하의', '장갑', '어깨']);
 const ACCESSORY_EQUIPMENT_TYPES = new Set(['목걸이', '귀걸이', '반지']);
 
-function buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, arkGrid }) {
+function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, arkGrid }) {
   const equipmentSnapshot = extractEquipmentSnapshot(equipment);
   const gemSnapshot = extractGemSnapshot(gems);
   const arkGridSnapshot = extractArkGridSnapshot(arkGrid);
@@ -172,6 +172,7 @@ function buildPowerSnapshot({ profile, equipment, gems, accessoryEffects, bracel
       server: profile?.ServerName || '',
       name: profile?.CharacterName || '',
       className: profile?.CharacterClassName || '',
+      secondClass: arkPassive?.Title || '',
       itemAvgLevel: parseNumber(profile?.ItemAvgLevel),
       itemMaxLevel: parseNumber(profile?.ItemMaxLevel),
       combatPower: parseNumber(profile?.CombatPower),

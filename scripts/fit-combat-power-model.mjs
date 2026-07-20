@@ -3,8 +3,9 @@ import { dirname, resolve } from 'node:path';
 
 const INPUT = resolve(process.env.LOA_SAMPLE_INPUT || 'tmp/combat-samples-loawa-around.json');
 const OUTPUT = resolve(process.env.LOA_MODEL_OUTPUT || 'tmp/combat-power-model.json');
+const CLASS_SPEC_SAMPLES_INPUT = resolve(process.env.LOA_CLASS_SPEC_SAMPLE_INPUT || 'scripts/combat-power-class-samples.json');
 
-const MODEL_VERSION = 'combat-power-delta-v2';
+const MODEL_VERSION = 'combat-power-delta-v3';
 const MIN_COMBAT_POWER = Number(process.env.LOA_MODEL_MIN_CP || 5000);
 const MAX_COMBAT_POWER = Number(process.env.LOA_MODEL_MAX_CP || 6500);
 const NORMAL_HONING_WEAPON_PERCENT = Number(process.env.LOA_NORMAL_HONING_WEAPON_PERCENT || 0.46);
@@ -17,6 +18,16 @@ const NORMAL_HONING_SLOT_LEVEL_PERCENT = {
   'gloves:21:22': { percent: 0.273614, confidence: 'verified', basis: 'Lopec before-after official CombatPower; Loaup rounded value cross-check.' },
   'shoulder:20:21': { percent: 0.236971, confidence: 'verified', basis: 'Lopec before-after official CombatPower; Loaup rounded value cross-check.' }
 };
+const REFERENCE_SCOPE = {
+  referenceCharacter: '무사브',
+  className: '브레이커',
+  secondClass: '수라의 길',
+  arkGridSignature: '그림자 주먹:고대:17|수라결:고대:18|수라:유물:20|현란한 공격:유물:18|불타는 일격:유물:17|무기:고대:17'
+};
+for (const row of Object.values(NORMAL_HONING_SLOT_LEVEL_PERCENT)) {
+  row.confidence = 'reference-verified';
+  row.scope = REFERENCE_SCOPE;
+}
 const CALIBRATION_SOURCES = {
   loaup: {
     url: 'https://loaup.com/character/%EB%AC%B4%EC%82%AC%EB%B8%8C?tab=specup',
@@ -56,12 +67,12 @@ const ACCESSORY_EFFECT_CALIBRATIONS = {
   'critDamage:하:상': 0.867146
 };
 const GEM_CALIBRATIONS = {
-  'dealer:6:7': { percent: 0.749292, referenceAverage: 8, slopePerAverageLevel: 0, confidence: 'verified' },
-  'dealer:7:8': { percent: 0.790964, referenceAverage: 8.090909, slopePerAverageLevel: 0, confidence: 'verified' },
-  'dealer:8:9': { percent: 0.786803, referenceAverage: 8.181818, slopePerAverageLevel: -0.003446, confidence: 'verified' },
-  'dealer:9:10': { percent: 0.783059, referenceAverage: 8.272727, slopePerAverageLevel: -0.003557, confidence: 'verified' },
-  'support:8:9': { percent: 1.205008, referenceAverage: 8.181818, slopePerAverageLevel: 0, confidence: 'verified' },
-  'support:9:10': { percent: 1.193868, referenceAverage: 8.272727, slopePerAverageLevel: 0, confidence: 'verified' }
+  'dealer:6:7': { percent: 0.749292, referenceAverage: 8, slopePerAverageLevel: 0, confidence: 'estimated' },
+  'dealer:7:8': { percent: 0.790964, referenceAverage: 8.090909, slopePerAverageLevel: 0, confidence: 'estimated' },
+  'dealer:8:9': { percent: 0.786803, referenceAverage: 8.181818, slopePerAverageLevel: -0.003446, confidence: 'estimated' },
+  'dealer:9:10': { percent: 0.783059, referenceAverage: 8.272727, slopePerAverageLevel: -0.003557, confidence: 'estimated' },
+  'support:8:9': { percent: 1.205008, referenceAverage: 8.181818, slopePerAverageLevel: 0, confidence: 'estimated' },
+  'support:9:10': { percent: 1.193868, referenceAverage: 8.272727, slopePerAverageLevel: 0, confidence: 'estimated' }
 };
 const ENGRAVING_PERCENT_SERIES = {
   '원한': [0.619732, 0.616102, 0.612144, 0.608604],
@@ -91,14 +102,28 @@ const EXTERNAL_SPEC_UP_CALIBRATIONS = {
 };
 const VALIDATION = {
   referenceCharacter: '무사브',
-  officialCombatPower: 5376.19,
-  lopecBaseline: 5376.19,
+  officialCombatPower: 5412.97,
+  lopecBaseline: 5412.97,
   baselineError: 0,
   accessory: { samples: 5, maxSpreadPercentPoints: 0.002085 },
   gem: { dealerSamples: 5, supportSamples: 1, musavGroupedMaxAbsError: 0.03 },
   engraving: { names: Object.keys(ENGRAVING_PERCENT_SERIES).length, stepsPerName: 4 },
-  honing: { verifiedRows: Object.keys(NORMAL_HONING_SLOT_LEVEL_PERCENT).length }
+  honing: { verifiedRows: Object.keys(NORMAL_HONING_SLOT_LEVEL_PERCENT).length, classSpecSamples: 30, sampledTransition: 'head:24:25', sampledAt: '2026-07-20' }
 };
+
+function buildClassSpecSampleMap(payload) {
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  return Object.fromEntries(rows.map(row => [
+    `${row.className}||${row.secondClass}||${row.slot}:${row.from}:${row.to}`,
+    {
+      percent: row.percent,
+      confidence: 'class-sampled',
+      referenceCharacter: row.referenceCharacter,
+      arkGridSignature: row.arkGridSignature,
+      basis: 'Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample'
+    }
+  ]));
+}
 
 const ALL_CLASS_NAMES = [
   '디스트로이어', '발키리', '버서커', '슬레이어', '워로드', '홀리나이트',
@@ -390,6 +415,8 @@ function buildNormalHoningFallbacks(rows) {
 
 async function main() {
   const payload = JSON.parse(await readFile(INPUT, 'utf8'));
+  const classSpecSamplePayload = JSON.parse(await readFile(CLASS_SPEC_SAMPLES_INPUT, 'utf8'));
+  const percentByClassSpecSlotLevel = buildClassSpecSampleMap(classSpecSamplePayload);
   const allRows = Array.isArray(payload?.rows) ? payload.rows : [];
   const rows = filterTrainingRows(allRows);
   if (rows.length < 12) throw new Error(`not enough training rows: ${rows.length}`);
@@ -468,8 +495,9 @@ async function main() {
           armor: NORMAL_HONING_ARMOR_PERCENT
         },
         percentBySlotLevel: NORMAL_HONING_SLOT_LEVEL_PERCENT,
+        percentByClassSpecSlotLevel,
         classFallbacks: buildNormalHoningFallbacks(rows),
-        coverage: 'all-loawa-rank-classes',
+        coverage: '30 class/spec/Ark Grid Lopec UI samples for head 24-to-25; other specs, cores, slots and ranges remain estimated',
         confidence: 'estimated',
         basis: 'Shared percent fallback for all classes. Replace each class/slot with verified before-after official CombatPower deltaPercent samples as they are collected.'
       }
