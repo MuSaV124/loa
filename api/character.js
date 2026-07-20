@@ -1,4 +1,6 @@
-const API_VERSION = '5.7.52';
+import { isBoundGem } from '../public/gem-math.js';
+
+const API_VERSION = '5.7.53';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = 60 * 1000;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -264,11 +266,17 @@ function extractGemSnapshot(gemData) {
       matchNumber(text, [/([0-9]+)\s*레벨/])
     ]);
     const kind = classifyGemKind([name, text, effectText].join(' '));
+    const bound = isBoundGem({
+      name,
+      text,
+      bindType: gem?.BindType || gem?.BoundType || gem?.TradeType || ''
+    });
     return {
       slot,
       name,
       level,
       kind,
+      bound,
       grade: gem?.Grade || '',
       icon: normalizeIconUrl(gem?.Icon || gem?.IconPath || findIconPath(gem?.Tooltip) || ''),
       skillName: effect?.Name || parseGemSkillName(effectText),

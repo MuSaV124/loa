@@ -1,7 +1,8 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.52';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.7.52';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.7.53';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.7.53';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.7.53';
 
-const VERSION = '5.7.52';
+const VERSION = '5.7.53';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1598,7 +1599,8 @@ async function calculateGemSpecEstimates(snapshot) {
     const nextLevel = currentLevel + 1;
     const row = (data.rows || []).find(item => Number(item.level || 0) === currentLevel);
     const market = kind === '작열' ? row?.cooldown : row?.damage;
-    const buyCount = 2;
+    const bound = isBoundGem(gem);
+    const buyCount = gemFusionPurchaseCount(gem);
     const price = Number(market?.price || 0) * buyCount;
     const calibration = gemPowerEstimate(snapshot, currentLevel, nextLevel, 1);
     const perGemDelta = combatPowerFeaturePerUnit('gemAverage') / Math.max(1, gems.length || 11);
@@ -1618,10 +1620,14 @@ async function calculateGemSpecEstimates(snapshot) {
       expectedCost: { expectedGold: price },
       powerDelta,
       powerEstimate,
-      supportLabel: `${kind} ${currentLevel}레벨 최저가 × 2개`,
+      supportLabel: `${kind} ${currentLevel}레벨 최저가 × ${buyCount}개${bound ? ' · 장착 보석 귀속' : ''}`,
       stepLabel: `${slotLabel} ${kind}`,
       stepDetail: `Lv.${currentLevel} → Lv.${nextLevel}`,
-      reason: price > 0 ? '보유 1개 + 구매 2개 합성 기준' : '보석 시세 없음'
+      reason: price > 0
+        ? bound
+          ? '장착 보석 귀속 · 같은 레벨 3개 구매 후 합성 기준'
+          : '보유 1개 + 구매 2개 합성 기준'
+        : '보석 시세 없음'
     };
   });
 }
