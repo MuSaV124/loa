@@ -2954,7 +2954,7 @@ body:not(.calculatorReady):not(.marketMode) .search input {
   font-size: 15px;
 }
 
-/* v5.8.1 operational dashboard refresh */
+/* v5.8.4 operational dashboard refresh */
 :root {
   --bg: #090d13;
   --panel: #111821;

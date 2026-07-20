@@ -4,12 +4,11 @@ import { dirname, resolve } from 'node:path';
 const INPUT = resolve(process.env.LOA_SAMPLE_INPUT || 'tmp/combat-samples-loawa-around.json');
 const OUTPUT = resolve(process.env.LOA_MODEL_OUTPUT || 'tmp/combat-power-model.json');
 const CLASS_SPEC_SAMPLES_INPUT = resolve(process.env.LOA_CLASS_SPEC_SAMPLE_INPUT || 'scripts/combat-power-class-samples.json');
+const REFERENCE_HONING_SAMPLES_INPUT = resolve(process.env.LOA_REFERENCE_HONING_SAMPLE_INPUT || 'scripts/combat-power-reference-honing-samples.json');
 
 const MODEL_VERSION = 'combat-power-delta-v3';
 const MIN_COMBAT_POWER = Number(process.env.LOA_MODEL_MIN_CP || 5000);
 const MAX_COMBAT_POWER = Number(process.env.LOA_MODEL_MAX_CP || 6500);
-const NORMAL_HONING_WEAPON_PERCENT = Number(process.env.LOA_NORMAL_HONING_WEAPON_PERCENT || 0.46);
-const NORMAL_HONING_ARMOR_PERCENT = Number(process.env.LOA_NORMAL_HONING_ARMOR_PERCENT || 0.11);
 const NORMAL_HONING_SLOT_LEVEL_PERCENT = {
   'weapon:23:24': { percent: 1.241214, confidence: 'verified', basis: 'Lopec before-after official CombatPower; Loaup rounded value cross-check.' },
   'head:20:21': { percent: 0.222648, confidence: 'verified', basis: 'Lopec before-after official CombatPower; Loaup rounded value cross-check.' },
@@ -120,20 +119,10 @@ function buildClassSpecSampleMap(payload) {
       confidence: 'class-sampled',
       referenceCharacter: row.referenceCharacter,
       arkGridSignature: row.arkGridSignature,
-      basis: 'Loawa representative search and Lopec UI class/spec/Ark Grid before-after sample'
+      basis: 'Lopec same-class slot/range before-after sample; second class and Ark Grid are audit metadata only.'
     }
   ]));
 }
-
-const ALL_CLASS_NAMES = [
-  '디스트로이어', '발키리', '버서커', '슬레이어', '워로드', '홀리나이트',
-  '기공사', '배틀마스터', '브레이커', '스트라이커', '인파이터', '창술사',
-  '건슬링어', '데빌헌터', '블래스터', '스카우터', '호크아이',
-  '바드', '서머너', '소서리스', '아르카나',
-  '데모닉', '리퍼', '블레이드', '소울이터',
-  '기상술사', '도화가', '차원술사', '환수사',
-  '가디언나이트'
-];
 
 const FEATURE_DEFS = [
   ['itemAvgLevel', row => row.itemAvgLevel],
@@ -384,39 +373,23 @@ function coefficientTable(model) {
   }).sort((a, b) => Math.abs(b.standardizedWeight) - Math.abs(a.standardizedWeight));
 }
 
-function classSampleCounts(rows) {
-  const counts = new Map();
-  for (const row of rows) {
-    const className = row.className || '';
-    if (!className) continue;
-    counts.set(className, (counts.get(className) || 0) + 1);
-  }
-  return counts;
-}
-
-function buildNormalHoningFallbacks(rows) {
-  const counts = classSampleCounts(rows);
-  const classNames = [...new Set([...ALL_CLASS_NAMES, ...counts.keys()])].sort((a, b) => a.localeCompare(b, 'ko'));
-  const classFallbacks = {};
-  for (const className of classNames) {
-    const sampleCount = counts.get(className) || 0;
-    classFallbacks[className] = {
-      weaponPercent: NORMAL_HONING_WEAPON_PERCENT,
-      armorPercent: NORMAL_HONING_ARMOR_PERCENT,
-      sampleCount,
-      confidence: sampleCount >= Number(process.env.LOA_MODEL_MIN_CLASS_COUNT || 4) ? 'class-estimated' : 'estimated',
-      basis: sampleCount
-        ? 'Class is present in the official combat-power sample set; deltaPercent uses shared honing fallback until before/after samples exist.'
-        : 'Loawa rank class coverage placeholder; deltaPercent uses shared honing fallback until samples exist.'
-    };
-  }
-  return classFallbacks;
-}
-
 async function main() {
   const payload = JSON.parse(await readFile(INPUT, 'utf8'));
   const classSpecSamplePayload = JSON.parse(await readFile(CLASS_SPEC_SAMPLES_INPUT, 'utf8'));
+  const referenceHoningPayload = JSON.parse(await readFile(REFERENCE_HONING_SAMPLES_INPUT, 'utf8'));
   const percentByClassSpecSlotLevel = buildClassSpecSampleMap(classSpecSamplePayload);
+  const scopedSamples = (Array.isArray(referenceHoningPayload?.rows) ? referenceHoningPayload.rows : []).map(row => ({
+    className: row.className,
+    secondClass: row.secondClass,
+    referenceCharacter: row.referenceCharacter,
+    arkGridSignature: row.arkGridSignature,
+    slot: row.slot,
+    from: row.from,
+    to: row.to,
+    percent: row.percent,
+    confidence: row.confidence,
+    basis: row.basis
+  }));
   const allRows = Array.isArray(payload?.rows) ? payload.rows : [];
   const rows = filterTrainingRows(allRows);
   if (rows.length < 12) throw new Error(`not enough training rows: ${rows.length}`);
@@ -483,23 +456,13 @@ async function main() {
     coefficientsByImpact: coefficientTable(model).slice(0, 20),
     upgradeDelta: {
       normalHoning: {
-        weaponPercent: NORMAL_HONING_WEAPON_PERCENT,
-        armorPercent: NORMAL_HONING_ARMOR_PERCENT,
-        percentDefaults: {
-          weapon: NORMAL_HONING_WEAPON_PERCENT,
-          head: NORMAL_HONING_ARMOR_PERCENT,
-          top: NORMAL_HONING_ARMOR_PERCENT,
-          bottom: NORMAL_HONING_ARMOR_PERCENT,
-          gloves: NORMAL_HONING_ARMOR_PERCENT,
-          shoulder: NORMAL_HONING_ARMOR_PERCENT,
-          armor: NORMAL_HONING_ARMOR_PERCENT
-        },
         percentBySlotLevel: NORMAL_HONING_SLOT_LEVEL_PERCENT,
         percentByClassSpecSlotLevel,
-        classFallbacks: buildNormalHoningFallbacks(rows),
-        coverage: '30 class/spec/Ark Grid Lopec UI samples for head 24-to-25; other specs, cores, slots and ranges remain estimated',
-        confidence: 'estimated',
-        basis: 'Shared percent fallback for all classes. Replace each class/slot with verified before-after official CombatPower deltaPercent samples as they are collected.'
+        scopedSamples,
+        coverage: `${scopedSamples.length} class/slot/range samples; second class and Ark Grid are not runtime matching conditions`,
+        confidence: 'unverified',
+        basis: 'Same-class slot/range samples use the median percent. Cross-class fallback is disabled.',
+        matchPolicy: 'className + slot + from + to'
       }
     }
   };

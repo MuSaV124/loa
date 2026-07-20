@@ -1,0 +1,24 @@
+{
+  "updatedAt": "2026-07-20",
+  "source": "Loawa combat-power ranking candidates below +25",
+  "policy": "Candidates were selected from the same class below +25. Second class and Ark Grid matches are retained as audit metadata but are not runtime matching conditions.",
+  "rows": [
+    { "className": "건슬링어", "name": "주니에요", "replaces": "세덩이", "weaponLevel": 24, "coreMatch": "6/6" },
+    { "className": "디스트로이어", "name": "킴백한", "replaces": "BARBER", "weaponLevel": 23, "coreMatch": "6/6" },
+    { "className": "워로드", "name": "데우스시아", "replaces": "솬황", "weaponLevel": 23, "coreMatch": "5/6" },
+    { "className": "인파이터", "name": "손태연", "replaces": "유성실화", "weaponLevel": 23, "coreMatch": "6/6" },
+    { "className": "창술사", "name": "김성게", "replaces": "벤츠CLS", "weaponLevel": 24, "coreMatch": "6/6" },
+    { "className": "데빌헌터", "name": "평판현황", "replaces": "ZI존대게", "weaponLevel": 23, "coreMatch": "6/6" },
+    { "className": "블래스터", "name": "송영감", "replaces": "블래스터를아십니까", "weaponLevel": 24, "coreMatch": "5/6" },
+    { "className": "스카우터", "name": "귀환", "replaces": "쌔끈머신", "weaponLevel": 24, "coreMatch": "6/6" },
+    { "className": "서머너", "name": "엘프는고블린한테지지않아", "replaces": "방댕이토실토실", "weaponLevel": 23, "coreMatch": "6/6" },
+    { "className": "소서리스", "name": "포션이맛이없어", "replaces": "천재마법사토리", "weaponLevel": 23, "coreMatch": "6/6" },
+    { "className": "아르카나", "name": "소용녀", "replaces": "캬르카나", "weaponLevel": 24, "coreMatch": "6/6" },
+    { "className": "블레이드", "name": "마린프린스", "replaces": "쥬모", "weaponLevel": 23, "coreMatch": "5/6" },
+    { "className": "소울이터", "name": "지구사자", "replaces": "BURF", "weaponLevel": 24, "coreMatch": "6/6" },
+    { "className": "소울이터", "name": "침안", "replaces": "BURF", "weaponLevel": 24, "coreMatch": "6/6", "reason": "fills shoulder and gloves transitions" },
+    { "className": "차원술사", "name": "세가지", "replaces": "KIRA", "weaponLevel": 20, "coreMatch": "6/6" },
+    { "className": "환수사", "name": "미니딩딩", "replaces": "랑우", "weaponLevel": 23, "coreMatch": "6/6" },
+    { "className": "가디언나이트", "name": "슴지", "replaces": "박룡녀", "weaponLevel": 24, "coreMatch": "6/6" }
+  ]
+}

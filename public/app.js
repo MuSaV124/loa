@@ -1,9 +1,9 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.8.1';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.1';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.1';
-import { arkGridSignature, calibrationScopeMatches, classSpecSlotLevelKey, confidenceTier } from './combat-power-calibration.js?v=5.8.1';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.8.4';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.4';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.4';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.4';
 
-const VERSION = '5.8.1';
+const VERSION = '5.8.4';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1203,55 +1203,43 @@ function normalHoningFallback(snapshot, item, next = null) {
   const official = snapshotOfficialCombatPower(snapshot);
   const className = normalizePowerModelText(snapshot?.profile?.className);
   const slot = powerGearSlot(item);
-  const group = slot === 'weapon' ? 'weapon' : 'armor';
   const fromLevel = Number(next?.from ?? item?.honingLevel ?? 0);
   const toLevel = Number(next?.to ?? fromLevel + 1);
   const slotLevelKey = `${slot}:${fromLevel}:${toLevel}`;
-  const classSpecKey = classSpecSlotLevelKey(snapshot, slot, fromLevel, toLevel);
-  const classSpecRow = normal.percentByClassSpecSlotLevel?.[classSpecKey];
-  const classSpecPercent = Number(classSpecRow?.percent ?? classSpecRow);
-  const classSpecArkGridMatches = !classSpecRow?.arkGridSignature
-    || arkGridSignature(snapshot) === normalizePowerModelText(classSpecRow.arkGridSignature);
-  if (classSpecArkGridMatches && official > 0 && Number.isFinite(classSpecPercent) && classSpecPercent > 0) {
+  const scopedSample = findClassHoningSample(normal.scopedSamples, snapshot, slot, fromLevel, toLevel);
+  const scopedPercent = Number(scopedSample?.percent);
+  if (official > 0 && Number.isFinite(scopedPercent) && scopedPercent > 0) {
     return {
-      value: official * classSpecPercent / 100,
-      percent: classSpecPercent,
-      confidence: classSpecRow?.confidence || 'class-sampled',
-      basis: classSpecRow?.basis || 'Lopec class/spec/Ark Grid before-after sample'
+      value: official * scopedPercent / 100,
+      percent: scopedPercent,
+      confidence: 'class-sampled',
+      basis: scopedSample?.basis || 'Lopec same-class slot/range before-after sample'
+    };
+  }
+  const legacyClassRows = Object.entries(normal.percentByClassSpecSlotLevel || {}).map(([key, row]) => {
+    const [rowClassName, secondClass, transition = ''] = key.split('||');
+    const [rowSlot, from, to] = transition.split(':');
+    return { ...(typeof row === 'object' ? row : { percent: row }), className: rowClassName, secondClass, slot: rowSlot, from: Number(from), to: Number(to) };
+  });
+  const legacyClassSample = findClassHoningSample(legacyClassRows, snapshot, slot, fromLevel, toLevel);
+  const legacyClassPercent = Number(legacyClassSample?.percent);
+  if (official > 0 && Number.isFinite(legacyClassPercent) && legacyClassPercent > 0) {
+    return {
+      value: official * legacyClassPercent / 100,
+      percent: legacyClassPercent,
+      confidence: 'class-sampled',
+      basis: legacyClassSample?.basis || 'Lopec same-class slot/range before-after sample'
     };
   }
   const slotLevel = normal.percentBySlotLevel?.[slotLevelKey];
   const slotLevelPercent = Number(slotLevel?.percent ?? slotLevel);
-  const slotLevelConfidence = slotLevel?.confidence || 'estimated';
-  const slotLevelAllowed = confidenceTier(slotLevelConfidence) > 0 || calibrationScopeMatches(slotLevel, snapshot);
+  const slotLevelAllowed = normalizePowerModelText(slotLevel?.className || slotLevel?.scope?.className) === className;
   if (slotLevelAllowed && official > 0 && Number.isFinite(slotLevelPercent) && slotLevelPercent > 0) {
     return {
       value: official * slotLevelPercent / 100,
       percent: slotLevelPercent,
-      confidence: slotLevelConfidence,
-      basis: slotLevel?.basis || 'slot and honing-level calibrated percent'
-    };
-  }
-  const classFallback = normal.classFallbacks?.[className] || normal.byClass?.[className] || null;
-  const classPercent = Number(classFallback?.[`${slot}Percent`] ?? classFallback?.[`${group}Percent`]);
-  if (official > 0 && Number.isFinite(classPercent) && classPercent > 0) {
-    const confidence = classFallback?.confidence || 'estimated';
-    return {
-      value: official * classPercent / 100,
-      percent: classPercent,
-      confidence,
-      basis: classFallback?.basis || (confidence === 'class-estimated'
-        ? 'class fallback from official combat-power samples'
-        : 'shared fallback until class-specific samples are verified')
-    };
-  }
-  const slotPercent = Number(normal.percentDefaults?.[slot] ?? normal[`${group}Percent`]);
-  if (official > 0 && Number.isFinite(slotPercent) && slotPercent > 0) {
-    return {
-      value: official * slotPercent / 100,
-      percent: slotPercent,
-      confidence: normal.confidence || 'estimated',
-      basis: normal.basis || 'all-class official combat-power percent model'
+      confidence: 'class-sampled',
+      basis: slotLevel?.basis || 'same-class slot and honing-level calibrated percent'
     };
   }
   return null;
@@ -1320,7 +1308,8 @@ function calculateNextNormalRefineEstimates(snapshot, priceMap) {
     const cost = optimized?.cost || calculateMaterialGoldCost(baseMaterials, priceMap);
     const powerEstimate = estimateNormalHoningPowerDelta(item, snapshot, next);
     const expectedCost = optimized?.expectedCost || calculateNormalHoningExpectedCostForStrategy(cost, next);
-    return { category: 'normalHoning', item, available: true, ...next, cost, expectedCost, supportStrategy: optimized?.strategy || null, supportLabel: optimized?.label || '보조재료 없음', powerDelta: powerEstimate.value, powerEstimate };
+    const powerVerified = Number(powerEstimate.value || 0) > 0;
+    return { category: 'normalHoning', item, available: powerVerified, reason: powerVerified ? '' : '현재 직업·부위·강화 구간 전투력 미검증', ...next, cost, expectedCost, supportStrategy: optimized?.strategy || null, supportLabel: optimized?.label || '보조재료 없음', powerDelta: powerEstimate.value, powerEstimate };
   });
 }
 function estimateAdvancedHoningPowerDelta(item, snapshot, levels = 1) {
@@ -1760,7 +1749,7 @@ function specEfficiencyReason(row) {
     const reason = row.reason || '시세 기준';
     const confidence = row.powerEstimate?.confidence;
     if (confidence === 'verified') return `${reason} · 검증 전투력`;
-    if (confidence === 'class-sampled') return `${reason} · 동일 직업/세팅 표본`;
+    if (confidence === 'class-sampled') return `${reason} · 동일 직업 표본`;
     if (confidence === 'class-estimated') return `${reason} · 직업별 추정 전투력`;
     return `${reason} · 추정 전투력`;
   }
@@ -1776,7 +1765,7 @@ function specEfficiencyReason(row) {
   if (missing.length) return `시세 없음: ${missing.slice(0, 2).join(', ')}${missing.length > 2 ? ' 외' : ''}`;
   const confidence = row.powerEstimate?.confidence;
   if (confidence === 'verified' || confidence === 'reference-verified') return row.hasGrowth ? '검증 전투력 · 장비 성장 포함' : '검증 전투력';
-  if (confidence === 'class-sampled') return row.hasGrowth ? '동일 직업/세팅 표본 · 장비 성장 포함' : '동일 직업/세팅 표본';
+  if (confidence === 'class-sampled') return row.hasGrowth ? '동일 직업 표본 · 장비 성장 포함' : '동일 직업 표본';
   if (confidence === 'class-estimated') return row.hasGrowth ? '직업별 추정 · 장비 성장 포함' : '직업별 추정';
   if (confidence === 'estimated') return row.hasGrowth ? '추정 전투력 · 장비 성장 포함' : '추정 전투력';
   if (row.hasGrowth) return '전투력 미검증 · 장비 성장 포함';
@@ -1784,8 +1773,8 @@ function specEfficiencyReason(row) {
 }
 function combatPowerAccuracyHint() {
   const validation = state.combatPowerModel?.validation || {};
-  const classSamples = Number(validation.honing?.classSpecSamples || 0);
-  return `로펙 전후값 ${classSamples}개 직업·세팅 표본과 공식 API 현재 전투력을 대조합니다. 직업·세팅·아크그리드·부위·강화 구간이 모두 맞는 항목만 표본값으로 표시하고, 나머지는 추정값으로 분리합니다.`;
+  const classSamples = Number(validation.honing?.scopedTransitionSamples || validation.honing?.classSpecSamples || 0);
+  return `로펙 전후값 ${classSamples}개 표본과 공식 API 현재 전투력을 대조합니다. 같은 직업·부위·강화 구간의 표본을 공통 적용하며, 세부 직업과 아크그리드는 매칭 조건에서 제외합니다.`;
 }
 function specPowerDeltaText(row, powerDelta) {
   if (!(powerDelta > 0)) return '전투력 -';
@@ -1823,7 +1812,7 @@ function updateCombatPowerCoverage(estimates) {
   const verified = confidenceValues.filter(value => confidenceTier(value) === 0).length;
   const sampled = confidenceValues.filter(value => value === 'class-sampled').length;
   const status = verified > 0 ? 'verified' : sampled > 0 ? 'sampled' : 'estimated';
-  const label = verified > 0 ? '현재 빌드 검증값 있음' : sampled > 0 ? '동일 직업·세팅 표본 있음' : '현재 구간은 추정값';
+  const label = verified > 0 ? '현재 빌드 검증값 있음' : sampled > 0 ? '동일 직업 표본 있음' : '현재 구간은 미검증';
   el.className = `combatPowerCoverage ${status}`;
   el.innerHTML = `<div><span>${escapeHtml(profile.className || '-')} · ${escapeHtml(profile.secondClass || '세팅 미확인')}</span><b>${escapeHtml(label)}</b></div><p>검증 ${verified} · 직업 표본 ${sampled} · 추정/미검증 ${Math.max(0, estimates.length - verified - sampled)}</p>`;
 }
@@ -1846,8 +1835,9 @@ function renderSpecEfficiencyTable() {
   });
   const finiteScores = sortedEstimates.map(specEfficiencyScore).filter(Number.isFinite);
   const bestScore = finiteScores.length ? Math.min(...finiteScores) : 0;
+  let rankedIndex = 0;
   const rows = sortedEstimates
-    .map((row, index) => {
+    .map(row => {
       const item = row.item || {};
       const cost = row.cost || {};
       const totalGold = row.available ? Number(cost.totalGold || 0) : 0;
@@ -1880,11 +1870,12 @@ function renderSpecEfficiencyTable() {
       const upgradeDetailText = row.stepDetail || stepMainText;
       const powerDeltaText = powerText;
       const score = specEfficiencyScore(row);
+      const rankText = Number.isFinite(score) ? String(++rankedIndex) : '-';
       const meterWidth = bestScore > 0 && Number.isFinite(score) ? Math.max(8, Math.min(100, (bestScore / score) * 100)) : 0;
       const confidenceMeta = specConfidenceMeta(row);
       return `<div class="specEfficiencyRow ${row.available ? '' : 'disabled'} confidence-${confidenceMeta.className}" data-category="${escapeHtml(row.category || '')}">
         <div class="specEfficiencyTarget">
-          <span class="specEfficiencyRank">${index + 1}</span>
+          <span class="specEfficiencyRank">${rankText}</span>
           ${powerItemIcon(item, { hideQuality: true })}
           <div>
             <div class="specEfficiencyTargetTitle"><b>${escapeHtml(item.type || '-')}</b><em class="confidencePill ${confidenceMeta.className}">${confidenceMeta.label}</em></div>

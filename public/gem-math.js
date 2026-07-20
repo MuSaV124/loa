@@ -1,17 +1,8 @@
 export function isBoundGem(gem = {}) {
-  if (typeof gem.bound === 'boolean') return gem.bound;
-  if (typeof gem.isBound === 'boolean') return gem.isBound;
-
-  const text = [
-    gem.name,
-    gem.text,
-    gem.tooltip,
-    gem.bindType,
-    gem.boundType,
-    gem.tradeType
-  ].filter(Boolean).join(' ');
-
-  return /(?:캐릭터|원정대)?\s*귀속/u.test(text);
+  const name = String(gem?.name || gem?.itemName || gem?.displayName || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return /\(\s*귀속\s*\)\s*$/u.test(name);
 }
 
 export function gemFusionPurchaseCount(gem = {}) {

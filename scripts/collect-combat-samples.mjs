@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 const API_BASE = process.env.LOA_SAMPLE_API_BASE || 'https://loa-beige.vercel.app';
 const OUTPUT = resolve(process.env.LOA_SAMPLE_OUTPUT || 'tmp/combat-samples.json');
 const RANK_INPUT = process.env.LOA_RANK_INPUT ? resolve(process.env.LOA_RANK_INPUT) : '';
+const REFERENCE_INPUT = process.env.LOA_REFERENCE_INPUT ? resolve(process.env.LOA_REFERENCE_INPUT) : '';
 
 const referenceName = (process.env.LOA_REFERENCE_NAME || '').trim();
 const defaultSampleNames = [
@@ -26,6 +27,12 @@ async function loadNames() {
 
   if (RANK_INPUT) {
     const payload = JSON.parse(await readFile(RANK_INPUT, 'utf8'));
+    const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+    return rows.map(row => row?.name).filter(Boolean);
+  }
+
+  if (REFERENCE_INPUT) {
+    const payload = JSON.parse(await readFile(REFERENCE_INPUT, 'utf8'));
     const rows = Array.isArray(payload?.rows) ? payload.rows : [];
     return rows.map(row => row?.name).filter(Boolean);
   }
@@ -81,6 +88,7 @@ function summarizeSnapshot(data) {
     ok: true,
     name: profile.name || data?.profile?.CharacterName || '',
     className: profile.className || data?.profile?.CharacterClassName || '',
+    secondClass: profile.secondClass || '',
     server: profile.server || data?.profile?.ServerName || '',
     itemAvgLevel: profile.itemAvgLevel ?? null,
     combatPower: profile.combatPower ?? null,
@@ -105,6 +113,13 @@ function summarizeSnapshot(data) {
       cooldownAverageLevel: average(cooldownGems.map(gem => gem.level))
     },
     arkGrid: {
+      slots: (Array.isArray(snapshot.arkGrid?.slots) ? snapshot.arkGrid.slots : []).map(slot => ({
+        side: slot?.side || '',
+        symbol: slot?.symbol || '',
+        name: slot?.name || '',
+        grade: slot?.grade || '',
+        point: Number(slot?.point || 0)
+      })),
       gemSummary: arkGrid,
       total: arkGridLevels.reduce((sum, value) => sum + value, 0),
       average: average(arkGridLevels)
@@ -134,7 +149,7 @@ async function main() {
   const sampleNames = await loadNames();
   const names = [...new Set([referenceName, ...sampleNames].map(name => name.trim()).filter(Boolean))];
   if (!names.length) {
-    throw new Error('No sample names. Set SAMPLE_NAMES, LOA_RANK_INPUT, or LOA_REFERENCE_NAME.');
+    throw new Error('No sample names. Set SAMPLE_NAMES, LOA_RANK_INPUT, LOA_REFERENCE_INPUT, or LOA_REFERENCE_NAME.');
   }
   const rows = [];
 
@@ -158,6 +173,7 @@ async function main() {
     collectedAt: new Date().toISOString(),
     apiBase: API_BASE,
     rankInput: RANK_INPUT || null,
+    referenceInput: REFERENCE_INPUT || null,
     referenceName,
     total: rows.length,
     success: rows.filter(row => row.ok).length,

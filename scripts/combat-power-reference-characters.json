@@ -1,0 +1,33 @@
+{
+  "updatedAt": "2026-07-20",
+  "source": "user-provided reference characters",
+  "rows": [
+    { "className": "디스트로이어", "name": "BARBER" },
+    { "className": "발키리", "name": "키리냐누" },
+    { "className": "버서커", "name": "솬남자" },
+    { "className": "슬레이어", "name": "오묘한대검" },
+    { "className": "워로드", "name": "솬황" },
+    { "className": "홀리나이트", "name": "St김수환" },
+    { "className": "기공사", "name": "기사브" },
+    { "className": "배틀마스터", "name": "박짱룡" },
+    { "className": "스트라이커", "name": "불주먹몽이" },
+    { "className": "인파이터", "name": "유성실화" },
+    { "className": "창술사", "name": "벤츠CLS" },
+    { "className": "건슬링어", "name": "세덩이" },
+    { "className": "데빌헌터", "name": "ZI존대게" },
+    { "className": "블래스터", "name": "블래스터를아십니까" },
+    { "className": "스카우터", "name": "쌔끈머신" },
+    { "className": "호크아이", "name": "미젤로오레올린" },
+    { "className": "서머너", "name": "방댕이토실토실" },
+    { "className": "소서리스", "name": "천재마법사토리" },
+    { "className": "아르카나", "name": "캬르카나" },
+    { "className": "데모닉", "name": "루왁커피" },
+    { "className": "리퍼", "name": "수슉수슉수슈슉" },
+    { "className": "블레이드", "name": "쥬모" },
+    { "className": "소울이터", "name": "BURF" },
+    { "className": "기상술사", "name": "샤뽐" },
+    { "className": "차원술사", "name": "KIRA" },
+    { "className": "환수사", "name": "랑우" },
+    { "className": "가디언나이트", "name": "박룡녀" }
+  ]
+}
