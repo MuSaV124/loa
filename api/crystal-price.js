@@ -1,4 +1,4 @@
-const API_VERSION = '5.8.7';
+const API_VERSION = '5.8.8';
 const LOSPI_OHLC_URL = 'https://loatool.taeu.kr/api/crystal-history/ohlc/1h';
 const REQUEST_TIMEOUT_MS = 6500;
 const CACHE_TTL_MS = 60 * 1000;

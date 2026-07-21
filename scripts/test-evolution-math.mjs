@@ -21,11 +21,19 @@ function approx(actual, expected, precision = 0.001) {
 assert.equal(shiftClickTargetLevel(0, node('치명')), 10);
 assert.equal(shiftClickTargetLevel(10, node('치명')), 20);
 assert.equal(shiftClickTargetLevel(25, node('치명')), 30);
+assert.equal(shiftClickTargetLevel(20, node('치명'), -1), 10);
+assert.equal(shiftClickTargetLevel(5, node('치명'), -1), 0);
 assert.equal(shiftClickTargetLevel(0, node('예리한 감각')), 2);
 assert.equal(shiftClickTargetLevel(1, node('예리한 감각')), 2);
-assert.equal(shiftClickTargetLevel(0, node('한계 돌파')), 1);
-assert.equal(shiftClickTargetLevel(0, node('회심')), 1);
+assert.equal(shiftClickTargetLevel(0, node('한계 돌파')), 2);
+assert.equal(shiftClickTargetLevel(1, node('한계 돌파')), 3);
+assert.equal(shiftClickTargetLevel(3, node('한계 돌파'), -1), 1);
+assert.equal(shiftClickTargetLevel(1, node('한계 돌파'), -1), 0);
+assert.equal(shiftClickTargetLevel(0, node('파괴 전차')), 2);
+assert.equal(shiftClickTargetLevel(2, node('파괴 전차'), -1), 0);
+assert.equal(shiftClickTargetLevel(0, node('회심')), 0);
 assert.equal(shiftClickTargetLevel(0, node('입식 타격가')), 2);
+assert.equal(shiftClickTargetLevel(2, node('입식 타격가'), -1), 0);
 
 for (const name of evolution.tiers['2']) assert.equal(node(name).costPerLevel, 10);
 assert.deepEqual(level('끝없는 마나', 2), { cooldownReduction: 14, manaReduction: 20 });

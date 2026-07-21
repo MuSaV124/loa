@@ -3261,6 +3261,13 @@ select {
 .staticInfo {
   border-radius: 6px;
 }
+.manualGrid > label,
+.manualGrid .adrenalineSetting > label,
+.manualGrid .adrenalineReplacement > label,
+.manualGrid .staticInfo {
+  height: 85px;
+  min-height: 85px;
+}
 .groupBox,
 .tier,
 .nodeCard,

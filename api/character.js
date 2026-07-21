@@ -1,6 +1,6 @@
 import { isBoundGem } from '../public/gem-math.js';
 
-const API_VERSION = '5.8.7';
+const API_VERSION = '5.8.8';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = 60 * 1000;
 const CHARACTER_CACHE_MAX_SIZE = 80;

@@ -1,10 +1,10 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.7';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.7';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.7';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.7';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.7';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.8';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.8';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.8';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.8';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.8';
 
-const VERSION = '5.8.7';
+const VERSION = '5.8.8';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2410,6 +2410,7 @@ function renderEvolutionTiers() {
   $('evolutionTiers').innerHTML = html;
   $('evolutionTiers').querySelectorAll('.nodeCard').forEach(card => {
     card.addEventListener('click', onNodeCardClick);
+    card.addEventListener('contextmenu', onNodeCardContextMenu);
     card.addEventListener('mouseenter', () => showNodeTooltip(card));
     card.addEventListener('mouseleave', hideNodeTooltip);
     card.addEventListener('focus', () => showNodeTooltip(card));
@@ -2424,9 +2425,22 @@ function onNodeCardClick(event) {
   const cur = Number(state.selected[name]?.level || 0);
   let nextLevel = cur;
   if (action === 'minus') nextLevel = cur - 1;
-  else if (event.shiftKey) nextLevel = shiftClickTargetLevel(cur, node);
+  else if (event.shiftKey && Number(node?.tier) !== 4) nextLevel = shiftClickTargetLevel(cur, node, 1);
   else if (action === 'plus') nextLevel = cur + 1;
   else nextLevel = cur > 0 ? 0 : 1;
+  setNodeLevel(name, nextLevel);
+}
+function onNodeCardContextMenu(event) {
+  const card = event.currentTarget;
+  const name = card.dataset.name;
+  const node = getNode(name);
+  if (!event.shiftKey || Number(node?.tier) === 4) return;
+  event.preventDefault();
+  const cur = Number(state.selected[name]?.level || 0);
+  setNodeLevel(name, shiftClickTargetLevel(cur, node, -1));
+}
+function setNodeLevel(name, desiredLevel) {
+  let nextLevel = desiredLevel;
   nextLevel = clampLevelByTierBudget(name, nextLevel);
   if (nextLevel <= 0) delete state.selected[name];
   else state.selected[name] = { level: nextLevel, source: 'manual' };
@@ -2496,7 +2510,7 @@ function getBaseStats(selection = state.selected) {
   const extraEnemyDamage = num($('extraEnemyDamage').value);
   const extraAttackSpeed = num($('extraAttackSpeed').value);
   const extraMoveSpeed = num($('extraMoveSpeed').value);
-  const critSynergy = $('critSynergyEnabled').checked ? 10 : 0;
+  const critSynergy = $('critSynergyEnabled').checked ? num($('critSynergyValue').value) : 0;
   const backAttackCritRate = $('backAttackEnabled').checked ? 10 : 0;
   const backAttackEnemyDamage = $('backAttackEnabled').checked ? 5 : 0;
   const baseSpeed = 114;
@@ -3214,9 +3228,30 @@ async function requestCharacterData(name, maxAttempts = 2) {
   throw lastError || new Error('검색 실패');
 }
 
+const EXTRA_EFFECT_INPUT_IDS = [
+  'extraCritRate',
+  'extraCritDamage',
+  'extraEvolutionDamage',
+  'extraAdditionalDamage',
+  'extraEnemyDamage',
+  'extraAttackSpeed',
+  'extraMoveSpeed'
+];
+
+function resetAdditionalEffects() {
+  for (const id of EXTRA_EFFECT_INPUT_IDS) {
+    const input = $(id);
+    if (input) input.value = '0';
+  }
+  if ($('critSynergyEnabled')) $('critSynergyEnabled').checked = false;
+  if ($('critSynergyValue')) $('critSynergyValue').value = '10';
+  if ($('backAttackEnabled')) $('backAttackEnabled').checked = false;
+}
+
 async function searchCharacter(name) {
   const button = $('searchButton');
   button.disabled = true; button.textContent = '검색...'; setMessage('');
+  resetAdditionalEffects();
   // 이전 검색 결과가 남아 보이지 않도록 검색 시작 시 화면을 먼저 비웁니다.
   document.body.classList.remove('calculatorReady');
   $('characterCard').classList.add('hidden');
@@ -3269,7 +3304,7 @@ $('searchForm').addEventListener('submit', (event) => {
   searchCharacter(name);
 });
 $('simulatorBackButton')?.addEventListener('click', closeSimulatorPage);
-['extraCritRate','extraCritDamage','extraEvolutionDamage','extraAdditionalDamage','extraEnemyDamage','extraAttackSpeed','extraMoveSpeed'].forEach(id => $(id).addEventListener('input', calculateAndRender));
+EXTRA_EFFECT_INPUT_IDS.forEach(id => $(id).addEventListener('input', calculateAndRender));
 $('adrenalineEnabled').addEventListener('change', () => { updateAdrenalineReplacementVisibility(); calculateAndRender(); });
 $('adrenalineBookLevel')?.addEventListener('change', () => { updateEngravingControlPreviews(); calculateAndRender(); });
 $('adrenalineReplacementName')?.addEventListener('change', () => {
@@ -3280,6 +3315,7 @@ $('adrenalineReplacementName')?.addEventListener('change', () => {
 });
 $('adrenalineReplacementBookLevel')?.addEventListener('change', () => { updateEngravingControlPreviews(); calculateAndRender(); });
 $('critSynergyEnabled').addEventListener('change', calculateAndRender);
+$('critSynergyValue').addEventListener('change', calculateAndRender);
 $('backAttackEnabled').addEventListener('change', calculateAndRender);
 $('excludeCooldown')?.addEventListener('change', calculateAndRender);
 $('noManaMainSkill')?.addEventListener('change', calculateAndRender);

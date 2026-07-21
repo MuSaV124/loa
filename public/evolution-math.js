@@ -18,14 +18,17 @@ export function calculateBluntSpike(rawCritRate, effect = {}) {
   };
 }
 
-export function shiftClickTargetLevel(currentLevel, node = {}) {
+const SHIFT_POINT_STEP_BY_TIER = { 1: 10, 2: 20, 3: 20, 5: 30 };
+
+export function shiftClickTargetLevel(currentLevel, node = {}, direction = 1) {
   const maxLevel = Math.max(0, Number(node.maxLevel || 0));
   const current = Math.max(0, Math.min(maxLevel, Number(currentLevel || 0)));
-  if (maxLevel === 2) return 2;
-
+  const pointStep = Number(SHIFT_POINT_STEP_BY_TIER[Number(node.tier)] || 0);
+  if (!pointStep) return current;
   const costPerLevel = Math.max(1, Number(node.costPerLevel || 1));
-  const tenPointLevels = Math.max(1, Math.floor(10 / costPerLevel));
-  return Math.min(maxLevel, current + tenPointLevels);
+  const levelStep = Math.max(1, Math.floor(pointStep / costPerLevel));
+  const signedStep = Number(direction) < 0 ? -levelStep : levelStep;
+  return Math.max(0, Math.min(maxLevel, current + signedStep));
 }
 
 export function calculateSonicBreakEvolutionDamage(attackSpeed, moveSpeed, effect = {}) {
