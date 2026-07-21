@@ -1,9 +1,10 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.8.4';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.4';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.4';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.4';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.8.5';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.5';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.5';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.5';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.5';
 
-const VERSION = '5.8.4';
+const VERSION = '5.8.5';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -29,6 +30,66 @@ const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] }, powerSnapshot: null, powerCostEstimates: [], combatPowerModel: null, specEfficiencyFilter: 'all' };
 let simulatorRendered = false;
+
+function engravingItemByName(name) {
+  return (state.engraving?.items || []).find(item => item?.name === name) || null;
+}
+
+function populateAdrenalineReplacementOptions(syncLevel = false) {
+  const select = $('adrenalineReplacementName');
+  if (!select) return;
+  const originalHasAdrenaline = !!state.engraving?.adrenaline?.adopted;
+  const equippedNames = new Set((state.engraving?.items || []).map(item => item?.name).filter(Boolean));
+  const supportedEquipped = [...equippedNames].filter(name => name !== ADRENALINE_ENGRAVING_NAME && RELIC_ENGRAVING_RULES[name]);
+  const candidates = originalHasAdrenaline
+    ? Object.keys(RELIC_ENGRAVING_RULES).filter(name => name !== ADRENALINE_ENGRAVING_NAME && !equippedNames.has(name))
+    : supportedEquipped;
+  const names = candidates.length ? candidates : Object.keys(RELIC_ENGRAVING_RULES).filter(name => name !== ADRENALINE_ENGRAVING_NAME);
+  const previous = select.value;
+  select.innerHTML = names.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+  if (names.includes(previous)) select.value = previous;
+  else select.value = names[0] || '';
+
+  if (syncLevel) {
+    const item = engravingItemByName(select.value);
+    $('adrenalineReplacementBookLevel').value = String(clampRelicBookLevel(item?.bookLevel ?? 0));
+  }
+}
+
+function getEngravingSimulation() {
+  const adrenalineEnabled = !!$('adrenalineEnabled')?.checked;
+  const adrenalineBookLevel = clampRelicBookLevel($('adrenalineBookLevel')?.value);
+  const replacementName = $('adrenalineReplacementName')?.value || '';
+  const replacementBookLevel = clampRelicBookLevel($('adrenalineReplacementBookLevel')?.value);
+  const originalReplacement = engravingItemByName(replacementName);
+  const adjusted = adjustedEngravingEffects(state.engraving?.effects, {
+    originalHasAdrenaline: !!state.engraving?.adrenaline?.adopted,
+    adrenalineEnabled,
+    replacementName,
+    replacementBookLevel,
+    originalReplacementEffect: originalReplacement?.effects || null
+  });
+  return {
+    ...adjusted,
+    adrenalineEnabled,
+    adrenalineBookLevel,
+    adrenalineEffect: adrenalineEnabled ? relicEngravingEffect(ADRENALINE_ENGRAVING_NAME, adrenalineBookLevel) : relicEngravingEffect('', 0),
+    replacementName,
+    replacementBookLevel,
+    originalReplacement
+  };
+}
+
+function updateEngravingControlPreviews() {
+  const adrenalineEffect = relicEngravingEffect(ADRENALINE_ENGRAVING_NAME, $('adrenalineBookLevel')?.value);
+  if ($('adrenalineEffectPreview')) $('adrenalineEffectPreview').textContent = describeEngravingEffect(adrenalineEffect);
+  const replacementName = $('adrenalineReplacementName')?.value || '';
+  const replacementEffect = relicEngravingEffect(replacementName, $('adrenalineReplacementBookLevel')?.value);
+  if ($('adrenalineReplacementEffectPreview')) {
+    const condition = replacementEffect.conditionalDamage ? ' (조건 충족 기준)' : '';
+    $('adrenalineReplacementEffectPreview').textContent = `${describeEngravingEffect(replacementEffect)}${condition}`;
+  }
+}
 
 const T4_GEAR_COST_RULES = {
   standard: {
@@ -2248,7 +2309,71 @@ function clampLevelByTierBudget(name, desiredLevel) {
   const availableLevels = Math.floor(Math.max(0, tierMax - usedWithoutThis) / cost);
   return Math.min(next, availableLevels);
 }
+function nodeEffectText(node, effect = {}) {
+  const parts = [];
+  const add = (key, label, suffix = '%') => {
+    const value = Number(effect?.[key] || 0);
+    if (Math.abs(value) > 0.0001) parts.push(`${label} ${value > 0 ? '+' : ''}${fmt(value)}${suffix}`);
+  };
+  if (effect.statBonus) parts.push(`${node.name} +${formatNumber(effect.statBonus)}`);
+  add('critRate', '치명타 적중률');
+  add('critDamage', '치명타 피해');
+  add('critHitDamage', '치명타 적중 시 피해');
+  add('evolutionDamage', '진화형 피해');
+  add('additionalDamage', '추가 피해');
+  add('enemyDamage', '적에게 주는 피해');
+  add('finalDamage', '최종 피해');
+  add('cooldownReduction', '재사용 대기시간 감소');
+  add('manaReduction', '마나 소모량 감소');
+  add('speedBonus', '공격/이동 속도');
+  if (effect.critCap != null) parts.push(`치명타 적중률 상한 ${fmt(effect.critCap)}%`);
+  if (effect.overCritToEvolutionDamageRate) parts.push(`초과 치적 1%당 진피 +${fmt(effect.overCritToEvolutionDamageRate)}%`);
+  if (effect.overCritEvolutionDamageCap != null) parts.push(`초과 치적 진피 최대 +${fmt(effect.overCritEvolutionDamageCap)}%`);
+  if (effect.sonicBreak) parts.push(`공이속 비례 진피 최대 +${fmt(effect.sonicBreak.maxEvolutionDamage || 0)}%`);
+  return parts.join(' · ') || '딜 계산에 직접 반영되는 효과 없음';
+}
+
+function nodeTooltipHtml(node, selectedLevel) {
+  const levels = Object.keys(node.levels || {}).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+  let shownLevels = levels;
+  if (levels.length > 4) shownLevels = [...new Set([selectedLevel > 0 ? selectedLevel : levels[0], levels.at(-1)])];
+  const levelRows = shownLevels.map(level => {
+    const current = level === selectedLevel ? ' current' : '';
+    const label = level === selectedLevel ? `현재 Lv.${level}` : `Lv.${level}`;
+    return `<div class="nodeTooltipLevel${current}"><b>${label}</b><span>${escapeHtml(nodeEffectText(node, node.levels?.[String(level)] || {}))}</span></div>`;
+  }).join('');
+  const description = node.description ? `<p>${escapeHtml(node.description)}</p>` : '';
+  return `<div class="nodeTooltipHead"><strong>${escapeHtml(node.name)}</strong><span>${Number(node.tier || 0)}티어 · 최대 Lv.${Number(node.maxLevel || 0)}</span></div>${description}<div class="nodeTooltipLevels">${levelRows || '<div class="nodeTooltipLevel"><span>딜 계산에 직접 반영되는 효과 없음</span></div>'}</div>`;
+}
+
+function hideNodeTooltip() {
+  const tooltip = $('nodeTooltip');
+  if (!tooltip) return;
+  tooltip.classList.remove('visible');
+  tooltip.setAttribute('aria-hidden', 'true');
+}
+
+function showNodeTooltip(card) {
+  const tooltip = $('nodeTooltip');
+  const node = getNode(card?.dataset?.name);
+  if (!tooltip || !node || !card) return;
+  const selectedLevel = Number(state.selected?.[node.name]?.level || 0);
+  tooltip.innerHTML = nodeTooltipHtml(node, selectedLevel);
+  tooltip.classList.add('visible');
+  tooltip.setAttribute('aria-hidden', 'false');
+  card.setAttribute('aria-describedby', 'nodeTooltip');
+  const cardRect = card.getBoundingClientRect();
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const gap = 9;
+  const left = Math.max(8, Math.min(window.innerWidth - tooltipRect.width - 8, cardRect.left + cardRect.width / 2 - tooltipRect.width / 2));
+  let top = cardRect.top - tooltipRect.height - gap;
+  if (top < 8) top = Math.min(window.innerHeight - tooltipRect.height - 8, cardRect.bottom + gap);
+  tooltip.style.left = `${Math.round(left)}px`;
+  tooltip.style.top = `${Math.max(8, Math.round(top))}px`;
+}
+
 function renderEvolutionTiers() {
+  hideNodeTooltip();
   const html = EVOLUTION_TIERS.map(tier => {
     const cost = tierCost(tier);
     const over = cost.used > cost.max ? ' over' : '';
@@ -2271,7 +2396,13 @@ function renderEvolutionTiers() {
     return `<div class="tierBlock"><h3 class="${over}">${tier}티어 <span>(${cost.max}P)</span> <em>(${cost.used}/${cost.max}P)</em></h3><div class="nodeGrid">${cards}</div></div>`;
   }).join('');
   $('evolutionTiers').innerHTML = html;
-  $('evolutionTiers').querySelectorAll('.nodeCard').forEach(card => card.addEventListener('click', onNodeCardClick));
+  $('evolutionTiers').querySelectorAll('.nodeCard').forEach(card => {
+    card.addEventListener('click', onNodeCardClick);
+    card.addEventListener('mouseenter', () => showNodeTooltip(card));
+    card.addEventListener('mouseleave', hideNodeTooltip);
+    card.addEventListener('focus', () => showNodeTooltip(card));
+    card.addEventListener('blur', hideNodeTooltip);
+  });
 }
 function onNodeCardClick(event) {
   const card = event.currentTarget;
@@ -2334,6 +2465,9 @@ function safePercentSources(sources, aggregateValue, aggregateLabel = '합산값
 
 
 function getBaseStats(selection = state.selected) {
+  const engravingSimulation = getEngravingSimulation();
+  const engravingEffects = engravingSimulation.effects;
+  const adrenalineEffect = engravingSimulation.adrenalineEffect;
   const selectedCritStat = tier1StatBonus('치명', selection);
   const selectedSwiftStat = tier1StatBonus('신속', selection);
   const critStat = num($('baseCritStat').value) + selectedCritStat;
@@ -2346,7 +2480,6 @@ function getBaseStats(selection = state.selected) {
   const extraEvolutionDamage = num($('extraEvolutionDamage').value);
   const extraAdditionalDamage = num($('extraAdditionalDamage').value);
   const extraEnemyDamage = num($('extraEnemyDamage').value);
-  const adrenalineReplacementDamage = num($('adrenalineReplacementDamage')?.value);
   const extraAttackSpeed = num($('extraAttackSpeed').value);
   const extraMoveSpeed = num($('extraMoveSpeed').value);
   const critSynergy = $('critSynergyEnabled').checked ? 10 : 0;
@@ -2358,7 +2491,7 @@ function getBaseStats(selection = state.selected) {
   const braceletAttackMoveSpeed = num(state.bracelet.attackMoveSpeed);
   const arkGridAttackSpeed = num(state.arkGrid.attackSpeed);
   const arkGridMoveSpeed = num(state.arkGrid.moveSpeed);
-  const engravingAttackSpeed = num(state.engraving?.effects?.attackSpeed);
+  const engravingAttackSpeed = num(engravingEffects.attackSpeed);
   const attackSpeed = baseSpeed + swiftSpeedBonus + enlightenmentAttackSpeed + braceletAttackMoveSpeed + arkGridAttackSpeed + engravingAttackSpeed + extraAttackSpeed;
   const moveSpeed = baseSpeed + swiftSpeedBonus + enlightenmentMoveSpeed + braceletAttackMoveSpeed + arkGridMoveSpeed + extraMoveSpeed;
   let dynamicEnlightenmentCritRate = 0;
@@ -2383,38 +2516,39 @@ function getBaseStats(selection = state.selected) {
   ];
   pushDamageSource(enemyDamageSources, '깨달음', state.enlightenment.enemyDamage);
   pushDamageSource(enemyDamageSources, '아크그리드', state.arkGrid.enemyDamage);
-  pushDamageSource(enemyDamageSources, '각인서/API', state.engraving?.effects?.enemyDamage);
+  pushDamageSource(enemyDamageSources, '각인서/API', engravingEffects.enemyDamage);
+  if (!engravingSimulation.adrenalineEnabled) pushDamageSource(enemyDamageSources, `${engravingSimulation.replacementName} · 조건 충족`, engravingSimulation.replacementEffect.conditionalDamage);
   pushDamageSource(enemyDamageSources, '어빌리티 스톤 각인 보너스', state.abilityStone?.effects?.enemyDamage);
   pushDamageSource(enemyDamageSources, '추가 입력', extraEnemyDamage);
-  if ($('adrenalineEnabled')?.checked && !state.engraving?.adrenaline?.adopted && adrenalineReplacementDamage > 0) {
-    pushDamageSource(enemyDamageSources, '아드 대체 각인 차감', -adrenalineReplacementDamage);
-  }
   pushDamageSource(enemyDamageSources, '백어택', backAttackEnemyDamage);
   const critHitDamageSources = [
     ...collectItemDamageSources(state.accessory, 'critHitDamage', '악세'),
     ...collectItemDamageSources(state.bracelet, 'critHitDamage', '팔찌')
   ];
   pushDamageSource(critHitDamageSources, '깨달음 · 회심', state.enlightenment.critHitDamage);
-  pushDamageSource(critHitDamageSources, '각인서/API', state.engraving?.effects?.critHitDamage);
+  pushDamageSource(critHitDamageSources, '각인서/API', engravingEffects.critHitDamage);
   pushDamageSource(critHitDamageSources, '어빌리티 스톤 각인 보너스', state.abilityStone?.effects?.critHitDamage);
   return {
     critStat,
     swiftStat,
     statCritRate,
-    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.arkGrid.critRate) + num(state.engraving?.effects?.critRate) + num(state.abilityStone?.effects?.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate,
-    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.arkGrid.critDamage) + num(state.engraving?.effects?.critDamage) + num(state.abilityStone?.effects?.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage,
-    critHitDamage: num(state.accessory.critHitDamage) + num(state.bracelet.critHitDamage) + num(state.enlightenment.critHitDamage) + num(state.engraving?.effects?.critHitDamage) + num(state.abilityStone?.effects?.critHitDamage),
+    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.arkGrid.critRate) + num(engravingEffects.critRate) + num(state.abilityStone?.effects?.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate,
+    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.arkGrid.critDamage) + num(engravingEffects.critDamage) + num(state.abilityStone?.effects?.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage,
+    critHitDamage: num(state.accessory.critHitDamage) + num(state.bracelet.critHitDamage) + num(state.enlightenment.critHitDamage) + num(engravingEffects.critHitDamage) + num(state.abilityStone?.effects?.critHitDamage),
     critHitDamageSources,
     evolutionDamage: num(state.enlightenment.evolutionDamage) + extraEvolutionDamage,
-    additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + num(state.arkGrid.additionalDamage) + num(state.engraving?.effects?.additionalDamage) + num(state.abilityStone?.effects?.additionalDamage) + extraAdditionalDamage,
+    additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + num(state.arkGrid.additionalDamage) + num(engravingEffects.additionalDamage) + num(state.abilityStone?.effects?.additionalDamage) + extraAdditionalDamage,
     enemyDamage: effectivePercentFromSources(enemyDamageSources),
     enemyDamageSources,
     skillCritBonus: 0,
     critSynergy,
     backAttackCritRate,
     backAttackEnemyDamage,
-    adrenalineCritRate: $('adrenalineEnabled').checked ? num($('adrenalineCritRate').value) : 0,
-    attackPower: ($('adrenalineEnabled').checked ? num($('adrenalineAttackPower').value) : 0) + num(state.abilityStone?.attackPower) + num(state.abilityStone?.effects?.attackPower) + num(state.engraving?.effects?.attackPower),
+    adrenalineCritRate: num(adrenalineEffect.critRate),
+    adrenalineAttackPower: num(adrenalineEffect.attackPower),
+    attackPower: num(adrenalineEffect.attackPower) + num(state.abilityStone?.attackPower) + num(state.abilityStone?.effects?.attackPower) + num(engravingEffects.attackPower),
+    engravingEffects,
+    replacementEngraving: engravingSimulation.adrenalineEnabled ? null : { name: engravingSimulation.replacementName, level: engravingSimulation.replacementBookLevel, effects: engravingSimulation.replacementEffect },
     swiftSpeedBonus,
     enlightenmentAttackSpeed,
     enlightenmentMoveSpeed,
@@ -2433,7 +2567,6 @@ function getBaseStats(selection = state.selected) {
     extraEvolutionDamage,
     extraAdditionalDamage,
     extraEnemyDamage,
-    adrenalineReplacementDamage,
     extraAttackSpeed,
     extraMoveSpeed
   };
@@ -2679,7 +2812,7 @@ function buildSourceSummary(current) {
   if (state.bracelet.critRate) critLines.push(sourceLine('팔찌', state.bracelet.critRate));
   if (state.enlightenment.critRate) critLines.push(sourceLine('깨달음', state.enlightenment.critRate));
   if (state.arkGrid.critRate) critLines.push(sourceLine('아크그리드', state.arkGrid.critRate));
-  if (state.engraving?.effects?.critRate) critLines.push(sourceLine('각인서/API', state.engraving.effects.critRate));
+  if (base.engravingEffects?.critRate) critLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.critRate));
   if (state.abilityStone?.effects?.critRate) critLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critRate));
   if (base.dynamicEnlightenmentCritRate) critLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritRate));
   if (base.extraCritRate) critLines.push(sourceLine('추가 입력', base.extraCritRate));
@@ -2690,7 +2823,7 @@ function buildSourceSummary(current) {
   if (state.bracelet.critDamage) critDamageLines.push(sourceLine('팔찌', state.bracelet.critDamage));
   if (state.enlightenment.critDamage) critDamageLines.push(sourceLine('깨달음', state.enlightenment.critDamage));
   if (state.arkGrid.critDamage) critDamageLines.push(sourceLine('아크그리드', state.arkGrid.critDamage));
-  if (state.engraving?.effects?.critDamage) critDamageLines.push(sourceLine('각인서/API', state.engraving.effects.critDamage));
+  if (base.engravingEffects?.critDamage) critDamageLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.critDamage));
   if (state.abilityStone?.effects?.critDamage) critDamageLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critDamage));
   if (base.dynamicEnlightenmentCritDamage) critDamageLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritDamage));
   if (base.extraCritDamage) critDamageLines.push(sourceLine('추가 입력', base.extraCritDamage));
@@ -2711,7 +2844,7 @@ function buildSourceSummary(current) {
   if (state.bracelet.additionalDamage) addLines.push(sourceLine('팔찌', state.bracelet.additionalDamage));
   if (state.enlightenment.additionalDamage) addLines.push(sourceLine('깨달음', state.enlightenment.additionalDamage));
   if (state.arkGrid.additionalDamage) addLines.push(sourceLine('아크그리드', state.arkGrid.additionalDamage));
-  if (state.engraving?.effects?.additionalDamage) addLines.push(sourceLine('각인서/API', state.engraving.effects.additionalDamage));
+  if (base.engravingEffects?.additionalDamage) addLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.additionalDamage));
   if (state.abilityStone?.effects?.additionalDamage) addLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.additionalDamage));
   if (base.extraAdditionalDamage) addLines.push(sourceLine('추가 입력', base.extraAdditionalDamage));
   addLines.push(...addEvolution);
@@ -2738,7 +2871,8 @@ function buildSourceSummary(current) {
   if (state.bracelet.enemyDamage) enemyLines.push(sourceLine('팔찌', state.bracelet.enemyDamage));
   if (state.enlightenment.enemyDamage) enemyLines.push(sourceLine('깨달음', state.enlightenment.enemyDamage));
   if (state.arkGrid.enemyDamage) enemyLines.push(sourceLine('아크그리드', state.arkGrid.enemyDamage));
-  if (state.engraving?.effects?.enemyDamage) enemyLines.push(sourceLine('각인서/API', state.engraving.effects.enemyDamage));
+  if (base.engravingEffects?.enemyDamage) enemyLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.enemyDamage));
+  if (base.replacementEngraving?.effects?.conditionalDamage) enemyLines.push(sourceLine(`${base.replacementEngraving.name} · 조건 충족`, base.replacementEngraving.effects.conditionalDamage));
   if (state.abilityStone?.effects?.enemyDamage) enemyLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.enemyDamage));
   if (base.extraEnemyDamage) enemyLines.push(sourceLine('추가 입력', base.extraEnemyDamage));
   if (base.backAttackEnemyDamage) enemyLines.push(sourceLine('백어택', base.backAttackEnemyDamage));
@@ -2748,7 +2882,7 @@ function buildSourceSummary(current) {
   if (base.adrenalineAttackPower) attackPowerLines.push(sourceLine('아드레날린', base.adrenalineAttackPower));
   if (state.abilityStone?.attackPower) attackPowerLines.push(sourceLine('어빌리티 스톤', state.abilityStone.attackPower, '기본 공격력 보너스'));
   if (state.abilityStone?.effects?.attackPower) attackPowerLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.attackPower));
-  if (state.engraving?.effects?.attackPower) attackPowerLines.push(sourceLine('각인서/API', state.engraving.effects.attackPower));
+  if (base.engravingEffects?.attackPower) attackPowerLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.attackPower));
 
   $('sourceSummary').innerHTML = `
     <div class="sourceTitle"><div><h3>계산 요약</h3><p>표시는 출처별 합산값, 기대값은 로아식 합연산/곱연산으로 계산합니다.</p></div><button id="resetViewButton" type="button">초기화</button></div>
@@ -3028,16 +3162,18 @@ async function loadDb() {
 function syncAdrenalineControlsFromEngraving() {
   const adr = state.engraving?.adrenaline || { adopted: false, critRate: 0, attackPower: 0 };
   if ($('adrenalineEnabled')) $('adrenalineEnabled').checked = !!adr.adopted;
-  if ($('adrenalineCritRate')) $('adrenalineCritRate').value = adr.adopted ? fmt(adr.critRate || 0) : '20';
-  if ($('adrenalineAttackPower')) $('adrenalineAttackPower').value = adr.adopted ? fmt(adr.attackPower || 0) : '5.4';
+  if ($('adrenalineBookLevel')) $('adrenalineBookLevel').value = String(clampRelicBookLevel(adr.bookLevel ?? adr.level ?? 0));
+  populateAdrenalineReplacementOptions(true);
   updateAdrenalineReplacementVisibility();
 }
 
 function updateAdrenalineReplacementVisibility() {
   const wrap = $('adrenalineReplacementWrap');
   if (!wrap) return;
-  const needsReplacement = !!$('adrenalineEnabled')?.checked && !state.engraving?.adrenaline?.adopted;
-  wrap.classList.toggle('hidden', !needsReplacement);
+  const originalHasAdrenaline = !!state.engraving?.adrenaline?.adopted;
+  const showReplacement = !$('adrenalineEnabled')?.checked || !originalHasAdrenaline;
+  wrap.classList.toggle('hidden', !showReplacement);
+  updateEngravingControlPreviews();
 }
 
 async function requestCharacterData(name, maxAttempts = 2) {
@@ -3118,8 +3254,16 @@ $('searchForm').addEventListener('submit', (event) => {
   searchCharacter(name);
 });
 $('simulatorBackButton')?.addEventListener('click', closeSimulatorPage);
-['extraCritRate','extraCritDamage','extraEvolutionDamage','extraAdditionalDamage','extraEnemyDamage','extraAttackSpeed','extraMoveSpeed','adrenalineCritRate','adrenalineAttackPower','adrenalineReplacementDamage'].forEach(id => $(id).addEventListener('input', calculateAndRender));
+['extraCritRate','extraCritDamage','extraEvolutionDamage','extraAdditionalDamage','extraEnemyDamage','extraAttackSpeed','extraMoveSpeed'].forEach(id => $(id).addEventListener('input', calculateAndRender));
 $('adrenalineEnabled').addEventListener('change', () => { updateAdrenalineReplacementVisibility(); calculateAndRender(); });
+$('adrenalineBookLevel')?.addEventListener('change', () => { updateEngravingControlPreviews(); calculateAndRender(); });
+$('adrenalineReplacementName')?.addEventListener('change', () => {
+  const item = engravingItemByName($('adrenalineReplacementName').value);
+  $('adrenalineReplacementBookLevel').value = String(clampRelicBookLevel(item?.bookLevel ?? 0));
+  updateEngravingControlPreviews();
+  calculateAndRender();
+});
+$('adrenalineReplacementBookLevel')?.addEventListener('change', () => { updateEngravingControlPreviews(); calculateAndRender(); });
 $('critSynergyEnabled').addEventListener('change', calculateAndRender);
 $('backAttackEnabled').addEventListener('change', calculateAndRender);
 $('excludeCooldown')?.addEventListener('change', calculateAndRender);
@@ -3715,6 +3859,10 @@ function renderMarketError(container, message) {
 // DOM 요소와 모든 함수가 정의된 뒤 한 번만 초기화합니다.
 if (!window.__lostarkCalculatorBootedV506) {
   window.__lostarkCalculatorBootedV506 = true;
+  populateAdrenalineReplacementOptions(true);
+  updateEngravingControlPreviews();
+  window.addEventListener('scroll', hideNodeTooltip, { passive: true });
+  window.addEventListener('resize', hideNodeTooltip);
   initLegendAvatarTab();
   initMarketPriceTab();
   setActiveTab('calculator');

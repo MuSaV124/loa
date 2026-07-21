@@ -1,6 +1,6 @@
 {
   "name": "lostark-node-recommend-calculator",
-  "version": "5.8.4",
+  "version": "5.8.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,8 @@
     "test:evolution": "node scripts/test-evolution-math.mjs",
     "test:advanced-honing": "node scripts/test-advanced-honing-math.mjs",
     "test:gem": "node scripts/test-gem-math.mjs",
-    "test:combat-power": "node scripts/test-combat-power-calibration.mjs"
+    "test:combat-power": "node scripts/test-combat-power-calibration.mjs",
+    "test:engraving": "node scripts/test-engraving-math.mjs"
   },
   "dependencies": {
     "cheerio": "^1.0.0"

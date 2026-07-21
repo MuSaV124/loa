@@ -1121,6 +1121,72 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .checkLabel input[type="checkbox"] { width: 20px; height: 20px; margin: 0; accent-color: var(--amber); }
 .checkLabel span { color: #bfdbfe; }
 
+.adrenalineSetting,
+.adrenalineReplacement {
+  grid-column: span 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, .72fr);
+  gap: 10px;
+  align-items: stretch;
+}
+.adrenalineSetting .checkLabel,
+.adrenalineSetting .engravingLevelLabel,
+.adrenalineReplacement label {
+  min-height: 72px;
+  margin: 0;
+}
+.adrenalineSetting select,
+.adrenalineReplacement select {
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 10px;
+}
+.engravingEffectPreview {
+  grid-column: 1 / -1;
+  color: #9fb0c8;
+  font-size: 11px;
+  line-height: 1.45;
+  padding: 0 4px;
+}
+.adrenalineReplacement.hidden { display: none; }
+
+.nodeTooltip {
+  position: fixed;
+  z-index: 1000;
+  width: min(310px, calc(100vw - 24px));
+  padding: 13px 14px;
+  border: 1px solid rgba(94, 231, 226, .42);
+  border-radius: 8px;
+  background: rgba(4, 9, 17, .98);
+  color: #e5edf8;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .48);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(3px);
+  transition: opacity .1s ease, transform .1s ease, visibility .1s ease;
+}
+.nodeTooltip.visible { opacity: 1; visibility: visible; transform: translateY(0); }
+.nodeTooltipHead { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 7px; }
+.nodeTooltipHead strong { color: #f8fafc; font-size: 14px; }
+.nodeTooltipHead span { color: #5ee7e2; font-size: 11px; font-weight: 900; white-space: nowrap; }
+.nodeTooltip p { margin: 0 0 8px; color: #b8c7dc; font-size: 12px; line-height: 1.5; }
+.nodeTooltipLevels { display: grid; gap: 5px; }
+.nodeTooltipLevel { display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid rgba(148, 163, 184, .12); padding-top: 5px; font-size: 11px; line-height: 1.4; }
+.nodeTooltipLevel b { color: #f6c65b; white-space: nowrap; }
+.nodeTooltipLevel span { color: #d5deeb; text-align: right; }
+.nodeTooltipLevel.current span { color: #ffffff; font-weight: 850; }
+
+@media (max-width: 980px) {
+  .adrenalineSetting,
+  .adrenalineReplacement { grid-column: span 2; }
+}
+@media (max-width: 760px) {
+  .adrenalineSetting,
+  .adrenalineReplacement { grid-column: span 1; grid-template-columns: 1fr; }
+  .engravingEffectPreview { grid-column: 1; }
+}
+
 
 /* v3.1 source summary UI */
 .sourceSummary { margin-top: 18px; border-top: 1px solid rgba(148, 163, 184, .16); padding-top: 14px; }

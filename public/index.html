@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LOSTARK 진화 노드 추천 계산기</title>
-  <link rel="stylesheet" href="/style.css?v=5.8.4" />
+  <link rel="stylesheet" href="/style.css?v=5.8.5" />
 </head>
 <body>
   <main class="wrap">
@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v5.8.4 · 직업별 전투력 표본 적용</span>
+        <span class="badge">v5.8.5 · 각인 레벨·노드 툴팁</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -70,10 +70,24 @@
         <label>추가 이동 속도(%)<input id="extraMoveSpeed" type="number" step="0.01" value="0" /></label>
         <label class="checkLabel"><span>치적 시너지 적용 (+10%)</span><input id="critSynergyEnabled" type="checkbox" /></label>
         <label class="checkLabel"><span>백어택 적용 (+치적 10% / 피해 5%)</span><input id="backAttackEnabled" type="checkbox" /></label>
-        <label class="checkLabel"><span>아드레날린 적용</span><input id="adrenalineEnabled" type="checkbox" checked /></label>
-        <label>아드 치명타 확률(%)<input id="adrenalineCritRate" type="number" step="0.01" value="20" /></label>
-        <label>아드 공격력 증가(%)<input id="adrenalineAttackPower" type="number" step="0.01" value="5.4" /></label>
-        <label id="adrenalineReplacementWrap" class="hidden">아드 대체 각인 효율 차감(%)<input id="adrenalineReplacementDamage" type="number" step="0.01" value="0" /></label>
+        <div class="adrenalineSetting">
+          <label class="checkLabel"><span>아드레날린 적용</span><input id="adrenalineEnabled" type="checkbox" checked /></label>
+          <label class="engravingLevelLabel"><span>유물 각인서</span>
+            <select id="adrenalineBookLevel" aria-label="아드레날린 유물 각인서 레벨">
+              <option value="0">유물 Lv.0</option><option value="1">유물 Lv.1</option><option value="2">유물 Lv.2</option><option value="3">유물 Lv.3</option><option value="4" selected>유물 Lv.4</option>
+            </select>
+          </label>
+          <small id="adrenalineEffectPreview" class="engravingEffectPreview"></small>
+        </div>
+        <div id="adrenalineReplacementWrap" class="adrenalineReplacement hidden">
+          <label><span>대체 각인</span><select id="adrenalineReplacementName" aria-label="아드레날린 대체 각인"></select></label>
+          <label><span>유물 각인서</span>
+            <select id="adrenalineReplacementBookLevel" aria-label="대체 각인 유물 각인서 레벨">
+              <option value="0">유물 Lv.0</option><option value="1">유물 Lv.1</option><option value="2">유물 Lv.2</option><option value="3">유물 Lv.3</option><option value="4">유물 Lv.4</option>
+            </select>
+          </label>
+          <small id="adrenalineReplacementEffectPreview" class="engravingEffectPreview"></small>
+        </div>
         <div class="staticInfo"><b>기본 공이속</b><span>114% = 기본 100% + 만찬 5% + 서폿 진화 9%</span></div>
         <div class="staticInfo"><b>신속 공이속</b><span>신속 ÷ 58.21 로 자동 계산</span></div>
           </div>
@@ -202,7 +216,8 @@
 
   </main>
 
-  <div class="version">Version 5.8.4</div>
-  <script type="module" src="/app.js?v=5.8.4"></script>
+  <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
+  <div class="version">Version 5.8.5</div>
+  <script type="module" src="/app.js?v=5.8.5"></script>
 </body>
 </html>
