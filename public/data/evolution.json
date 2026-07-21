@@ -671,7 +671,11 @@
         }
       },
       "iconImage": "/images/evolution/끝없는 마나.webp",
-      "description": "마나 사용 스킬 재사용 대기시간 7%/14% 감소, 마나 소모량 10%/20% 감소"
+      "description": "마나를 사용하는 스킬에만 적용됩니다. 재사용 대기시간과 마나 소모량이 함께 감소합니다.",
+      "displayLevels": {
+        "1": "마나 사용 스킬 재사용 대기시간 7% 감소, 마나 소모량 10% 감소",
+        "2": "마나 사용 스킬 재사용 대기시간 14% 감소, 마나 소모량 20% 감소"
+      }
     },
     {
       "name": "금단의 주문",
@@ -690,7 +694,11 @@
         }
       },
       "iconImage": "/images/evolution/금단의 주문.webp",
-      "description": "진화형 피해 5%/10% 증가 + 마나 스킬 진화형 피해 5%/10% 추가 증가, 마나 소모량 6%/12% 감소"
+      "description": "모든 스킬의 진화형 피해가 증가하며, 마나를 사용하는 스킬은 같은 수치만큼 추가로 증가합니다.",
+      "displayLevels": {
+        "1": "진화형 피해 5% 증가. 마나 스킬은 진화형 피해 5% 추가 증가(총 10%), 마나 소모량 6% 감소",
+        "2": "진화형 피해 10% 증가. 마나 스킬은 진화형 피해 10% 추가 증가(총 20%), 마나 소모량 12% 감소"
+      }
     },
     {
       "name": "예리한 감각",
@@ -708,7 +716,12 @@
           "evolutionDamage": 10
         }
       },
-      "iconImage": "/images/evolution/예리한 감각.webp"
+      "iconImage": "/images/evolution/예리한 감각.webp",
+      "description": "조건 없이 치명타 적중률과 진화형 피해가 증가합니다.",
+      "displayLevels": {
+        "1": "치명타 적중률 4% 증가, 진화형 피해 5% 증가",
+        "2": "치명타 적중률 8% 증가, 진화형 피해 10% 증가"
+      }
     },
     {
       "name": "한계 돌파",
@@ -727,7 +740,13 @@
           "evolutionDamage": 30
         }
       },
-      "iconImage": "/images/evolution/한계 돌파.webp"
+      "iconImage": "/images/evolution/한계 돌파.webp",
+      "description": "별도 발동 조건 없이 진화형 피해가 증가합니다.",
+      "displayLevels": {
+        "1": "진화형 피해 10% 증가",
+        "2": "진화형 피해 20% 증가",
+        "3": "진화형 피해 30% 증가"
+      }
     },
     {
       "name": "최적화 훈련",
@@ -745,7 +764,12 @@
           "cooldownReduction": 8
         }
       },
-      "iconImage": "/images/evolution/최적화 훈련.webp"
+      "iconImage": "/images/evolution/최적화 훈련.webp",
+      "description": "각성기, 이동기 및 기상기를 제외한 스킬에 재사용 대기시간 감소가 적용됩니다.",
+      "displayLevels": {
+        "1": "각성기·이동기·기상기 제외 스킬 재사용 대기시간 4% 감소, 진화형 피해 5% 증가",
+        "2": "각성기·이동기·기상기 제외 스킬 재사용 대기시간 8% 감소, 진화형 피해 10% 증가"
+      }
     },
     {
       "name": "축복의 여신",
@@ -753,8 +777,24 @@
       "maxLevel": 3,
       "costPerLevel": 10,
       "icon": "🧎",
-      "levels": {},
-      "iconImage": "/images/evolution/축복의 여신.webp"
+      "levels": {
+        "1": {
+          "speedBonus": 3
+        },
+        "2": {
+          "speedBonus": 6
+        },
+        "3": {
+          "speedBonus": 9
+        }
+      },
+      "iconImage": "/images/evolution/축복의 여신.webp",
+      "description": "전투 중 자신과 주변 파티원에게 전투 축복을 적용합니다. 효과는 20초 동안 유지되고 매초 갱신됩니다.",
+      "displayLevels": {
+        "1": "전투 축복 I: 공격속도 및 이동속도 3% 증가",
+        "2": "전투 축복 II: 공격속도 및 이동속도 6% 증가",
+        "3": "전투 축복 III: 공격속도 및 이동속도 9% 증가"
+      }
     },
     {
       "name": "무한한 마력",
@@ -775,7 +815,11 @@
         }
       },
       "iconImage": "/images/evolution/무한한 마력.webp",
-      "description": "진화형 피해 8%/16% 증가, 마나 스킬 재사용 대기시간 7%/14% 감소, 마나 소모량 8%/16% 감소"
+      "description": "진화형 피해는 항상 증가하며, 재사용 대기시간 및 마나 소모량 감소는 마나를 사용하는 스킬에만 적용됩니다.",
+      "displayLevels": {
+        "1": "진화형 피해 8% 증가, 마나 스킬 재사용 대기시간 7% 감소, 마나 소모량 8% 감소",
+        "2": "진화형 피해 16% 증가, 마나 스킬 재사용 대기시간 14% 감소, 마나 소모량 16% 감소"
+      }
     },
     {
       "name": "혼신의 강타",
@@ -793,7 +837,12 @@
           "evolutionDamage": 4
         }
       },
-      "iconImage": "/images/evolution/혼신의 강타.webp"
+      "iconImage": "/images/evolution/혼신의 강타.webp",
+      "description": "조건 없이 치명타 적중률과 진화형 피해가 증가합니다.",
+      "displayLevels": {
+        "1": "치명타 적중률 12% 증가, 진화형 피해 2% 증가",
+        "2": "치명타 적중률 24% 증가, 진화형 피해 4% 증가"
+      }
     },
     {
       "name": "일격",
@@ -811,7 +860,12 @@
           "critDamage": 32
         }
       },
-      "iconImage": "/images/evolution/일격.webp"
+      "iconImage": "/images/evolution/일격.webp",
+      "description": "치명타 적중률은 모든 공격에 적용되지만, 치명타 피해 증가는 헤드어택·백어택 등 방향성 공격 스킬에만 적용됩니다.",
+      "displayLevels": {
+        "1": "치명타 적중률 10% 증가, 방향성 공격 스킬의 치명타 피해 16% 증가",
+        "2": "치명타 적중률 20% 증가, 방향성 공격 스킬의 치명타 피해 32% 증가"
+      }
     },
     {
       "name": "파괴 전차",
@@ -822,14 +876,19 @@
       "levels": {
         "1": {
           "evolutionDamage": 12,
-          "speedBonus": 4
+          "attackSpeedBonus": 4
         },
         "2": {
           "evolutionDamage": 24,
-          "speedBonus": 8
+          "attackSpeedBonus": 8
         }
       },
-      "iconImage": "/images/evolution/파괴 전차.webp"
+      "iconImage": "/images/evolution/파괴 전차.webp",
+      "description": "별도 발동 조건 없이 진화형 피해와 공격속도가 증가합니다. 이동속도는 증가하지 않습니다.",
+      "displayLevels": {
+        "1": "진화형 피해 12% 증가, 공격속도 4% 증가",
+        "2": "진화형 피해 24% 증가, 공격속도 8% 증가"
+      }
     },
     {
       "name": "타이밍 지배",
@@ -839,13 +898,20 @@
       "icon": "🛡️",
       "levels": {
         "1": {
-          "evolutionDamage": 8
+          "evolutionDamage": 8,
+          "cooldownReduction": 5
         },
         "2": {
-          "evolutionDamage": 16
+          "evolutionDamage": 16,
+          "cooldownReduction": 10
         }
       },
-      "iconImage": "/images/evolution/타이밍 지배.webp"
+      "iconImage": "/images/evolution/타이밍 지배.webp",
+      "description": "각성기, 이동기 및 기상기를 제외한 스킬에 재사용 대기시간 감소가 적용됩니다.",
+      "displayLevels": {
+        "1": "각성기·이동기·기상기 제외 스킬 재사용 대기시간 5% 감소, 진화형 피해 8% 증가",
+        "2": "각성기·이동기·기상기 제외 스킬 재사용 대기시간 10% 감소, 진화형 피해 16% 증가"
+      }
     },
     {
       "name": "정열의 춤사위",
@@ -855,13 +921,18 @@
       "icon": "🌹",
       "levels": {
         "1": {
-          "evolutionDamage": 6
+          "evolutionDamage": 7
         },
         "2": {
-          "evolutionDamage": 12
+          "evolutionDamage": 14
         }
       },
-      "iconImage": "/images/evolution/정열의 춤사위.webp"
+      "iconImage": "/images/evolution/정열의 춤사위.webp",
+      "description": "공격 적중 시 아이덴티티 게이지 획득량이 증가합니다. 전투 중 자신과 주변 파티원에게 정열의 춤을 적용하며, 20초 동안 유지되고 매초 갱신됩니다.",
+      "displayLevels": {
+        "1": "적중 시 아이덴티티 게이지 획득량 10% 증가. 정열의 춤 I: 진화형 피해 7% 증가",
+        "2": "적중 시 아이덴티티 게이지 획득량 20% 증가. 정열의 춤 II: 진화형 피해 14% 증가"
+      }
     },
     {
       "name": "회심",
@@ -874,7 +945,11 @@
           "critHitDamage": 12
         }
       },
-      "iconImage": "/images/evolution/회심.webp"
+      "iconImage": "/images/evolution/회심.webp",
+      "description": "공격이 치명타로 적중했을 때만 적에게 주는 피해 증가가 적용됩니다. 받는 피해는 항상 4% 감소합니다.",
+      "displayLevels": {
+        "1": "치명타 적중 시 적에게 주는 피해 12% 증가, 받는 피해 4% 감소"
+      }
     },
     {
       "name": "달인",
@@ -888,7 +963,11 @@
           "additionalDamage": 8.5
         }
       },
-      "iconImage": "/images/evolution/달인.webp"
+      "iconImage": "/images/evolution/달인.webp",
+      "description": "이동기 및 기상기를 제외한 스킬을 사용하면 10초간 달인 효과를 얻습니다. 스킬을 계속 사용해 최대 5중첩을 유지해야 최대 효과가 적용됩니다.",
+      "displayLevels": {
+        "1": "받는 피해 4% 감소. 달인 1중첩당 치명타 적중률 1.4%·추가 피해 1.7% 증가, 최대 5중첩(치적 7%·추피 8.5%)"
+      }
     },
     {
       "name": "분쇄",
@@ -901,7 +980,11 @@
           "evolutionDamage": 20
         }
       },
-      "iconImage": "/images/evolution/분쇄.webp"
+      "iconImage": "/images/evolution/분쇄.webp",
+      "description": "별도 발동 조건 없이 진화형 피해가 증가하고 받는 피해가 감소합니다.",
+      "displayLevels": {
+        "1": "진화형 피해 20% 증가, 받는 피해 4% 감소"
+      }
     },
     {
       "name": "선각자",
@@ -910,7 +993,11 @@
       "costPerLevel": 10,
       "icon": "🧭",
       "levels": {},
-      "iconImage": "/images/evolution/선각자.webp"
+      "iconImage": "/images/evolution/선각자.webp",
+      "description": "이동기 및 기상기를 제외한 스킬을 사용하면 10초간 통찰을 얻습니다. 최대 5중첩에 도달해야 추가 공격력 강화와 쿨감이 적용됩니다.",
+      "displayLevels": {
+        "1": "최대 생명력 6% 증가. 통찰 1중첩당 아군 공격력 강화 효과 2.2% 증가(최대 5중첩). 최대 중첩 시 아군 공격력 강화 효과 추가 11% 증가 및 기상기·각성기 제외 스킬 재사용 대기시간 5% 감소"
+      }
     },
     {
       "name": "진군",
@@ -919,7 +1006,11 @@
       "costPerLevel": 10,
       "icon": "🚩",
       "levels": {},
-      "iconImage": "/images/evolution/진군.webp"
+      "iconImage": "/images/evolution/진군.webp",
+      "description": "아군에게 보호 효과를 사용하면 자신의 5m 안에 진군 에테르를 생성합니다. 에테르 생성에는 7초의 발동 재사용 대기시간이 있습니다.",
+      "displayLevels": {
+        "1": "최대 생명력 6% 증가. 진군 에테르 획득 시 15초간 아군 공격력 강화 효과 24%·공격속도 4%·이동속도 4% 증가"
+      }
     },
     {
       "name": "기원",
@@ -928,7 +1019,11 @@
       "costPerLevel": 10,
       "icon": "💗",
       "levels": {},
-      "iconImage": "/images/evolution/기원.webp"
+      "iconImage": "/images/evolution/기원.webp",
+      "description": "별도 발동 조건 없이 서포터의 아군 공격력 강화 효과와 낙인력을 높입니다.",
+      "displayLevels": {
+        "1": "최대 생명력 6% 증가, 아군 공격력 강화 효과 22% 증가, 낙인력 4% 증가"
+      }
     },
     {
       "name": "뭉툭한 가시",
@@ -936,7 +1031,7 @@
       "maxLevel": 2,
       "costPerLevel": 15,
       "icon": "🗡️",
-      "description": "진화형 피해 증가 + 치명타 확률 80% 초과분을 진화형 피해로 전환(Lv.2 기준 총 진피 최대 75%)",
+      "description": "치명타 적중률은 최대 80%로 제한됩니다. 공격 시 80%를 초과한 치명타 적중률이 진화형 피해로 전환되며, 노드 전체 진화형 피해에는 레벨별 상한이 있습니다.",
       "levels": {
         "1": {
           "evolutionDamage": 7.5,
@@ -951,7 +1046,11 @@
           "overCritEvolutionDamageCap": 60
         }
       },
-      "iconImage": "/images/evolution/뭉툭한 가시.webp"
+      "iconImage": "/images/evolution/뭉툭한 가시.webp",
+      "displayLevels": {
+        "1": "기본 진화형 피해 7.5% 증가. 초과 치명타 적중률의 125%를 진화형 피해로 전환하며, 전환 피해는 최대 52.5%·노드 전체는 최대 60%",
+        "2": "기본 진화형 피해 15% 증가. 초과 치명타 적중률의 150%를 진화형 피해로 전환하며, 전환 피해는 최대 60%·노드 전체는 최대 75%"
+      }
     },
     {
       "name": "음속 돌파",
@@ -959,7 +1058,7 @@
       "maxLevel": 2,
       "costPerLevel": 15,
       "icon": "💎",
-      "description": "현재 공속/이속 증가량과 상한 초과분으로 진화형 피해 계산(최대 12%/24%)",
+      "description": "공격 적중 시 공격속도 및 이동속도 증가량에 비례해 진화형 피해가 증가합니다. 두 속도가 모두 상한을 초과하면 고정 보너스와 상한 초과분 환산이 추가됩니다.",
       "levels": {
         "1": {
           "sonicBreak": {
@@ -978,7 +1077,11 @@
           }
         }
       },
-      "iconImage": "/images/evolution/음속 돌파.webp"
+      "iconImage": "/images/evolution/음속 돌파.webp",
+      "displayLevels": {
+        "1": "공속·이속 증가량의 5%만큼 진화형 피해 증가. 두 속도 모두 상한 초과 시 4% 추가 및 초과 증가량의 15% 추가 환산, 노드 전체 최대 12%",
+        "2": "공속·이속 증가량의 10%만큼 진화형 피해 증가. 두 속도 모두 상한 초과 시 8% 추가 및 초과 증가량의 30% 추가 환산, 노드 전체 최대 24%"
+      }
     },
     {
       "name": "인파이팅",
@@ -986,7 +1089,7 @@
       "maxLevel": 2,
       "costPerLevel": 15,
       "icon": "🥊",
-      "description": "정면 승부 기준 진화형 피해 증가",
+      "description": "공격이 적중하면 정면 승부 효과를 얻습니다. 방향성 공격 여부와 관계없이 적중이 발동 조건입니다.",
       "levels": {
         "1": {
           "evolutionDamage": 9
@@ -995,7 +1098,11 @@
           "evolutionDamage": 18
         }
       },
-      "iconImage": "/images/evolution/인파이팅.webp"
+      "iconImage": "/images/evolution/인파이팅.webp",
+      "displayLevels": {
+        "1": "정면 승부 I: 진화형 피해 9% 증가",
+        "2": "정면 승부 II: 진화형 피해 18% 증가"
+      }
     },
     {
       "name": "입식 타격가",
@@ -1003,7 +1110,7 @@
       "maxLevel": 2,
       "costPerLevel": 15,
       "icon": "🧍",
-      "description": "입식 타격 6중첩 기준 진화형 피해 증가",
+      "description": "전투 시작 시 입식 타격 효과를 최대 중첩으로 얻습니다. 피격 이상 시 3중첩을 잃고, 이후 2초마다 1중첩씩 회복합니다.",
       "levels": {
         "1": {
           "evolutionDamage": 10.5
@@ -1012,7 +1119,11 @@
           "evolutionDamage": 21
         }
       },
-      "iconImage": "/images/evolution/입식 타격가.webp"
+      "iconImage": "/images/evolution/입식 타격가.webp",
+      "displayLevels": {
+        "1": "기본 진화형 피해 6%·낙인력 4% 증가. 입식 타격 I 1중첩당 진화형 피해 0.75%·낙인력 1% 증가, 최대 6중첩(총 진피 10.5%)",
+        "2": "기본 진화형 피해 12%·낙인력 8% 증가. 입식 타격 II 1중첩당 진화형 피해 1.5%·낙인력 2% 증가, 최대 6중첩(총 진피 21%)"
+      }
     },
     {
       "name": "마나 용광로",
@@ -1020,7 +1131,7 @@
       "maxLevel": 2,
       "costPerLevel": 15,
       "icon": "🌊",
-      "description": "마나 소모 조건을 만족한다고 가정한 최대 진화형 피해",
+      "description": "마나 스킬 사용 시 최대 마나의 2%가 추가로 소모됩니다. 피해를 준 스킬의 증감 전 기본 마나 소모량에 비례해 해당 스킬의 진화형 피해가 증가합니다.",
       "levels": {
         "1": {
           "evolutionDamage": 12
@@ -1029,7 +1140,11 @@
           "evolutionDamage": 24
         }
       },
-      "iconImage": "/images/evolution/마나 용광로.webp"
+      "iconImage": "/images/evolution/마나 용광로.webp",
+      "displayLevels": {
+        "1": "낙인력 10% 증가. 기본 마나 소모량 10당 진화형 피해 0.25% 증가, 최대 12%",
+        "2": "낙인력 20% 증가. 기본 마나 소모량 10당 진화형 피해 0.5% 증가, 최대 24%"
+      }
     },
     {
       "name": "안정된 관리자",
@@ -1037,9 +1152,13 @@
       "maxLevel": 2,
       "costPerLevel": 15,
       "icon": "🤝",
-      "description": "낙인력 증가 노드. 딜 계산에서는 직접 피해 증가 없음으로 처리",
+      "description": "낙인력이 증가하는 대신 아이덴티티 게이지 획득량이 감소합니다. 직접적인 피해 증가 효과는 없어 딜 계산에는 반영되지 않습니다.",
       "levels": {},
-      "iconImage": "/images/evolution/안정된 관리자.webp"
+      "iconImage": "/images/evolution/안정된 관리자.webp",
+      "displayLevels": {
+        "1": "낙인력 10% 증가, 아이덴티티 게이지 획득량 3% 감소",
+        "2": "낙인력 20% 증가, 아이덴티티 게이지 획득량 6% 감소"
+      }
     }
   ]
 }

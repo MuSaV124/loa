@@ -1,4 +1,4 @@
-const API_VERSION = '5.8.5';
+const API_VERSION = '5.8.6';
 const LOSTARK_ORIGIN = 'https://lostark.game.onstove.com';
 const NOTICE_URL = `${LOSTARK_ORIGIN}/News/Notice/List`;
 const UPDATE_URL = `${LOSTARK_ORIGIN}/News/Update/List`;

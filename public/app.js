@@ -1,10 +1,10 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.8.5';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.5';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.5';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.5';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.5';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.8.6';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.6';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.6';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.6';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.6';
 
-const VERSION = '5.8.5';
+const VERSION = '5.8.6';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2326,6 +2326,7 @@ function nodeEffectText(node, effect = {}) {
   add('cooldownReduction', '재사용 대기시간 감소');
   add('manaReduction', '마나 소모량 감소');
   add('speedBonus', '공격/이동 속도');
+  add('attackSpeedBonus', '공격 속도');
   if (effect.critCap != null) parts.push(`치명타 적중률 상한 ${fmt(effect.critCap)}%`);
   if (effect.overCritToEvolutionDamageRate) parts.push(`초과 치적 1%당 진피 +${fmt(effect.overCritToEvolutionDamageRate)}%`);
   if (effect.overCritEvolutionDamageCap != null) parts.push(`초과 치적 진피 최대 +${fmt(effect.overCritEvolutionDamageCap)}%`);
@@ -2334,13 +2335,17 @@ function nodeEffectText(node, effect = {}) {
 }
 
 function nodeTooltipHtml(node, selectedLevel) {
-  const levels = Object.keys(node.levels || {}).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+  const levels = [...new Set([
+    ...Object.keys(node.levels || {}),
+    ...Object.keys(node.displayLevels || {})
+  ].map(Number).filter(Number.isFinite))].sort((a, b) => a - b);
   let shownLevels = levels;
   if (levels.length > 4) shownLevels = [...new Set([selectedLevel > 0 ? selectedLevel : levels[0], levels.at(-1)])];
   const levelRows = shownLevels.map(level => {
     const current = level === selectedLevel ? ' current' : '';
     const label = level === selectedLevel ? `현재 Lv.${level}` : `Lv.${level}`;
-    return `<div class="nodeTooltipLevel${current}"><b>${label}</b><span>${escapeHtml(nodeEffectText(node, node.levels?.[String(level)] || {}))}</span></div>`;
+    const detail = node.displayLevels?.[String(level)] || nodeEffectText(node, node.levels?.[String(level)] || {});
+    return `<div class="nodeTooltipLevel${current}"><b>${label}</b><span>${escapeHtml(detail)}</span></div>`;
   }).join('');
   const description = node.description ? `<p>${escapeHtml(node.description)}</p>` : '';
   return `<div class="nodeTooltipHead"><strong>${escapeHtml(node.name)}</strong><span>${Number(node.tier || 0)}티어 · 최대 Lv.${Number(node.maxLevel || 0)}</span></div>${description}<div class="nodeTooltipLevels">${levelRows || '<div class="nodeTooltipLevel"><span>딜 계산에 직접 반영되는 효과 없음</span></div>'}</div>`;
@@ -2368,8 +2373,15 @@ function showNodeTooltip(card) {
   const left = Math.max(8, Math.min(window.innerWidth - tooltipRect.width - 8, cardRect.left + cardRect.width / 2 - tooltipRect.width / 2));
   let top = cardRect.top - tooltipRect.height - gap;
   if (top < 8) top = Math.min(window.innerHeight - tooltipRect.height - 8, cardRect.bottom + gap);
+  top = Math.min(Math.max(8, window.innerHeight - tooltipRect.height - 8), Math.max(8, top));
   tooltip.style.left = `${Math.round(left)}px`;
-  tooltip.style.top = `${Math.max(8, Math.round(top))}px`;
+  tooltip.style.top = `${Math.round(top)}px`;
+}
+
+function refreshFocusedNodeTooltip() {
+  const focusedCard = document.activeElement?.closest?.('.nodeCard');
+  if (focusedCard) showNodeTooltip(focusedCard);
+  else hideNodeTooltip();
 }
 
 function renderEvolutionTiers() {
@@ -2604,6 +2616,7 @@ function applyEffect(stats, effect, sourceLabel = '진화') {
   }
   if (effect.attackPower) out.attackPower = (out.attackPower || 0) + effect.attackPower;
   if (effect.speedBonus) { out.attackSpeed = (out.attackSpeed || out.moveAttackSpeed || 0) + effect.speedBonus; out.moveSpeed = (out.moveSpeed || out.moveAttackSpeed || 0) + effect.speedBonus; out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
+  if (effect.attackSpeedBonus) { out.attackSpeed = (out.attackSpeed || out.moveAttackSpeed || 0) + effect.attackSpeedBonus; out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed || out.moveAttackSpeed || 0); }
   if (effect.critCap != null) out.critCap = effect.critCap;
   if (effect.overCritToEvolutionDamageRate) out.overCritToEvolutionDamageRate = effect.overCritToEvolutionDamageRate;
   if (effect.overCritEvolutionDamageCap != null) out.overCritEvolutionDamageCap = effect.overCritEvolutionDamageCap;
@@ -3861,8 +3874,8 @@ if (!window.__lostarkCalculatorBootedV506) {
   window.__lostarkCalculatorBootedV506 = true;
   populateAdrenalineReplacementOptions(true);
   updateEngravingControlPreviews();
-  window.addEventListener('scroll', hideNodeTooltip, { passive: true });
-  window.addEventListener('resize', hideNodeTooltip);
+  window.addEventListener('scroll', refreshFocusedNodeTooltip, { passive: true });
+  window.addEventListener('resize', refreshFocusedNodeTooltip);
   initLegendAvatarTab();
   initMarketPriceTab();
   setActiveTab('calculator');

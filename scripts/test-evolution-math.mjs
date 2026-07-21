@@ -23,7 +23,11 @@ assert.deepEqual(level('금단의 주문', 2), { evolutionDamage: 20, manaReduct
 assert.deepEqual(level('예리한 감각', 2), { critRate: 8, evolutionDamage: 10 });
 assert.deepEqual(level('한계 돌파', 3), { evolutionDamage: 30 });
 assert.deepEqual(level('최적화 훈련', 2), { evolutionDamage: 10, cooldownReduction: 8 });
-assert.deepEqual(node('축복의 여신').levels, {});
+assert.deepEqual(level('축복의 여신', 3), { speedBonus: 9 });
+
+assert.deepEqual(level('파괴 전차', 2), { evolutionDamage: 24, attackSpeedBonus: 8 });
+assert.deepEqual(level('타이밍 지배', 2), { evolutionDamage: 16, cooldownReduction: 10 });
+assert.deepEqual(level('정열의 춤사위', 2), { evolutionDamage: 14 });
 
 assert.deepEqual(level('회심', 1), { critHitDamage: 12 });
 assert.deepEqual(level('달인', 1), { critRate: 7, additionalDamage: 8.5 });
@@ -33,6 +37,19 @@ for (const name of ['선각자', '진군', '기원']) assert.deepEqual(node(name
 assert.deepEqual(level('음속 돌파', 1).sonicBreak, sonicLv1);
 assert.deepEqual(level('음속 돌파', 2).sonicBreak, sonicLv2);
 assert.deepEqual(node('안정된 관리자').levels, {});
+
+for (const item of evolution.nodes) {
+  assert.ok(item.description?.trim(), `${item.name}: 툴팁 설명 누락`);
+  if (item.tier > 1) {
+    assert.equal(Object.keys(item.displayLevels || {}).length, item.maxLevel, `${item.name}: 레벨별 전체 설명 누락`);
+  }
+}
+assert.match(node('달인').description, /10초/);
+assert.match(node('달인').displayLevels['1'], /최대 5중첩/);
+assert.match(node('진군').description, /5m/);
+assert.match(node('진군').description, /7초/);
+assert.match(node('입식 타격가').description, /피격 이상/);
+assert.match(node('마나 용광로').description, /최대 마나의 2%/);
 
 // 로펙 표본: 공속 150.85%, 이속 145.85%에서 음속 돌파 Lv.2 진피 21.01%.
 approx(calculateSonicBreakEvolutionDamage(150.85, 145.85, sonicLv2), 21.01);
