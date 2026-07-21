@@ -1125,7 +1125,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .adrenalineReplacement {
   grid-column: span 2;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(150px, .72fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   align-items: stretch;
 }

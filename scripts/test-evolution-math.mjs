@@ -31,7 +31,8 @@ assert.equal(shiftClickTargetLevel(3, node('한계 돌파'), -1), 1);
 assert.equal(shiftClickTargetLevel(1, node('한계 돌파'), -1), 0);
 assert.equal(shiftClickTargetLevel(0, node('파괴 전차')), 2);
 assert.equal(shiftClickTargetLevel(2, node('파괴 전차'), -1), 0);
-assert.equal(shiftClickTargetLevel(0, node('회심')), 0);
+assert.equal(shiftClickTargetLevel(0, node('회심')), 1);
+assert.equal(shiftClickTargetLevel(1, node('회심'), -1), 0);
 assert.equal(shiftClickTargetLevel(0, node('입식 타격가')), 2);
 assert.equal(shiftClickTargetLevel(2, node('입식 타격가'), -1), 0);
 

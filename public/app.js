@@ -1,10 +1,10 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.8';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.8';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.8';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.8';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.8';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.9';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.9';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.9';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.9';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.9';
 
-const VERSION = '5.8.8';
+const VERSION = '5.8.9';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2424,20 +2424,19 @@ function onNodeCardClick(event) {
   const action = event.target?.dataset?.action || 'select';
   const cur = Number(state.selected[name]?.level || 0);
   let nextLevel = cur;
-  if (action === 'minus') nextLevel = cur - 1;
-  else if (event.shiftKey && Number(node?.tier) !== 4) nextLevel = shiftClickTargetLevel(cur, node, 1);
-  else if (action === 'plus') nextLevel = cur + 1;
-  else nextLevel = cur > 0 ? 0 : 1;
+  if (event.shiftKey) nextLevel = shiftClickTargetLevel(cur, node, 1);
+  else if (action === 'minus') nextLevel = cur - 1;
+  else nextLevel = cur + 1;
   setNodeLevel(name, nextLevel);
 }
 function onNodeCardContextMenu(event) {
   const card = event.currentTarget;
   const name = card.dataset.name;
   const node = getNode(name);
-  if (!event.shiftKey || Number(node?.tier) === 4) return;
   event.preventDefault();
   const cur = Number(state.selected[name]?.level || 0);
-  setNodeLevel(name, shiftClickTargetLevel(cur, node, -1));
+  const nextLevel = event.shiftKey ? shiftClickTargetLevel(cur, node, -1) : cur - 1;
+  setNodeLevel(name, nextLevel);
 }
 function setNodeLevel(name, desiredLevel) {
   let nextLevel = desiredLevel;

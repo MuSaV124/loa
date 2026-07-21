@@ -18,7 +18,7 @@ export function calculateBluntSpike(rawCritRate, effect = {}) {
   };
 }
 
-const SHIFT_POINT_STEP_BY_TIER = { 1: 10, 2: 20, 3: 20, 5: 30 };
+const SHIFT_POINT_STEP_BY_TIER = { 1: 10, 2: 20, 3: 20, 4: 20, 5: 30 };
 
 export function shiftClickTargetLevel(currentLevel, node = {}, direction = 1) {
   const maxLevel = Math.max(0, Number(node.maxLevel || 0));
