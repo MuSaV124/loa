@@ -1,10 +1,10 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage } from './evolution-math.js?v=5.8.6';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.6';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.6';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.6';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.6';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.7';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.7';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.7';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.7';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.7';
 
-const VERSION = '5.8.6';
+const VERSION = '5.8.7';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2419,10 +2419,12 @@ function renderEvolutionTiers() {
 function onNodeCardClick(event) {
   const card = event.currentTarget;
   const name = card.dataset.name;
+  const node = getNode(name);
   const action = event.target?.dataset?.action || 'select';
   const cur = Number(state.selected[name]?.level || 0);
   let nextLevel = cur;
   if (action === 'minus') nextLevel = cur - 1;
+  else if (event.shiftKey) nextLevel = shiftClickTargetLevel(cur, node);
   else if (action === 'plus') nextLevel = cur + 1;
   else nextLevel = cur > 0 ? 0 : 1;
   nextLevel = clampLevelByTierBudget(name, nextLevel);

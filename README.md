@@ -1,4 +1,8 @@
-# Lost Ark Node Recommend Calculator v5.8.6
+# Lost Ark Node Recommend Calculator v5.8.7
+
+## v5.8.7
+- 진화 노드를 Shift+클릭하거나 Shift+＋로 누르면 1티어는 10P씩 올리고, 최대 Lv.2 노드는 바로 Lv.2를 목표로 올립니다.
+- 티어의 남은 포인트가 부족하면 초과하지 않고 가능한 레벨까지만 적용합니다.
 
 ## v5.8.6
 - 진화 노드 툴팁에 발동 조건, 적용 대상, 유지 시간, 중첩, 회복, 상한과 레벨별 전체 효과를 표시합니다.

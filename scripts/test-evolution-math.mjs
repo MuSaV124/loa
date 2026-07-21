@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import {
   calculateBluntSpike,
   calculatePracticalRecommendationScore,
-  calculateSonicBreakEvolutionDamage
+  calculateSonicBreakEvolutionDamage,
+  shiftClickTargetLevel
 } from '../public/evolution-math.js';
 
 const evolution = JSON.parse(readFileSync(new URL('../public/data/evolution.json', import.meta.url), 'utf8'));
@@ -16,6 +17,15 @@ const sonicLv2 = { rate: 0.1, overCapBonus: 8, overCapRate: 0.3, maxEvolutionDam
 function approx(actual, expected, precision = 0.001) {
   assert.ok(Math.abs(actual - expected) <= precision, `${actual} != ${expected}`);
 }
+
+assert.equal(shiftClickTargetLevel(0, node('치명')), 10);
+assert.equal(shiftClickTargetLevel(10, node('치명')), 20);
+assert.equal(shiftClickTargetLevel(25, node('치명')), 30);
+assert.equal(shiftClickTargetLevel(0, node('예리한 감각')), 2);
+assert.equal(shiftClickTargetLevel(1, node('예리한 감각')), 2);
+assert.equal(shiftClickTargetLevel(0, node('한계 돌파')), 1);
+assert.equal(shiftClickTargetLevel(0, node('회심')), 1);
+assert.equal(shiftClickTargetLevel(0, node('입식 타격가')), 2);
 
 for (const name of evolution.tiers['2']) assert.equal(node(name).costPerLevel, 10);
 assert.deepEqual(level('끝없는 마나', 2), { cooldownReduction: 14, manaReduction: 20 });
