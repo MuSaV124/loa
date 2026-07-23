@@ -1,10 +1,10 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.11';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.11';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.11';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.11';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.11';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.12';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.12';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.12';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.12';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.12';
 
-const VERSION = '5.8.11';
+const VERSION = '5.8.12';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -3948,12 +3948,12 @@ function renderCrystalMarketPrice(container, data) {
   container.innerHTML = `
     <div class="crystalExchangeCard">
       <div class="crystalCurrency crystalCurrencyBlue">
-        <img src="/assets/currency/crystal.png" alt="크리스탈">
+        <span class="loaCurrencyIcon loaCrystalIcon" role="img" aria-label="크리스탈"></span>
         <span><small>구매 수량</small><strong>100 크리스탈</strong></span>
       </div>
       <span class="crystalExchangeArrow" aria-hidden="true">→</span>
       <div class="crystalCurrency crystalCurrencyGold">
-        <img src="/assets/currency/gold.png" alt="골드">
+        <span class="loaCurrencyIcon loaGoldIcon" role="img" aria-label="골드"></span>
         <span><small>현재 시세</small><strong>${Math.round(gold).toLocaleString('ko-KR')} 골드</strong></span>
       </div>
     </div>
