@@ -1,10 +1,11 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.12';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.12';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.12';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.12';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.12';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.13';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.13';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.13';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.13';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.13';
+import { benchmarkKillSeconds, findClassBenchmark } from './class-benchmark.js?v=5.8.13';
 
-const VERSION = '5.8.12';
+const VERSION = '5.8.13';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -28,7 +29,7 @@ function emptyEngravingState() {
 
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
-const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] }, powerSnapshot: null, powerCostEstimates: [], combatPowerModel: null, specEfficiencyFilter: 'all' };
+const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] }, powerSnapshot: null, powerCostEstimates: [], combatPowerModel: null, classBenchmarks: null, specEfficiencyFilter: 'all' };
 let simulatorRendered = false;
 
 function engravingItemByName(name) {
@@ -2255,6 +2256,7 @@ function renderPowerSnapshot(snapshot) {
   const accessoryPanelRows = [accessoryRows, braceletRow, stoneRow, engravingPanel].filter(Boolean).join('');
   view.innerHTML = `
     <div class="powerSnapshotColumns">
+      ${renderClassBenchmarkShell()}
       ${renderSpecEfficiencyShell()}
       <div class="powerRawHeader">
         <div><h3>현재 장비 분석</h3><p>효율 계산에 사용한 API 원자료를 확인합니다.</p></div>
@@ -2278,6 +2280,7 @@ function renderPowerSnapshot(snapshot) {
     </div>
     <p class="powerSnapshotNote">일반/상급 재련 단계는 공식 API Tooltip에서 읽습니다. 상급 재련 전투력 상승량은 공개 산식이 없어 현재 공식 전투력 비율 기반 추정값으로 표시합니다.</p>
   `;
+  renderClassBenchmark(snapshot);
   hydratePowerCostMaterialPrices();
   hydrateCrystalPrice();
 }
@@ -3920,6 +3923,86 @@ function renderMarketError(container, message) {
   container.innerHTML = `<div class="marketEmptyBox marketError">${escapeHtml(message || '시세 조회 중 오류가 발생했습니다.')}</div>`;
 }
 
+let classBenchmarksPromise = null;
+async function loadClassBenchmarks() {
+  if (state.classBenchmarks) return state.classBenchmarks;
+  if (!classBenchmarksPromise) {
+    classBenchmarksPromise = fetch('/class-benchmarks.json', { cache: 'no-store' })
+      .then(response => {
+        if (!response.ok) throw new Error(`class benchmark ${response.status}`);
+        return response.json();
+      })
+      .then(data => {
+        state.classBenchmarks = data;
+        if ($('classBenchmarkView') && state.powerSnapshot) renderClassBenchmark(state.powerSnapshot);
+        return data;
+      })
+      .catch(() => {
+        state.classBenchmarks = null;
+        if ($('classBenchmarkView')) $('classBenchmarkView').innerHTML = '<p class="classBenchmarkEmpty">직업 지표를 불러오지 못했습니다.</p>';
+        return null;
+      });
+  }
+  return classBenchmarksPromise;
+}
+
+function benchmarkDateLabel(value) {
+  const date = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return date ? `${Number(date[1])}.${Number(date[2])}.${Number(date[3])}` : '-';
+}
+
+function renderClassBenchmarkShell() {
+  return `<section class="powerSnapshotBlock classBenchmarkPanel">
+    <div class="classBenchmarkHead">
+      <div><h3>직업 기준 루메루스 지표</h3><p>전투력 5,000 · 체력 1,000억 · 대표 캐릭터 기준</p></div>
+      <span>주간 채택률 갱신</span>
+    </div>
+    <div id="classBenchmarkView"><p class="classBenchmarkEmpty">직업 지표를 불러오는 중입니다.</p></div>
+  </section>`;
+}
+
+function renderClassBenchmark(snapshot) {
+  const view = $('classBenchmarkView');
+  if (!view) return;
+  const data = state.classBenchmarks;
+  const profile = snapshot?.profile || {};
+  if (!data) {
+    view.innerHTML = '<p class="classBenchmarkEmpty">직업 지표를 불러오는 중입니다.</p>';
+    loadClassBenchmarks();
+    return;
+  }
+  const className = profile.className || profile.CharacterClassName || '';
+  if ((data.excludedClasses || []).includes(className)) {
+    view.innerHTML = `<p class="classBenchmarkEmpty">${escapeHtml(className)}는 지원 직업이라 딜러 루메루스 지표에서 제외했습니다.</p>`;
+    return;
+  }
+  const row = findClassBenchmark(data, profile);
+  if (!row) {
+    view.innerHTML = `<p class="classBenchmarkEmpty">${escapeHtml(className || '현재 직업')}의 검증 지표가 아직 없습니다.</p>`;
+    return;
+  }
+  const seconds = benchmarkKillSeconds(data, row);
+  const ratio = Number(row.ratio?.representative || 0);
+  const min = Number(row.ratio?.min || ratio);
+  const max = Number(row.ratio?.max || ratio);
+  const range = Math.abs(max - min) > 0.0001 ? `${min.toFixed(3)}–${max.toFixed(3)}` : ratio.toFixed(3);
+  const coreItems = (row.cores || []).map(core => `
+    <span class="classBenchmarkCore"><i>${escapeHtml(core.slot)}</i><b>${escapeHtml(core.name)}</b>${Number(core.adoption) > 0 ? `<small>${Number(core.adoption).toFixed(1)}%</small>` : ''}</span>
+  `).join('');
+  view.innerHTML = `
+    <div class="classBenchmarkSummary">
+      <div class="classBenchmarkIdentity"><span>${escapeHtml(row.className)}</span><strong>${escapeHtml(row.engraving)}</strong></div>
+      <div class="classBenchmarkMetric"><span>대표 배율</span><strong>${ratio.toFixed(3)}배</strong><small>표본 범위 ${range}</small></div>
+      <div class="classBenchmarkMetric"><span>예상 처치</span><strong>${seconds ? `${seconds.toFixed(1)}초` : '-'}</strong><small>전투력 5,000 기준</small></div>
+      <div class="classBenchmarkMetric"><span>진화 노드</span><strong>${escapeHtml(row.evolution || '-')}</strong><small>대표 세팅</small></div>
+    </div>
+    <div class="classBenchmarkCores">${coreItems}</div>
+    <div class="classBenchmarkMeta">
+      <span>채택률 통계 ${benchmarkDateLabel(data.popularSettingsDate)} · 배율 ${benchmarkDateLabel(data.ratioBasisDate)}</span>
+      <span>실전 사이클, 치명 편차, 숙련도에 따라 달라질 수 있습니다.</span>
+    </div>`;
+}
+
 async function loadMarketCrystalPrice(force = false) {
   if (!force && marketListLoadState.crystal === 'loaded') return;
   if (!force && marketListLoadState.crystal === 'loading') return;
@@ -3974,6 +4057,7 @@ if (!window.__lostarkCalculatorBootedV506) {
   initMarketPriceTab();
   setActiveTab('calculator');
   loadLostarkNoticeCard();
+  loadClassBenchmarks();
   loadDb().catch((error) => setMessage(error.message || '진화 노드 데이터를 불러오지 못했습니다.'));
 }
 

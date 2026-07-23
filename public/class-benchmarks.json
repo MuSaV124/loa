@@ -1,0 +1,871 @@
+{
+  "version": 1,
+  "updatedAt": "2026-07-23T06:51:18.754Z",
+  "popularSettingsDate": "2026-07-23",
+  "ratioBasisDate": "2026-07-22",
+  "filters": {
+    "minCombatPower": 4500,
+    "maxCombatPower": 5500,
+    "representativeOnly": true
+  },
+  "benchmark": {
+    "combatPower": 5000,
+    "lumerusHp": 100000000000
+  },
+  "sources": [
+    {
+      "label": "LOAWA 직업별 아크그리드 통계",
+      "url": "https://loawa.com/stat/class-cores"
+    },
+    {
+      "label": "7월 22일 밸런스 패치 후 루메루스 배율 표본",
+      "url": "https://www.inven.co.kr/board/lostark/6271/3927487"
+    }
+  ],
+  "excludedClasses": [
+    "바드",
+    "도화가"
+  ],
+  "classes": [
+    {
+      "className": "가디언나이트",
+      "engraving": "업화의 계승자",
+      "cores": [
+        {
+          "slot": "달",
+          "name": "노바 플레임",
+          "adoption": 6.05629348513599,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "라스트 스탠드",
+          "adoption": 6.087919038583175,
+          "group": "질서"
+        },
+        {
+          "slot": "해",
+          "name": "피니셔",
+          "adoption": 6.11954459203036,
+          "group": "질서"
+        }
+      ],
+      "evolution": "입식 타격가",
+      "ratio": {
+        "min": 1.17,
+        "max": 1.17,
+        "representative": 1.17
+      }
+    },
+    {
+      "className": "건슬링어",
+      "engraving": "사냥의 시간",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "무법지대",
+          "adoption": 7.9043697094486385,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "불릿 무빙",
+          "adoption": 7.927247769389155,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "풀 매거진",
+          "adoption": 7.961564859299932,
+          "group": "질서"
+        }
+      ],
+      "evolution": "입식 타격가",
+      "ratio": {
+        "min": 0.9,
+        "max": 1,
+        "representative": 0.95
+      }
+    },
+    {
+      "className": "기공사",
+      "engraving": "역천지체",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "광류연파",
+          "adoption": 7.680050987890376,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "천류섬열풍",
+          "adoption": 7.680050987890376,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "파공나선",
+          "adoption": 7.616316124920331,
+          "group": "질서"
+        }
+      ],
+      "evolution": "입식 타격가",
+      "ratio": {
+        "min": 0.95,
+        "max": 1,
+        "representative": 0.975
+      }
+    },
+    {
+      "className": "기상술사",
+      "engraving": "질풍노도",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "비연참",
+          "adoption": 8.678328474246841,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "우산의 춤",
+          "adoption": 8.746355685131196,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "휘몰아치기",
+          "adoption": 13.896987366375122,
+          "group": "질서"
+        }
+      ],
+      "evolution": "음속 돌파",
+      "ratio": {
+        "min": 0.98,
+        "max": 0.98,
+        "representative": 0.98
+      }
+    },
+    {
+      "className": "데모닉",
+      "engraving": "멈출 수 없는 충동",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "오미너스",
+          "adoption": 13.456549935149157,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "제노사이드",
+          "adoption": 11.640726329442282,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "치명적인 할퀴기",
+          "adoption": 14.040207522697795,
+          "group": "질서"
+        }
+      ],
+      "evolution": "뭉툭한 가시",
+      "ratio": {
+        "min": 0.92,
+        "max": 0.95,
+        "representative": 0.935
+      }
+    },
+    {
+      "className": "데빌헌터",
+      "engraving": "전술 탄환",
+      "cores": [
+        {
+          "slot": "달",
+          "name": "광란의 해결사",
+          "adoption": 14.638538718806277,
+          "group": "질서"
+        },
+        {
+          "slot": "해",
+          "name": "샷건 오버로드",
+          "adoption": 14.587085155647028,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "지배자의 탄환",
+          "adoption": 14.30409055827116,
+          "group": "질서"
+        }
+      ],
+      "evolution": "마나 용광로",
+      "ratio": {
+        "min": 1.068,
+        "max": 1.068,
+        "representative": 1.068
+      }
+    },
+    {
+      "className": "디스트로이어",
+      "engraving": "중력 수련",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "그라비티 코어",
+          "adoption": 8.487337440109513,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "대지 부수기",
+          "adoption": 8.487337440109513,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "몰아치는 중력",
+          "adoption": 8.487337440109513,
+          "group": "질서"
+        }
+      ],
+      "evolution": "뭉툭한 가시",
+      "ratio": {
+        "min": 1.1,
+        "max": 1.1,
+        "representative": 1.1
+      }
+    },
+    {
+      "className": "리퍼",
+      "engraving": "갈증",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "갈증의 악몽",
+          "adoption": 13.521566401816118,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "치명적 악몽",
+          "adoption": 13.507377979568671,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "치명적 연계",
+          "adoption": 10.102156640181612,
+          "group": "질서"
+        }
+      ],
+      "evolution": "뭉툭한 가시",
+      "ratio": {
+        "min": 1.05,
+        "max": 1.1,
+        "representative": 1.075
+      }
+    },
+    {
+      "className": "발키리",
+      "engraving": "빛의 기사",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "종언",
+          "adoption": 5,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "종언의 기사",
+          "adoption": 5.037453183520599,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "진정한 종언",
+          "adoption": 5.898876404494382,
+          "group": "질서"
+        }
+      ],
+      "evolution": "입식 타격가",
+      "ratio": {
+        "min": 1,
+        "max": 1,
+        "representative": 1
+      }
+    },
+    {
+      "className": "배틀마스터",
+      "engraving": "초심",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "극의귀원",
+          "adoption": 11.432369557992688,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "용류 강화",
+          "adoption": 11.781322698570953,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "초순환",
+          "adoption": 13.260219341974079,
+          "group": "질서"
+        }
+      ],
+      "evolution": "뭉툭한 가시",
+      "ratio": {
+        "min": 1,
+        "max": 1,
+        "representative": 1
+      }
+    },
+    {
+      "className": "버서커",
+      "engraving": "광기",
+      "cores": [
+        {
+          "slot": "별",
+          "name": "광란",
+          "adoption": 7.818930041152264,
+          "group": "질서"
+        },
+        {
+          "slot": "해",
+          "name": "다크 파워",
+          "adoption": 7.79320987654321,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "어둠의 격류",
+          "adoption": 7.87037037037037,
+          "group": "질서"
+        }
+      ],
+      "evolution": "음속 돌파",
+      "ratio": {
+        "min": 0.9,
+        "max": 1,
+        "representative": 0.95
+      }
+    },
+    {
+      "className": "브레이커",
+      "engraving": "권왕파천무",
+      "cores": [
+        {
+          "slot": "별",
+          "name": "권왕십이식",
+          "adoption": 9.73076397430641,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "충격 충전",
+          "adoption": 9.792264589312559,
+          "group": "질서"
+        },
+        {
+          "slot": "해",
+          "name": "충전된 충격",
+          "adoption": 9.83326499931666,
+          "group": "질서"
+        }
+      ],
+      "evolution": "입식 타격가",
+      "ratio": {
+        "min": 1.1,
+        "max": 1.23,
+        "representative": 1.165
+      }
+    },
+    {
+      "className": "블래스터",
+      "engraving": "포격 강화",
+      "cores": [
+        {
+          "slot": "달",
+          "name": "세이프 존",
+          "adoption": 13.214285714285714,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "초토화",
+          "adoption": 13.392857142857142,
+          "group": "질서"
+        },
+        {
+          "slot": "해",
+          "name": "포화 전차",
+          "adoption": 13.452380952380953,
+          "group": "질서"
+        }
+      ],
+      "evolution": "뭉툭한 가시",
+      "ratio": {
+        "min": 0.8,
+        "max": 0.95,
+        "representative": 0.875
+      }
+    },
+    {
+      "className": "블레이드",
+      "engraving": "잔재된 기운",
+      "cores": [
+        {
+          "slot": "달",
+          "name": "블레이드 웨이브",
+          "adoption": 10.181236673773988,
+          "group": "질서"
+        },
+        {
+          "slot": "해",
+          "name": "일섬",
+          "adoption": 10.42999289267946,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "죽음의 검기",
+          "adoption": 10.438877043354655,
+          "group": "질서"
+        }
+      ],
+      "evolution": "입식 타격가",
+      "ratio": {
+        "min": 1.1,
+        "max": 1.18,
+        "representative": 1.14
+      }
+    },
+    {
+      "className": "서머너",
+      "engraving": "상급 소환사",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "고대의 유산",
+          "adoption": 12.977961951403277,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "오쉬의 지원",
+          "adoption": 13.919758899981163,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "창세의 힘",
+          "adoption": 13.938594838952723,
+          "group": "질서"
+        }
+      ],
+      "evolution": "마나 용광로",
+      "ratio": {
+        "min": 1,
+        "max": 1,
+        "representative": 1
+      }
+    },
+    {
+      "className": "소서리스",
+      "engraving": "점화",
+      "cores": [
+        {
+          "slot": "달",
+          "name": "반복된 종말",
+          "adoption": 8.91309440149918,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "종말의 시",
+          "adoption": 8.749121574139142,
+          "group": "질서"
+        },
+        {
+          "slot": "해",
+          "name": "종말의 시작",
+          "adoption": 8.90138205668775,
+          "group": "질서"
+        }
+      ],
+      "evolution": "마나 용광로",
+      "ratio": {
+        "min": 0.88,
+        "max": 0.9,
+        "representative": 0.89
+      }
+    },
+    {
+      "className": "소울이터",
+      "engraving": "만월의 집행자",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "망자의 발걸음",
+          "adoption": 9.830932999373825,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "빙의",
+          "adoption": 9.768315591734503,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "소울 코어",
+          "adoption": 9.757879357127948,
+          "group": "질서"
+        }
+      ],
+      "evolution": "뭉툭한 가시",
+      "ratio": {
+        "min": 1.35,
+        "max": 1.4,
+        "representative": 1.375
+      }
+    },
+    {
+      "className": "스카우터",
+      "engraving": "진화의 유산",
+      "cores": [
+        {
+          "slot": "달",
+          "name": "어썰트 타이탄",
+          "adoption": 10.504469987228608,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "코어 리액터 증폭",
+          "adoption": 10.440613026819923,
+          "group": "질서"
+        },
+        {
+          "slot": "해",
+          "name": "타이탄 슈트",
+          "adoption": 9.195402298850574,
+          "group": "질서"
+        }
+      ],
+      "evolution": "입식 타격가",
+      "ratio": {
+        "min": 0.9,
+        "max": 1,
+        "representative": 0.95
+      }
+    },
+    {
+      "className": "스트라이커",
+      "engraving": "일격필살",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "뇌호",
+          "adoption": 9.514925373134329,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "벽뢰호각",
+          "adoption": 9.535655058043117,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "섬호뇌격",
+          "adoption": 9.535655058043117,
+          "group": "질서"
+        }
+      ],
+      "evolution": "입식 타격가",
+      "ratio": {
+        "min": 1.1,
+        "max": 1.1,
+        "representative": 1.1
+      }
+    },
+    {
+      "className": "슬레이어",
+      "engraving": "처단자",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "격노폭발",
+          "adoption": 3.016514998314796,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "교차된 힘",
+          "adoption": 2.9996629592180653,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "신중한 강타",
+          "adoption": 3.016514998314796,
+          "group": "질서"
+        }
+      ],
+      "evolution": "뭉툭한 가시",
+      "ratio": {
+        "min": 1,
+        "max": 1.09,
+        "representative": 1.045
+      }
+    },
+    {
+      "className": "아르카나",
+      "engraving": "황제의 칙령",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "노말 인핸스",
+          "adoption": 7.2584171403585485,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "셔플 댄스",
+          "adoption": 7.156391196618569,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "스택 홀드",
+          "adoption": 6.194432298498761,
+          "group": "질서"
+        }
+      ],
+      "evolution": "뭉툭한 가시",
+      "ratio": {
+        "min": 1.3,
+        "max": 1.41,
+        "representative": 1.355
+      }
+    },
+    {
+      "className": "워로드",
+      "engraving": "전투 태세",
+      "cores": [
+        {
+          "slot": "별",
+          "name": "광역 낙뢰",
+          "adoption": 4.210104250200481,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "번개폭풍",
+          "adoption": 2.6396685378241114,
+          "group": "질서"
+        },
+        {
+          "slot": "해",
+          "name": "천둥",
+          "adoption": 2.632985832665063,
+          "group": "질서"
+        }
+      ],
+      "evolution": "입식 타격가",
+      "ratio": {
+        "min": 0.75,
+        "max": 0.75,
+        "representative": 0.75
+      }
+    },
+    {
+      "className": "인파이터",
+      "engraving": "극의: 체술",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "대지 붕괴",
+          "adoption": 14.62797619047619,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "대지 파괴",
+          "adoption": 14.62797619047619,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "투지 강화",
+          "adoption": 14.613095238095237,
+          "group": "질서"
+        }
+      ],
+      "evolution": "뭉툭한 가시",
+      "ratio": {
+        "min": 1,
+        "max": 1.08,
+        "representative": 1.04
+      }
+    },
+    {
+      "className": "차원술사",
+      "engraving": "시간 관리자",
+      "cores": [
+        {
+          "slot": "별",
+          "name": "결합 강화",
+          "adoption": 10.666666666666666,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "컴바인 웨폰",
+          "adoption": 11.333333333333334,
+          "group": "질서"
+        },
+        {
+          "slot": "해",
+          "name": "타임 키퍼",
+          "adoption": 11.333333333333334,
+          "group": "질서"
+        }
+      ],
+      "evolution": "입식 타격가",
+      "ratio": {
+        "min": 0.95,
+        "max": 1,
+        "representative": 0.975
+      }
+    },
+    {
+      "className": "창술사",
+      "engraving": "절정",
+      "cores": [
+        {
+          "slot": "별",
+          "name": "맹룡 회도",
+          "adoption": 10.671191553544494,
+          "group": "질서"
+        },
+        {
+          "slot": "해",
+          "name": "연가 창식",
+          "adoption": 9.074912016088486,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "청룡기",
+          "adoption": 8.974358974358974,
+          "group": "질서"
+        }
+      ],
+      "evolution": "뭉툭한 가시",
+      "ratio": {
+        "min": 0.99,
+        "max": 1.05,
+        "representative": 1.05
+      }
+    },
+    {
+      "className": "호크아이",
+      "engraving": "죽음의 습격",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "TA-09 피어싱 애로우",
+          "adoption": 7.306465642215135,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "HSU-98 버드 스트라이크",
+          "adoption": 5.334879675268193,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "HSU-04 자동 제어 스코프",
+          "adoption": 11.10466801971586,
+          "group": "질서"
+        }
+      ],
+      "evolution": "입식 타격가",
+      "ratio": {
+        "min": 0.97,
+        "max": 0.99,
+        "representative": 0.98
+      }
+    },
+    {
+      "className": "홀리나이트",
+      "engraving": "심판자",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "신의 권능",
+          "adoption": 0.6578947368421053,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "징벌의 시간",
+          "adoption": 0.5781499202551834,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "참하는 검",
+          "adoption": 0.6379585326953748,
+          "group": "질서"
+        }
+      ],
+      "evolution": "뭉툭한 가시",
+      "ratio": {
+        "min": 0.9,
+        "max": 1,
+        "representative": 0.95
+      }
+    },
+    {
+      "className": "환수사",
+      "engraving": "야성",
+      "cores": [
+        {
+          "slot": "해",
+          "name": "곰은 사람을 찢어",
+          "adoption": 13.930041152263374,
+          "group": "질서"
+        },
+        {
+          "slot": "달",
+          "name": "센 곰",
+          "adoption": 13.559670781893004,
+          "group": "질서"
+        },
+        {
+          "slot": "별",
+          "name": "필살 곰",
+          "adoption": 13.950617283950617,
+          "group": "질서"
+        }
+      ],
+      "evolution": "입식 타격가",
+      "ratio": {
+        "min": 0.87,
+        "max": 0.9,
+        "representative": 0.885
+      }
+    }
+  ]
+}

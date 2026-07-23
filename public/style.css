@@ -96,6 +96,119 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   font-size: 14px;
   color: #e2e8f0;
 }
+.classBenchmarkPanel {
+  display: grid;
+  gap: 12px;
+  border-color: rgba(82, 213, 255, .24);
+  background: linear-gradient(110deg, rgba(5, 18, 31, .94), rgba(12, 25, 42, .88));
+}
+.classBenchmarkHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+.classBenchmarkHead h3 {
+  margin-bottom: 4px;
+  font-size: 16px;
+}
+.classBenchmarkHead p,
+.classBenchmarkEmpty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.classBenchmarkHead > span {
+  flex: 0 0 auto;
+  border: 1px solid rgba(82, 213, 255, .28);
+  color: #a5edff;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 900;
+}
+.classBenchmarkSummary {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.35fr) repeat(3, minmax(120px, 1fr));
+  border-top: 1px solid rgba(148, 163, 184, .13);
+  border-bottom: 1px solid rgba(148, 163, 184, .13);
+}
+.classBenchmarkIdentity,
+.classBenchmarkMetric {
+  min-width: 0;
+  padding: 12px;
+  border-left: 1px solid rgba(148, 163, 184, .13);
+}
+.classBenchmarkIdentity {
+  border-left: 0;
+}
+.classBenchmarkIdentity span,
+.classBenchmarkMetric span,
+.classBenchmarkMetric small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+.classBenchmarkIdentity strong,
+.classBenchmarkMetric strong {
+  display: block;
+  margin: 4px 0 2px;
+  color: #f8fafc;
+  font-size: 17px;
+  line-height: 1.25;
+  word-break: keep-all;
+}
+.classBenchmarkMetric:nth-child(2) strong {
+  color: #ffcf64;
+}
+.classBenchmarkMetric:nth-child(3) strong {
+  color: #7dd3fc;
+}
+.classBenchmarkCores {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.classBenchmarkCore {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(148, 163, 184, .13);
+  background: rgba(2, 6, 23, .36);
+}
+.classBenchmarkCore i {
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(245, 182, 66, .38);
+  color: #ffcf64;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 950;
+}
+.classBenchmarkCore b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.classBenchmarkCore small {
+  color: #a5edff;
+  font-size: 10px;
+  font-weight: 900;
+}
+.classBenchmarkMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
 .powerEquipmentList,
 .powerAccessoryList {
   display: grid;
@@ -1087,6 +1200,13 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   .simulatorJumpButton { width: 100%; }
   .search { flex-direction: column; }
   .search button { min-height: 42px; }
+  .classBenchmarkHead,
+  .classBenchmarkMeta { display: block; }
+  .classBenchmarkHead > span { display: inline-block; margin-top: 8px; }
+  .classBenchmarkSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .classBenchmarkMetric:nth-child(3) { border-left: 0; }
+  .classBenchmarkCores { grid-template-columns: 1fr; }
+  .classBenchmarkMeta span { display: block; margin-top: 4px; }
 }
 
 /* v1.5.0 node card UI */

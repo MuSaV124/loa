@@ -1,0 +1,36 @@
+name: Update class benchmarks
+
+on:
+  schedule:
+    - cron: "30 18 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run update:class-benchmarks
+      - run: npm run test:class-benchmark
+      - name: Commit refreshed statistics
+        shell: bash
+        run: |
+          if git diff --quiet -- public/class-benchmarks.json; then
+            echo "No benchmark changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/class-benchmarks.json
+          git commit -m "chore: refresh weekly class benchmarks"
+          git push
