@@ -1,11 +1,11 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.14';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.14';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.14';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.14';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.14';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.8.14';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.15';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.15';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.15';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.15';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.15';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.8.15';
 
-const VERSION = '5.8.14';
+const VERSION = '5.8.15';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -3978,10 +3978,25 @@ function renderRatioPanel() {
     view.innerHTML = '<p class="classBenchmarkEmpty">검색 조건에 맞는 직업각인이 없습니다.</p>';
     return;
   }
-  view.innerHTML = classes.map(row => `
-    <section class="ratioClassGroup">
-      <h3>${escapeHtml(row.className)}</h3>
-      <div class="ratioBuildList">${row.builds.map(build => {
+  const groups = [];
+  for (const row of classes) {
+    const groupName = row.group || '기타';
+    let group = groups.find(item => item.name === groupName);
+    if (!group) {
+      group = { name: groupName, classes: [] };
+      groups.push(group);
+    }
+    group.classes.push(row);
+  }
+  view.innerHTML = `
+    <div class="ratioColumnHead">
+      <span>직업</span><span>직업각인</span><span>조합</span><span>배율</span>
+      <span class="ratioCoreHead"><i>해</i><i>달</i><i>별</i></span>
+    </div>
+    ${groups.map(group => `
+      <section class="ratioRoleGroup">
+        <h3>${escapeHtml(group.name)}</h3>
+        <div class="ratioBuildList">${group.classes.flatMap(row => row.builds.map(build => {
         const representative = Number(build.ratio?.representative || 0);
         const ratioText = representative > 0 ? `${representative.toFixed(3)}배` : escapeHtml(build.status || '자료 부족');
         const range = formatBenchmarkRange(build.ratio);
@@ -3990,12 +4005,14 @@ function renderRatioPanel() {
             <i>${escapeHtml(core.slot)}</i><b>${escapeHtml(core.name)}</b>
           </span>`).join('');
         return `<article class="ratioBuildRow">
+          <div class="ratioClassName">${escapeHtml(row.className)}</div>
           <div class="ratioBuildIdentity"><strong>${escapeHtml(build.engraving)}</strong><small>${escapeHtml(build.evolution || '-')}</small></div>
+          <div class="ratioCombination">${build.combination ? `<strong>${escapeHtml(build.combination)}</strong><small>해·달·별</small>` : '<span>확인 중</span>'}</div>
           <div class="ratioBuildMetric"><strong>${ratioText}</strong>${range ? `<small>표본 ${escapeHtml(range)}</small>` : '<small>추가 표본 필요</small>'}</div>
           <div class="ratioCoreList">${cores || '<span class="ratioCorePending">대표 세팅 집계 중</span>'}</div>
         </article>`;
-      }).join('')}</div>
-    </section>`).join('');
+      })).join('')}</div>
+      </section>`).join('')}`;
   const meta = $('ratioMeta');
   if (meta) meta.innerHTML = `<span>대표 세팅 ${benchmarkDateLabel(data.popularSettingsDate)} · 배율 ${benchmarkDateLabel(data.ratioBasisDate)}</span><span>실전 사이클, 치명 편차와 숙련도에 따라 달라질 수 있습니다.</span>`;
 }

@@ -37,6 +37,18 @@ assert.equal(data.version, 2);
 assert.equal(data.classes.length, 28);
 assert.deepEqual(data.excludedClasses, ['바드', '도화가']);
 assert.equal(data.classes.reduce((sum, row) => sum + row.builds.length, 0), 54);
+assert.deepEqual(
+  [...new Set(data.classes.map(row => row.group))],
+  ['전사', '무도가', '헌터', '마법사', '암살자', '스페셜리스트', '오리지널']
+);
+for (const group of [...new Set(data.classes.map(row => row.group))]) {
+  const classNames = data.classes.filter(row => row.group === group).map(row => row.className);
+  assert.deepEqual(classNames, [...classNames].sort((a, b) => a.localeCompare(b, 'ko')), `${group}: 가나다순`);
+}
+const dreadRoar = data.classes.find(row => row.className === '가디언나이트')?.builds.find(build => build.engraving === '드레드 로어');
+const asura = data.classes.find(row => row.className === '브레이커')?.builds.find(build => build.engraving === '수라의 길');
+assert.equal(dreadRoar?.combination, '232');
+assert.equal(asura?.combination, '322');
 for (const row of data.classes) {
   assert.ok(row.builds.length >= 1, `${row.className}: 직업각인`);
   for (const build of row.builds) {

@@ -15,8 +15,8 @@ const build = (className, engraving, coreNames, ratioValue, evolution, options =
 });
 
 export const CLASS_BENCHMARK_CATALOG = [
-  build('가디언나이트', '공포의 포효', ['도미넌트', '브랜디쉬', '일당백'], ratio(1.05), '입식 타격가'),
-  build('가디언나이트', '불꽃의 계승자', ['노바 플레임', '라스트 스탠드', '피니셔'], ratio(1.17), '입식 타격가'),
+  build('가디언나이트', '드레드 로어', ['도미넌트', '브랜디쉬', '일당백'], ratio(1.05), '입식 타격가', { combination: '232' }),
+  build('가디언나이트', '업화의 계승자', ['노바 플레임', '라스트 스탠드', '피니셔'], ratio(1.17), '입식 타격가'),
   build('건슬링어', '피스메이커', ['블로우 백', '연회의 잔향', '체인지 암즈'], ratio(1), '마나 용광로'),
   build('건슬링어', '사냥의 시간', ['무법지대', '불릿 무빙', '풀 매거진'], ratio(0.95, 0.9, 1), '입식 타격가'),
   build('기공사', '세맥타통', ['무상기연', '불영세', '신장대멸겁'], ratio(1.025, 1, 1.05), '입식 타격가', { settingEngraving: '무상신공' }),
@@ -37,7 +37,7 @@ export const CLASS_BENCHMARK_CATALOG = [
   build('버서커', '광기', ['광란', '다크 파워', '어둠의 격류'], ratio(0.95, 0.9, 1), '음속 돌파'),
   build('버서커', '광전사의 비기', ['분쇄 폭풍', '콤비네이션', '피의 순환'], ratio(1.1, 1.1, 1.1, '1.1 이상'), '뭉툭한 가시'),
   build('브레이커', '권왕파천무', ['충전된 충격', '충격 충전', '권왕십이식'], ratio(1.165, 1.1, 1.23), '입식 타격가'),
-  build('브레이커', '수라의 길', ['그림자 주먹', '수라결', '수라'], ratio(1.25, 1.2, 1.3, '실전 재현 편차 큼'), '뭉툭한 가시'),
+  build('브레이커', '수라의 길', ['그림자 주먹', '수라결', '수라'], ratio(1.25, 1.2, 1.3, '실전 재현 편차 큼'), '뭉툭한 가시', { combination: '322' }),
   build('블래스터', '포격 강화', ['세이프 존', '초토화', '포화 전차'], ratio(0.875, 0.8, 0.95), '뭉툭한 가시'),
   build('블래스터', '화력 강화', ['오토 락온', '점핑맨', '질풍 포병'], ratio(0.85, 0.8, 0.9), '입식 타격가'),
   build('블레이드', '버스트', ['버스트 코어', '블레이드 버스트', '일격'], ratio(1.23), '입식 타격가'),
@@ -71,4 +71,20 @@ export const CLASS_BENCHMARK_CATALOG = [
   build('환수사', '환수 각성', ['무한 각성', '붕붕 펀치', '빙글빙글'], ratio(0.82), '마나 용광로')
 ];
 
-export const CLASS_DISPLAY_ORDER = [...new Set(CLASS_BENCHMARK_CATALOG.map(item => item.className))];
+export const CLASS_GROUPS = [
+  { name: '전사', classes: ['디스트로이어', '발키리', '버서커', '슬레이어', '워로드', '홀리나이트'] },
+  { name: '무도가', classes: ['기공사', '배틀마스터', '브레이커', '스트라이커', '인파이터', '창술사'] },
+  { name: '헌터', classes: ['건슬링어', '데빌헌터', '블래스터', '스카우터', '호크아이'] },
+  { name: '마법사', classes: ['서머너', '소서리스', '아르카나'] },
+  { name: '암살자', classes: ['데모닉', '리퍼', '블레이드', '소울이터'] },
+  { name: '스페셜리스트', classes: ['기상술사', '차원술사', '환수사'] },
+  { name: '오리지널', classes: ['가디언나이트'] }
+];
+
+export const CLASS_DISPLAY_ORDER = CLASS_GROUPS.flatMap(group =>
+  [...group.classes].sort((a, b) => a.localeCompare(b, 'ko'))
+);
+
+export const CLASS_GROUP_BY_NAME = new Map(
+  CLASS_GROUPS.flatMap(group => group.classes.map(className => [className, group.name]))
+);

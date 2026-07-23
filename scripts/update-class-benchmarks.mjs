@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { CLASS_BENCHMARK_CATALOG, CLASS_DISPLAY_ORDER } from './class-benchmark-catalog.mjs';
+import { CLASS_BENCHMARK_CATALOG, CLASS_DISPLAY_ORDER, CLASS_GROUP_BY_NAME } from './class-benchmark-catalog.mjs';
 
 const outputPath = path.resolve('public/class-benchmarks.json');
 const statsUrl = 'https://loawa.com/stat/class-cores';
@@ -160,12 +160,13 @@ function groupCatalog(scraped, previous, popularBuilds) {
           cores: resolveCores(row, item, previousBuild, popularBuild),
           evolution: popularBuild?.evolution || previousBuild?.evolution || item.evolution,
           ratio: item.ratio,
+          combination: item.combination || previousBuild?.combination || '',
           ...(popularBuild?.sampleUsers ? { sampleUsers: popularBuild.sampleUsers } : previousBuild?.sampleUsers ? { sampleUsers: previousBuild.sampleUsers } : {}),
           ...(popularBuild?.sourceUrl ? { sourceUrl: popularBuild.sourceUrl } : previousBuild?.sourceUrl ? { sourceUrl: previousBuild.sourceUrl } : {}),
           ...(item.status ? { status: item.status } : {})
         };
       });
-    return { className, builds };
+    return { className, group: CLASS_GROUP_BY_NAME.get(className) || '기타', builds };
   });
 }
 

@@ -300,52 +300,117 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   display: grid;
   gap: 0;
 }
-.ratioClassGroup {
+.ratioColumnHead,
+.ratioBuildRow {
   display: grid;
-  grid-template-columns: 132px minmax(0, 1fr);
-  border-bottom: 1px solid rgba(148, 163, 184, .14);
+  grid-template-columns: 110px minmax(150px, .85fr) 74px 118px minmax(420px, 2.3fr);
+  align-items: stretch;
 }
-.ratioClassGroup > h3 {
+.ratioColumnHead {
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, .18);
+  background: rgba(2, 6, 23, .62);
+  color: #a8b7ca;
+  font-size: 11px;
+  font-weight: 900;
+}
+.ratioColumnHead > span {
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 12px;
+  border-left: 1px solid rgba(148, 163, 184, .12);
+}
+.ratioColumnHead > span:first-child {
+  border-left: 0;
+}
+.ratioCoreHead {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  text-align: center;
+}
+.ratioCoreHead i {
+  font-style: normal;
+}
+.ratioRoleGroup {
+  border-bottom: 1px solid rgba(148, 163, 184, .18);
+}
+.ratioRoleGroup > h3 {
   margin: 0;
-  padding: 18px 16px 18px 24px;
-  background: rgba(15, 23, 42, .62);
-  color: #f8fafc;
-  font-size: 15px;
+  padding: 10px 24px;
+  border-top: 1px solid rgba(94, 234, 212, .2);
+  border-bottom: 1px solid rgba(148, 163, 184, .13);
+  background: rgba(13, 43, 48, .48);
+  color: #99f6e4;
+  font-size: 13px;
 }
 .ratioBuildList {
   min-width: 0;
 }
 .ratioBuildRow {
-  min-height: 72px;
-  display: grid;
-  grid-template-columns: minmax(145px, .9fr) 116px minmax(420px, 2.4fr);
-  align-items: center;
-  gap: 14px;
-  padding: 10px 16px;
+  min-height: 76px;
+  padding: 0 16px;
   border-bottom: 1px solid rgba(148, 163, 184, .09);
 }
 .ratioBuildRow:last-child {
   border-bottom: 0;
 }
+.ratioBuildRow > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 11px 12px;
+  border-left: 1px solid rgba(148, 163, 184, .12);
+}
+.ratioBuildRow > div:first-child {
+  border-left: 0;
+}
+.ratioClassName {
+  color: #dbeafe;
+  font-size: 13px;
+  font-weight: 900;
+  word-break: keep-all;
+}
 .ratioBuildIdentity,
-.ratioBuildMetric {
+.ratioBuildMetric,
+.ratioCombination {
   min-width: 0;
 }
 .ratioBuildIdentity strong,
 .ratioBuildIdentity small,
 .ratioBuildMetric strong,
-.ratioBuildMetric small {
+.ratioBuildMetric small,
+.ratioCombination strong,
+.ratioCombination small {
   display: block;
 }
 .ratioBuildIdentity strong {
   color: #f8fafc;
   font-size: 14px;
+  line-height: 1.35;
+  word-break: keep-all;
 }
 .ratioBuildIdentity small,
-.ratioBuildMetric small {
+.ratioBuildMetric small,
+.ratioCombination small {
   margin-top: 4px;
   color: var(--muted);
   font-size: 10px;
+}
+.ratioCombination {
+  text-align: center;
+}
+.ratioCombination strong {
+  color: #67e8f9;
+  font-size: 18px;
+}
+.ratioCombination span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 .ratioBuildMetric strong {
   color: #fbbf24;
@@ -353,7 +418,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 }
 .ratioCoreList {
   min-width: 0;
-  display: grid;
+  display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
 }
@@ -369,10 +434,10 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   background: rgba(2, 6, 23, .36);
 }
 .ratioCore b {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 1.35;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 .ratioCorePending {
   grid-column: 1 / -1;
@@ -3991,20 +4056,48 @@ body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .tabNav {
     width: 100%;
     margin: 2px 0 0;
   }
-  .ratioClassGroup {
-    grid-template-columns: 1fr;
+  .ratioColumnHead {
+    display: none;
   }
-  .ratioClassGroup > h3 {
-    padding: 12px 14px;
-    border-bottom: 1px solid rgba(148, 163, 184, .12);
+  .ratioRoleGroup > h3 {
+    padding: 10px 14px;
   }
   .ratioBuildRow {
-    grid-template-columns: minmax(0, 1fr) 100px;
-    gap: 10px;
-    padding: 12px 14px;
+    grid-template-columns: minmax(0, 1fr) 70px 92px;
+    grid-template-areas:
+      "class combo metric"
+      "identity combo metric"
+      "cores cores cores";
+    padding: 0 12px;
+  }
+  .ratioBuildRow > div {
+    padding: 6px 8px;
+  }
+  .ratioClassName {
+    grid-area: class;
+    justify-content: end !important;
+    padding-bottom: 1px !important;
+    border-left: 0 !important;
+    font-size: 11px;
+    color: #93c5fd;
+  }
+  .ratioBuildIdentity {
+    grid-area: identity;
+    justify-content: start !important;
+    padding-top: 1px !important;
+    border-left: 0 !important;
+  }
+  .ratioCombination {
+    grid-area: combo;
+  }
+  .ratioBuildMetric {
+    grid-area: metric;
   }
   .ratioCoreList {
-    grid-column: 1 / -1;
+    grid-area: cores;
+    padding: 9px 0 !important;
+    border-top: 1px solid rgba(148, 163, 184, .1);
+    border-left: 0 !important;
   }
   .ratioCore {
     grid-template-columns: 22px minmax(0, 1fr);
