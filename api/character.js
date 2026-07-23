@@ -1,6 +1,7 @@
 import { isBoundGem } from '../public/gem-math.js';
+import { relicEngravingEffect } from '../public/engraving-math.js';
 
-const API_VERSION = '5.8.9';
+const API_VERSION = '5.8.10';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = 60 * 1000;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -660,9 +661,11 @@ function extractEngravingEffects(engravingData) {
     const rule = DEALER_ENGRAVING_BOOK_RULES[name];
     if (!rule) continue;
 
-    const eff = evaluateBookRule(rule, grade, bookLevel);
+    const eff = grade === '유물' ? relicEngravingEffect(name, bookLevel) : evaluateBookRule(rule, grade, bookLevel);
     const nextBookLevel = bookLevel < 4 ? bookLevel + 1 : null;
-    const nextEff = nextBookLevel != null ? evaluateBookRule(rule, grade, nextBookLevel) : null;
+    const nextEff = nextBookLevel != null
+      ? (grade === '유물' ? relicEngravingEffect(name, nextBookLevel) : evaluateBookRule(rule, grade, nextBookLevel))
+      : null;
     const deltaEff = nextEff ? diffEngravingEffects(nextEff, eff) : null;
     if (name === '질량 증가') eff.attackSpeed = -10;
     result.items.push({ name, grade, bookLevel, count: bookLevel * 5, effects: eff, nextBookLevel, nextEffects: nextEff, deltaEffects: deltaEff });

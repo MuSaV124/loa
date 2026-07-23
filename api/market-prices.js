@@ -1,7 +1,8 @@
-const API_VERSION = '5.8.9';
+const API_VERSION = '5.8.10';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
+const ARK_GRID_GEM_GRADE = '영웅';
 
 const ACCESSORY_RULES = {
   necklace: {
@@ -590,7 +591,7 @@ async function searchEngravingListFresh(apiKey, maxPages) {
 
 async function searchT4Materials(apiKey, query) {
   const force = String(query.force || '') === '1';
-  const cacheKey = 't4Materials:v8';
+  const cacheKey = 't4Materials:v9:hero-ark-grid-gems';
   return getCachedMarketList(cacheKey, force, async () => searchT4MaterialsFresh(apiKey), isUsableT4MaterialList);
 }
 
@@ -626,19 +627,21 @@ async function searchMarketMaterial(apiKey, name, group) {
   const tried = [];
   const matched = [];
   const aliases = materialSearchAliases(name);
+  const isArkGridGem = isArkGridGemName(name);
   for (const keyword of aliases) {
     for (const categoryCode of [null, 50000, 50010, 50020, 50030, 50040]) {
-      const payload = { Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode ?? undefined, ItemName: keyword, PageNo: 1 };
+      const payload = { Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode ?? undefined, ItemGrade: isArkGridGem ? ARK_GRID_GEM_GRADE : undefined, ItemName: keyword, PageNo: 1 };
       stripUndefined(payload);
       const result = await fetchMarketPage(apiKey, payload);
       tried.push({ group, name, keyword, categoryCode, count: result.items.length, totalCount: result.totalCount, error: result.error || null });
       for (const raw of result.items) {
         const item = normalizeMarketItem(raw);
         if (!item.price) continue;
+        if (isArkGridGem && normalizeText(item.grade) !== ARK_GRID_GEM_GRADE) continue;
         const itemText = normalizeText(`${item.name} ${item.fullText}`);
         if (!isMaterialNameMatch(itemText, name, keyword)) continue;
         const meta = applyMaterialUnitMeta({ ...item, group, requestedName: name, source: 'markets/items' }, name);
-        matched.push(isArkGridGemName(name) ? { ...meta, pheonCost: defaultArkGridGemPheonCost(meta.grade) } : meta);
+        matched.push(isArkGridGem ? { ...meta, pheonCost: defaultArkGridGemPheonCost(meta.grade) } : meta);
       }
       if (matched.length) break;
     }

@@ -1,10 +1,10 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.9';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.9';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.9';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.9';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.9';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.10';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.10';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.10';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.10';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.10';
 
-const VERSION = '5.8.9';
+const VERSION = '5.8.10';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2521,6 +2521,12 @@ function getBaseStats(selection = state.selected) {
   const engravingAttackSpeed = num(engravingEffects.attackSpeed);
   const attackSpeed = baseSpeed + swiftSpeedBonus + enlightenmentAttackSpeed + braceletAttackMoveSpeed + arkGridAttackSpeed + engravingAttackSpeed + extraAttackSpeed;
   const moveSpeed = baseSpeed + swiftSpeedBonus + enlightenmentMoveSpeed + braceletAttackMoveSpeed + arkGridMoveSpeed + extraMoveSpeed;
+  const replacementEffects = { ...(engravingSimulation.replacementEffect || {}) };
+  if (!engravingSimulation.adrenalineEnabled && engravingSimulation.replacementName === '돌격대장') {
+    const moveSpeedRatio = Math.max(0, Math.min((moveSpeed - 100) / 40, 1));
+    replacementEffects.conditionalDamage = Math.round(num(replacementEffects.conditionalDamage) * moveSpeedRatio * 100) / 100;
+  }
+  const engravingDamageMultiplier = !engravingSimulation.adrenalineEnabled && engravingSimulation.replacementName === '예리한 둔기' ? 0.98 : 1;
   let dynamicEnlightenmentCritRate = 0;
   let dynamicEnlightenmentCritDamage = 0;
   for (const item of state.enlightenment.items || []) {
@@ -2544,7 +2550,7 @@ function getBaseStats(selection = state.selected) {
   pushDamageSource(enemyDamageSources, '깨달음', state.enlightenment.enemyDamage);
   pushDamageSource(enemyDamageSources, '아크그리드', state.arkGrid.enemyDamage);
   pushDamageSource(enemyDamageSources, '각인서/API', engravingEffects.enemyDamage);
-  if (!engravingSimulation.adrenalineEnabled) pushDamageSource(enemyDamageSources, `${engravingSimulation.replacementName} · 조건 충족`, engravingSimulation.replacementEffect.conditionalDamage);
+  if (!engravingSimulation.adrenalineEnabled) pushDamageSource(enemyDamageSources, `${engravingSimulation.replacementName} · 조건 충족`, replacementEffects.conditionalDamage);
   pushDamageSource(enemyDamageSources, '어빌리티 스톤 각인 보너스', state.abilityStone?.effects?.enemyDamage);
   pushDamageSource(enemyDamageSources, '추가 입력', extraEnemyDamage);
   pushDamageSource(enemyDamageSources, '백어택', backAttackEnemyDamage);
@@ -2574,8 +2580,9 @@ function getBaseStats(selection = state.selected) {
     adrenalineCritRate: num(adrenalineEffect.critRate),
     adrenalineAttackPower: num(adrenalineEffect.attackPower),
     attackPower: num(adrenalineEffect.attackPower) + num(state.abilityStone?.attackPower) + num(state.abilityStone?.effects?.attackPower) + num(engravingEffects.attackPower),
+    engravingDamageMultiplier,
     engravingEffects,
-    replacementEngraving: engravingSimulation.adrenalineEnabled ? null : { name: engravingSimulation.replacementName, level: engravingSimulation.replacementBookLevel, effects: engravingSimulation.replacementEffect },
+    replacementEngraving: engravingSimulation.adrenalineEnabled ? null : { name: engravingSimulation.replacementName, level: engravingSimulation.replacementBookLevel, effects: replacementEffects },
     swiftSpeedBonus,
     enlightenmentAttackSpeed,
     enlightenmentMoveSpeed,
@@ -2674,6 +2681,7 @@ function score(stats) {
   const displayEnemyDamage = additivePercentFromSources(stats.enemyDamageSources);
   const displayCritHitDamage = additivePercentFromSources(critHitSources);
   const attackMultiplier = 1 + (stats.attackPower || 0) / 100;
+  const engravingDamageMultiplier = Number(stats.engravingDamageMultiplier || 1);
   // v4.8.8: 쿨감의 이론 DPS 증가분을 사용자가 입력한 '주력기 딜 지분'만큼 반영.
   // 쿨감 효과 제외 체크 시 끝마/무마/최적화 훈련 등 모든 cooldownReduction은 점수에서 0으로 처리.
   const cooldownExcluded = isCooldownExcluded();
@@ -2682,8 +2690,8 @@ function score(stats) {
   const cooldownRatio = mainSkillDamageSharePct / 100;
   const theoreticalCooldownGain = cooldownReduction > 0 ? (1 / (1 - cooldownReduction / 100) - 1) : 0;
   const cooldownMultiplier = 1 + theoreticalCooldownGain * cooldownRatio;
-  const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier * cooldownMultiplier;
-  return { value, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
+  const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier * engravingDamageMultiplier * cooldownMultiplier;
+  return { value, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, engravingDamageMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
 }
 function cloneBaseStats(stats) {
   return {
@@ -2912,6 +2920,11 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.effects?.attackPower) attackPowerLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.attackPower));
   if (base.engravingEffects?.attackPower) attackPowerLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.attackPower));
 
+  const engravingExpectedLines = [];
+  if (base.engravingDamageMultiplier !== 1) {
+    engravingExpectedLines.push(sourceLine('예리한 둔기 평균 페널티', (base.engravingDamageMultiplier - 1) * 100, `피해 배율 ×${fmt(base.engravingDamageMultiplier)}`));
+  }
+
   $('sourceSummary').innerHTML = `
     <div class="sourceTitle"><div><h3>계산 요약</h3><p>표시는 출처별 합산값, 기대값은 로아식 합연산/곱연산으로 계산합니다.</p></div><button id="resetViewButton" type="button">초기화</button></div>
     ${sourceGroup('치명타 확률', 'blue', critLines, current.result.critRate)}
@@ -2921,6 +2934,7 @@ function buildSourceSummary(current) {
     ${sourceGroup('추피', 'green', addLines, current.result.additionalDamage)}
     ${sourceGroup('적주피', 'pink', enemyLines, current.result.enemyDamage)}
     ${sourceGroup('공격력 증가', 'green', attackPowerLines, current.result.attackPower)}
+    ${engravingExpectedLines.length ? sourceGroup('각인 기대값 보정', 'orange', engravingExpectedLines, (current.result.engravingDamageMultiplier - 1) * 100) : ''}
     ${sourceGroup('공격 속도', 'cyan', attackSpeedLines, current.result.attackSpeed)}
     ${sourceGroup('이동 속도', 'cyan', moveSpeedLines, current.result.moveSpeed)}
     ${enlightenmentAppliedDetailHtml(base)}
