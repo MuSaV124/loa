@@ -209,6 +209,184 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   font-size: 11px;
   line-height: 1.4;
 }
+.ratioPanel {
+  grid-column: 1 / -1;
+  padding: 0;
+  overflow: hidden;
+}
+.ratioHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+  align-items: end;
+  gap: 24px;
+  padding: 24px;
+  border-bottom: 1px solid rgba(148, 163, 184, .15);
+  background:
+    linear-gradient(100deg, rgba(17, 24, 39, .97), rgba(4, 25, 32, .94)),
+    #111827;
+}
+.ratioHero h2 {
+  margin: 5px 0 7px;
+  font-size: 25px;
+}
+.ratioEyebrow {
+  color: #fbbf24;
+  font-size: 11px;
+  font-weight: 950;
+}
+.ratioSearch {
+  display: grid;
+  gap: 6px;
+  color: #a8b7ca;
+  font-size: 11px;
+  font-weight: 900;
+}
+.ratioSearch input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(94, 234, 212, .3);
+  border-radius: 6px;
+  background: rgba(2, 6, 23, .7);
+  color: #f8fafc;
+  padding: 0 12px;
+}
+.ratioLegend {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 24px;
+  border-bottom: 1px solid rgba(148, 163, 184, .12);
+  background: rgba(2, 6, 23, .42);
+  font-size: 11px;
+}
+.ratioLegend b {
+  margin-right: 4px;
+  color: #dbeafe;
+}
+.ratioLegend small {
+  margin-left: auto;
+  color: var(--muted);
+}
+.ratioSlot,
+.ratioCore i {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 1000;
+}
+.ratioSlotSun,
+.ratioCoreSun i {
+  border: 1px solid rgba(251, 191, 36, .55);
+  background: rgba(120, 53, 15, .42);
+  color: #fde68a;
+}
+.ratioSlotMoon,
+.ratioCoreMoon i {
+  border: 1px solid rgba(56, 189, 248, .5);
+  background: rgba(12, 74, 110, .42);
+  color: #bae6fd;
+}
+.ratioSlotStar,
+.ratioCoreStar i {
+  border: 1px solid rgba(192, 132, 252, .5);
+  background: rgba(88, 28, 135, .4);
+  color: #e9d5ff;
+}
+.ratioTable {
+  display: grid;
+  gap: 0;
+}
+.ratioClassGroup {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  border-bottom: 1px solid rgba(148, 163, 184, .14);
+}
+.ratioClassGroup > h3 {
+  margin: 0;
+  padding: 18px 16px 18px 24px;
+  background: rgba(15, 23, 42, .62);
+  color: #f8fafc;
+  font-size: 15px;
+}
+.ratioBuildList {
+  min-width: 0;
+}
+.ratioBuildRow {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(145px, .9fr) 116px minmax(420px, 2.4fr);
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, .09);
+}
+.ratioBuildRow:last-child {
+  border-bottom: 0;
+}
+.ratioBuildIdentity,
+.ratioBuildMetric {
+  min-width: 0;
+}
+.ratioBuildIdentity strong,
+.ratioBuildIdentity small,
+.ratioBuildMetric strong,
+.ratioBuildMetric small {
+  display: block;
+}
+.ratioBuildIdentity strong {
+  color: #f8fafc;
+  font-size: 14px;
+}
+.ratioBuildIdentity small,
+.ratioBuildMetric small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.ratioBuildMetric strong {
+  color: #fbbf24;
+  font-size: 18px;
+}
+.ratioCoreList {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+.ratioCore {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border: 1px solid rgba(148, 163, 184, .15);
+  border-radius: 6px;
+  background: rgba(2, 6, 23, .36);
+}
+.ratioCore b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.ratioCorePending {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 11px;
+}
+.ratioMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 24px;
+  color: var(--muted);
+  font-size: 10px;
+}
 .powerEquipmentList,
 .powerAccessoryList {
   display: grid;
@@ -2645,6 +2823,13 @@ body.marketMode .tabNav,
 body.marketMode #marketPanel,
 body.marketMode #legendAvatarPanel { grid-column: 1 / -1; }
 body.marketMode:not(.avatarMode) #legendAvatarPanel { display: none !important; }
+body.ratioMode .hero,
+body.ratioMode .calcTabPanel,
+body.ratioMode #marketPanel,
+body.ratioMode #legendAvatarPanel { display: none !important; }
+body.ratioMode .wrap { display: grid; grid-template-columns: 1fr; max-width: 1180px; }
+body.ratioMode .tabNav,
+body.ratioMode #ratioPanel { grid-column: 1 / -1; }
 body.simulatorMode .hero,
 body.simulatorMode #characterCard,
 body.simulatorMode .calcTabPanel,
@@ -3052,13 +3237,13 @@ select {
 }
 
 /* v5.7.14 search-first calculator entry */
-body:not(.calculatorReady):not(.marketMode) #characterCard,
-body:not(.calculatorReady):not(.marketMode) #powerSnapshotPanel,
-body:not(.calculatorReady):not(.marketMode) #summaryPanel,
-body:not(.calculatorReady):not(.marketMode) #inputPanel,
-body:not(.calculatorReady):not(.marketMode) #evolutionPanel,
-body:not(.calculatorReady):not(.marketMode) #recommendPanel,
-body:not(.calculatorReady):not(.marketMode) #keenPanel {
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) #characterCard,
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) #powerSnapshotPanel,
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) #summaryPanel,
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) #inputPanel,
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) #evolutionPanel,
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) #recommendPanel,
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) #keenPanel {
   display: none !important;
 }
 
@@ -3120,24 +3305,24 @@ body:not(.calculatorReady):not(.marketMode) #keenPanel {
     line-height: 1.45;
   }
 }
-body:not(.calculatorReady):not(.marketMode) .wrap {
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .wrap {
   grid-template-columns: 1fr;
   width: min(960px, calc(100vw - 28px));
 }
-body:not(.calculatorReady):not(.marketMode) .hero {
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .hero {
   margin-top: clamp(34px, 8vh, 86px);
   padding: clamp(22px, 4vw, 34px);
 }
-body:not(.calculatorReady):not(.marketMode) .hero h1 {
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .hero h1 {
   font-size: clamp(30px, 4vw, 42px);
 }
-body:not(.calculatorReady):not(.marketMode) .hero p {
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .hero p {
   max-width: 680px;
 }
-body:not(.calculatorReady):not(.marketMode) .search {
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .search {
   margin-top: 18px;
 }
-body:not(.calculatorReady):not(.marketMode) .search input {
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .search input {
   min-height: 50px;
   font-size: 15px;
 }
@@ -3683,10 +3868,10 @@ body.simulatorMode .wrap {
     grid-template-columns: 28px 42px minmax(0, 1fr);
   }
 }
-body:not(.calculatorReady):not(.marketMode) .search button {
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .search button {
   min-width: 92px;
 }
-body:not(.calculatorReady):not(.marketMode) .tabNav {
+body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .tabNav {
   grid-column: 1;
 }
 
@@ -3789,18 +3974,64 @@ body:not(.calculatorReady):not(.marketMode) .tabNav {
   font-weight: 800;
 }
 @media (max-width: 760px) {
+  .ratioHero {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 16px;
+    padding: 18px;
+  }
+  .ratioHero h2 {
+    font-size: 21px;
+  }
+  .ratioLegend {
+    padding: 10px 14px;
+    flex-wrap: wrap;
+  }
+  .ratioLegend small {
+    width: 100%;
+    margin: 2px 0 0;
+  }
+  .ratioClassGroup {
+    grid-template-columns: 1fr;
+  }
+  .ratioClassGroup > h3 {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(148, 163, 184, .12);
+  }
+  .ratioBuildRow {
+    grid-template-columns: minmax(0, 1fr) 100px;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .ratioCoreList {
+    grid-column: 1 / -1;
+  }
+  .ratioCore {
+    grid-template-columns: 22px minmax(0, 1fr);
+    padding: 6px;
+  }
+  .ratioSlot,
+  .ratioCore i {
+    width: 22px;
+    height: 22px;
+  }
+  .ratioMeta {
+    display: grid;
+    gap: 4px;
+    padding: 11px 14px;
+  }
   .powerRawHeader {
     align-items: flex-start;
     flex-direction: column;
     gap: 2px;
   }
-  body:not(.calculatorReady):not(.marketMode) .wrap {
+  body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .wrap {
     width: min(100vw - 24px, 560px);
   }
-  body:not(.calculatorReady):not(.marketMode) .hero {
+  body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .hero {
     margin-top: 18px;
   }
-  body:not(.calculatorReady):not(.marketMode) .hero h1 {
+  body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .hero h1 {
     font-size: 28px;
   }
   .crystalMarketToolbar,

@@ -1,11 +1,11 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.13';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.13';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.13';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.13';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.13';
-import { benchmarkKillSeconds, findClassBenchmark } from './class-benchmark.js?v=5.8.13';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.14';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.14';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.14';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.14';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.14';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.8.14';
 
-const VERSION = '5.8.13';
+const VERSION = '5.8.14';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2256,7 +2256,6 @@ function renderPowerSnapshot(snapshot) {
   const accessoryPanelRows = [accessoryRows, braceletRow, stoneRow, engravingPanel].filter(Boolean).join('');
   view.innerHTML = `
     <div class="powerSnapshotColumns">
-      ${renderClassBenchmarkShell()}
       ${renderSpecEfficiencyShell()}
       <div class="powerRawHeader">
         <div><h3>현재 장비 분석</h3><p>효율 계산에 사용한 API 원자료를 확인합니다.</p></div>
@@ -2280,7 +2279,6 @@ function renderPowerSnapshot(snapshot) {
     </div>
     <p class="powerSnapshotNote">일반/상급 재련 단계는 공식 API Tooltip에서 읽습니다. 상급 재련 전투력 상승량은 공개 산식이 없어 현재 공식 전투력 비율 기반 추정값으로 표시합니다.</p>
   `;
-  renderClassBenchmark(snapshot);
   hydratePowerCostMaterialPrices();
   hydrateCrystalPrice();
 }
@@ -3375,20 +3373,28 @@ const marketListLoadState = { gem: 'idle', engraving: 'idle', material: 'idle', 
 function setActiveTab(tabName) {
   document.querySelectorAll('.tabButton').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
   const isMarket = tabName === 'market';
+  const isRatio = tabName === 'ratio';
   const isAvatar = isMarket && selectedMarketTab === 'avatar';
   document.body.classList.remove('simulatorMode');
   $('powerSnapshotPanel')?.classList.add('hidden');
   document.body.classList.toggle('marketMode', isMarket);
+  document.body.classList.toggle('ratioMode', isRatio);
   document.body.classList.toggle('avatarMode', isAvatar);
   document.querySelectorAll('.calcTabPanel').forEach(el => {
-    el.classList.toggle('hiddenByTab', isMarket);
-    el.style.display = isMarket ? 'none' : '';
+    el.classList.toggle('hiddenByTab', isMarket || isRatio);
+    el.style.display = isMarket || isRatio ? 'none' : '';
   });
   const marketPanel = $('marketPanel');
   if (marketPanel) {
     marketPanel.classList.toggle('hidden', !isMarket);
     marketPanel.classList.toggle('hiddenByTab', !isMarket);
     marketPanel.style.display = isMarket ? '' : 'none';
+  }
+  const ratioPanel = $('ratioPanel');
+  if (ratioPanel) {
+    ratioPanel.classList.toggle('hidden', !isRatio);
+    ratioPanel.classList.toggle('hiddenByTab', !isRatio);
+    ratioPanel.style.display = isRatio ? '' : 'none';
   }
   const avatarPanel = $('legendAvatarPanel');
   if (avatarPanel) {
@@ -3400,6 +3406,10 @@ function setActiveTab(tabName) {
     loadLostarkNoticeCard();
     renderMarketSubTab();
     preloadMarketPriceLists();
+  }
+  if (isRatio) {
+    loadClassBenchmarks();
+    renderRatioPanel();
   }
   if (isAvatar) prepareLegendAvatarTab();
 }
@@ -3934,12 +3944,12 @@ async function loadClassBenchmarks() {
       })
       .then(data => {
         state.classBenchmarks = data;
-        if ($('classBenchmarkView') && state.powerSnapshot) renderClassBenchmark(state.powerSnapshot);
+        renderRatioPanel();
         return data;
       })
       .catch(() => {
         state.classBenchmarks = null;
-        if ($('classBenchmarkView')) $('classBenchmarkView').innerHTML = '<p class="classBenchmarkEmpty">직업 지표를 불러오지 못했습니다.</p>';
+        if ($('ratioTable')) $('ratioTable').innerHTML = '<p class="classBenchmarkEmpty">직업 지표를 불러오지 못했습니다.</p>';
         return null;
       });
   }
@@ -3951,56 +3961,43 @@ function benchmarkDateLabel(value) {
   return date ? `${Number(date[1])}.${Number(date[2])}.${Number(date[3])}` : '-';
 }
 
-function renderClassBenchmarkShell() {
-  return `<section class="powerSnapshotBlock classBenchmarkPanel">
-    <div class="classBenchmarkHead">
-      <div><h3>직업 기준 루메루스 지표</h3><p>전투력 5,000 · 체력 1,000억 · 대표 캐릭터 기준</p></div>
-      <span>주간 채택률 갱신</span>
-    </div>
-    <div id="classBenchmarkView"><p class="classBenchmarkEmpty">직업 지표를 불러오는 중입니다.</p></div>
-  </section>`;
-}
-
-function renderClassBenchmark(snapshot) {
-  const view = $('classBenchmarkView');
+function renderRatioPanel() {
+  const view = $('ratioTable');
   if (!view) return;
   const data = state.classBenchmarks;
-  const profile = snapshot?.profile || {};
   if (!data) {
     view.innerHTML = '<p class="classBenchmarkEmpty">직업 지표를 불러오는 중입니다.</p>';
-    loadClassBenchmarks();
     return;
   }
-  const className = profile.className || profile.CharacterClassName || '';
-  if ((data.excludedClasses || []).includes(className)) {
-    view.innerHTML = `<p class="classBenchmarkEmpty">${escapeHtml(className)}는 지원 직업이라 딜러 루메루스 지표에서 제외했습니다.</p>`;
+  const query = String($('ratioSearchInput')?.value || '').trim().toLowerCase();
+  const classes = (data.classes || []).map(row => ({
+    ...row,
+    builds: (row.builds || []).filter(build => !query || `${row.className} ${build.engraving}`.toLowerCase().includes(query))
+  })).filter(row => row.builds.length);
+  if (!classes.length) {
+    view.innerHTML = '<p class="classBenchmarkEmpty">검색 조건에 맞는 직업각인이 없습니다.</p>';
     return;
   }
-  const row = findClassBenchmark(data, profile);
-  if (!row) {
-    view.innerHTML = `<p class="classBenchmarkEmpty">${escapeHtml(className || '현재 직업')}의 검증 지표가 아직 없습니다.</p>`;
-    return;
-  }
-  const seconds = benchmarkKillSeconds(data, row);
-  const ratio = Number(row.ratio?.representative || 0);
-  const min = Number(row.ratio?.min || ratio);
-  const max = Number(row.ratio?.max || ratio);
-  const range = Math.abs(max - min) > 0.0001 ? `${min.toFixed(3)}–${max.toFixed(3)}` : ratio.toFixed(3);
-  const coreItems = (row.cores || []).map(core => `
-    <span class="classBenchmarkCore"><i>${escapeHtml(core.slot)}</i><b>${escapeHtml(core.name)}</b>${Number(core.adoption) > 0 ? `<small>${Number(core.adoption).toFixed(1)}%</small>` : ''}</span>
-  `).join('');
-  view.innerHTML = `
-    <div class="classBenchmarkSummary">
-      <div class="classBenchmarkIdentity"><span>${escapeHtml(row.className)}</span><strong>${escapeHtml(row.engraving)}</strong></div>
-      <div class="classBenchmarkMetric"><span>대표 배율</span><strong>${ratio.toFixed(3)}배</strong><small>표본 범위 ${range}</small></div>
-      <div class="classBenchmarkMetric"><span>예상 처치</span><strong>${seconds ? `${seconds.toFixed(1)}초` : '-'}</strong><small>전투력 5,000 기준</small></div>
-      <div class="classBenchmarkMetric"><span>진화 노드</span><strong>${escapeHtml(row.evolution || '-')}</strong><small>대표 세팅</small></div>
-    </div>
-    <div class="classBenchmarkCores">${coreItems}</div>
-    <div class="classBenchmarkMeta">
-      <span>채택률 통계 ${benchmarkDateLabel(data.popularSettingsDate)} · 배율 ${benchmarkDateLabel(data.ratioBasisDate)}</span>
-      <span>실전 사이클, 치명 편차, 숙련도에 따라 달라질 수 있습니다.</span>
-    </div>`;
+  view.innerHTML = classes.map(row => `
+    <section class="ratioClassGroup">
+      <h3>${escapeHtml(row.className)}</h3>
+      <div class="ratioBuildList">${row.builds.map(build => {
+        const representative = Number(build.ratio?.representative || 0);
+        const ratioText = representative > 0 ? `${representative.toFixed(3)}배` : escapeHtml(build.status || '자료 부족');
+        const range = formatBenchmarkRange(build.ratio);
+        const cores = sortedBenchmarkCores(build.cores).map(core => `
+          <span class="ratioCore ratioCore${core.slot === '해' ? 'Sun' : core.slot === '달' ? 'Moon' : 'Star'}">
+            <i>${escapeHtml(core.slot)}</i><b>${escapeHtml(core.name)}</b>
+          </span>`).join('');
+        return `<article class="ratioBuildRow">
+          <div class="ratioBuildIdentity"><strong>${escapeHtml(build.engraving)}</strong><small>${escapeHtml(build.evolution || '-')}</small></div>
+          <div class="ratioBuildMetric"><strong>${ratioText}</strong>${range ? `<small>표본 ${escapeHtml(range)}</small>` : '<small>추가 표본 필요</small>'}</div>
+          <div class="ratioCoreList">${cores || '<span class="ratioCorePending">대표 세팅 집계 중</span>'}</div>
+        </article>`;
+      }).join('')}</div>
+    </section>`).join('');
+  const meta = $('ratioMeta');
+  if (meta) meta.innerHTML = `<span>대표 세팅 ${benchmarkDateLabel(data.popularSettingsDate)} · 배율 ${benchmarkDateLabel(data.ratioBasisDate)}</span><span>실전 사이클, 치명 편차와 숙련도에 따라 달라질 수 있습니다.</span>`;
 }
 
 async function loadMarketCrystalPrice(force = false) {
@@ -4055,6 +4052,7 @@ if (!window.__lostarkCalculatorBootedV506) {
   window.addEventListener('resize', refreshFocusedNodeTooltip);
   initLegendAvatarTab();
   initMarketPriceTab();
+  $('ratioSearchInput')?.addEventListener('input', renderRatioPanel);
   setActiveTab('calculator');
   loadLostarkNoticeCard();
   loadClassBenchmarks();

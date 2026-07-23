@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "updatedAt": "2026-07-23T06:51:18.754Z",
+  "version": 2,
+  "updatedAt": "2026-07-23T07:36:55.630Z",
   "popularSettingsDate": "2026-07-23",
   "ratioBasisDate": "2026-07-22",
   "filters": {
@@ -18,6 +18,10 @@
       "url": "https://loawa.com/stat/class-cores"
     },
     {
+      "label": "LOAGG 직업각인별 대표 세팅 통계",
+      "url": "https://loagg.com/stats"
+    },
+    {
       "label": "7월 22일 밸런스 패치 후 루메루스 배율 표본",
       "url": "https://www.inven.co.kr/board/lostark/6271/3927487"
     }
@@ -29,843 +33,1787 @@
   "classes": [
     {
       "className": "가디언나이트",
-      "engraving": "업화의 계승자",
-      "cores": [
+      "builds": [
         {
-          "slot": "달",
-          "name": "노바 플레임",
-          "adoption": 6.05629348513599,
-          "group": "질서"
+          "engraving": "공포의 포효",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "브랜디쉬",
+              "adoption": 4.237824161922834,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "도미넌트",
+              "adoption": 6.05629348513599,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "일당백",
+              "adoption": 4.301075268817204,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 1.05,
+            "min": 1.05,
+            "max": 1.05
+          }
         },
         {
-          "slot": "별",
-          "name": "라스트 스탠드",
-          "adoption": 6.087919038583175,
-          "group": "질서"
-        },
-        {
-          "slot": "해",
-          "name": "피니셔",
-          "adoption": 6.11954459203036,
-          "group": "질서"
+          "engraving": "불꽃의 계승자",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "피니셔",
+              "adoption": 6.11954459203036,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "노바 플레임",
+              "adoption": 6.05629348513599,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "라스트 스탠드",
+              "adoption": 6.087919038583175,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 1.17,
+            "min": 1.17,
+            "max": 1.17
+          }
         }
-      ],
-      "evolution": "입식 타격가",
-      "ratio": {
-        "min": 1.17,
-        "max": 1.17,
-        "representative": 1.17
-      }
+      ]
     },
     {
       "className": "건슬링어",
-      "engraving": "사냥의 시간",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "무법지대",
-          "adoption": 7.9043697094486385,
-          "group": "질서"
+          "engraving": "피스메이커",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "연회의 잔향",
+              "adoption": 6.119881034088309,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "체인지 암즈",
+              "adoption": 5.994051704415465,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "블로우 백",
+              "adoption": 6.085563944177534,
+              "group": "질서"
+            }
+          ],
+          "evolution": "마나 용광로",
+          "ratio": {
+            "representative": 1,
+            "min": 1,
+            "max": 1
+          },
+          "sampleUsers": 172,
+          "sourceUrl": "https://loagg.com/stats/setting/%ED%94%BC%EC%8A%A4%EB%A9%94%EC%9D%B4%EC%BB%A4"
         },
         {
-          "slot": "달",
-          "name": "불릿 무빙",
-          "adoption": 7.927247769389155,
-          "group": "질서"
-        },
-        {
-          "slot": "별",
-          "name": "풀 매거진",
-          "adoption": 7.961564859299932,
-          "group": "질서"
+          "engraving": "사냥의 시간",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "무법지대",
+              "adoption": 7.9043697094486385,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "불릿 무빙",
+              "adoption": 7.927247769389155,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "풀 매거진",
+              "adoption": 7.961564859299932,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 0.95,
+            "min": 0.9,
+            "max": 1
+          },
+          "sampleUsers": 159,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%82%AC%EB%83%A5%EC%9D%98%20%EC%8B%9C%EA%B0%84"
         }
-      ],
-      "evolution": "입식 타격가",
-      "ratio": {
-        "min": 0.9,
-        "max": 1,
-        "representative": 0.95
-      }
+      ]
     },
     {
       "className": "기공사",
-      "engraving": "역천지체",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "광류연파",
-          "adoption": 7.680050987890376,
-          "group": "질서"
+          "engraving": "세맥타통",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "무상기연",
+              "adoption": 3.282345442957298,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "신장대멸겁",
+              "adoption": 3.282345442957298,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "불영세",
+              "adoption": 3.409815168897387,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 1.025,
+            "min": 1,
+            "max": 1.05
+          },
+          "sampleUsers": 50,
+          "sourceUrl": "https://loagg.com/stats/setting/%EB%AC%B4%EC%83%81%EC%8B%A0%EA%B3%B5"
         },
         {
-          "slot": "달",
-          "name": "천류섬열풍",
-          "adoption": 7.680050987890376,
-          "group": "질서"
-        },
-        {
-          "slot": "별",
-          "name": "파공나선",
-          "adoption": 7.616316124920331,
-          "group": "질서"
+          "engraving": "역천지체",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "광류연파",
+              "adoption": 7.680050987890376,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "천류섬열풍",
+              "adoption": 7.680050987890376,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "파공나선",
+              "adoption": 7.616316124920331,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 0.975,
+            "min": 0.95,
+            "max": 1
+          },
+          "sampleUsers": 138,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%97%AD%EC%B2%9C%EC%A7%80%EC%B2%B4"
         }
-      ],
-      "evolution": "입식 타격가",
-      "ratio": {
-        "min": 0.95,
-        "max": 1,
-        "representative": 0.975
-      }
+      ]
     },
     {
       "className": "기상술사",
-      "engraving": "질풍노도",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "비연참",
-          "adoption": 8.678328474246841,
-          "group": "질서"
+          "engraving": "질풍노도",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "비연참",
+              "adoption": 8.678328474246841,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "우산의 춤",
+              "adoption": 8.746355685131196,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "휘몰아치기",
+              "adoption": 13.896987366375122,
+              "group": "질서"
+            }
+          ],
+          "evolution": "음속 돌파",
+          "ratio": {
+            "representative": 0.98,
+            "min": 0.98,
+            "max": 0.98
+          },
+          "sampleUsers": 143,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%A7%88%ED%92%8D%EB%85%B8%EB%8F%84"
         },
         {
-          "slot": "달",
-          "name": "우산의 춤",
-          "adoption": 8.746355685131196,
-          "group": "질서"
-        },
-        {
-          "slot": "별",
-          "name": "휘몰아치기",
-          "adoption": 13.896987366375122,
-          "group": "질서"
+          "engraving": "이슬비",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "해와 바람",
+              "adoption": 0.7094266277939747,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "뜨거운 햇볕",
+              "adoption": 1.4285714285714286,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "나그네의 외투를 벗긴건",
+              "adoption": 1.185617103984451,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 0.95,
+            "min": 0.94,
+            "max": 0.96
+          },
+          "sampleUsers": 52,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%9D%B4%EC%8A%AC%EB%B9%84"
         }
-      ],
-      "evolution": "음속 돌파",
-      "ratio": {
-        "min": 0.98,
-        "max": 0.98,
-        "representative": 0.98
-      }
+      ]
     },
     {
       "className": "데모닉",
-      "engraving": "멈출 수 없는 충동",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "오미너스",
-          "adoption": 13.456549935149157,
-          "group": "질서"
+          "engraving": "멈출 수 없는 충동",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "오미너스",
+              "adoption": 13.456549935149157,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "제노사이드",
+              "adoption": 11.640726329442282,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "치명적인 할퀴기",
+              "adoption": 14.040207522697795,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 0.935,
+            "min": 0.92,
+            "max": 0.95
+          },
+          "sampleUsers": 121,
+          "sourceUrl": "https://loagg.com/stats/setting/%EB%A9%88%EC%B6%9C%20%EC%88%98%20%EC%97%86%EB%8A%94%20%EC%B6%A9%EB%8F%99"
         },
         {
-          "slot": "달",
-          "name": "제노사이드",
-          "adoption": 11.640726329442282,
-          "group": "질서"
-        },
-        {
-          "slot": "별",
-          "name": "치명적인 할퀴기",
-          "adoption": 14.040207522697795,
-          "group": "질서"
+          "engraving": "완벽한 억제",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "매시브 컨슘",
+              "adoption": 1.1997405966277561,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "서브 스톰",
+              "adoption": 1.1997405966277561,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "파괴 광선",
+              "adoption": 1.1997405966277561,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 0.855,
+            "min": 0.84,
+            "max": 0.87
+          },
+          "sampleUsers": 43,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%99%84%EB%B2%BD%ED%95%9C%20%EC%96%B5%EC%A0%9C"
         }
-      ],
-      "evolution": "뭉툭한 가시",
-      "ratio": {
-        "min": 0.92,
-        "max": 0.95,
-        "representative": 0.935
-      }
+      ]
     },
     {
       "className": "데빌헌터",
-      "engraving": "전술 탄환",
-      "cores": [
+      "builds": [
         {
-          "slot": "달",
-          "name": "광란의 해결사",
-          "adoption": 14.638538718806277,
-          "group": "질서"
+          "engraving": "전술 탄환",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "샷건 오버로드",
+              "adoption": 14.587085155647028,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "광란의 해결사",
+              "adoption": 14.638538718806277,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "지배자의 탄환",
+              "adoption": 14.30409055827116,
+              "group": "질서"
+            }
+          ],
+          "evolution": "마나 용광로",
+          "ratio": {
+            "representative": 1.068,
+            "min": 1.068,
+            "max": 1.068
+          },
+          "sampleUsers": 91,
+          "sourceUrl": "https://loagg.com/stats/setting/%EA%B0%95%ED%99%94%20%EB%AC%B4%EA%B8%B0"
         },
         {
-          "slot": "해",
-          "name": "샷건 오버로드",
-          "adoption": 14.587085155647028,
-          "group": "질서"
-        },
-        {
-          "slot": "별",
-          "name": "지배자의 탄환",
-          "adoption": 14.30409055827116,
-          "group": "질서"
+          "engraving": "핸드거너",
+          "cores": [],
+          "evolution": "대표 세팅 집계 중",
+          "ratio": {
+            "representative": 0.9,
+            "min": 0.88,
+            "max": 0.92
+          }
         }
-      ],
-      "evolution": "마나 용광로",
-      "ratio": {
-        "min": 1.068,
-        "max": 1.068,
-        "representative": 1.068
-      }
+      ]
     },
     {
       "className": "디스트로이어",
-      "engraving": "중력 수련",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "그라비티 코어",
-          "adoption": 8.487337440109513,
-          "group": "질서"
+          "engraving": "분노의 망치",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "어스 웨이브",
+              "adoption": 3.730321697467488,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "중력 질주",
+              "adoption": 3.730321697467488,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "무모한 한방",
+              "adoption": 3.7132101300479126,
+              "group": "질서"
+            }
+          ],
+          "evolution": "마나 용광로",
+          "ratio": {
+            "representative": 1.05,
+            "min": 1,
+            "max": 1.1
+          },
+          "sampleUsers": 78,
+          "sourceUrl": "https://loagg.com/stats/setting/%EB%B6%84%EB%85%B8%EC%9D%98%20%EB%A7%9D%EC%B9%98"
         },
         {
-          "slot": "별",
-          "name": "대지 부수기",
-          "adoption": 8.487337440109513,
-          "group": "질서"
-        },
-        {
-          "slot": "달",
-          "name": "몰아치는 중력",
-          "adoption": 8.487337440109513,
-          "group": "질서"
+          "engraving": "중력 수련",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "그라비티 코어",
+              "adoption": 8.487337440109513,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "몰아치는 중력",
+              "adoption": 8.487337440109513,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "대지 부수기",
+              "adoption": 8.487337440109513,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 1.1,
+            "min": 1.1,
+            "max": 1.1
+          },
+          "sampleUsers": 172,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%A4%91%EB%A0%A5%20%EC%88%98%EB%A0%A8"
         }
-      ],
-      "evolution": "뭉툭한 가시",
-      "ratio": {
-        "min": 1.1,
-        "max": 1.1,
-        "representative": 1.1
-      }
+      ]
     },
     {
       "className": "리퍼",
-      "engraving": "갈증",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "갈증의 악몽",
-          "adoption": 13.521566401816118,
-          "group": "질서"
+          "engraving": "갈증",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "갈증의 악몽",
+              "adoption": 13.521566401816118,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "치명적 악몽",
+              "adoption": 13.507377979568671,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "치명적 연계",
+              "adoption": 10.102156640181612,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 1.075,
+            "min": 1.05,
+            "max": 1.1
+          },
+          "sampleUsers": 157,
+          "sourceUrl": "https://loagg.com/stats/setting/%EA%B0%88%EC%A6%9D"
         },
         {
-          "slot": "달",
-          "name": "치명적 악몽",
-          "adoption": 13.507377979568671,
-          "group": "질서"
-        },
-        {
-          "slot": "별",
-          "name": "치명적 연계",
-          "adoption": 10.102156640181612,
-          "group": "질서"
+          "engraving": "달의 소리",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "달의 향기",
+              "adoption": 1.5607264472190692,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "페르소나",
+              "adoption": 1.6316685584562998,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "할루시네이션",
+              "adoption": 1.5891032917139614,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 1.24,
+            "min": 1.24,
+            "max": 1.24
+          },
+          "sampleUsers": 43,
+          "sourceUrl": "https://loagg.com/stats/setting/%EB%8B%AC%EC%9D%98%20%EC%86%8C%EB%A6%AC"
         }
-      ],
-      "evolution": "뭉툭한 가시",
-      "ratio": {
-        "min": 1.05,
-        "max": 1.1,
-        "representative": 1.075
-      }
+      ]
     },
     {
       "className": "발키리",
-      "engraving": "빛의 기사",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "종언",
-          "adoption": 5,
-          "group": "질서"
-        },
-        {
-          "slot": "달",
-          "name": "종언의 기사",
-          "adoption": 5.037453183520599,
-          "group": "질서"
-        },
-        {
-          "slot": "별",
-          "name": "진정한 종언",
-          "adoption": 5.898876404494382,
-          "group": "질서"
+          "engraving": "빛의 기사",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "종언",
+              "adoption": 5,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "종언의 기사",
+              "adoption": 5.037453183520599,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "진정한 종언",
+              "adoption": 5.898876404494382,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 1,
+            "min": 1,
+            "max": 1
+          },
+          "sampleUsers": 152,
+          "sourceUrl": "https://loagg.com/stats/setting/%EB%B9%9B%EC%9D%98%20%EA%B8%B0%EC%82%AC"
         }
-      ],
-      "evolution": "입식 타격가",
-      "ratio": {
-        "min": 1,
-        "max": 1,
-        "representative": 1
-      }
+      ]
     },
     {
       "className": "배틀마스터",
-      "engraving": "초심",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "극의귀원",
-          "adoption": 11.432369557992688,
-          "group": "질서"
+          "engraving": "초심",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "극의귀원",
+              "adoption": 11.432369557992688,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "초순환",
+              "adoption": 13.260219341974079,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "용류 강화",
+              "adoption": 11.781322698570953,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 1,
+            "min": 1,
+            "max": 1
+          },
+          "sampleUsers": 121,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%B4%88%EC%8B%AC"
         },
         {
-          "slot": "별",
-          "name": "용류 강화",
-          "adoption": 11.781322698570953,
-          "group": "질서"
-        },
-        {
-          "slot": "달",
-          "name": "초순환",
-          "adoption": 13.260219341974079,
-          "group": "질서"
+          "engraving": "오의 강화",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "오기강체",
+              "adoption": 1.8943170488534398,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "심안",
+              "adoption": 2.293120638085743,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "창풍극의",
+              "adoption": 1.6284479893652377,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 0.85,
+            "min": 0.8,
+            "max": 0.9
+          },
+          "sampleUsers": 41,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%98%A4%EC%9D%98%20%EA%B0%95%ED%99%94"
         }
-      ],
-      "evolution": "뭉툭한 가시",
-      "ratio": {
-        "min": 1,
-        "max": 1,
-        "representative": 1
-      }
+      ]
     },
     {
       "className": "버서커",
-      "engraving": "광기",
-      "cores": [
+      "builds": [
         {
-          "slot": "별",
-          "name": "광란",
-          "adoption": 7.818930041152264,
-          "group": "질서"
+          "engraving": "광기",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "다크 파워",
+              "adoption": 7.79320987654321,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "어둠의 격류",
+              "adoption": 7.87037037037037,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "광란",
+              "adoption": 7.818930041152264,
+              "group": "질서"
+            }
+          ],
+          "evolution": "음속 돌파",
+          "ratio": {
+            "representative": 0.95,
+            "min": 0.9,
+            "max": 1
+          },
+          "sampleUsers": 93,
+          "sourceUrl": "https://loagg.com/stats/setting/%EA%B4%91%EA%B8%B0"
         },
         {
-          "slot": "해",
-          "name": "다크 파워",
-          "adoption": 7.79320987654321,
-          "group": "질서"
-        },
-        {
-          "slot": "달",
-          "name": "어둠의 격류",
-          "adoption": 7.87037037037037,
-          "group": "질서"
+          "engraving": "광전사의 비기",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "콤비네이션",
+              "adoption": 5.29835390946502,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "피의 순환",
+              "adoption": 6.893004115226337,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "분쇄 폭풍",
+              "adoption": 4.938271604938271,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 1.1,
+            "min": 1.1,
+            "max": 1.1,
+            "note": "1.1 이상"
+          },
+          "sampleUsers": 66,
+          "sourceUrl": "https://loagg.com/stats/setting/%EA%B4%91%EC%A0%84%EC%82%AC%EC%9D%98%20%EB%B9%84%EA%B8%B0"
         }
-      ],
-      "evolution": "음속 돌파",
-      "ratio": {
-        "min": 0.9,
-        "max": 1,
-        "representative": 0.95
-      }
+      ]
     },
     {
       "className": "브레이커",
-      "engraving": "권왕파천무",
-      "cores": [
+      "builds": [
         {
-          "slot": "별",
-          "name": "권왕십이식",
-          "adoption": 9.73076397430641,
-          "group": "질서"
+          "engraving": "권왕파천무",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "충전된 충격",
+              "adoption": 9.83326499931666,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "충격 충전",
+              "adoption": 9.792264589312559,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "권왕십이식",
+              "adoption": 9.73076397430641,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 1.165,
+            "min": 1.1,
+            "max": 1.23
+          },
+          "sampleUsers": 215,
+          "sourceUrl": "https://loagg.com/stats/setting/%EA%B6%8C%EC%99%95%ED%8C%8C%EC%B2%9C%EB%AC%B4"
         },
         {
-          "slot": "달",
-          "name": "충격 충전",
-          "adoption": 9.792264589312559,
-          "group": "질서"
-        },
-        {
-          "slot": "해",
-          "name": "충전된 충격",
-          "adoption": 9.83326499931666,
-          "group": "질서"
+          "engraving": "수라의 길",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "그림자 주먹",
+              "adoption": 6.642066420664206,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "수라결",
+              "adoption": 6.710400437337706,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "수라",
+              "adoption": 6.765067650676507,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 1.25,
+            "min": 1.2,
+            "max": 1.3,
+            "note": "실전 재현 편차 큼"
+          },
+          "sampleUsers": 174,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%88%98%EB%9D%BC%EC%9D%98%20%EA%B8%B8"
         }
-      ],
-      "evolution": "입식 타격가",
-      "ratio": {
-        "min": 1.1,
-        "max": 1.23,
-        "representative": 1.165
-      }
+      ]
     },
     {
       "className": "블래스터",
-      "engraving": "포격 강화",
-      "cores": [
+      "builds": [
         {
-          "slot": "달",
-          "name": "세이프 존",
-          "adoption": 13.214285714285714,
-          "group": "질서"
+          "engraving": "포격 강화",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "포화 전차",
+              "adoption": 13.452380952380953,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "세이프 존",
+              "adoption": 13.214285714285714,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "초토화",
+              "adoption": 13.392857142857142,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 0.875,
+            "min": 0.8,
+            "max": 0.95
+          },
+          "sampleUsers": 230,
+          "sourceUrl": "https://loagg.com/stats/setting/%ED%8F%AC%EA%B2%A9%20%EA%B0%95%ED%99%94"
         },
         {
-          "slot": "별",
-          "name": "초토화",
-          "adoption": 13.392857142857142,
-          "group": "질서"
-        },
-        {
-          "slot": "해",
-          "name": "포화 전차",
-          "adoption": 13.452380952380953,
-          "group": "질서"
+          "engraving": "화력 강화",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "점핑맨",
+              "adoption": 1.6369047619047619,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "질풍 포병",
+              "adoption": 1.4583333333333333,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "오토 락온",
+              "adoption": 2.1726190476190474,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 0.85,
+            "min": 0.8,
+            "max": 0.9
+          },
+          "sampleUsers": 18,
+          "sourceUrl": "https://loagg.com/stats/setting/%ED%99%94%EB%A0%A5%20%EA%B0%95%ED%99%94"
         }
-      ],
-      "evolution": "뭉툭한 가시",
-      "ratio": {
-        "min": 0.8,
-        "max": 0.95,
-        "representative": 0.875
-      }
+      ]
     },
     {
       "className": "블레이드",
-      "engraving": "잔재된 기운",
-      "cores": [
+      "builds": [
         {
-          "slot": "달",
-          "name": "블레이드 웨이브",
-          "adoption": 10.181236673773988,
-          "group": "질서"
+          "engraving": "버스트",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "블레이드 버스트",
+              "adoption": 2.85181236673774,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "버스트 코어",
+              "adoption": 2.878464818763326,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "일격",
+              "adoption": 2.425373134328358,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 1.23,
+            "min": 1.23,
+            "max": 1.23
+          },
+          "sampleUsers": 55,
+          "sourceUrl": "https://loagg.com/stats/setting/%EB%B2%84%EC%8A%A4%ED%8A%B8"
         },
         {
-          "slot": "해",
-          "name": "일섬",
-          "adoption": 10.42999289267946,
-          "group": "질서"
-        },
-        {
-          "slot": "별",
-          "name": "죽음의 검기",
-          "adoption": 10.438877043354655,
-          "group": "질서"
+          "engraving": "잔재된 기운",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "일섬",
+              "adoption": 10.42999289267946,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "블레이드 웨이브",
+              "adoption": 10.181236673773988,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "죽음의 검기",
+              "adoption": 10.438877043354655,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 1.14,
+            "min": 1.1,
+            "max": 1.18
+          },
+          "sampleUsers": 192,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%9E%94%EC%9E%AC%EB%90%9C%20%EA%B8%B0%EC%9A%B4"
         }
-      ],
-      "evolution": "입식 타격가",
-      "ratio": {
-        "min": 1.1,
-        "max": 1.18,
-        "representative": 1.14
-      }
+      ]
     },
     {
       "className": "서머너",
-      "engraving": "상급 소환사",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "고대의 유산",
-          "adoption": 12.977961951403277,
-          "group": "질서"
+          "engraving": "넘치는 교감",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "정령 결속",
+              "adoption": 1.7329063853833113,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "결속 증폭",
+              "adoption": 1.695234507440196,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "증폭 공명",
+              "adoption": 1.5257110566961762,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 0.995,
+            "min": 0.99,
+            "max": 1
+          },
+          "sampleUsers": 34,
+          "sourceUrl": "https://loagg.com/stats/setting/%EB%84%98%EC%B9%98%EB%8A%94%20%EA%B5%90%EA%B0%90"
         },
         {
-          "slot": "달",
-          "name": "오쉬의 지원",
-          "adoption": 13.919758899981163,
-          "group": "질서"
-        },
-        {
-          "slot": "별",
-          "name": "창세의 힘",
-          "adoption": 13.938594838952723,
-          "group": "질서"
+          "engraving": "상급 소환사",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "고대의 유산",
+              "adoption": 12.977961951403277,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "오쉬의 지원",
+              "adoption": 13.919758899981163,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "창세의 힘",
+              "adoption": 13.938594838952723,
+              "group": "질서"
+            }
+          ],
+          "evolution": "마나 용광로",
+          "ratio": {
+            "representative": 1,
+            "min": 1,
+            "max": 1
+          },
+          "sampleUsers": 223,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%83%81%EA%B8%89%20%EC%86%8C%ED%99%98%EC%82%AC"
         }
-      ],
-      "evolution": "마나 용광로",
-      "ratio": {
-        "min": 1,
-        "max": 1,
-        "representative": 1
-      }
+      ]
     },
     {
       "className": "소서리스",
-      "engraving": "점화",
-      "cores": [
+      "builds": [
         {
-          "slot": "달",
-          "name": "반복된 종말",
-          "adoption": 8.91309440149918,
-          "group": "질서"
+          "engraving": "점화",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "종말의 시작",
+              "adoption": 8.90138205668775,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "반복된 종말",
+              "adoption": 8.91309440149918,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "종말의 시",
+              "adoption": 8.749121574139142,
+              "group": "질서"
+            }
+          ],
+          "evolution": "마나 용광로",
+          "ratio": {
+            "representative": 0.89,
+            "min": 0.88,
+            "max": 0.9
+          },
+          "sampleUsers": 161,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%A0%90%ED%99%94"
         },
         {
-          "slot": "별",
-          "name": "종말의 시",
-          "adoption": 8.749121574139142,
-          "group": "질서"
-        },
-        {
-          "slot": "해",
-          "name": "종말의 시작",
-          "adoption": 8.90138205668775,
-          "group": "질서"
+          "engraving": "환류",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "편향",
+              "adoption": 4.204731787303818,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "교류",
+              "adoption": 2.9515108924806746,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "무결",
+              "adoption": 3.970484891075193,
+              "group": "질서"
+            }
+          ],
+          "evolution": "마나 용광로",
+          "ratio": {
+            "representative": 0.99,
+            "min": 0.99,
+            "max": 0.99
+          },
+          "sampleUsers": 85,
+          "sourceUrl": "https://loagg.com/stats/setting/%ED%99%98%EB%A5%98"
         }
-      ],
-      "evolution": "마나 용광로",
-      "ratio": {
-        "min": 0.88,
-        "max": 0.9,
-        "representative": 0.89
-      }
+      ]
     },
     {
       "className": "소울이터",
-      "engraving": "만월의 집행자",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "망자의 발걸음",
-          "adoption": 9.830932999373825,
-          "group": "질서"
+          "engraving": "그믐의 경계",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "사신의 부름",
+              "adoption": 5.280734710916302,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "광월야",
+              "adoption": 5.249426007096639,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "사신의 힘",
+              "adoption": 5.280734710916302,
+              "group": "질서"
+            }
+          ],
+          "evolution": "마나 용광로",
+          "ratio": {
+            "representative": 1.13,
+            "min": 1.1,
+            "max": 1.16
+          },
+          "sampleUsers": 126,
+          "sourceUrl": "https://loagg.com/stats/setting/%EA%B7%B8%EB%AF%90%EC%9D%98%20%EA%B2%BD%EA%B3%84"
         },
         {
-          "slot": "별",
-          "name": "빙의",
-          "adoption": 9.768315591734503,
-          "group": "질서"
-        },
-        {
-          "slot": "달",
-          "name": "소울 코어",
-          "adoption": 9.757879357127948,
-          "group": "질서"
+          "engraving": "만월의 집행자",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "망자의 발걸음",
+              "adoption": 9.830932999373825,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "소울 코어",
+              "adoption": 9.757879357127948,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "빙의",
+              "adoption": 9.768315591734503,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 1.375,
+            "min": 1.35,
+            "max": 1.4
+          },
+          "sampleUsers": 209,
+          "sourceUrl": "https://loagg.com/stats/setting/%EB%A7%8C%EC%9B%94%EC%9D%98%20%EC%A7%91%ED%96%89%EC%9E%90"
         }
-      ],
-      "evolution": "뭉툭한 가시",
-      "ratio": {
-        "min": 1.35,
-        "max": 1.4,
-        "representative": 1.375
-      }
+      ]
     },
     {
       "className": "스카우터",
-      "engraving": "진화의 유산",
-      "cores": [
+      "builds": [
         {
-          "slot": "달",
-          "name": "어썰트 타이탄",
-          "adoption": 10.504469987228608,
-          "group": "질서"
+          "engraving": "아르데타인의 기술",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "펄스 노바",
+              "adoption": 2.0114942528735633,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "에너지 아포칼립스",
+              "adoption": 1.7241379310344827,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "제로백 버스트",
+              "adoption": 1.9795657726692208,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 1.025,
+            "min": 1,
+            "max": 1.05
+          },
+          "sampleUsers": 35,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%95%84%EB%A5%B4%EB%8D%B0%ED%83%80%EC%9D%B8%EC%9D%98%20%EA%B8%B0%EC%88%A0"
         },
         {
-          "slot": "별",
-          "name": "코어 리액터 증폭",
-          "adoption": 10.440613026819923,
-          "group": "질서"
-        },
-        {
-          "slot": "해",
-          "name": "타이탄 슈트",
-          "adoption": 9.195402298850574,
-          "group": "질서"
+          "engraving": "진화의 유산",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "타이탄 슈트",
+              "adoption": 9.195402298850574,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "어썰트 타이탄",
+              "adoption": 10.504469987228608,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "코어 리액터 증폭",
+              "adoption": 10.440613026819923,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 0.95,
+            "min": 0.9,
+            "max": 1
+          },
+          "sampleUsers": 153,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%A7%84%ED%99%94%EC%9D%98%20%EC%9C%A0%EC%82%B0"
         }
-      ],
-      "evolution": "입식 타격가",
-      "ratio": {
-        "min": 0.9,
-        "max": 1,
-        "representative": 0.95
-      }
+      ]
     },
     {
       "className": "스트라이커",
-      "engraving": "일격필살",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "뇌호",
-          "adoption": 9.514925373134329,
-          "group": "질서"
+          "engraving": "오의난무",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "광파섬",
+              "adoption": 4.083747927031509,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "풍뢰보",
+              "adoption": 3.917910447761194,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "신왕화신",
+              "adoption": 4.021558872305141,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 1.1,
+            "min": 1.05,
+            "max": 1.15
+          },
+          "sampleUsers": 60,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%98%A4%EC%9D%98%EB%82%9C%EB%AC%B4"
         },
         {
-          "slot": "달",
-          "name": "벽뢰호각",
-          "adoption": 9.535655058043117,
-          "group": "질서"
-        },
-        {
-          "slot": "별",
-          "name": "섬호뇌격",
-          "adoption": 9.535655058043117,
-          "group": "질서"
+          "engraving": "일격필살",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "뇌호",
+              "adoption": 9.514925373134329,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "벽뢰호각",
+              "adoption": 9.535655058043117,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "섬호뇌격",
+              "adoption": 9.535655058043117,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 1.1,
+            "min": 1.1,
+            "max": 1.1
+          },
+          "sampleUsers": 195,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%9D%BC%EA%B2%A9%ED%95%84%EC%82%B4"
         }
-      ],
-      "evolution": "입식 타격가",
-      "ratio": {
-        "min": 1.1,
-        "max": 1.1,
-        "representative": 1.1
-      }
+      ]
     },
     {
       "className": "슬레이어",
-      "engraving": "처단자",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "격노폭발",
-          "adoption": 3.016514998314796,
-          "group": "질서"
+          "engraving": "처단자",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "격노폭발",
+              "adoption": 3.016514998314796,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "교차된 힘",
+              "adoption": 2.9996629592180653,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "신중한 강타",
+              "adoption": 3.016514998314796,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 1.045,
+            "min": 1,
+            "max": 1.09
+          },
+          "sampleUsers": 121,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%B2%98%EB%8B%A8%EC%9E%90"
         },
         {
-          "slot": "달",
-          "name": "교차된 힘",
-          "adoption": 2.9996629592180653,
-          "group": "질서"
-        },
-        {
-          "slot": "별",
-          "name": "신중한 강타",
-          "adoption": 3.016514998314796,
-          "group": "질서"
+          "engraving": "포식자",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "회오리",
+              "adoption": 10.819009100101113,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "소용돌이",
+              "adoption": 13.329962925513987,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "파괴의 바람",
+              "adoption": 10.903269295584765,
+              "group": "질서"
+            }
+          ],
+          "evolution": "음속 돌파",
+          "ratio": {
+            "representative": 1,
+            "min": 1,
+            "max": 1
+          },
+          "sampleUsers": 73,
+          "sourceUrl": "https://loagg.com/stats/setting/%ED%8F%AC%EC%8B%9D%EC%9E%90"
         }
-      ],
-      "evolution": "뭉툭한 가시",
-      "ratio": {
-        "min": 1,
-        "max": 1.09,
-        "representative": 1.045
-      }
+      ]
     },
     {
       "className": "아르카나",
-      "engraving": "황제의 칙령",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "노말 인핸스",
-          "adoption": 7.2584171403585485,
-          "group": "질서"
+          "engraving": "황제의 칙령",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "노말 인핸스",
+              "adoption": 7.2584171403585485,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "스택 홀드",
+              "adoption": 6.194432298498761,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "셔플 댄스",
+              "adoption": 7.156391196618569,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 1.355,
+            "min": 1.3,
+            "max": 1.41
+          },
+          "sampleUsers": 153,
+          "sourceUrl": "https://loagg.com/stats/setting/%ED%99%A9%EC%A0%9C%EC%9D%98%20%EC%B9%99%EB%A0%B9"
         },
         {
-          "slot": "별",
-          "name": "셔플 댄스",
-          "adoption": 7.156391196618569,
-          "group": "질서"
-        },
-        {
-          "slot": "달",
-          "name": "스택 홀드",
-          "adoption": 6.194432298498761,
-          "group": "질서"
+          "engraving": "황후의 은총",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "인피니티 덱",
+              "adoption": 8.35155225185833,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "엣지 콤보",
+              "adoption": 5.086722052178983,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "스트림 오브 엣지",
+              "adoption": 4.897245299519021,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": null,
+          "sampleUsers": 120,
+          "sourceUrl": "https://loagg.com/stats/setting/%ED%99%A9%ED%9B%84%EC%9D%98%20%EC%9D%80%EC%B4%9D",
+          "status": "자료 부족"
         }
-      ],
-      "evolution": "뭉툭한 가시",
-      "ratio": {
-        "min": 1.3,
-        "max": 1.41,
-        "representative": 1.355
-      }
+      ]
     },
     {
       "className": "워로드",
-      "engraving": "전투 태세",
-      "cores": [
+      "builds": [
         {
-          "slot": "별",
-          "name": "광역 낙뢰",
-          "adoption": 4.210104250200481,
-          "group": "질서"
+          "engraving": "고독한 기사",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "전술 제어",
+              "adoption": 8.213044640470462,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "방어 전술",
+              "adoption": 8.420208500400962,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "방어 포격",
+              "adoption": 8.560545308740979,
+              "group": "질서"
+            }
+          ],
+          "evolution": "마나 용광로",
+          "ratio": {
+            "representative": 0.9,
+            "min": 0.9,
+            "max": 0.9
+          },
+          "sampleUsers": 184,
+          "sourceUrl": "https://loagg.com/stats/setting/%EA%B3%A0%EB%8F%85%ED%95%9C%20%EA%B8%B0%EC%82%AC"
         },
         {
-          "slot": "달",
-          "name": "번개폭풍",
-          "adoption": 2.6396685378241114,
-          "group": "질서"
-        },
-        {
-          "slot": "해",
-          "name": "천둥",
-          "adoption": 2.632985832665063,
-          "group": "질서"
+          "engraving": "전투 태세",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "천둥",
+              "adoption": 2.632985832665063,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "번개폭풍",
+              "adoption": 2.6396685378241114,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "광역 낙뢰",
+              "adoption": 4.210104250200481,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 0.75,
+            "min": 0.75,
+            "max": 0.75
+          },
+          "sampleUsers": 91,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%A0%84%ED%88%AC%20%ED%83%9C%EC%84%B8"
         }
-      ],
-      "evolution": "입식 타격가",
-      "ratio": {
-        "min": 0.75,
-        "max": 0.75,
-        "representative": 0.75
-      }
+      ]
     },
     {
       "className": "인파이터",
-      "engraving": "극의: 체술",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "대지 붕괴",
-          "adoption": 14.62797619047619,
-          "group": "질서"
+          "engraving": "극의: 체술",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "대지 붕괴",
+              "adoption": 14.62797619047619,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "투지 강화",
+              "adoption": 14.613095238095237,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "대지 파괴",
+              "adoption": 14.62797619047619,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 1.04,
+            "min": 1,
+            "max": 1.08
+          },
+          "sampleUsers": 47,
+          "sourceUrl": "https://loagg.com/stats/setting/%EA%B7%B9%EC%9D%98%20%3A%20%EC%B2%B4%EC%88%A0"
         },
         {
-          "slot": "별",
-          "name": "대지 파괴",
-          "adoption": 14.62797619047619,
-          "group": "질서"
-        },
-        {
-          "slot": "달",
-          "name": "투지 강화",
-          "adoption": 14.613095238095237,
-          "group": "질서"
+          "engraving": "충격 단련",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "충격 억제",
+              "adoption": 0.9821428571428571,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "기력 절약",
+              "adoption": 1.0119047619047619,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "역발산",
+              "adoption": 0.9821428571428571,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 1,
+            "min": 1,
+            "max": 1
+          },
+          "sampleUsers": 40,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%B6%A9%EA%B2%A9%20%EB%8B%A8%EB%A0%A8"
         }
-      ],
-      "evolution": "뭉툭한 가시",
-      "ratio": {
-        "min": 1,
-        "max": 1.08,
-        "representative": 1.04
-      }
+      ]
     },
     {
       "className": "차원술사",
-      "engraving": "시간 관리자",
-      "cores": [
+      "builds": [
         {
-          "slot": "별",
-          "name": "결합 강화",
-          "adoption": 10.666666666666666,
-          "group": "질서"
+          "engraving": "공간의 지배자",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "차원 절단",
+              "adoption": 1.3333333333333333,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "정밀 조작",
+              "adoption": 1.3333333333333333,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "다중 절단",
+              "adoption": 1.3333333333333333,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 1.28,
+            "min": 1.2,
+            "max": 1.36
+          }
         },
         {
-          "slot": "달",
-          "name": "컴바인 웨폰",
-          "adoption": 11.333333333333334,
-          "group": "질서"
-        },
-        {
-          "slot": "해",
-          "name": "타임 키퍼",
-          "adoption": 11.333333333333334,
-          "group": "질서"
+          "engraving": "시간의 지배자",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "타임 키퍼",
+              "adoption": 11.333333333333334,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "컴바인 웨폰",
+              "adoption": 11.333333333333334,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "결합 강화",
+              "adoption": 10.666666666666666,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 0.975,
+            "min": 0.95,
+            "max": 1
+          }
         }
-      ],
-      "evolution": "입식 타격가",
-      "ratio": {
-        "min": 0.95,
-        "max": 1,
-        "representative": 0.975
-      }
+      ]
     },
     {
       "className": "창술사",
-      "engraving": "절정",
-      "cores": [
+      "builds": [
         {
-          "slot": "별",
-          "name": "맹룡 회도",
-          "adoption": 10.671191553544494,
-          "group": "질서"
+          "engraving": "절정",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "연가 창식",
+              "adoption": 9.074912016088486,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "청룡기",
+              "adoption": 8.974358974358974,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "맹룡 회도",
+              "adoption": 10.671191553544494,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 1.05,
+            "min": 1.05,
+            "max": 1.05
+          },
+          "sampleUsers": 115,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%A0%88%EC%A0%95"
         },
         {
-          "slot": "해",
-          "name": "연가 창식",
-          "adoption": 9.074912016088486,
-          "group": "질서"
-        },
-        {
-          "slot": "달",
-          "name": "청룡기",
-          "adoption": 8.974358974358974,
-          "group": "질서"
+          "engraving": "절제",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "연가일섬",
+              "adoption": 2.0361990950226243,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "연환 타격",
+              "adoption": 2.237305178481649,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "환영",
+              "adoption": 2.1618903971845147,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 1,
+            "min": 1,
+            "max": 1
+          },
+          "sampleUsers": 44,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%A0%88%EC%A0%9C"
         }
-      ],
-      "evolution": "뭉툭한 가시",
-      "ratio": {
-        "min": 0.99,
-        "max": 1.05,
-        "representative": 1.05
-      }
+      ]
     },
     {
       "className": "호크아이",
-      "engraving": "죽음의 습격",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "TA-09 피어싱 애로우",
-          "adoption": 7.306465642215135,
-          "group": "질서"
+          "engraving": "두 번째 동료",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "TA-64 리퍼 볼트",
+              "adoption": 4.175123224122935,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "HSU-08 고강도 케이블",
+              "adoption": 4.146129312844303,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "HSU-57 근력 보조 장갑",
+              "adoption": 4.030153667729777,
+              "group": "질서"
+            }
+          ],
+          "evolution": "뭉툭한 가시",
+          "ratio": {
+            "representative": 0.975,
+            "min": 0.95,
+            "max": 1
+          },
+          "sampleUsers": 93,
+          "sourceUrl": "https://loagg.com/stats/setting/%EB%91%90%20%EB%B2%88%EC%A7%B8%20%EB%8F%99%EB%A3%8C"
         },
         {
-          "slot": "달",
-          "name": "HSU-98 버드 스트라이크",
-          "adoption": 5.334879675268193,
-          "group": "질서"
-        },
-        {
-          "slot": "별",
-          "name": "HSU-04 자동 제어 스코프",
-          "adoption": 11.10466801971586,
-          "group": "질서"
+          "engraving": "죽음의 습격",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "TA-09 피어싱 애로우",
+              "adoption": 7.306465642215135,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "HSU-13 특제 고폭약",
+              "adoption": 6.175703102348507,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "HSU-04 자동 제어 스코프",
+              "adoption": 11.10466801971586,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 0.97,
+            "min": 0.97,
+            "max": 0.97
+          },
+          "sampleUsers": 126,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%A3%BD%EC%9D%8C%EC%9D%98%20%EC%8A%B5%EA%B2%A9"
         }
-      ],
-      "evolution": "입식 타격가",
-      "ratio": {
-        "min": 0.97,
-        "max": 0.99,
-        "representative": 0.98
-      }
+      ]
     },
     {
       "className": "홀리나이트",
-      "engraving": "심판자",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "신의 권능",
-          "adoption": 0.6578947368421053,
-          "group": "질서"
-        },
-        {
-          "slot": "달",
-          "name": "징벌의 시간",
-          "adoption": 0.5781499202551834,
-          "group": "질서"
-        },
-        {
-          "slot": "별",
-          "name": "참하는 검",
-          "adoption": 0.6379585326953748,
-          "group": "질서"
+          "engraving": "심판자",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "성스러운 일격",
+              "adoption": 1.036682615629984,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "천상의 검",
+              "adoption": 1.076555023923445,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "신성한 검",
+              "adoption": 1.0167464114832536,
+              "group": "질서"
+            }
+          ],
+          "evolution": "음속 돌파",
+          "ratio": {
+            "representative": 0.95,
+            "min": 0.9,
+            "max": 1
+          },
+          "sampleUsers": 19,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%8B%AC%ED%8C%90%EC%9E%90"
         }
-      ],
-      "evolution": "뭉툭한 가시",
-      "ratio": {
-        "min": 0.9,
-        "max": 1,
-        "representative": 0.95
-      }
+      ]
     },
     {
       "className": "환수사",
-      "engraving": "야성",
-      "cores": [
+      "builds": [
         {
-          "slot": "해",
-          "name": "곰은 사람을 찢어",
-          "adoption": 13.930041152263374,
-          "group": "질서"
+          "engraving": "야성",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "곰은 사람을 찢어",
+              "adoption": 13.930041152263374,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "센 곰",
+              "adoption": 13.559670781893004,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "필살 곰",
+              "adoption": 13.950617283950617,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": {
+            "representative": 0.885,
+            "min": 0.87,
+            "max": 0.9
+          },
+          "sampleUsers": 248,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%95%BC%EC%84%B1"
         },
         {
-          "slot": "달",
-          "name": "센 곰",
-          "adoption": 13.559670781893004,
-          "group": "질서"
-        },
-        {
-          "slot": "별",
-          "name": "필살 곰",
-          "adoption": 13.950617283950617,
-          "group": "질서"
+          "engraving": "환수 각성",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "무한 각성",
+              "adoption": 2.42798353909465,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "빙글빙글",
+              "adoption": 0.9053497942386831,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "붕붕 펀치",
+              "adoption": 2.016460905349794,
+              "group": "질서"
+            }
+          ],
+          "evolution": "마나 용광로",
+          "ratio": {
+            "representative": 0.82,
+            "min": 0.82,
+            "max": 0.82
+          },
+          "sampleUsers": 20,
+          "sourceUrl": "https://loagg.com/stats/setting/%ED%99%98%EC%88%98%20%EA%B0%81%EC%84%B1"
         }
-      ],
-      "evolution": "입식 타격가",
-      "ratio": {
-        "min": 0.87,
-        "max": 0.9,
-        "representative": 0.885
-      }
+      ]
     }
   ]
 }

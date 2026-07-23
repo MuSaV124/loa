@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LOSTARK 진화 노드 추천 계산기</title>
-  <link rel="stylesheet" href="/style.css?v=5.8.13" />
+  <link rel="stylesheet" href="/style.css?v=5.8.14" />
 </head>
 <body>
   <main class="wrap">
@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v5.8.13 · 직업별 루메루스 지표</span>
+        <span class="badge">v5.8.14 · 직업각인별 배율표</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -27,6 +27,7 @@
       <div class="tabButtonGroup">
         <button class="tabButton active" type="button" data-tab="calculator">계산기</button>
         <button class="tabButton" type="button" data-tab="market">시세</button>
+        <button class="tabButton" type="button" data-tab="ratio">배율</button>
       </div>
       <div id="lostarkNoticeCardTop" class="lostarkNoticeCard tabNoticeCard" aria-live="polite">
         <a class="lostarkNoticeLink" href="https://lostark.game.onstove.com/News/Notice/List" target="_blank" rel="noopener">
@@ -141,6 +142,29 @@
       <div id="keenEfficiency" class="keenGrid"></div>
     </section>
 
+    <section id="ratioPanel" class="panel ratioPanel tabContent hidden">
+      <div class="ratioHero">
+        <div>
+          <span class="ratioEyebrow">7월 22일 밸런스 패치 기준</span>
+          <h2>직업각인별 루메루스 배율</h2>
+          <p class="hint">전투력 5,000 캐릭터가 체력 1,000억 루메루스를 공격한 표본과 대표 아크그리드를 함께 봅니다.</p>
+        </div>
+        <label class="ratioSearch">
+          <span>직업 또는 직업각인 검색</span>
+          <input id="ratioSearchInput" type="search" placeholder="예: 브레이커, 권왕파천무" autocomplete="off" />
+        </label>
+      </div>
+      <div class="ratioLegend" aria-label="아크그리드 표시 순서">
+        <b>대표 아크그리드</b>
+        <span class="ratioSlot ratioSlotSun">해</span>
+        <span class="ratioSlot ratioSlotMoon">달</span>
+        <span class="ratioSlot ratioSlotStar">별</span>
+        <small>순서 고정 · 직업별 인기 세팅</small>
+      </div>
+      <div id="ratioTable" class="ratioTable"><p class="classBenchmarkEmpty">직업 배율을 불러오는 중입니다.</p></div>
+      <div id="ratioMeta" class="ratioMeta"></div>
+    </section>
+
     <section id="marketPanel" class="panel marketPanel tabContent hidden">
       <div class="sectionHead">
         <div>
@@ -234,7 +258,7 @@
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <div class="version">Version 5.8.13</div>
-  <script type="module" src="/app.js?v=5.8.13"></script>
+  <div class="version">Version 5.8.14</div>
+  <script type="module" src="/app.js?v=5.8.14"></script>
 </body>
 </html>

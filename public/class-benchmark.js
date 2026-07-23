@@ -11,6 +11,23 @@ export function findClassBenchmark(data, profile) {
   }) || null;
 }
 
+const BENCHMARK_SLOT_ORDER = new Map([['해', 0], ['달', 1], ['별', 2]]);
+
+export function sortedBenchmarkCores(cores) {
+  return [...(Array.isArray(cores) ? cores : [])]
+    .sort((a, b) => (BENCHMARK_SLOT_ORDER.get(a?.slot) ?? 99) - (BENCHMARK_SLOT_ORDER.get(b?.slot) ?? 99));
+}
+
+export function formatBenchmarkRange(ratio) {
+  const representative = Number(ratio?.representative || 0);
+  if (!(representative > 0)) return '';
+  const min = Number(ratio?.min ?? representative);
+  const max = Number(ratio?.max ?? representative);
+  return Math.abs(max - min) > 0.0001
+    ? `${min.toFixed(3)}–${max.toFixed(3)}배`
+    : `${representative.toFixed(3)}배`;
+}
+
 export function lumerusKillSeconds({
   combatPower = 5000,
   ratio,
