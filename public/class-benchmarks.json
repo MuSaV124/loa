@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-07-23T07:55:19.830Z",
+  "updatedAt": "2026-07-23T08:41:06.008Z",
   "popularSettingsDate": "2026-07-23",
   "ratioBasisDate": "2026-07-22",
   "filters": {
@@ -63,7 +63,8 @@
             "min": 1,
             "max": 1.1
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5343/147648",
           "sampleUsers": 78,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%B6%84%EB%85%B8%EC%9D%98%20%EB%A7%9D%EC%B9%98"
         },
@@ -95,7 +96,8 @@
             "min": 1.1,
             "max": 1.1
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5343/147648",
           "sampleUsers": 172,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%A4%91%EB%A0%A5%20%EC%88%98%EB%A0%A8"
         }
@@ -133,7 +135,8 @@
             "min": 1,
             "max": 1
           },
-          "combination": "",
+          "combination": "111",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6335/3597",
           "sampleUsers": 152,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%B9%9B%EC%9D%98%20%EA%B8%B0%EC%82%AC"
         }
@@ -171,7 +174,8 @@
             "min": 0.9,
             "max": 1
           },
-          "combination": "",
+          "combination": "111",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5341/150300",
           "sampleUsers": 93,
           "sourceUrl": "https://loagg.com/stats/setting/%EA%B4%91%EA%B8%B0"
         },
@@ -204,7 +208,8 @@
             "max": 1.1,
             "note": "1.1 이상"
           },
-          "combination": "",
+          "combination": "111",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5341/150300",
           "sampleUsers": 66,
           "sourceUrl": "https://loagg.com/stats/setting/%EA%B4%91%EC%A0%84%EC%82%AC%EC%9D%98%20%EB%B9%84%EA%B8%B0"
         }
@@ -242,7 +247,8 @@
             "min": 1,
             "max": 1.09
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5995/42676",
           "sampleUsers": 121,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%B2%98%EB%8B%A8%EC%9E%90"
         },
@@ -274,7 +280,8 @@
             "min": 1,
             "max": 1
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5995/42676",
           "sampleUsers": 73,
           "sourceUrl": "https://loagg.com/stats/setting/%ED%8F%AC%EC%8B%9D%EC%9E%90"
         }
@@ -312,7 +319,8 @@
             "min": 0.9,
             "max": 0.9
           },
-          "combination": "",
+          "combination": "111",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5339/189349",
           "sampleUsers": 184,
           "sourceUrl": "https://loagg.com/stats/setting/%EA%B3%A0%EB%8F%85%ED%95%9C%20%EA%B8%B0%EC%82%AC"
         },
@@ -344,7 +352,8 @@
             "min": 0.75,
             "max": 0.75
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5339/189349",
           "sampleUsers": 91,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%A0%84%ED%88%AC%20%ED%83%9C%EC%84%B8"
         }
@@ -382,7 +391,8 @@
             "min": 0.9,
             "max": 1
           },
-          "combination": "",
+          "combination": "222",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5558/83545",
           "sampleUsers": 19,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%8B%AC%ED%8C%90%EC%9E%90"
         }
@@ -420,7 +430,8 @@
             "min": 1,
             "max": 1.05
           },
-          "combination": "",
+          "combination": "222",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5344/126192",
           "sampleUsers": 50,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%AC%B4%EC%83%81%EC%8B%A0%EA%B3%B5"
         },
@@ -452,7 +463,8 @@
             "min": 0.95,
             "max": 1
           },
-          "combination": "",
+          "combination": "222",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5344/126192",
           "sampleUsers": 138,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%97%AD%EC%B2%9C%EC%A7%80%EC%B2%B4"
         }
@@ -490,7 +502,8 @@
             "min": 1,
             "max": 1
           },
-          "combination": "",
+          "combination": "233",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5342/156875",
           "sampleUsers": 121,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%B4%88%EC%8B%AC"
         },
@@ -522,7 +535,8 @@
             "min": 0.8,
             "max": 0.9
           },
-          "combination": "",
+          "combination": "331",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5342/156875",
           "sampleUsers": 41,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%98%A4%EC%9D%98%20%EA%B0%95%ED%99%94"
         }
@@ -560,7 +574,8 @@
             "min": 1.1,
             "max": 1.23
           },
-          "combination": "",
+          "combination": "331",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6155/32361",
           "sampleUsers": 215,
           "sourceUrl": "https://loagg.com/stats/setting/%EA%B6%8C%EC%99%95%ED%8C%8C%EC%B2%9C%EB%AC%B4"
         },
@@ -594,6 +609,7 @@
             "note": "실전 재현 편차 큼"
           },
           "combination": "322",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6155/32361",
           "sampleUsers": 174,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%88%98%EB%9D%BC%EC%9D%98%20%EA%B8%B8"
         }
@@ -631,7 +647,8 @@
             "min": 1.05,
             "max": 1.15
           },
-          "combination": "",
+          "combination": "111",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5709/105381",
           "sampleUsers": 60,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%98%A4%EC%9D%98%EB%82%9C%EB%AC%B4"
         },
@@ -663,7 +680,8 @@
             "min": 1.1,
             "max": 1.1
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5709/105381",
           "sampleUsers": 195,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%9D%BC%EA%B2%A9%ED%95%84%EC%82%B4"
         }
@@ -701,7 +719,8 @@
             "min": 1,
             "max": 1.08
           },
-          "combination": "",
+          "combination": "111",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5340/158595",
           "sampleUsers": 47,
           "sourceUrl": "https://loagg.com/stats/setting/%EA%B7%B9%EC%9D%98%20%3A%20%EC%B2%B4%EC%88%A0"
         },
@@ -733,7 +752,8 @@
             "min": 1,
             "max": 1
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5340/158595",
           "sampleUsers": 40,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%B6%A9%EA%B2%A9%20%EB%8B%A8%EB%A0%A8"
         }
@@ -771,7 +791,8 @@
             "min": 1.05,
             "max": 1.05
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5434/120559",
           "sampleUsers": 115,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%A0%88%EC%A0%95"
         },
@@ -803,7 +824,8 @@
             "min": 1,
             "max": 1
           },
-          "combination": "",
+          "combination": "232",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5434/120559",
           "sampleUsers": 44,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%A0%88%EC%A0%9C"
         }
@@ -841,7 +863,8 @@
             "min": 1,
             "max": 1
           },
-          "combination": "",
+          "combination": "222",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5708/140969",
           "sampleUsers": 172,
           "sourceUrl": "https://loagg.com/stats/setting/%ED%94%BC%EC%8A%A4%EB%A9%94%EC%9D%B4%EC%BB%A4"
         },
@@ -873,7 +896,8 @@
             "min": 0.9,
             "max": 1
           },
-          "combination": "",
+          "combination": "222",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5708/140969",
           "sampleUsers": 159,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%82%AC%EB%83%A5%EC%9D%98%20%EC%8B%9C%EA%B0%84"
         }
@@ -911,20 +935,42 @@
             "min": 1.068,
             "max": 1.068
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5345/156136",
           "sampleUsers": 91,
           "sourceUrl": "https://loagg.com/stats/setting/%EA%B0%95%ED%99%94%20%EB%AC%B4%EA%B8%B0"
         },
         {
           "engraving": "핸드거너",
-          "cores": [],
-          "evolution": "대표 세팅 집계 중",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "섀도우 불릿",
+              "adoption": 0.9004373552868536,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "이터널 리볼버",
+              "adoption": 0.36017494211474144,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "끝없는 나선",
+              "adoption": 0.5659891947517366,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
           "ratio": {
             "representative": 0.9,
             "min": 0.88,
             "max": 0.92
           },
-          "combination": ""
+          "combination": "133",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5345/156136",
+          "sourceUrl": "https://www.inven.co.kr/board/lostark/5345/162449"
         }
       ]
     },
@@ -960,7 +1006,8 @@
             "min": 0.8,
             "max": 0.95
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5349/142797",
           "sampleUsers": 230,
           "sourceUrl": "https://loagg.com/stats/setting/%ED%8F%AC%EA%B2%A9%20%EA%B0%95%ED%99%94"
         },
@@ -992,7 +1039,8 @@
             "min": 0.8,
             "max": 0.9
           },
-          "combination": "",
+          "combination": "313",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5349/142797",
           "sampleUsers": 18,
           "sourceUrl": "https://loagg.com/stats/setting/%ED%99%94%EB%A0%A5%20%EA%B0%95%ED%99%94"
         }
@@ -1030,7 +1078,8 @@
             "min": 1,
             "max": 1.05
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5631/86151",
           "sampleUsers": 35,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%95%84%EB%A5%B4%EB%8D%B0%ED%83%80%EC%9D%B8%EC%9D%98%20%EA%B8%B0%EC%88%A0"
         },
@@ -1062,7 +1111,8 @@
             "min": 0.9,
             "max": 1
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5631/86151",
           "sampleUsers": 153,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%A7%84%ED%99%94%EC%9D%98%20%EC%9C%A0%EC%82%B0"
         }
@@ -1100,7 +1150,8 @@
             "min": 0.95,
             "max": 1
           },
-          "combination": "",
+          "combination": "222",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5347/155690",
           "sampleUsers": 93,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%91%90%20%EB%B2%88%EC%A7%B8%20%EB%8F%99%EB%A3%8C"
         },
@@ -1132,7 +1183,8 @@
             "min": 0.97,
             "max": 0.97
           },
-          "combination": "",
+          "combination": "131",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5347/155690",
           "sampleUsers": 126,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%A3%BD%EC%9D%8C%EC%9D%98%20%EC%8A%B5%EA%B2%A9"
         }
@@ -1170,7 +1222,8 @@
             "min": 0.99,
             "max": 1
           },
-          "combination": "",
+          "combination": "111",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5348/139598",
           "sampleUsers": 34,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%84%98%EC%B9%98%EB%8A%94%20%EA%B5%90%EA%B0%90"
         },
@@ -1202,7 +1255,8 @@
             "min": 1,
             "max": 1
           },
-          "combination": "",
+          "combination": "222",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5348/139598",
           "sampleUsers": 223,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%83%81%EA%B8%89%20%EC%86%8C%ED%99%98%EC%82%AC"
         }
@@ -1240,7 +1294,8 @@
             "min": 0.88,
             "max": 0.9
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5770/113190",
           "sampleUsers": 161,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%A0%90%ED%99%94"
         },
@@ -1272,7 +1327,8 @@
             "min": 0.99,
             "max": 0.99
           },
-          "combination": "",
+          "combination": "122",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5770/113190",
           "sampleUsers": 85,
           "sourceUrl": "https://loagg.com/stats/setting/%ED%99%98%EB%A5%98"
         }
@@ -1310,7 +1366,8 @@
             "min": 1.3,
             "max": 1.41
           },
-          "combination": "",
+          "combination": "222",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5346/162617",
           "sampleUsers": 153,
           "sourceUrl": "https://loagg.com/stats/setting/%ED%99%A9%EC%A0%9C%EC%9D%98%20%EC%B9%99%EB%A0%B9"
         },
@@ -1338,7 +1395,8 @@
           ],
           "evolution": "뭉툭한 가시",
           "ratio": null,
-          "combination": "",
+          "combination": "211",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5346/162617",
           "sampleUsers": 120,
           "sourceUrl": "https://loagg.com/stats/setting/%ED%99%A9%ED%9B%84%EC%9D%98%20%EC%9D%80%EC%B4%9D",
           "status": "자료 부족"
@@ -1377,7 +1435,8 @@
             "min": 0.92,
             "max": 0.95
           },
-          "combination": "",
+          "combination": "332",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5498/68243",
           "sampleUsers": 121,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%A9%88%EC%B6%9C%20%EC%88%98%20%EC%97%86%EB%8A%94%20%EC%B6%A9%EB%8F%99"
         },
@@ -1409,7 +1468,8 @@
             "min": 0.84,
             "max": 0.87
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5498/68243",
           "sampleUsers": 43,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%99%84%EB%B2%BD%ED%95%9C%20%EC%96%B5%EC%A0%9C"
         }
@@ -1447,7 +1507,8 @@
             "min": 1.05,
             "max": 1.1
           },
-          "combination": "",
+          "combination": "112",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5647/123288",
           "sampleUsers": 157,
           "sourceUrl": "https://loagg.com/stats/setting/%EA%B0%88%EC%A6%9D"
         },
@@ -1479,7 +1540,8 @@
             "min": 1.24,
             "max": 1.24
           },
-          "combination": "",
+          "combination": "111",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5647/123288",
           "sampleUsers": 43,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%8B%AC%EC%9D%98%20%EC%86%8C%EB%A6%AC"
         }
@@ -1517,7 +1579,8 @@
             "min": 1.23,
             "max": 1.23
           },
-          "combination": "",
+          "combination": "111",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5497/165447",
           "sampleUsers": 55,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%B2%84%EC%8A%A4%ED%8A%B8"
         },
@@ -1549,7 +1612,8 @@
             "min": 1.1,
             "max": 1.18
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5497/165447",
           "sampleUsers": 192,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%9E%94%EC%9E%AC%EB%90%9C%20%EA%B8%B0%EC%9A%B4"
         }
@@ -1587,7 +1651,8 @@
             "min": 1.1,
             "max": 1.16
           },
-          "combination": "",
+          "combination": "222",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5996/29864",
           "sampleUsers": 126,
           "sourceUrl": "https://loagg.com/stats/setting/%EA%B7%B8%EB%AF%90%EC%9D%98%20%EA%B2%BD%EA%B3%84"
         },
@@ -1619,7 +1684,8 @@
             "min": 1.35,
             "max": 1.4
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5996/29864",
           "sampleUsers": 209,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%A7%8C%EC%9B%94%EC%9D%98%20%EC%A7%91%ED%96%89%EC%9E%90"
         }
@@ -1657,7 +1723,8 @@
             "min": 0.98,
             "max": 0.98
           },
-          "combination": "",
+          "combination": "111",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5862/77546",
           "sampleUsers": 143,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%A7%88%ED%92%8D%EB%85%B8%EB%8F%84"
         },
@@ -1689,7 +1756,8 @@
             "min": 0.94,
             "max": 0.96
           },
-          "combination": "",
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5862/77546",
           "sampleUsers": 52,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%9D%B4%EC%8A%AC%EB%B9%84"
         }
@@ -1727,7 +1795,8 @@
             "min": 1.2,
             "max": 1.36
           },
-          "combination": ""
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6543/210"
         },
         {
           "engraving": "시간의 지배자",
@@ -1757,7 +1826,8 @@
             "min": 0.95,
             "max": 1
           },
-          "combination": ""
+          "combination": "111",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6543/210"
         }
       ]
     },
@@ -1793,7 +1863,8 @@
             "min": 0.87,
             "max": 0.9
           },
-          "combination": "",
+          "combination": "222",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6334/6880",
           "sampleUsers": 248,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%95%BC%EC%84%B1"
         },
@@ -1825,7 +1896,8 @@
             "min": 0.82,
             "max": 0.82
           },
-          "combination": "",
+          "combination": "122",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6334/6880",
           "sampleUsers": 20,
           "sourceUrl": "https://loagg.com/stats/setting/%ED%99%98%EC%88%98%20%EA%B0%81%EC%84%B1"
         }
@@ -1864,6 +1936,7 @@
             "max": 1.05
           },
           "combination": "232",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6469/158",
           "sampleUsers": 63,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%93%9C%EB%A0%88%EB%93%9C%20%EB%A1%9C%EC%96%B4"
         },
@@ -1895,7 +1968,8 @@
             "min": 1.17,
             "max": 1.17
           },
-          "combination": "",
+          "combination": "111",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6469/158",
           "sampleUsers": 240,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%97%85%ED%99%94%EC%9D%98%20%EA%B3%84%EC%8A%B9%EC%9E%90"
         }

@@ -4,12 +4,27 @@ import { chromium } from 'playwright';
 import { CLASS_BENCHMARK_CATALOG, CLASS_DISPLAY_ORDER, CLASS_GROUP_BY_NAME } from './class-benchmark-catalog.mjs';
 
 const outputPath = path.resolve('public/class-benchmarks.json');
+const coreNumberPath = path.resolve('scripts/ark-grid-core-numbers.json');
 const statsUrl = 'https://loawa.com/stat/class-cores';
 const settingStatsUrl = 'https://loagg.com/stats';
 const slotOrder = new Map([['해', 0], ['달', 1], ['별', 2]]);
 
 function normalize(value) {
   return String(value || '').replace(/\s+/g, '').replace(/[·:]/g, '').toLowerCase();
+}
+
+function resolveCombination(coreNumberCatalog, className, cores) {
+  if (cores.length !== 3) return null;
+  const classCatalog = coreNumberCatalog[className];
+  if (!classCatalog) return null;
+  const numbers = cores.map(core => classCatalog.cores.find(item =>
+    item.slot === core.slot && normalize(item.name) === normalize(core.name)
+  )?.number);
+  if (numbers.some(number => ![1, 2, 3].includes(number))) return null;
+  return {
+    value: numbers.join(''),
+    sourceUrl: classCatalog.articleUrl
+  };
 }
 
 function newestDate(values) {
@@ -139,7 +154,7 @@ function resolveCores(row, catalogItem, previousBuild, popularBuild) {
   return cores.sort((a, b) => slotOrder.get(a.slot) - slotOrder.get(b.slot));
 }
 
-function groupCatalog(scraped, previous, popularBuilds) {
+function groupCatalog(scraped, previous, popularBuilds, coreNumberCatalog) {
   const byClass = new Map(scraped.rows.map(row => [normalize(row.className), row]));
   const previousBuilds = new Map();
   for (const previousClass of previous?.classes || []) {
@@ -155,14 +170,26 @@ function groupCatalog(scraped, previous, popularBuilds) {
       .map(item => {
         const previousBuild = previousBuilds.get(`${normalize(className)}:${normalize(item.engraving)}`);
         const popularBuild = popularBuilds.get(`${normalize(className)}:${normalize(item.engraving)}`);
+        const cores = resolveCores(row, item, previousBuild, popularBuild);
+        const combination = resolveCombination(coreNumberCatalog, className, cores);
+        if (cores.length && !combination) {
+          throw new Error(`${className} ${item.engraving}: 인벤 코어 번호와 대표 세팅을 대조하지 못했습니다.`);
+        }
         return {
           engraving: item.engraving,
-          cores: resolveCores(row, item, previousBuild, popularBuild),
-          evolution: popularBuild?.evolution || previousBuild?.evolution || item.evolution,
+          cores,
+          evolution: popularBuild?.evolution || item.evolution || previousBuild?.evolution,
           ratio: item.ratio,
-          combination: item.combination || previousBuild?.combination || '',
+          combination: combination?.value || '',
+          ...(combination?.sourceUrl ? { combinationSourceUrl: combination.sourceUrl } : {}),
           ...(popularBuild?.sampleUsers ? { sampleUsers: popularBuild.sampleUsers } : previousBuild?.sampleUsers ? { sampleUsers: previousBuild.sampleUsers } : {}),
-          ...(popularBuild?.sourceUrl ? { sourceUrl: popularBuild.sourceUrl } : previousBuild?.sourceUrl ? { sourceUrl: previousBuild.sourceUrl } : {}),
+          ...(popularBuild?.sourceUrl
+            ? { sourceUrl: popularBuild.sourceUrl }
+            : item.sourceUrl
+              ? { sourceUrl: item.sourceUrl }
+              : previousBuild?.sourceUrl
+                ? { sourceUrl: previousBuild.sourceUrl }
+                : {}),
           ...(item.status ? { status: item.status } : {})
         };
       });
@@ -171,7 +198,10 @@ function groupCatalog(scraped, previous, popularBuilds) {
 }
 
 async function main() {
-  const previous = JSON.parse(await fs.readFile(outputPath, 'utf8'));
+  const [previous, coreNumberCatalog] = await Promise.all([
+    fs.readFile(outputPath, 'utf8').then(JSON.parse),
+    fs.readFile(coreNumberPath, 'utf8').then(JSON.parse)
+  ]);
   const browser = await chromium.launch({
     headless: true,
     args: ['--disable-blink-features=AutomationControlled']
@@ -187,7 +217,7 @@ async function main() {
       scrapeWeeklyCores(page),
       scrapePopularBuilds(context)
     ]);
-    const classes = groupCatalog(scraped, previous, popularBuilds);
+    const classes = groupCatalog(scraped, previous, popularBuilds, coreNumberCatalog);
     const updated = {
       version: 2,
       updatedAt: new Date().toISOString(),

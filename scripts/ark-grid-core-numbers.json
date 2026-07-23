@@ -1,0 +1,2718 @@
+{
+  "디스트로이어": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5343",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5343/147648",
+    "title": "[정보] 디스트로이어 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "특이점"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "차원 붕괴"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "어스 웨이브"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "완벽한 제어"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "중력 강화"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "중력 질주"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "끊어진 사슬"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "몰아치는 해방"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "무모한 한방"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "중력 역전"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "중력 파괴"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "그라비티 코어"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "사건의 지평선"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "중력 순환"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "몰아치는 중력"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "붕괴"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "바위 칼날"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "대지 부수기"
+      }
+    ]
+  },
+  "발키리": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/6335",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/6335/3597",
+    "title": "[정보] 발키리 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "종언"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "기원"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "속삭이는 검"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "종언의 기사"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "빛의 안식"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "눈부신 정의"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "진정한 종언"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "성휘의 집행"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "강화된 정의"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "빛의 은총"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "성스러운 맹약"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "빛이 생명을 새긴다"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "빛의 서사"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "구원의 서약"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "여명이 세상을 깨우는 순간"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "수호의 선고"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "수호의 륜"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "성휘의 재"
+      }
+    ]
+  },
+  "버서커": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5341",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5341/150300",
+    "title": "[정보] 버서커 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "콤비네이션"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "오버 파워"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "파워 코어"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "피의 순환"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "오버 버스트"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "브레이크 대시"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "분쇄 폭풍"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "오버플로우"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "브레이크 아웃"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "다크 파워"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "파워드라이브"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "홀드 엣지"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "어둠의 격류"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "래피드 슬래쉬"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "사이클론 슬래쉬"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "광란"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "연참"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "지옥 뒤집기"
+      }
+    ]
+  },
+  "슬레이어": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5995",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5995/42676",
+    "title": "[정보] 슬레이어 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "단두대"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "분노압축"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "격노폭발"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "단죄의 칼날"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "힘의 응축"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "교차된 힘"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "처형"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "분쇄"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "신중한 강타"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "차오르는 분노"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "예측불가"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "회오리"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "코어 임팩트"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "분노격화"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "소용돌이"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "즉결 처형"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "마무리 일격"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "파괴의 바람"
+      }
+    ]
+  },
+  "워로드": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5339",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5339/189349",
+    "title": "[정보] 워로드 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "전술 제어"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "창술"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "종전"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "방어 전술"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "스트라이크 포인트"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "랜스 차지"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "방어 포격"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "확정된 포격"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "크로스 랜스"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "방패 연계"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "연속 돌진"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "천둥"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "방패술"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "함성 돌진"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "번개폭풍"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "방패 타격"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "전차 돌진"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "광역 낙뢰"
+      }
+    ]
+  },
+  "홀리나이트": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5558",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5558/83545",
+    "title": "[정보] 홀리나이트 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "신의 권능"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "성스러운 일격"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "심판 예고"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "징벌의 시간"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "천상의 검"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "심판의 시간"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "참하는 검"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "신성한 검"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "꿰뚫는 검"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "천상의 대리인"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "진정한 정의"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "빛의 축복"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "천상의 결의"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "신성한 대의"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "성전"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "검의 기도"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "폭발의 기도"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "빛의 기도"
+      }
+    ]
+  },
+  "기공사": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5344",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5344/126192",
+    "title": "[정보] 기공사 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "파천섬결"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "광류연파"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "백연쇄공"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "연환섬멸"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "천류섬열풍"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "회기탄환"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "광멸옥"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "파공나선"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "축기탄공"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "무영무상"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "무상기연"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "축기회류"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "진무상격"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "신장대멸겁"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "연태극"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "극멸진공"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "불영세"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "음양결"
+      }
+    ]
+  },
+  "배틀마스터": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5342",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5342/156875",
+    "title": "[정보] 배틀마스터 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "연격강타"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "극의귀원"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "삼문 개방"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "초강풍각"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "귀원화신"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "초순환"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "극선풍각"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "파천격"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "용류 강화"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "패황불패"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "화룡순환"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "오기강체"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "패황지도"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "화룡진천"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "심안"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "창풍극의"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "폭룡천상"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "패황권"
+      }
+    ]
+  },
+  "브레이커": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/6155",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/6155/32361",
+    "title": "[정보] 브레이커 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "진 권왕"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "파천경"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "충전된 충격"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "권왕태세"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "진 파천섬광"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "충격 충전"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "권왕십이식"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "파천 돌파"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "포스 건틀릿"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "파천기"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "수라안"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "그림자 주먹"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "개 파천섬광"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "수라결"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "종횡무진"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "전천극"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "수라"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "징벌"
+      }
+    ]
+  },
+  "스트라이커": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5709",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5709/105381",
+    "title": "[정보] 스트라이커 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "호령"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "광폭"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "뇌호"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "천뢰포효"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "호뢰진"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "벽뢰호각"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "뇌호극권"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "쌍극광폭진"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "섬호뇌격"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "광파섬"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "산군"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "외공"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "풍뢰보"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "뇌호파천"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "파한오의"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "신왕화신"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "초극뇌연격"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "파극권"
+      }
+    ]
+  },
+  "인파이터": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5340",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5340/158595",
+    "title": "[정보] 인파이터 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "충격 폭주"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "충격파"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "충격 억제"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "충격 강화"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "대지 연타"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "기력 절약"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "오브 폭발"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "지면 분쇄"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "역발산"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "대지 붕괴"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "반복 도약"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "투지 억제"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "투지 강화"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "치명적인 도약"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "상시 강화"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "대지 파괴"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "흑룡의 도약"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "연격"
+      }
+    ]
+  },
+  "창술사": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5434",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5434/120559",
+    "title": "[정보] 창술사 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "적룡의 기운"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "적룡연격"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "연가 창식"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "일점 집중"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "집중 강화"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "청룡기"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "진화의 끝"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "한 점 돌파"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "맹룡 회도"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "질풍연격"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "연가일섬"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "맹룡오격"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "맹룡의 기운"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "비기승화"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "연환 타격"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "이중 비기"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "환영"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "연격 난무"
+      }
+    ]
+  },
+  "건슬링어": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5708",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5708/140969",
+    "title": "[정보] 건슬링어 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "티거 미스트리스"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "연회의 잔향"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "트루 에임"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "제너럴리스트"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "체인지 암즈"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "방패 조준"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "올라운더"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "블로우 백"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "핀포인트"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "미드나잇 로즈"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "무법지대"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "유단자"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "철갑파쇄탄"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "불릿 무빙"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "건법"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "정밀 타격"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "풀 매거진"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "힐 스트라이크"
+      }
+    ]
+  },
+  "데빌헌터": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5345",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5345/156136",
+    "title": "[정보] 데빌헌터 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "블러드 하운드"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "데드 샷"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "샷건 오버로드"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "산탄강화"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "무결점 조준"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "광란의 해결사"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "탄환 폭발"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "아이언 사이트"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "지배자의 탄환"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "섀도우 불릿"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "히든 팽"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "데드 토스"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "하늘의 지배자"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "긴박한 해결사"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "이터널 리볼버"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "불릿 샤워"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "실버 불릿"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "끝없는 나선"
+      }
+    ]
+  },
+  "블래스터": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5349",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5349/142797",
+    "title": "[정보] 블래스터 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "폭격"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "슛 앤 스쿳"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "포화 전차"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "래피드 탱크"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "과열된 포탄"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "세이프 존"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "시 오브 파이어"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "타임 온 타겟"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "초토화"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "탄약 수집가"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "데몬 파이어"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "점핑맨"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "질풍 포병"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "무한 연소"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "도약의 순간"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "아이언 샤워"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "웰던맨"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "오토 락온"
+      }
+    ]
+  },
+  "스카우터": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5631",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5631/86151",
+    "title": "[정보] 스카우터 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "퀀텀 오퍼레이티브"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "에이전트 SMG"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "펄스 노바"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "생체 개조 기술"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "불릿 템페스트"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "에너지 아포칼립스"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "배터리 출력 강화"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "소각 집행"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "제로백 버스트"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "아스트라 슈트"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "퀘이사 캐넌 슈트"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "타이탄 슈트"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "퍼펙트 싱크"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "제로 펄스 에너지"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "어썰트 타이탄"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "초감각 동기화"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "아틸러리 스탠스"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "코어 리액터 증폭"
+      }
+    ]
+  },
+  "호크아이": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5347",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5347/155690",
+    "title": "[정보] 호크아이 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "TA-09 피어싱 애로우"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "ATB-07 니들레인"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "TA-12 버스팅 애로우"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "HSU-98 버드 스트라이크"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "HSU-21 실버 레인"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "HSU-13 특제 고폭약"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "HSU-04 자동 제어 스코프"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "HSU-17 일렉트릭 노바"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "HSU-36 도트 사이트"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "ATB-03 볼트 랩터"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "TA-64 리퍼 볼트"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "ATB-19 스톰리피터"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "HSU-99 버드 스톰"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "HSU-08 고강도 케이블"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "HSU-37 연사 보조기"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "HSU-06 레이저사이트"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "HSU-57 근력 보조 장갑"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "HSU-22 사지 안정기"
+      }
+    ]
+  },
+  "서머너": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5348",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5348/139598",
+    "title": "[정보] 서머너 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "정령 결속"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "강화 폭주"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "기초 훈련"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "결속 증폭"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "폭주 집중"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "강풍 진화"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "증폭 공명"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "명령 각성"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "전술 명령"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "힘의 계승"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "고대의 유산"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "힘의 순환"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "힘의 집중"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "오쉬의 지원"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "정령의 고리"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "힘의 균형"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "창세의 힘"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "정령 인도자"
+      }
+    ]
+  },
+  "소서리스": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5770",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5770/113190",
+    "title": "[정보] 소서리스 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "마력의 촉매"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "불완전 연소"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "종말의 시작"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "점화의 문장"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "연소 가속"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "반복된 종말"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "원소의 잔향"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "삼중 파동"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "종말의 시"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "편향"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "순환"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "응축"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "직류"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "교류"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "와류"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "화뇌"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "무결"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "청뢰"
+      }
+    ]
+  },
+  "아르카나": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5346",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5346/162617",
+    "title": "[정보] 아르카나 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "엣지 오브 페이트"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "인피니티 덱"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "루인 서브셋"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "엣지 콤보"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "체인 드로우"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "루인 풀셋"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "스트림 오브 엣지"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "페이탈 핸드"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "루인 마이너셋"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "하이 템포"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "노말 인핸스"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "임팩트 메이트"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "황제의 심장"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "스택 홀드"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "다크 메이트"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "다크 콜렉션"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "셔플 댄스"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "스피드 메이트"
+      }
+    ]
+  },
+  "데모닉": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5498",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5498/68243",
+    "title": "[정보] 데모닉 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "블러드 매서커"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "이터널 블러드"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "오미너스"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "블러디 데몬"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "고어 블리딩"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "제노사이드"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "피의 폭발"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "치명적인 할퀴기"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "혼돈의 악마"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "서프레서"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "서징 스톰"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "매시브 컨슘"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "트리니티 코어"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "듀얼 코어"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "서브 스톰"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "페이탈 스트라이크"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "죽음의 부메랑"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "파괴 광선"
+      }
+    ]
+  },
+  "리퍼": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5647",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5647/123288",
+    "title": "[정보] 리퍼 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "달의 향기"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "달의 낙하"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "두 개의 달"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "페르소나"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "사일런트"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "더블 코어"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "할루시네이션"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "암살자의 그림자"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "데스 루프"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "갈증의 악몽"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "치명적인 발걸음"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "피의 갈증"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "치명적 악몽"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "라스트 스피어"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "출혈독"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "급습 악몽"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "치명적 연계"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "다가오는 죽음"
+      }
+    ]
+  },
+  "블레이드": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5497",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5497/165447",
+    "title": "[정보] 블레이드 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "블레이드 버스트"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "살상연희"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "블레이드 러시"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "버스트 코어"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "쌍검난무"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "데스 블리츠"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "일격"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "쾌도난마"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "얼음과 불의 검"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "아츠 마스터"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "집중의 일격"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "일섬"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "아츠 코어"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "리차지"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "블레이드 웨이브"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "기본기"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "잠깐의 기다림"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "죽음의 검기"
+      }
+    ]
+  },
+  "소울이터": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5996",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5996/29864",
+    "title": "[정보] 소울이터 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "아더 디멘션"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "래피드 데스"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "망자의 발걸음"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "이계의 힘"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "영속자"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "소울 코어"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "이계의 지배자"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "수확의 밤"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "빙의"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "다크 문"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "사신의 부름"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "살귀의 밤"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "크레센트"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "광월야"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "강탈자"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "그믐의 지배자"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "사신의 힘"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "잠식된 경계"
+      }
+    ]
+  },
+  "기상술사": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5862",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5862/77546",
+    "title": "[정보] 기상술사 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "비연참"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "기류 조절"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "바람의 칼날"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "우산의 춤"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "상승기류"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "쾌속"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "휘몰아치기"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "일점돌파"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "강풍일섬"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "싸라기눈"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "마른 하늘에 날벼락"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "해와 바람"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "비바람이 치던 바다"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "가랑비"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "뜨거운 햇볕"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "눈에 돌넣기"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "우르릉 쾅쾅쾅"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "나그네의 외투를 벗긴건"
+      }
+    ]
+  },
+  "차원술사": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/6543",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/6543/210",
+    "title": "[잡담] 인증 차원술사 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "타임 키퍼"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "왜곡된 시간선"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "차원 소멸"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "컴바인 웨폰"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "타임 라인"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "미닛 템포"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "결합 강화"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "비틀림"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "컨버젼"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "공간 검술"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "찌르기의 대가"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "차원 절단"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "검술 강화"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "포인트 어택"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "정밀 조작"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "분침 조정"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "찌르기 연계"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "다중 절단"
+      }
+    ]
+  },
+  "환수사": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/6334",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/6334/6880",
+    "title": "[정보] 환수사 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "변신술사!"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "곰은 사람을 찢어"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "여우가 될 운명!"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "금술"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "센 곰"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "센 여우"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "돌격 곰 여우"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "필살 곰"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "별빛 여우"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "무한 각성"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "곰 주먹"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "까마귀의 왕"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "환수 해방"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "빙글빙글"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "까마귀 내려온다"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "환영 곰"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "붕붕 펀치"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "까마귀 대난투"
+      }
+    ]
+  },
+  "가디언나이트": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/6469",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/6469/158",
+    "title": "[잡담] 인증 가디언나이트 아크 그리드 정보",
+    "cores": [
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "피니셔"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "매니페스트"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "붉은 날개"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "노바 플레임"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "리버레이션"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "복수귀"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "라스트 스탠드"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "엑스큐셔너"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "추격 시작"
+      },
+      {
+        "slot": "해",
+        "number": 1,
+        "name": "차지 인핸스"
+      },
+      {
+        "slot": "해",
+        "number": 2,
+        "name": "브랜디쉬"
+      },
+      {
+        "slot": "해",
+        "number": 3,
+        "name": "에이펙스"
+      },
+      {
+        "slot": "달",
+        "number": 1,
+        "name": "위압"
+      },
+      {
+        "slot": "달",
+        "number": 2,
+        "name": "플러리쉬"
+      },
+      {
+        "slot": "달",
+        "number": 3,
+        "name": "도미넌트"
+      },
+      {
+        "slot": "별",
+        "number": 1,
+        "name": "그랜드 피날레"
+      },
+      {
+        "slot": "별",
+        "number": 2,
+        "name": "일당백"
+      },
+      {
+        "slot": "별",
+        "number": 3,
+        "name": "파멸"
+      }
+    ]
+  }
+}
