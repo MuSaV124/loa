@@ -1,10 +1,10 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.10';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.10';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.10';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.10';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.10';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.11';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.11';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.11';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.11';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.11';
 
-const VERSION = '5.8.10';
+const VERSION = '5.8.11';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2127,10 +2127,10 @@ async function loadT4MaterialPriceMap() {
     .finally(() => { t4MaterialPriceInflight = null; });
   return t4MaterialPriceInflight;
 }
-async function loadCrystalPrice() {
-  if (crystalPriceCache) return crystalPriceCache;
+async function loadCrystalPrice(force = false) {
+  if (!force && crystalPriceCache) return crystalPriceCache;
   if (crystalPriceInflight) return crystalPriceInflight;
-  crystalPriceInflight = fetchMarketJson(`/api/crystal-price?_=${Date.now()}`)
+  crystalPriceInflight = fetchMarketJson(`/api/crystal-price${force ? '?force=1&' : '?'}_=${Date.now()}`)
     .then(data => {
       crystalPriceCache = data;
       return data;
@@ -3367,7 +3367,7 @@ function formatGold(value) {
 
 let selectedMarketTab = 'accessory';
 let lostarkNoticeLoaded = false;
-const marketListLoadState = { gem: 'idle', engraving: 'idle', material: 'idle' };
+const marketListLoadState = { gem: 'idle', engraving: 'idle', material: 'idle', crystal: 'idle' };
 
 function setActiveTab(tabName) {
   document.querySelectorAll('.tabButton').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
@@ -3408,6 +3408,7 @@ function renderMarketSubTab() {
     engraving: $('marketEngravingPanel'),
     gem: $('marketGemPanel'),
     material: $('marketMaterialPanel'),
+    crystal: $('marketCrystalPanel'),
   };
   Object.entries(panels).forEach(([key, el]) => {
     if (!el) return;
@@ -3430,6 +3431,7 @@ function autoLoadMarketSubTab() {
   if (selectedMarketTab === 'gem') loadMarketGemList();
   if (selectedMarketTab === 'engraving') loadMarketEngravingList();
   if (selectedMarketTab === 'material') loadMarketMaterialList();
+  if (selectedMarketTab === 'crystal') loadMarketCrystalPrice();
 }
 
 function preloadMarketPriceLists() {
@@ -3625,6 +3627,7 @@ function initMarketPriceTab() {
   $('gemListButton')?.addEventListener('click', () => loadMarketGemList(true));
   $('engravingListButton')?.addEventListener('click', () => loadMarketEngravingList(true));
   $('materialListButton')?.addEventListener('click', () => loadMarketMaterialList(true));
+  $('crystalListButton')?.addEventListener('click', () => loadMarketCrystalPrice(true));
   $('accPartSelect')?.addEventListener('change', renderAccessoryRuleHint);
   $('accComboSelect')?.addEventListener('change', renderAccessoryRuleHint);
   renderAccessoryRuleHint();
@@ -3915,6 +3918,46 @@ function marketDebugText(data) {
 function renderMarketError(container, message) {
   if (!container) return;
   container.innerHTML = `<div class="marketEmptyBox marketError">${escapeHtml(message || '시세 조회 중 오류가 발생했습니다.')}</div>`;
+}
+
+async function loadMarketCrystalPrice(force = false) {
+  if (!force && marketListLoadState.crystal === 'loaded') return;
+  if (!force && marketListLoadState.crystal === 'loading') return;
+  const button = $('crystalListButton');
+  const resultEl = $('crystalMarketResult');
+  marketListLoadState.crystal = 'loading';
+  if (button) button.disabled = true;
+  if (resultEl) resultEl.innerHTML = '<div class="marketEmptyBox">최신 크리스탈 시세를 불러오는 중입니다.</div>';
+  try {
+    const data = await loadCrystalPrice(force);
+    renderCrystalMarketPrice(resultEl, data);
+    marketListLoadState.crystal = 'loaded';
+  } catch (error) {
+    marketListLoadState.crystal = 'idle';
+    renderMarketError(resultEl, error.message || '크리스탈 시세를 불러오지 못했습니다.');
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+function renderCrystalMarketPrice(container, data) {
+  if (!container) return;
+  const gold = Number(data?.crystalGoldPer100 || 0);
+  if (gold <= 0) return renderMarketError(container, '현재 크리스탈 시세를 확인할 수 없습니다.');
+  const latestTime = data?.latest?.dt || data?.updatedAt || '';
+  container.innerHTML = `
+    <div class="crystalExchangeCard">
+      <div class="crystalCurrency crystalCurrencyBlue">
+        <img src="/assets/currency/crystal.png" alt="크리스탈">
+        <span><small>구매 수량</small><strong>100 크리스탈</strong></span>
+      </div>
+      <span class="crystalExchangeArrow" aria-hidden="true">→</span>
+      <div class="crystalCurrency crystalCurrencyGold">
+        <img src="/assets/currency/gold.png" alt="골드">
+        <span><small>현재 시세</small><strong>${Math.round(gold).toLocaleString('ko-KR')} 골드</strong></span>
+      </div>
+    </div>
+    <div class="crystalMarketMeta"><span>LOSPI 1시간 종가 기준</span><span>${escapeHtml(formatMarketUpdatedAt(latestTime))}${data?.cached ? ' · 캐시' : ''}</span></div>`;
 }
 
 

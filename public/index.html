@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LOSTARK 진화 노드 추천 계산기</title>
-  <link rel="stylesheet" href="/style.css?v=5.8.10" />
+  <link rel="stylesheet" href="/style.css?v=5.8.11" />
 </head>
 <body>
   <main class="wrap">
@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v5.8.10 · 각인 단계값 정확도 보정</span>
+        <span class="badge">v5.8.11 · 크리스탈 시세 추가</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -145,7 +145,7 @@
       <div class="sectionHead">
         <div>
           <h2>시세</h2>
-          <p class="hint">악세, 아바타, 유각, 보석 시세 기능을 한 탭에 모았습니다.</p>
+          <p class="hint">악세, 아바타, 유각, 보석, 재료, 크리스탈 시세를 한 탭에 모았습니다.</p>
         </div>
       </div>
       <div class="marketSubNav">
@@ -154,6 +154,7 @@
         <button class="marketSubButton" type="button" data-market-tab="engraving">유각</button>
         <button class="marketSubButton" type="button" data-market-tab="gem">보석</button>
         <button class="marketSubButton" type="button" data-market-tab="material">재료</button>
+        <button class="marketSubButton" type="button" data-market-tab="crystal">크리스탈</button>
       </div>
       <div id="marketAccessoryPanel" class="marketSubPanel">
         <div class="marketSearchBox">
@@ -202,6 +203,16 @@
         </div>
         <div id="materialMarketResult" class="marketResultBox">4티어 강화 재료 시세를 거래소에서 조회합니다.</div>
       </div>
+      <div id="marketCrystalPanel" class="marketSubPanel hidden">
+        <div class="marketSearchBox crystalMarketToolbar">
+          <div>
+            <b>화폐 거래소 크리스탈 시세</b>
+            <small>100 크리스탈을 구매할 때 필요한 골드입니다.</small>
+          </div>
+          <button id="crystalListButton" type="button">새로고침</button>
+        </div>
+        <div id="crystalMarketResult" class="marketResultBox">최신 크리스탈 시세를 불러옵니다.</div>
+      </div>
     </section>
 
     <section id="legendAvatarPanel" class="panel legendAvatarPanel tabContent hidden">
@@ -223,7 +234,7 @@
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <div class="version">Version 5.8.10</div>
-  <script type="module" src="/app.js?v=5.8.10"></script>
+  <div class="version">Version 5.8.11</div>
+  <script type="module" src="/app.js?v=5.8.11"></script>
 </body>
 </html>

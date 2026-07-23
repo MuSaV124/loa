@@ -3569,6 +3569,96 @@ body:not(.calculatorReady):not(.marketMode) .search button {
 body:not(.calculatorReady):not(.marketMode) .tabNav {
   grid-column: 1;
 }
+
+/* v5.8.11 crystal exchange market tab */
+.crystalMarketToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.crystalMarketToolbar b,
+.crystalMarketToolbar small {
+  display: block;
+}
+.crystalMarketToolbar b {
+  color: #f8fafc;
+  font-size: 15px;
+}
+.crystalMarketToolbar small {
+  color: var(--muted);
+  margin-top: 4px;
+  font-weight: 750;
+}
+.crystalMarketToolbar button {
+  min-width: 112px;
+  border: 0;
+  border-radius: 7px;
+  padding: 10px 14px;
+  background: var(--amber);
+  color: #111827;
+  font-weight: 1000;
+  cursor: pointer;
+}
+.crystalMarketToolbar button:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+.crystalExchangeCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 10px;
+}
+.crystalCurrency {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-height: 92px;
+  padding: 16px;
+  border: 1px solid rgba(148,163,184,.18);
+  border-radius: 7px;
+  background: rgba(15,23,42,.66);
+}
+.crystalCurrency img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  flex: 0 0 58px;
+}
+.crystalCurrency small,
+.crystalCurrency strong {
+  display: block;
+}
+.crystalCurrency small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  margin-bottom: 5px;
+}
+.crystalCurrency strong {
+  color: #f8fafc;
+  font-size: 22px;
+  font-weight: 1000;
+}
+.crystalCurrencyBlue strong { color: #7dd3fc; }
+.crystalCurrencyGold strong { color: #fbbf24; }
+.crystalExchangeArrow {
+  color: #cbd5e1;
+  font-size: 25px;
+  font-weight: 1000;
+  text-align: center;
+}
+.crystalMarketMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 10px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
 @media (max-width: 760px) {
   .powerRawHeader {
     align-items: flex-start;
@@ -3583,5 +3673,19 @@ body:not(.calculatorReady):not(.marketMode) .tabNav {
   }
   body:not(.calculatorReady):not(.marketMode) .hero h1 {
     font-size: 28px;
+  }
+  .crystalMarketToolbar,
+  .crystalMarketMeta {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .crystalExchangeCard {
+    grid-template-columns: 1fr;
+  }
+  .crystalExchangeArrow {
+    transform: rotate(90deg);
+  }
+  .crystalCurrency strong {
+    font-size: 19px;
   }
 }
