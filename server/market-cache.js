@@ -40,7 +40,6 @@ export async function readMarketSnapshot() {
     versionedUrl.searchParams.set('etag', metadata.etag);
     const result = await get(versionedUrl.toString(), { access: 'public' });
     if (!result || result.statusCode !== 200 || !result.stream) return null;
-    if (result.blob.etag !== metadata.etag) continue;
 
     const snapshot = JSON.parse(await new Response(result.stream).text());
     if (!isUsableMarketSnapshot(snapshot)) return null;

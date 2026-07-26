@@ -1,4 +1,8 @@
-# Lost Ark Node Recommend Calculator v5.8.19
+# Lost Ark Node Recommend Calculator v5.8.20
+
+## v5.8.20
+
+- 저장소 ETag와 공개 파일의 HTTP ETag 형식 차이를 분리해 자동 시세 캐시 덮어쓰기가 안정적으로 완료되도록 수정했습니다.
 
 ## v5.8.19
 
