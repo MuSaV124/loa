@@ -1,6 +1,6 @@
 import { MARKET_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
 
-const API_VERSION = '5.8.18';
+const API_VERSION = '5.8.19';
 const LOSPI_OHLC_URL = 'https://loatool.taeu.kr/api/crystal-history/ohlc/1h';
 const REQUEST_TIMEOUT_MS = 6500;
 const CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;

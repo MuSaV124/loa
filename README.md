@@ -1,4 +1,8 @@
-# Lost Ark Node Recommend Calculator v5.8.18
+# Lost Ark Node Recommend Calculator v5.8.19
+
+## v5.8.19
+
+- 공개 Blob을 덮어쓴 뒤에도 최신 메타데이터 ETag와 일치하는 시세 본문을 읽도록 보강해 30분 자동 갱신의 충돌 오류를 수정했습니다.
 
 ## v5.8.18
 

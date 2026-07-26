@@ -1,4 +1,4 @@
-import { BlobPreconditionFailedError, get, put } from '@vercel/blob';
+import { BlobNotFoundError, BlobPreconditionFailedError, get, head, put } from '@vercel/blob';
 
 export const MARKET_CACHE_PATH = 'loa/market-cache.json';
 export const MARKET_CACHE_SCHEMA_VERSION = 1;
@@ -27,15 +27,26 @@ export function isMarketBlobConfigured() {
 
 export async function readMarketSnapshot() {
   if (!isMarketBlobConfigured()) return null;
-  const result = await get(MARKET_CACHE_PATH, { access: 'public', useCache: false });
-  if (!result || result.statusCode !== 200 || !result.stream) return null;
-  const snapshot = JSON.parse(await new Response(result.stream).text());
-  if (!isUsableMarketSnapshot(snapshot)) return null;
-  return {
-    snapshot,
-    etag: result.blob.etag,
-    url: result.blob.url
-  };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let metadata;
+    try {
+      metadata = await head(MARKET_CACHE_PATH);
+    } catch (error) {
+      if (error instanceof BlobNotFoundError) return null;
+      throw error;
+    }
+
+    const versionedUrl = new URL(metadata.url);
+    versionedUrl.searchParams.set('etag', metadata.etag);
+    const result = await get(versionedUrl.toString(), { access: 'public' });
+    if (!result || result.statusCode !== 200 || !result.stream) return null;
+    if (result.blob.etag !== metadata.etag) continue;
+
+    const snapshot = JSON.parse(await new Response(result.stream).text());
+    if (!isUsableMarketSnapshot(snapshot)) return null;
+    return { snapshot, etag: metadata.etag, url: metadata.url };
+  }
+  throw new Error('시세 캐시가 갱신되는 동안 최신 버전을 읽지 못했습니다.');
 }
 
 export async function writeMarketSnapshot(snapshot, { ifMatch } = {}) {

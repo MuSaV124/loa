@@ -1,6 +1,6 @@
 import { readMarketSnapshot } from '../server/market-cache.js';
 
-const API_VERSION = '5.8.18';
+const API_VERSION = '5.8.19';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=60, stale-while-revalidate=300, stale-if-error=86400');

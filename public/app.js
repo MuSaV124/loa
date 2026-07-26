@@ -1,9 +1,9 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.18';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.18';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.18';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.18';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.18';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.8.18';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.19';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.19';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.19';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.19';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.19';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.8.19';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -11,9 +11,9 @@ import {
   canonicalMarketRequestKey,
   formatCooldownClock,
   remainingCooldownMs
-} from './cache-policy.js?v=5.8.18';
+} from './cache-policy.js?v=5.8.19';
 
-const VERSION = '5.8.18';
+const VERSION = '5.8.19';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }

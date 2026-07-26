@@ -9,7 +9,7 @@ import {
   writeMarketSnapshot
 } from '../server/market-cache.js';
 
-const API_VERSION = '5.8.18';
+const API_VERSION = '5.8.19';
 let refreshInflight = null;
 
 export const config = { maxDuration: 60 };
