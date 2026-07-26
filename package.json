@@ -1,6 +1,6 @@
 {
   "name": "lostark-node-recommend-calculator",
-  "version": "5.8.17",
+  "version": "5.8.18",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,9 +13,11 @@
     "test:engraving": "node scripts/test-engraving-math.mjs",
     "test:class-benchmark": "node scripts/test-class-benchmark.mjs",
     "test:cache": "node scripts/test-cache-policy.mjs",
+    "test:market-cache": "node scripts/test-market-cache.mjs",
     "update:class-benchmarks": "node scripts/update-class-benchmarks.mjs"
   },
   "dependencies": {
+    "@vercel/blob": "^2.6.1",
     "cheerio": "^1.0.0"
   },
   "devDependencies": {

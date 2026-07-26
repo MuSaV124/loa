@@ -1,9 +1,9 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.17';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.17';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.17';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.17';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.17';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.8.17';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.18';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.18';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.18';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.18';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.18';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.8.18';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -11,9 +11,9 @@ import {
   canonicalMarketRequestKey,
   formatCooldownClock,
   remainingCooldownMs
-} from './cache-policy.js?v=5.8.17';
+} from './cache-policy.js?v=5.8.18';
 
-const VERSION = '5.8.17';
+const VERSION = '5.8.18';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -301,6 +301,7 @@ const marketResponseCache = new Map();
 const marketRequestInflight = new Map();
 const MARKET_CLIENT_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const MARKET_REFRESH_STORAGE_KEY = 'loa-market-refresh-v1';
+const MARKET_SNAPSHOT_STORAGE_KEY = 'loa-market-snapshot-v1';
 const CHARACTER_CACHE_STORAGE_KEY = 'loa-character-cache-v1';
 const CHARACTER_CACHE_MAX_ENTRIES = 20;
 const MARKET_REFRESH_BUTTON_IDS = {
@@ -310,6 +311,9 @@ const MARKET_REFRESH_BUTTON_IDS = {
   crystal: 'crystalListButton'
 };
 let marketRefreshTimes = readStoredObject(MARKET_REFRESH_STORAGE_KEY);
+let marketSnapshotHydrated = false;
+let marketSnapshotAvailable = false;
+let marketSnapshotNetworkState = 'idle';
 let activeCharacterName = '';
 let activeCharacterSavedAt = 0;
 let characterRequestPending = false;
@@ -2168,15 +2172,16 @@ async function loadT4MaterialPriceMap() {
   if (t4MaterialPriceInflight) return t4MaterialPriceInflight;
   t4MaterialPriceInflight = fetchMarketJson('/api/market-prices?mode=t4Materials')
     .then(data => {
-      const map = new Map();
-      for (const item of data?.items || []) {
-        map.set(item.requestedName || item.name, item);
-      }
-      t4MaterialPriceCache = map;
-      return map;
+      t4MaterialPriceCache = buildT4MaterialPriceMap(data);
+      return t4MaterialPriceCache;
     })
     .finally(() => { t4MaterialPriceInflight = null; });
   return t4MaterialPriceInflight;
+}
+function buildT4MaterialPriceMap(data) {
+  const map = new Map();
+  for (const item of data?.items || []) map.set(item.requestedName || item.name, item);
+  return map;
 }
 async function loadCrystalPrice(force = false) {
   if (!force && crystalPriceCache) return crystalPriceCache;
@@ -3589,10 +3594,177 @@ function autoLoadMarketSubTab() {
 }
 
 function preloadMarketPriceLists() {
+  hydrateStoredMarketSnapshot();
+  if (marketSnapshotNetworkState === 'loading' || marketSnapshotNetworkState === 'loaded') return;
+  marketSnapshotNetworkState = 'loading';
+  fetchMarketJson('/api/market-snapshot')
+    .then(snapshot => {
+      if (applyMarketSnapshot(snapshot)) {
+        marketSnapshotNetworkState = 'loaded';
+        return;
+      }
+      marketSnapshotNetworkState = 'failed';
+      if (!marketSnapshotAvailable) preloadLegacyMarketPriceLists();
+    })
+    .catch(() => {
+      marketSnapshotNetworkState = 'failed';
+      if (!marketSnapshotAvailable) preloadLegacyMarketPriceLists();
+    });
+}
+
+function hydrateStoredMarketSnapshot() {
+  if (marketSnapshotHydrated) return;
+  marketSnapshotHydrated = true;
+  const snapshot = readStoredObject(MARKET_SNAPSHOT_STORAGE_KEY);
+  if (isUsableClientMarketSnapshot(snapshot)) applyMarketSnapshot(snapshot, { persist: false });
+}
+
+function preloadLegacyMarketPriceLists() {
   loadMarketEngravingList();
   loadMarketGemList();
   loadMarketMaterialList();
   loadMarketCrystalPrice();
+}
+
+function isUsableClientMarketSnapshot(snapshot) {
+  const sections = snapshot?.sections;
+  return snapshot?.ok === true
+    && Array.isArray(sections?.gem?.rows) && sections.gem.rows.length > 0
+    && Array.isArray(sections?.engraving?.items) && sections.engraving.items.length > 0
+    && Array.isArray(sections?.material?.items) && sections.material.items.length > 0
+    && Number(sections?.crystal?.crystalGoldPer100 || 0) > 0;
+}
+
+function applyMarketSnapshot(snapshot, { persist = true } = {}) {
+  if (!isUsableClientMarketSnapshot(snapshot)) return false;
+  marketSnapshotAvailable = true;
+  const sections = snapshot.sections;
+  applyMarketSnapshotSection('gem', sections.gem);
+  applyMarketSnapshotSection('engraving', sections.engraving);
+  applyMarketSnapshotSection('material', sections.material);
+  applyMarketSnapshotSection('crystal', sections.crystal);
+  if (persist) writeStoredObject(MARKET_SNAPSHOT_STORAGE_KEY, compactClientMarketSnapshot(snapshot));
+  updateMarketRefreshButtons();
+  return true;
+}
+
+function applyMarketSnapshotSection(section, rawData) {
+  const data = { ...rawData, cached: true, cacheSource: 'automatic-snapshot' };
+  const routes = {
+    gem: '/api/market-prices?mode=gemList',
+    engraving: '/api/market-prices?mode=engravingList',
+    material: '/api/market-prices?mode=t4Materials',
+    crystal: '/api/crystal-price'
+  };
+  const route = routes[section];
+  if (route) {
+    marketResponseCache.set(canonicalMarketRequestKey(route, window.location.origin), {
+      data,
+      expiresAt: Date.now() + MARKET_CLIENT_CACHE_TTL_MS
+    });
+  }
+
+  if (section === 'gem') renderGemPriceGrid($('gemMarketResult'), data);
+  if (section === 'engraving') renderEngravingPriceGrid($('engravingMarketResult'), data);
+  if (section === 'material') {
+    renderMaterialPriceGrid($('materialMarketResult'), data);
+    t4MaterialPriceCache = buildT4MaterialPriceMap(data);
+    refreshPowerCostEstimatesFromMarketCache();
+  }
+  if (section === 'crystal') {
+    crystalPriceCache = data;
+    renderCrystalMarketPrice($('crystalMarketResult'), data);
+  }
+  marketListLoadState[section] = 'loaded';
+  rememberMarketRefresh(section, false);
+}
+
+function updateStoredMarketSnapshotSection(section, data) {
+  const snapshot = readStoredObject(MARKET_SNAPSHOT_STORAGE_KEY);
+  if (!isUsableClientMarketSnapshot(snapshot)) return;
+  const updatedAt = data?.updatedAt || new Date().toISOString();
+  snapshot.sections[section] = compactClientMarketSection(section, data);
+  snapshot.sectionUpdatedAt = { ...(snapshot.sectionUpdatedAt || {}), [section]: updatedAt };
+  snapshot.updatedAt = new Date().toISOString();
+  writeStoredObject(MARKET_SNAPSHOT_STORAGE_KEY, snapshot);
+}
+
+function compactClientMarketSnapshot(snapshot) {
+  return {
+    ok: true,
+    schemaVersion: Number(snapshot.schemaVersion || 1),
+    apiVersion: snapshot.apiVersion || VERSION,
+    source: snapshot.source || 'market-cache',
+    updatedAt: snapshot.updatedAt || new Date().toISOString(),
+    sectionUpdatedAt: { ...(snapshot.sectionUpdatedAt || {}) },
+    sections: {
+      gem: compactClientMarketSection('gem', snapshot.sections.gem),
+      engraving: compactClientMarketSection('engraving', snapshot.sections.engraving),
+      material: compactClientMarketSection('material', snapshot.sections.material),
+      crystal: { ...snapshot.sections.crystal }
+    }
+  };
+}
+
+function compactClientMarketSection(section, data) {
+  if (section === 'gem') {
+    return {
+      ok: true,
+      mode: 'gemList',
+      source: data.source || '',
+      updatedAt: data.updatedAt || new Date().toISOString(),
+      rows: (data.rows || []).map(row => ({
+        level: Number(row.level || 0),
+        damage: compactClientMarketItem(row.damage),
+        cooldown: compactClientMarketItem(row.cooldown)
+      }))
+    };
+  }
+  if (section === 'engraving') {
+    return {
+      ok: true,
+      mode: 'engravingList',
+      source: data.source || '',
+      updatedAt: data.updatedAt || new Date().toISOString(),
+      items: (data.items || []).map(compactClientMarketItem).filter(Boolean)
+    };
+  }
+  if (section === 'material') {
+    return {
+      ok: true,
+      mode: 't4Materials',
+      source: data.source || '',
+      updatedAt: data.updatedAt || new Date().toISOString(),
+      groups: Array.isArray(data.groups) ? data.groups : [],
+      items: (data.items || []).map(item => compactClientMarketItem(item, true)).filter(Boolean)
+    };
+  }
+  return { ...data };
+}
+
+function compactClientMarketItem(item, material = false) {
+  if (!item) return null;
+  const compact = {
+    id: item.id || null,
+    name: item.name || '',
+    icon: item.icon || '',
+    grade: item.grade || '',
+    price: Number(item.price || 0)
+  };
+  if (!material) return compact;
+  return {
+    ...compact,
+    group: item.group || '',
+    requestedName: item.requestedName || item.name || '',
+    source: item.source || '',
+    unitPrice: Number(item.unitPrice || 0),
+    bundleCount: Number(item.bundleCount || 1),
+    shardCount: Number(item.shardCount || 0),
+    shardUnitPrice: Number(item.shardUnitPrice || 0),
+    pheonCost: Number(item.pheonCost || 0),
+    missing: Boolean(item.missing),
+    error: item.error || ''
+  };
 }
 
 function initMarketTabs() {
@@ -3898,6 +4070,7 @@ async function loadMarketGemList(force = false) {
     const data = await fetchMarketJson(`/api/market-prices?mode=gemList${force ? '&force=1' : ''}`);
     renderGemPriceGrid(resultEl, data);
     marketListLoadState.gem = 'loaded';
+    updateStoredMarketSnapshotSection('gem', data);
     rememberMarketRefresh('gem', force);
   } catch (error) {
     marketListLoadState.gem = 'idle';
@@ -3920,6 +4093,7 @@ async function loadMarketEngravingList(force = false) {
     const data = await fetchMarketJson(`/api/market-prices?mode=engravingList${force ? '&force=1' : ''}`);
     renderEngravingPriceGrid(resultEl, data);
     marketListLoadState.engraving = 'loaded';
+    updateStoredMarketSnapshotSection('engraving', data);
     rememberMarketRefresh('engraving', force);
   } catch (error) {
     marketListLoadState.engraving = 'idle';
@@ -3942,7 +4116,9 @@ async function loadMarketMaterialList(force = false) {
     const data = await fetchMarketJson(`/api/market-prices?mode=t4Materials${force ? '&force=1' : ''}`);
     renderMaterialPriceGrid(resultEl, data);
     marketListLoadState.material = 'loaded';
-    if (force) t4MaterialPriceCache = null;
+    t4MaterialPriceCache = buildT4MaterialPriceMap(data);
+    refreshPowerCostEstimatesFromMarketCache();
+    updateStoredMarketSnapshotSection('material', data);
     rememberMarketRefresh('material', force);
   } catch (error) {
     marketListLoadState.material = 'idle';
@@ -4196,6 +4372,7 @@ async function loadMarketCrystalPrice(force = false) {
     const data = await loadCrystalPrice(force);
     renderCrystalMarketPrice(resultEl, data);
     marketListLoadState.crystal = 'loaded';
+    updateStoredMarketSnapshotSection('crystal', data);
     rememberMarketRefresh('crystal', force);
   } catch (error) {
     marketListLoadState.crystal = 'idle';

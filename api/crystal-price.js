@@ -1,6 +1,6 @@
 import { MARKET_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
 
-const API_VERSION = '5.8.17';
+const API_VERSION = '5.8.18';
 const LOSPI_OHLC_URL = 'https://loatool.taeu.kr/api/crystal-history/ohlc/1h';
 const REQUEST_TIMEOUT_MS = 6500;
 const CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
@@ -17,40 +17,7 @@ export default async function handler(req, res) {
     const force = String(req.query.force || '') === '1';
     const sharedTtlSeconds = Math.floor((force ? MARKET_REFRESH_COOLDOWN_MS : CACHE_TTL_MS) / 1000);
     res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${sharedTtlSeconds}`);
-    const now = Date.now();
-    if (!force && cache && cache.expiresAt > now) {
-      return res.status(200).json({ ...cache.data, cached: true });
-    }
-
-    const rows = await fetchLospiOhlc();
-    const latest = rows
-      .filter(row => Number(row?.close || 0) > 0)
-      .sort((a, b) => new Date(a.dt).getTime() - new Date(b.dt).getTime())
-      .at(-1);
-
-    if (!latest) throw new Error('LOSPI OHLC 최신 시세를 찾지 못했습니다.');
-
-    const crystalGoldPer100 = Number(latest.close || 0);
-    const defaultPackage = PHEON_PACKAGES.find(pack => pack.pheons === 100);
-    const pheonCrystalPerOne = defaultPackage.crystalPerPheon;
-    const pheonGoldPerOne = round4((crystalGoldPer100 / 100) * pheonCrystalPerOne);
-    const data = {
-      ok: true,
-      apiVersion: API_VERSION,
-      source: 'loatool-lospi-ohlc',
-      sourceUrl: LOSPI_OHLC_URL,
-      basis: '100 크리스탈 / 골드',
-      crystalGoldPer100,
-      latest,
-      pheonPackages: PHEON_PACKAGES,
-      defaultPheonPackage: defaultPackage,
-      pheonCrystalPerOne,
-      pheonGoldPerOne,
-      updatedAt: new Date().toISOString()
-    };
-
-    cache = { expiresAt: Date.now() + CACHE_TTL_MS, data };
-    return res.status(200).json(data);
+    return res.status(200).json(await loadCrystalPriceData({ force }));
   } catch (error) {
     return res.status(500).json({
       ok: false,
@@ -60,6 +27,41 @@ export default async function handler(req, res) {
       message: error?.message || String(error)
     });
   }
+}
+
+export async function loadCrystalPriceData({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && cache && cache.expiresAt > now) return { ...cache.data, cached: true };
+
+  const rows = await fetchLospiOhlc();
+  const latest = rows
+    .filter(row => Number(row?.close || 0) > 0)
+    .sort((a, b) => new Date(a.dt).getTime() - new Date(b.dt).getTime())
+    .at(-1);
+
+  if (!latest) throw new Error('LOSPI OHLC 최신 시세를 찾지 못했습니다.');
+
+  const crystalGoldPer100 = Number(latest.close || 0);
+  const defaultPackage = PHEON_PACKAGES.find(pack => pack.pheons === 100);
+  const pheonCrystalPerOne = defaultPackage.crystalPerPheon;
+  const pheonGoldPerOne = round4((crystalGoldPer100 / 100) * pheonCrystalPerOne);
+  const data = {
+    ok: true,
+    apiVersion: API_VERSION,
+    source: 'loatool-lospi-ohlc',
+    sourceUrl: LOSPI_OHLC_URL,
+    basis: '100 크리스탈 / 골드',
+    crystalGoldPer100,
+    latest,
+    pheonPackages: PHEON_PACKAGES,
+    defaultPheonPackage: defaultPackage,
+    pheonCrystalPerOne,
+    pheonGoldPerOne,
+    updatedAt: new Date().toISOString()
+  };
+
+  cache = { expiresAt: Date.now() + CACHE_TTL_MS, data };
+  return data;
 }
 
 async function fetchLospiOhlc() {

@@ -1,6 +1,6 @@
 import { MARKET_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
 
-const API_VERSION = '5.8.17';
+const API_VERSION = '5.8.18';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -88,23 +88,33 @@ const DESTINY_SHARD_POUCH_COUNTS = {
 
 export default async function handler(req, res) {
   try {
-    const apiKey = process.env.LOSTARK_API_KEY;
-    if (!apiKey) return res.status(500).json({ ok: false, error: 'Vercel 환경변수 LOSTARK_API_KEY가 없습니다.' });
     const mode = String(req.query.mode || '').trim();
     const force = String(req.query.force || '') === '1';
     const sharedTtlSeconds = Math.floor((force ? MARKET_REFRESH_COOLDOWN_MS : SHARED_PRICE_CACHE_TTL_MS) / 1000);
     res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${sharedTtlSeconds}`);
-    if (mode === 'accessory') return res.status(200).json(await searchAccessory(apiKey, req.query));
-    if (mode === 'gem') return res.status(200).json(await searchGem(apiKey, req.query));
-    if (mode === 'gemList') return res.status(200).json(await searchGemList(apiKey, req.query));
-    if (mode === 'engraving') return res.status(200).json(await searchEngraving(apiKey, req.query));
-    if (mode === 'engravingList') return res.status(200).json(await searchEngravingList(apiKey, req.query));
-    if (mode === 't4Materials') return res.status(200).json(await searchT4Materials(apiKey, req.query));
-    if (mode === 'auctionOptions') return res.status(200).json(await getAuctionOptions(apiKey));
-    return res.status(400).json({ ok: false, error: 'mode는 accessory/gem/gemList/engraving/engravingList/t4Materials/auctionOptions 중 하나여야 합니다.' });
+    return res.status(200).json(await loadMarketPriceSection(mode, req.query));
   } catch (error) {
-    return res.status(500).json({ ok: false, apiVersion: API_VERSION, error: '시세 조회 실패', message: error?.message || String(error) });
+    return res.status(Number(error?.statusCode || 500)).json({ ok: false, apiVersion: API_VERSION, error: '시세 조회 실패', message: error?.message || String(error) });
   }
+}
+
+export async function loadMarketPriceSection(mode, query = {}) {
+  const apiKey = process.env.LOSTARK_API_KEY;
+  if (!apiKey) {
+    const error = new Error('Vercel 환경변수 LOSTARK_API_KEY가 없습니다.');
+    error.statusCode = 503;
+    throw error;
+  }
+  if (mode === 'accessory') return searchAccessory(apiKey, query);
+  if (mode === 'gem') return searchGem(apiKey, query);
+  if (mode === 'gemList') return searchGemList(apiKey, query);
+  if (mode === 'engraving') return searchEngraving(apiKey, query);
+  if (mode === 'engravingList') return searchEngravingList(apiKey, query);
+  if (mode === 't4Materials') return searchT4Materials(apiKey, query);
+  if (mode === 'auctionOptions') return getAuctionOptions(apiKey);
+  const error = new Error('mode는 accessory/gem/gemList/engraving/engravingList/t4Materials/auctionOptions 중 하나여야 합니다.');
+  error.statusCode = 400;
+  throw error;
 }
 
 
