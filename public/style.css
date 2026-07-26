@@ -27,6 +27,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .search button { border: 0; background: var(--blue); color: #07111f; font-weight: 950; border-radius: 9px; padding: 0 18px; cursor: pointer; }
 .search button:disabled { opacity: .6; cursor: wait; }
 .message { margin-top: 12px; padding: 12px; border-radius: 8px; background: #7f1d1d; color: #fee2e2; }
+.message.info { background: #12324a; color: #d9efff; }
 .hidden { display: none; }
 .character { display: flex; gap: 16px; align-items: center; }
 .character img { width: 84px; height: 84px; object-fit: cover; border-radius: 10px; background: var(--panel2); }
@@ -4141,4 +4142,8 @@ body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .tabNav {
   .crystalCurrency strong {
     font-size: 19px;
   }
+}
+.characterRefreshButton {
+  min-width: 132px;
+  white-space: nowrap;
 }

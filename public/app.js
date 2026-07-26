@@ -1,11 +1,19 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.16';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.16';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.16';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.16';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.16';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.8.16';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.17';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.17';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.17';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.17';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.17';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.8.17';
+import {
+  CHARACTER_REFRESH_COOLDOWN_MS,
+  MARKET_REFRESH_COOLDOWN_MS,
+  SHARED_PRICE_CACHE_TTL_MS,
+  canonicalMarketRequestKey,
+  formatCooldownClock,
+  remainingCooldownMs
+} from './cache-policy.js?v=5.8.17';
 
-const VERSION = '5.8.16';
+const VERSION = '5.8.17';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -291,7 +299,38 @@ let crystalPriceCache = null;
 let crystalPriceInflight = null;
 const marketResponseCache = new Map();
 const marketRequestInflight = new Map();
-const MARKET_CLIENT_CACHE_TTL_MS = 60 * 1000;
+const MARKET_CLIENT_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
+const MARKET_REFRESH_STORAGE_KEY = 'loa-market-refresh-v1';
+const CHARACTER_CACHE_STORAGE_KEY = 'loa-character-cache-v1';
+const CHARACTER_CACHE_MAX_ENTRIES = 20;
+const MARKET_REFRESH_BUTTON_IDS = {
+  engraving: 'engravingListButton',
+  gem: 'gemListButton',
+  material: 'materialListButton',
+  crystal: 'crystalListButton'
+};
+let marketRefreshTimes = readStoredObject(MARKET_REFRESH_STORAGE_KEY);
+let activeCharacterName = '';
+let activeCharacterSavedAt = 0;
+let characterRequestPending = false;
+
+function readStoredObject(key) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredObject(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
 function escapeRegExp(v) { return String(v || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -325,7 +364,18 @@ function round2(v) {
 }
 function formatNumber(v) { const n = Number(v); return Number.isFinite(n) ? n.toLocaleString('ko-KR') : '-'; }
 function item(label, value) { return `<div class="cell"><b>${label}</b><span>${escapeHtml(value ?? '-')}</span></div>`; }
-function setMessage(text) { const el = $('message'); if (!text) { el.classList.add('hidden'); el.textContent = ''; return; } el.classList.remove('hidden'); el.textContent = text; }
+function setMessage(text, tone = 'error') {
+  const el = $('message');
+  if (!text) {
+    el.classList.add('hidden');
+    el.classList.remove('info');
+    el.textContent = '';
+    return;
+  }
+  el.classList.remove('hidden');
+  el.classList.toggle('info', tone === 'info');
+  el.textContent = text;
+}
 function getStat(profile, type) { return (profile?.Stats || []).find(s => s.Type === type)?.Value ?? '-'; }
 
 function parseProfileStats(profile) {
@@ -1596,7 +1646,7 @@ async function calculateAccessorySpecEstimates() {
   const candidates = accessoryUpgradeCandidates(equipped);
   const rows = await Promise.all(candidates.map(async candidate => {
     try {
-      const data = await fetchMarketJson(`/api/market-prices?mode=accessory&part=${encodeURIComponent(candidate.part)}&combo=${encodeURIComponent(candidate.combo)}&_=${Date.now()}`);
+      const data = await fetchMarketJson(`/api/market-prices?mode=accessory&part=${encodeURIComponent(candidate.part)}&combo=${encodeURIComponent(candidate.combo)}`);
       const item = data.lowest || data.items?.[0] || null;
       const price = Number(item?.price || 0);
       const powerEstimate = accessoryPowerEstimate(candidate, state.powerSnapshot);
@@ -1666,7 +1716,7 @@ async function calculateGemSpecEstimates(snapshot) {
   const candidates = gems.filter(gem => Number(gem.level || 0) > 0 && Number(gem.level || 0) < 10);
   if (!candidates.length) return [];
   let data = null;
-  try { data = await fetchMarketJson(`/api/market-prices?mode=gemList&_=${Date.now()}`); } catch (error) {
+  try { data = await fetchMarketJson('/api/market-prices?mode=gemList'); } catch (error) {
     return [{ category: 'gem', item: { type: '보석', name: '보석 시세' }, available: false, reason: error.message || '보석 시세 조회 실패', powerDelta: 0, cost: {}, expectedCost: {} }];
   }
   return candidates.map(gem => {
@@ -1713,7 +1763,7 @@ async function calculateEngravingSpecEstimates(snapshot) {
   if (!candidates.length) return [];
   const rows = await Promise.all(candidates.map(async book => {
     try {
-      const data = await fetchMarketJson(`/api/market-prices?mode=engraving&name=${encodeURIComponent(book.name)}&_=${Date.now()}`);
+      const data = await fetchMarketJson(`/api/market-prices?mode=engraving&name=${encodeURIComponent(book.name)}`);
       const item = data.lowest || data.items?.[0] || null;
       const unitPrice = Number(item?.price || 0);
       const buyCount = 5;
@@ -2116,7 +2166,7 @@ function renderPowerCostPrep(snapshot) {
 async function loadT4MaterialPriceMap() {
   if (t4MaterialPriceCache) return t4MaterialPriceCache;
   if (t4MaterialPriceInflight) return t4MaterialPriceInflight;
-  t4MaterialPriceInflight = fetchMarketJson(`/api/market-prices?mode=t4Materials&_=${Date.now()}`)
+  t4MaterialPriceInflight = fetchMarketJson('/api/market-prices?mode=t4Materials')
     .then(data => {
       const map = new Map();
       for (const item of data?.items || []) {
@@ -2131,7 +2181,7 @@ async function loadT4MaterialPriceMap() {
 async function loadCrystalPrice(force = false) {
   if (!force && crystalPriceCache) return crystalPriceCache;
   if (crystalPriceInflight) return crystalPriceInflight;
-  crystalPriceInflight = fetchMarketJson(`/api/crystal-price${force ? '?force=1&' : '?'}_=${Date.now()}`)
+  crystalPriceInflight = fetchMarketJson(`/api/crystal-price${force ? '?force=1' : ''}`)
     .then(data => {
       crystalPriceCache = data;
       return data;
@@ -3219,15 +3269,58 @@ function updateAdrenalineReplacementVisibility() {
   updateEngravingControlPreviews();
 }
 
-async function requestCharacterData(name, maxAttempts = 2) {
+function normalizeCharacterCacheKey(name) {
+  return String(name || '').trim().toLocaleLowerCase('ko-KR');
+}
+
+function getStoredCharacter(name) {
+  const key = normalizeCharacterCacheKey(name);
+  const entry = readStoredObject(CHARACTER_CACHE_STORAGE_KEY)[key];
+  if (!entry?.data?.ok || !entry?.data?.profile?.CharacterName) return null;
+  return { data: entry.data, savedAt: Number(entry.savedAt || 0) };
+}
+
+function saveStoredCharacter(name, data) {
+  const key = normalizeCharacterCacheKey(name);
+  const entries = readStoredObject(CHARACTER_CACHE_STORAGE_KEY);
+  const cacheableData = { ...data };
+  delete cacheableData.raw;
+  delete cacheableData.equipment;
+  delete cacheableData.gems;
+  const savedAt = Date.now();
+  entries[key] = { data: cacheableData, savedAt };
+
+  const oldestFirst = () => Object.entries(entries)
+    .sort((left, right) => Number(left[1]?.savedAt || 0) - Number(right[1]?.savedAt || 0));
+  while (Object.keys(entries).length > CHARACTER_CACHE_MAX_ENTRIES) {
+    delete entries[oldestFirst()[0]?.[0]];
+  }
+  while (!writeStoredObject(CHARACTER_CACHE_STORAGE_KEY, entries)) {
+    const oldest = oldestFirst()[0]?.[0];
+    if (!oldest || oldest === key) break;
+    delete entries[oldest];
+  }
+  return savedAt;
+}
+
+async function requestCharacterData(name, { force = false, maxAttempts = 2 } = {}) {
+  if (!force) {
+    const stored = getStoredCharacter(name);
+    if (stored) return { ...stored, fromCache: true };
+  }
+
   let lastError = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      const res = await fetch(`/api/character?name=${encodeURIComponent(name)}&_=${Date.now()}`, { cache: 'no-store' });
+      const url = `/api/character?name=${encodeURIComponent(name)}${force ? '&force=1' : ''}`;
+      const res = await fetch(url, { cache: 'default' });
       const body = await res.text();
       let data = null;
       try { data = body ? JSON.parse(body) : null; } catch {}
-      if (res.ok && data?.ok) return data;
+      if (res.ok && data?.ok) {
+        const savedAt = saveStoredCharacter(data.profile?.CharacterName || name, data);
+        return { data, savedAt, fromCache: false };
+      }
 
       const error = new Error(data?.error || data?.message || `캐릭터 검색 서버 오류 (${res.status})`);
       error.retryable = !data || res.status === 429 || res.status >= 500;
@@ -3262,11 +3355,7 @@ function resetAdditionalEffects() {
   if ($('backAttackEnabled')) $('backAttackEnabled').checked = false;
 }
 
-async function searchCharacter(name) {
-  const button = $('searchButton');
-  button.disabled = true; button.textContent = '검색...'; setMessage('');
-  resetAdditionalEffects();
-  // 이전 검색 결과가 남아 보이지 않도록 검색 시작 시 화면을 먼저 비웁니다.
+function resetCharacterResultState() {
   document.body.classList.remove('calculatorReady');
   $('characterCard').classList.add('hidden');
   $('characterCard').innerHTML = '';
@@ -3283,32 +3372,78 @@ async function searchCharacter(name) {
   state.enlightenment = { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
   simulatorRendered = false;
   document.body.classList.remove('simulatorMode');
+}
+
+function applyCharacterData(data) {
+  state.accessory = data.accessoryEffects || { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+  state.bracelet = data.braceletEffects || { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+  state.abilityStone = data.abilityStoneEffects || { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
+  state.engraving = data.engravingEffects || emptyEngravingState();
+  state.arkGrid = data.arkGridEffects || { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+  state.powerSnapshot = data.powerSnapshot || null;
+  if (state.powerSnapshot?.profile && !state.powerSnapshot.profile.secondClass) {
+    state.powerSnapshot.profile.secondClass = data.arkPassive?.Title || '';
+  }
+  syncAdrenalineControlsFromEngraving();
+  renderCharacter(data.profile, data.arkPassive);
+  state.foundEffects = readEffects(data.arkPassive);
+  state.enlightenment = extractEnlightenmentEffects(state.foundEffects);
+  state.selected = classifyEvolution(state.foundEffects);
+  state.apiSelected = JSON.parse(JSON.stringify(state.selected));
+  applyProfileDefaults(data.profile, state.selected);
+  renderPowerSnapshot(state.powerSnapshot);
+  renderEvolutionTiers();
+  renderSummary(data.profile, data.arkPassive);
+  calculateAndRender();
+}
+
+function updateCharacterRefreshButton() {
+  const button = $('characterRefreshButton');
+  if (!button) return;
+  const inputName = normalizeCharacterCacheKey($('characterName')?.value);
+  const matchesActive = activeCharacterName && inputName === normalizeCharacterCacheKey(activeCharacterName);
+  button.classList.toggle('hidden', !matchesActive);
+  if (!matchesActive) return;
+  if (characterRequestPending) {
+    button.disabled = true;
+    button.textContent = '갱신 중';
+    return;
+  }
+  const remaining = remainingCooldownMs(activeCharacterSavedAt, CHARACTER_REFRESH_COOLDOWN_MS);
+  button.disabled = remaining > 0;
+  button.textContent = remaining > 0 ? `캐릭터 갱신 ${formatCooldownClock(remaining)}` : '캐릭터 갱신';
+}
+
+async function searchCharacter(name, { force = false } = {}) {
+  if (characterRequestPending) return;
+  const button = $('searchButton');
+  characterRequestPending = true;
+  button.disabled = true;
+  button.textContent = force ? '갱신...' : '검색...';
+  updateCharacterRefreshButton();
+  setMessage('');
   try {
-    const data = await requestCharacterData(name);
+    const result = await requestCharacterData(name, { force });
+    const data = result.data;
     if (!data.profile?.CharacterName) throw new Error('캐릭터 프로필을 가져오지 못했습니다.');
-    state.accessory = data.accessoryEffects || { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
-    state.bracelet = data.braceletEffects || { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
-    state.abilityStone = data.abilityStoneEffects || { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
-    state.engraving = data.engravingEffects || emptyEngravingState();
-    state.arkGrid = data.arkGridEffects || { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
-    state.powerSnapshot = data.powerSnapshot || null;
-    if (state.powerSnapshot?.profile && !state.powerSnapshot.profile.secondClass) {
-      state.powerSnapshot.profile.secondClass = data.arkPassive?.Title || '';
+    resetCharacterResultState();
+    resetAdditionalEffects();
+    applyCharacterData(data);
+    activeCharacterName = data.profile.CharacterName;
+    activeCharacterSavedAt = result.savedAt;
+    if ($('characterName')) $('characterName').value = activeCharacterName;
+    if (!Object.keys(state.selected).length) {
+      setMessage('캐릭터 정보는 갱신됐지만 API에서 진화 노드를 읽지 못했습니다. 노드는 직접 선택해 주세요.');
+    } else if (result.fromCache) {
+      setMessage('저장된 캐릭터 정보를 불러왔습니다. 캐릭터 갱신을 눌러야 공식 API를 다시 조회합니다.', 'info');
     }
-    syncAdrenalineControlsFromEngraving();
-    renderCharacter(data.profile, data.arkPassive);
-    state.foundEffects = readEffects(data.arkPassive);
-    state.enlightenment = extractEnlightenmentEffects(state.foundEffects);
-    state.selected = classifyEvolution(state.foundEffects);
-    state.apiSelected = JSON.parse(JSON.stringify(state.selected));
-    applyProfileDefaults(data.profile, state.selected);
-    renderPowerSnapshot(state.powerSnapshot);
-    renderEvolutionTiers();
-    renderSummary(data.profile, data.arkPassive);
-    calculateAndRender();
-    if (!Object.keys(state.selected).length) setMessage('캐릭터 정보는 갱신됐지만 API에서 진화 노드를 읽지 못했습니다. 노드는 직접 선택해 주세요.');
   } catch (error) { setMessage(error.message); }
-  finally { button.disabled = false; button.textContent = '검색'; }
+  finally {
+    characterRequestPending = false;
+    button.disabled = false;
+    button.textContent = '검색';
+    updateCharacterRefreshButton();
+  }
 }
 
 $('searchForm').addEventListener('submit', (event) => {
@@ -3317,6 +3452,12 @@ $('searchForm').addEventListener('submit', (event) => {
   if (!name) return setMessage('캐릭터명을 입력하세요.');
   searchCharacter(name);
 });
+$('characterRefreshButton')?.addEventListener('click', () => {
+  if (!activeCharacterName || characterRequestPending) return;
+  if (remainingCooldownMs(activeCharacterSavedAt, CHARACTER_REFRESH_COOLDOWN_MS) > 0) return updateCharacterRefreshButton();
+  searchCharacter(activeCharacterName, { force: true });
+});
+$('characterName')?.addEventListener('input', updateCharacterRefreshButton);
 $('simulatorBackButton')?.addEventListener('click', closeSimulatorPage);
 EXTRA_EFFECT_INPUT_IDS.forEach(id => $(id).addEventListener('input', calculateAndRender));
 $('adrenalineEnabled').addEventListener('change', () => { updateAdrenalineReplacementVisibility(); calculateAndRender(); });
@@ -3451,6 +3592,7 @@ function preloadMarketPriceLists() {
   loadMarketEngravingList();
   loadMarketGemList();
   loadMarketMaterialList();
+  loadMarketCrystalPrice();
 }
 
 function initMarketTabs() {
@@ -3635,6 +3777,37 @@ const MARKET_ACCESSORY_RULES = {
   ring: { label: '반지', range: '12450~12897', primary: '치피', secondary: '치적', combos: { highHigh: '치피 상 + 치적 상', highMid: '치피 상 + 치적 중', reverseHighMid: '치피 중 + 치적 상' } }
 };
 
+function marketRefreshRemaining(key) {
+  return remainingCooldownMs(marketRefreshTimes[key], MARKET_REFRESH_COOLDOWN_MS);
+}
+
+function rememberMarketRefresh(key, force) {
+  if (!force && Number(marketRefreshTimes[key] || 0) > 0) return;
+  marketRefreshTimes = { ...marketRefreshTimes, [key]: Date.now() };
+  writeStoredObject(MARKET_REFRESH_STORAGE_KEY, marketRefreshTimes);
+}
+
+function updateMarketRefreshButtons() {
+  for (const [key, id] of Object.entries(MARKET_REFRESH_BUTTON_IDS)) {
+    const button = $(id);
+    if (!button) continue;
+    if (marketListLoadState[key] === 'loading') {
+      button.disabled = true;
+      button.textContent = '조회 중';
+      continue;
+    }
+    const remaining = marketRefreshRemaining(key);
+    button.disabled = remaining > 0;
+    button.textContent = remaining > 0 ? `새로고침 ${formatCooldownClock(remaining)}` : '새로고침';
+  }
+}
+
+function canForceMarketRefresh(key, force) {
+  if (!force || marketRefreshRemaining(key) <= 0) return true;
+  updateMarketRefreshButtons();
+  return false;
+}
+
 function initMarketPriceTab() {
   $('accSearchButton')?.addEventListener('click', searchMarketAccessory);
   $('gemListButton')?.addEventListener('click', () => loadMarketGemList(true));
@@ -3644,6 +3817,12 @@ function initMarketPriceTab() {
   $('accPartSelect')?.addEventListener('change', renderAccessoryRuleHint);
   $('accComboSelect')?.addEventListener('change', renderAccessoryRuleHint);
   renderAccessoryRuleHint();
+  updateMarketRefreshButtons();
+  window.addEventListener('storage', event => {
+    if (event.key !== MARKET_REFRESH_STORAGE_KEY) return;
+    marketRefreshTimes = readStoredObject(MARKET_REFRESH_STORAGE_KEY);
+    updateMarketRefreshButtons();
+  });
 }
 
 async function loadLostarkNoticeCard(force = false) {
@@ -3651,7 +3830,7 @@ async function loadLostarkNoticeCard(force = false) {
   if (!cards.length || (lostarkNoticeLoaded && !force)) return;
   lostarkNoticeLoaded = true;
   try {
-    const data = await fetchMarketJson(`/api/lostark-news?_=${Date.now()}`);
+    const data = await fetchMarketJson('/api/lostark-news');
     renderLostarkNoticeCard(data);
   } catch (error) {
     const html = `<a class="lostarkNoticeLink warning" href="https://lostark.game.onstove.com/News/Notice/List" target="_blank" rel="noopener">
@@ -3696,7 +3875,7 @@ async function searchMarketAccessory() {
   if (button) { button.disabled = true; button.textContent = '검색 중'; }
   if (resultEl) resultEl.innerHTML = '악세 후보 인덱스를 갱신하고 선택 옵션 최저가를 확인하는 중입니다.';
   try {
-    const url = `/api/market-prices?mode=accessory&part=${encodeURIComponent(part)}&combo=${encodeURIComponent(combo)}&_=${Date.now()}`;
+    const url = `/api/market-prices?mode=accessory&part=${encodeURIComponent(part)}&combo=${encodeURIComponent(combo)}`;
     const data = await fetchMarketJson(url);
     renderMarketResults(resultEl, data, `${data.partLabel || '악세'} · ${data.comboLabel || ''}`, data.targetOptions?.map(o => `${o.label} ${Number(o.value).toFixed(2)}%`).join(' / '));
   } catch (error) {
@@ -3707,6 +3886,7 @@ async function searchMarketAccessory() {
 }
 
 async function loadMarketGemList(force = false) {
+  if (!canForceMarketRefresh('gem', force)) return;
   if (!force && marketListLoadState.gem === 'loaded') return;
   if (!force && marketListLoadState.gem === 'loading') return;
   marketListLoadState.gem = 'loading';
@@ -3715,18 +3895,20 @@ async function loadMarketGemList(force = false) {
   if (button) { button.disabled = true; button.textContent = '조회 중'; }
   if (resultEl) resultEl.innerHTML = '경매장에서 5~10레벨 겁화/작열 최저가를 조회하는 중입니다.';
   try {
-    const data = await fetchMarketJson(`/api/market-prices?mode=gemList${force ? '&force=1' : ''}&_=${Date.now()}`);
+    const data = await fetchMarketJson(`/api/market-prices?mode=gemList${force ? '&force=1' : ''}`);
     renderGemPriceGrid(resultEl, data);
     marketListLoadState.gem = 'loaded';
+    rememberMarketRefresh('gem', force);
   } catch (error) {
     marketListLoadState.gem = 'idle';
     renderMarketError(resultEl, error.message);
   } finally {
-    if (button) { button.disabled = false; button.textContent = '새로고침'; }
+    updateMarketRefreshButtons();
   }
 }
 
 async function loadMarketEngravingList(force = false) {
+  if (!canForceMarketRefresh('engraving', force)) return;
   if (!force && marketListLoadState.engraving === 'loaded') return;
   if (!force && marketListLoadState.engraving === 'loading') return;
   marketListLoadState.engraving = 'loading';
@@ -3735,18 +3917,20 @@ async function loadMarketEngravingList(force = false) {
   if (button) { button.disabled = true; button.textContent = '조회 중'; }
   if (resultEl) resultEl.innerHTML = '거래소에서 전체 유물 각인서 최저가를 조회하는 중입니다.';
   try {
-    const data = await fetchMarketJson(`/api/market-prices?mode=engravingList${force ? '&force=1' : ''}&_=${Date.now()}`);
+    const data = await fetchMarketJson(`/api/market-prices?mode=engravingList${force ? '&force=1' : ''}`);
     renderEngravingPriceGrid(resultEl, data);
     marketListLoadState.engraving = 'loaded';
+    rememberMarketRefresh('engraving', force);
   } catch (error) {
     marketListLoadState.engraving = 'idle';
     renderMarketError(resultEl, error.message);
   } finally {
-    if (button) { button.disabled = false; button.textContent = '새로고침'; }
+    updateMarketRefreshButtons();
   }
 }
 
 async function loadMarketMaterialList(force = false) {
+  if (!canForceMarketRefresh('material', force)) return;
   if (!force && marketListLoadState.material === 'loaded') return;
   if (!force && marketListLoadState.material === 'loading') return;
   marketListLoadState.material = 'loading';
@@ -3755,39 +3939,21 @@ async function loadMarketMaterialList(force = false) {
   if (button) { button.disabled = true; button.textContent = '조회 중'; }
   if (resultEl) resultEl.innerHTML = '거래소에서 4티어 재료와 아크그리드 젬 최저가를 조회하는 중입니다.';
   try {
-    let data = await fetchMarketJson(`/api/market-prices?mode=t4Materials${force ? '&force=1' : ''}&_=${Date.now()}`);
-    if (!force && shouldForceRefreshMaterialPrices(data)) {
-      if (resultEl) resultEl.innerHTML = '캐시된 재료 시세에 매물 없음이 많아 최신 시세로 다시 조회하는 중입니다.';
-      data = await fetchMarketJson(`/api/market-prices?mode=t4Materials&force=1&_=${Date.now()}`);
-    }
+    const data = await fetchMarketJson(`/api/market-prices?mode=t4Materials${force ? '&force=1' : ''}`);
     renderMaterialPriceGrid(resultEl, data);
     marketListLoadState.material = 'loaded';
+    if (force) t4MaterialPriceCache = null;
+    rememberMarketRefresh('material', force);
   } catch (error) {
     marketListLoadState.material = 'idle';
     renderMarketError(resultEl, error.message);
   } finally {
-    if (button) { button.disabled = false; button.textContent = '새로고침'; }
+    updateMarketRefreshButtons();
   }
 }
 
-function shouldForceRefreshMaterialPrices(data) {
-  const items = Array.isArray(data?.items) ? data.items : [];
-  if (!items.length) return true;
-  const missingCount = items.filter(item => item?.missing || !Number(item?.price || 0)).length;
-  const importantNames = ['아비도스 융화제', '상급 아비도스 융화제', '빙하의 숨결', '용암의 숨결'];
-  const importantMissing = items.some(item => importantNames.includes(item?.requestedName || item?.name || '') && (item?.missing || !Number(item?.price || 0)));
-  return importantMissing || missingCount >= Math.max(3, Math.ceil(items.length * 0.25));
-}
-
-function marketRequestKey(url) {
-  const parsed = new URL(url, window.location.origin);
-  parsed.searchParams.delete('_');
-  parsed.searchParams.sort();
-  return `${parsed.pathname}?${parsed.searchParams.toString()}`;
-}
-
 async function fetchMarketJson(url) {
-  const key = marketRequestKey(url);
+  const key = canonicalMarketRequestKey(url, window.location.origin);
   const force = new URL(url, window.location.origin).searchParams.get('force') === '1';
   const cached = marketResponseCache.get(key);
   if (!force && cached?.expiresAt > Date.now()) return cached.data;
@@ -3797,10 +3963,10 @@ async function fetchMarketJson(url) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 75000);
     try {
-      const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+      const res = await fetch(url, { cache: 'default', signal: controller.signal });
       const data = await readJsonSafely(res);
       if (!res.ok || !data?.ok) throw new Error(data?.error || data?.message || '시세 조회 실패');
-      if (!force) marketResponseCache.set(key, { data, expiresAt: Date.now() + MARKET_CLIENT_CACHE_TTL_MS });
+      marketResponseCache.set(key, { data, expiresAt: Date.now() + MARKET_CLIENT_CACHE_TTL_MS });
       return data;
     } catch (error) {
       if (error?.name === 'AbortError') throw new Error('조회 시간이 초과되었습니다. 잠시 뒤 다시 누르면 서버 캐시 또는 다음 조회에서 더 빨리 응답할 수 있습니다.');
@@ -4018,6 +4184,7 @@ function renderRatioPanel() {
 }
 
 async function loadMarketCrystalPrice(force = false) {
+  if (!canForceMarketRefresh('crystal', force)) return;
   if (!force && marketListLoadState.crystal === 'loaded') return;
   if (!force && marketListLoadState.crystal === 'loading') return;
   const button = $('crystalListButton');
@@ -4029,11 +4196,12 @@ async function loadMarketCrystalPrice(force = false) {
     const data = await loadCrystalPrice(force);
     renderCrystalMarketPrice(resultEl, data);
     marketListLoadState.crystal = 'loaded';
+    rememberMarketRefresh('crystal', force);
   } catch (error) {
     marketListLoadState.crystal = 'idle';
     renderMarketError(resultEl, error.message || '크리스탈 시세를 불러오지 못했습니다.');
   } finally {
-    if (button) button.disabled = false;
+    updateMarketRefreshButtons();
   }
 }
 
@@ -4069,8 +4237,11 @@ if (!window.__lostarkCalculatorBootedV506) {
   window.addEventListener('resize', refreshFocusedNodeTooltip);
   initLegendAvatarTab();
   initMarketPriceTab();
+  setInterval(updateMarketRefreshButtons, 1000);
+  setInterval(updateCharacterRefreshButton, 1000);
   $('ratioSearchInput')?.addEventListener('input', renderRatioPanel);
   setActiveTab('calculator');
+  preloadMarketPriceLists();
   loadLostarkNoticeCard();
   loadClassBenchmarks();
   loadDb().catch((error) => setMessage(error.message || '진화 노드 데이터를 불러오지 못했습니다.'));

@@ -1,17 +1,20 @@
 import { isBoundGem } from '../public/gem-math.js';
 import { relicEngravingEffect } from '../public/engraving-math.js';
+import { CHARACTER_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
 
-const API_VERSION = '5.8.12';
+const API_VERSION = '5.8.17';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
-const CHARACTER_CACHE_TTL_MS = 60 * 1000;
+const CHARACTER_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const CHARACTER_CACHE_MAX_SIZE = 80;
 const characterCache = new Map();
 const characterInflight = new Map();
 
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=120');
   try {
     const name = String(req.query.name || '').trim();
+    const force = String(req.query.force || '') === '1';
+    const sharedTtlSeconds = Math.floor((force ? CHARACTER_REFRESH_COOLDOWN_MS : CHARACTER_CACHE_TTL_MS) / 1000);
+    res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${sharedTtlSeconds}`);
 
     if (!name) return res.status(400).json({ error: '캐릭터명을 입력하세요.' });
 
@@ -20,7 +23,7 @@ export default async function handler(req, res) {
 
     const cacheKey = name.toLowerCase();
     const cached = characterCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
+    if (!force && cached && cached.expiresAt > Date.now()) {
       return res.status(200).json({ ...cached.data, cached: true });
     }
 

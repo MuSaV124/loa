@@ -1,4 +1,6 @@
-const API_VERSION = '5.8.12';
+import { MARKET_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
+
+const API_VERSION = '5.8.17';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -85,11 +87,13 @@ const DESTINY_SHARD_POUCH_COUNTS = {
 };
 
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   try {
     const apiKey = process.env.LOSTARK_API_KEY;
     if (!apiKey) return res.status(500).json({ ok: false, error: 'Vercel 환경변수 LOSTARK_API_KEY가 없습니다.' });
     const mode = String(req.query.mode || '').trim();
+    const force = String(req.query.force || '') === '1';
+    const sharedTtlSeconds = Math.floor((force ? MARKET_REFRESH_COOLDOWN_MS : SHARED_PRICE_CACHE_TTL_MS) / 1000);
+    res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${sharedTtlSeconds}`);
     if (mode === 'accessory') return res.status(200).json(await searchAccessory(apiKey, req.query));
     if (mode === 'gem') return res.status(200).json(await searchGem(apiKey, req.query));
     if (mode === 'gemList') return res.status(200).json(await searchGemList(apiKey, req.query));
@@ -105,21 +109,21 @@ export default async function handler(req, res) {
 
 
 let auctionOptionCache = { expiresAt: 0, data: null };
-const ACCESSORY_CACHE_TTL_MS = 90 * 1000;
+const ACCESSORY_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const ACCESSORY_SCAN_TIME_BUDGET_MS = 54000;
 const LOSTARK_REQUEST_TIMEOUT_MS = 9000;
 const accessoryComboCache = new Map();
 const accessoryComboInflight = new Map();
 const marketListCache = new Map();
 const marketListInflight = new Map();
-const MARKET_LIST_CACHE_TTL_MS = 120 * 1000;
+const MARKET_LIST_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 
 async function getAuctionOptionDataCached(apiKey) {
   const now = Date.now();
   if (auctionOptionCache.data && auctionOptionCache.expiresAt > now) return auctionOptionCache.data;
   try {
     const data = await requestLostArk(apiKey, 'https://developer-lostark.game.onstove.com/auctions/options', { method: 'GET' });
-    auctionOptionCache = { data, expiresAt: now + 10 * 60 * 1000 };
+    auctionOptionCache = { data, expiresAt: now + SHARED_PRICE_CACHE_TTL_MS };
     return data;
   } catch {
     return null;

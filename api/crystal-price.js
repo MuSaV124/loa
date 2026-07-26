@@ -1,7 +1,9 @@
-const API_VERSION = '5.8.12';
+import { MARKET_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
+
+const API_VERSION = '5.8.17';
 const LOSPI_OHLC_URL = 'https://loatool.taeu.kr/api/crystal-history/ohlc/1h';
 const REQUEST_TIMEOUT_MS = 6500;
-const CACHE_TTL_MS = 60 * 1000;
+const CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const PHEON_PACKAGES = [
   { pheons: 1, crystals: 10, crystalPerPheon: 10 },
   { pheons: 30, crystals: 270, crystalPerPheon: 9 },
@@ -11,9 +13,10 @@ const PHEON_PACKAGES = [
 let cache = null;
 
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   try {
     const force = String(req.query.force || '') === '1';
+    const sharedTtlSeconds = Math.floor((force ? MARKET_REFRESH_COOLDOWN_MS : CACHE_TTL_MS) / 1000);
+    res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${sharedTtlSeconds}`);
     const now = Date.now();
     if (!force && cache && cache.expiresAt > now) {
       return res.status(200).json({ ...cache.data, cached: true });
