@@ -5,6 +5,7 @@ import {
   SHARED_PRICE_CACHE_TTL_MS,
   canonicalMarketRequestKey,
   formatCooldownClock,
+  isCompatibleCharacterCacheData,
   remainingCooldownMs
 } from '../public/cache-policy.js';
 
@@ -26,5 +27,10 @@ assert.equal(
   canonicalMarketRequestKey('/api/market-prices?combo=highHigh&part=necklace&mode=accessory'),
   '/api/market-prices?combo=highHigh&mode=accessory&part=necklace'
 );
+
+const currentCharacter = { ok: true, apiVersion: '5.9.3', profile: { CharacterName: '무사브' } };
+assert.equal(isCompatibleCharacterCacheData(currentCharacter, '5.9.3'), true);
+assert.equal(isCompatibleCharacterCacheData(currentCharacter, '5.9.2'), false);
+assert.equal(isCompatibleCharacterCacheData({ ...currentCharacter, apiVersion: undefined }, '5.9.3'), false);
 
 console.log('cache policy tests passed');

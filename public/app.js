@@ -1,21 +1,22 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.2';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.2';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.2';
-import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.9.2';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.2';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.2';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.2';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.2';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.3';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.3';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.3';
+import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.9.3';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.3';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.3';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.3';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.3';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
   SHARED_PRICE_CACHE_TTL_MS,
   canonicalMarketRequestKey,
   formatCooldownClock,
+  isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.9.2';
+} from './cache-policy.js?v=5.9.3';
 
-const VERSION = '5.9.2';
+const VERSION = '5.9.3';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -3776,7 +3777,7 @@ function normalizeCharacterCacheKey(name) {
 function getStoredCharacter(name) {
   const key = normalizeCharacterCacheKey(name);
   const entry = readStoredObject(CHARACTER_CACHE_STORAGE_KEY)[key];
-  if (!entry?.data?.ok || !entry?.data?.profile?.CharacterName) return null;
+  if (!isCompatibleCharacterCacheData(entry?.data, VERSION)) return null;
   return { data: entry.data, savedAt: Number(entry.savedAt || 0) };
 }
 
@@ -3813,7 +3814,7 @@ async function requestCharacterData(name, { force = false, maxAttempts = 2 } = {
   let lastError = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      const url = `/api/character?name=${encodeURIComponent(name)}${force ? '&force=1' : ''}`;
+      const url = `/api/character?name=${encodeURIComponent(name)}&appVersion=${encodeURIComponent(VERSION)}${force ? '&force=1' : ''}`;
       const res = await fetch(url, { cache: 'default' });
       const body = await res.text();
       let data = null;

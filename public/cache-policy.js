@@ -24,3 +24,11 @@ export function canonicalMarketRequestKey(url, baseUrl = 'http://localhost') {
   const query = parsed.searchParams.toString();
   return `${parsed.pathname}${query ? `?${query}` : ''}`;
 }
+
+export function isCompatibleCharacterCacheData(data, apiVersion) {
+  return Boolean(
+    data?.ok
+    && data?.profile?.CharacterName
+    && String(data?.apiVersion || '') === String(apiVersion || '')
+  );
+}

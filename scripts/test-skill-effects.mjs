@@ -60,7 +60,9 @@ const skills = [
     Tripods: [
       { Tier: 1, Slot: 0, Name: '치명타 강화', IsSelected: true, Tooltip: '치명타 피해가 60% 증가한다.' },
       { Tier: 2, Slot: 0, Name: '약점 노출', IsSelected: true, Tooltip: '적에게 주는 피해가 10% 증가한다.' },
-      { Tier: 3, Slot: 0, Name: '마력 증폭', IsSelected: true, Tooltip: '추가 피해가 20% 증가한다.' }
+      { Tier: 3, Slot: 0, Name: '마력 증폭', IsSelected: true, Tooltip: '추가 피해가 20% 증가한다.' },
+      { Tier: 3, Slot: 1, Name: '면역 대상 강화', IsSelected: true, Tooltip: '피격이상 면역인 적에게 주는 피해가 80% 증가한다.' },
+      { Tier: 3, Slot: 2, Name: '보스 대상 강화', IsSelected: true, Tooltip: '보스 등급 이상인 적에게 주는 피해가 70% 증가한다.' }
     ]
   },
   {
@@ -72,7 +74,7 @@ const skills = [
 const parsed = extractCombatSkillEffects(skills);
 assert.equal(parsed.items.length, 3);
 assert.equal(parsed.calculableItems.length, 2);
-assert.equal(parsed.selectedTripodCount, 7);
+assert.equal(parsed.selectedTripodCount, 9);
 assert.equal(parsed.ignoredCooldownCount, 2);
 assert.deepEqual(parsed.calculableItems[0].effects, {
   critRate: 33.2,
@@ -86,8 +88,9 @@ assert.deepEqual(parsed.calculableItems[0].effects, {
   skillDamage: 40
 });
 assert.equal(parsed.calculableItems[1].effects.critDamage, 60);
-assert.equal(parsed.calculableItems[1].effects.enemyDamage, 10);
+assert.equal(parsed.calculableItems[1].effects.enemyDamage, 0);
 assert.equal(parsed.calculableItems[1].effects.additionalDamage, 20);
+assert.equal(parsed.calculableItems[1].effects.skillDamage, 236.6, '트라이포드 전용 피해 10%, 80%, 70%는 곱연산 스킬 피해여야 한다.');
 assert.equal(hasSkillEffects(parsed.items[2].effects), false);
 assert.match(formatSkillEffectSummary(parsed.calculableItems[0].effects), /치적 \+33.2%/);
 assert.doesNotMatch(formatSkillEffectSummary(parsed.calculableItems[0].effects), /쿨/);

@@ -192,6 +192,14 @@ function parseSelectedTripod(tripod) {
       if (Math.abs(Number(parsed[key] || 0)) > Math.abs(Number(effects[key] || 0))) effects[key] = parsed[key];
     }
   }
+  // A tripod's "적에게 주는 피해" applies to that skill, not the character-wide
+  // enemy-damage bucket. Keep the exported text parser generic, then normalize it
+  // once the tooltip is known to belong to a selected tripod.
+  if (Math.abs(Number(effects.enemyDamage || 0)) > 0.0001) {
+    effects.skillDamage = ((1 + Number(effects.skillDamage || 0) / 100)
+      * (1 + Number(effects.enemyDamage || 0) / 100) - 1) * 100;
+    effects.enemyDamage = 0;
+  }
   for (const key of SKILL_EFFECT_KEYS) effects[key] = round2(effects[key]);
   return {
     tier: Number(tripod?.Tier || 0),
