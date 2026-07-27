@@ -1,10 +1,11 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.0';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.0';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.0';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.0';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.0';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.0';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.0';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.1';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.1';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.1';
+import { emptySkillEffectState, formatSkillEffectSummary } from './skill-effects.js?v=5.9.1';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.1';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.1';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.1';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.1';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -12,9 +13,9 @@ import {
   canonicalMarketRequestKey,
   formatCooldownClock,
   remainingCooldownMs
-} from './cache-policy.js?v=5.9.0';
+} from './cache-policy.js?v=5.9.1';
 
-const VERSION = '5.9.0';
+const VERSION = '5.9.1';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -54,6 +55,8 @@ const state = {
   engraving: emptyEngravingState(),
   arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
   enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] },
+  skillEffects: emptySkillEffectState(),
+  selectedSkillName: '',
   powerSnapshot: null,
   powerCostEstimates: [],
   combatPowerModel: null,
@@ -67,6 +70,37 @@ const state = {
   pendingSharedScenario: null
 };
 let simulatorRendered = false;
+
+function selectedSkillEffectItem() {
+  return (state.skillEffects?.calculableItems || []).find(item => item?.name === state.selectedSkillName) || null;
+}
+
+function renderSkillEffectControl() {
+  const select = $('skillEffectSelect');
+  const preview = $('skillEffectPreview');
+  if (!select || !preview) return;
+  const items = state.skillEffects?.calculableItems || [];
+  const previous = state.selectedSkillName;
+  select.innerHTML = [
+    '<option value="">적용 안 함</option>',
+    ...items.map(item => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}${Number(item.level || 0) ? ` Lv.${Number(item.level)}` : ''}</option>`)
+  ].join('');
+  state.selectedSkillName = items.some(item => item.name === previous) ? previous : '';
+  select.value = state.selectedSkillName;
+  const selected = selectedSkillEffectItem();
+  if (selected) {
+    preview.innerHTML = `<b>${escapeHtml(selected.name)}</b><span>${escapeHtml(formatSkillEffectSummary(selected.effects) || '계산 효과 없음')}</span>`;
+    preview.classList.remove('muted');
+    return;
+  }
+  const loadedCount = Number(state.skillEffects?.items?.length || 0);
+  const ignoredCooldownCount = Number(state.skillEffects?.ignoredCooldownCount || 0);
+  const status = loadedCount
+    ? `효과 확인 ${items.length}개${ignoredCooldownCount ? ` · 쿨감 제외 ${ignoredCooldownCount}개` : ''}`
+    : '캐릭터 검색 후 표시';
+  preview.innerHTML = `<b>대표 스킬 미적용</b><span>${escapeHtml(status)}</span>`;
+  preview.classList.add('muted');
+}
 
 function engravingItemByName(name) {
   return (state.engraving?.items || []).find(item => item?.name === name) || null;
@@ -330,7 +364,7 @@ const marketRequestInflight = new Map();
 const MARKET_CLIENT_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const MARKET_REFRESH_STORAGE_KEY = 'loa-market-refresh-v1';
 const MARKET_SNAPSHOT_STORAGE_KEY = 'loa-market-snapshot-v1';
-const CHARACTER_CACHE_STORAGE_KEY = 'loa-character-cache-v1';
+const CHARACTER_CACHE_STORAGE_KEY = 'loa-character-cache-v2';
 const CHARACTER_CACHE_MAX_ENTRIES = 20;
 const MARKET_REFRESH_BUTTON_IDS = {
   engraving: 'engravingListButton',
@@ -2929,7 +2963,9 @@ function getBaseStats(selection = state.selected) {
   const swiftSpeedBonus = speedFromSwift(swiftStat);
   const extraCritRate = num($('extraCritRate').value);
   const extraCritDamage = num($('extraCritDamage').value);
-  const skillCritDamage = 0;
+  const selectedSkill = selectedSkillEffectItem();
+  const selectedSkillEffects = selectedSkill?.effects || {};
+  const selectedSkillLabel = selectedSkill ? `스킬 · ${selectedSkill.name}` : '';
   const extraEvolutionDamage = num($('extraEvolutionDamage').value);
   const extraAdditionalDamage = num($('extraAdditionalDamage').value);
   const extraEnemyDamage = num($('extraEnemyDamage').value);
@@ -2945,8 +2981,8 @@ function getBaseStats(selection = state.selected) {
   const arkGridAttackSpeed = num(state.arkGrid.attackSpeed);
   const arkGridMoveSpeed = num(state.arkGrid.moveSpeed);
   const engravingAttackSpeed = num(engravingEffects.attackSpeed);
-  const attackSpeed = baseSpeed + swiftSpeedBonus + enlightenmentAttackSpeed + braceletAttackMoveSpeed + arkGridAttackSpeed + engravingAttackSpeed + extraAttackSpeed;
-  const moveSpeed = baseSpeed + swiftSpeedBonus + enlightenmentMoveSpeed + braceletAttackMoveSpeed + arkGridMoveSpeed + extraMoveSpeed;
+  const attackSpeed = baseSpeed + swiftSpeedBonus + enlightenmentAttackSpeed + braceletAttackMoveSpeed + arkGridAttackSpeed + engravingAttackSpeed + num(selectedSkillEffects.attackSpeed) + extraAttackSpeed;
+  const moveSpeed = baseSpeed + swiftSpeedBonus + enlightenmentMoveSpeed + braceletAttackMoveSpeed + arkGridMoveSpeed + num(selectedSkillEffects.moveSpeed) + extraMoveSpeed;
   const replacementEffects = { ...(engravingSimulation.replacementEffect || {}) };
   if (!engravingSimulation.adrenalineEnabled && engravingSimulation.replacementName === '돌격대장') {
     const moveSpeedRatio = Math.max(0, Math.min((moveSpeed - 100) / 40, 1));
@@ -2978,6 +3014,7 @@ function getBaseStats(selection = state.selected) {
   pushDamageSource(enemyDamageSources, '각인서/API', engravingEffects.enemyDamage);
   if (!engravingSimulation.adrenalineEnabled) pushDamageSource(enemyDamageSources, `${engravingSimulation.replacementName} · 조건 충족`, replacementEffects.conditionalDamage);
   pushDamageSource(enemyDamageSources, '어빌리티 스톤 각인 보너스', state.abilityStone?.effects?.enemyDamage);
+  if (selectedSkillLabel) pushDamageSource(enemyDamageSources, selectedSkillLabel, selectedSkillEffects.enemyDamage);
   pushDamageSource(enemyDamageSources, '추가 입력', extraEnemyDamage);
   pushDamageSource(enemyDamageSources, '백어택', backAttackEnemyDamage);
   const critHitDamageSources = [
@@ -2987,25 +3024,28 @@ function getBaseStats(selection = state.selected) {
   pushDamageSource(critHitDamageSources, '깨달음 · 회심', state.enlightenment.critHitDamage);
   pushDamageSource(critHitDamageSources, '각인서/API', engravingEffects.critHitDamage);
   pushDamageSource(critHitDamageSources, '어빌리티 스톤 각인 보너스', state.abilityStone?.effects?.critHitDamage);
+  if (selectedSkillLabel) pushDamageSource(critHitDamageSources, selectedSkillLabel, selectedSkillEffects.critHitDamage);
   return {
     critStat,
     swiftStat,
     statCritRate,
-    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.arkGrid.critRate) + num(engravingEffects.critRate) + num(state.abilityStone?.effects?.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate,
-    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.arkGrid.critDamage) + num(engravingEffects.critDamage) + num(state.abilityStone?.effects?.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage,
-    critHitDamage: num(state.accessory.critHitDamage) + num(state.bracelet.critHitDamage) + num(state.enlightenment.critHitDamage) + num(engravingEffects.critHitDamage) + num(state.abilityStone?.effects?.critHitDamage),
+    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.arkGrid.critRate) + num(engravingEffects.critRate) + num(state.abilityStone?.effects?.critRate) + num(selectedSkillEffects.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate,
+    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.arkGrid.critDamage) + num(engravingEffects.critDamage) + num(state.abilityStone?.effects?.critDamage) + num(selectedSkillEffects.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage,
+    critHitDamage: num(state.accessory.critHitDamage) + num(state.bracelet.critHitDamage) + num(state.enlightenment.critHitDamage) + num(engravingEffects.critHitDamage) + num(state.abilityStone?.effects?.critHitDamage) + num(selectedSkillEffects.critHitDamage),
     critHitDamageSources,
     evolutionDamage: num(state.enlightenment.evolutionDamage) + extraEvolutionDamage,
-    additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + num(state.arkGrid.additionalDamage) + num(engravingEffects.additionalDamage) + num(state.abilityStone?.effects?.additionalDamage) + extraAdditionalDamage,
+    additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + num(state.arkGrid.additionalDamage) + num(engravingEffects.additionalDamage) + num(state.abilityStone?.effects?.additionalDamage) + num(selectedSkillEffects.additionalDamage) + extraAdditionalDamage,
     enemyDamage: effectivePercentFromSources(enemyDamageSources),
     enemyDamageSources,
     skillCritBonus: 0,
+    skillDamage: num(selectedSkillEffects.skillDamage),
+    selectedSkill,
     critSynergy,
     backAttackCritRate,
     backAttackEnemyDamage,
     adrenalineCritRate: num(adrenalineEffect.critRate),
     adrenalineAttackPower: num(adrenalineEffect.attackPower),
-    attackPower: num(adrenalineEffect.attackPower) + num(state.abilityStone?.attackPower) + num(state.abilityStone?.effects?.attackPower) + num(engravingEffects.attackPower),
+    attackPower: num(adrenalineEffect.attackPower) + num(state.abilityStone?.attackPower) + num(state.abilityStone?.effects?.attackPower) + num(engravingEffects.attackPower) + num(selectedSkillEffects.attackPower),
     engravingDamageMultiplier,
     engravingEffects,
     replacementEngraving: engravingSimulation.adrenalineEnabled ? null : { name: engravingSimulation.replacementName, level: engravingSimulation.replacementBookLevel, effects: replacementEffects },
@@ -3016,6 +3056,8 @@ function getBaseStats(selection = state.selected) {
     arkGridAttackSpeed,
     arkGridMoveSpeed,
     engravingAttackSpeed,
+    skillAttackSpeed: num(selectedSkillEffects.attackSpeed),
+    skillMoveSpeed: num(selectedSkillEffects.moveSpeed),
     dynamicEnlightenmentCritRate,
     dynamicEnlightenmentCritDamage,
     baseMoveAttackSpeed: baseSpeed,
@@ -3107,6 +3149,7 @@ function score(stats) {
   const displayEnemyDamage = additivePercentFromSources(stats.enemyDamageSources);
   const displayCritHitDamage = additivePercentFromSources(critHitSources);
   const attackMultiplier = 1 + (stats.attackPower || 0) / 100;
+  const skillDamageMultiplier = 1 + (stats.skillDamage || 0) / 100;
   const engravingDamageMultiplier = Number(stats.engravingDamageMultiplier || 1);
   // v4.8.8: 쿨감의 이론 DPS 증가분을 사용자가 입력한 '주력기 딜 지분'만큼 반영.
   // 쿨감 효과 제외 체크 시 끝마/무마/최적화 훈련 등 모든 cooldownReduction은 점수에서 0으로 처리.
@@ -3116,8 +3159,8 @@ function score(stats) {
   const cooldownRatio = mainSkillDamageSharePct / 100;
   const theoreticalCooldownGain = cooldownReduction > 0 ? (1 / (1 - cooldownReduction / 100) - 1) : 0;
   const cooldownMultiplier = 1 + theoreticalCooldownGain * cooldownRatio;
-  const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier * engravingDamageMultiplier * cooldownMultiplier;
-  return { value, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, engravingDamageMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
+  const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier * skillDamageMultiplier * engravingDamageMultiplier * cooldownMultiplier;
+  return { value, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, skillDamageMultiplier, engravingDamageMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, skillDamage: stats.skillDamage || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
 }
 function cloneBaseStats(stats) {
   return {
@@ -3240,6 +3283,9 @@ function engravingAppliedDetailHtml() {
 
 function buildSourceSummary(current) {
   const base = getBaseStats();
+  const selectedSkill = base.selectedSkill;
+  const selectedSkillEffects = selectedSkill?.effects || {};
+  const selectedSkillLabel = selectedSkill ? `스킬 · ${selectedSkill.name}` : '';
   const critEvolution = [];
   const critDamageEvolution = [];
   const critHitEvolution = [];
@@ -3277,6 +3323,7 @@ function buildSourceSummary(current) {
   if (base.engravingEffects?.critRate) critLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.critRate));
   if (state.abilityStone?.effects?.critRate) critLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critRate));
   if (base.dynamicEnlightenmentCritRate) critLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritRate));
+  if (selectedSkillLabel && selectedSkillEffects.critRate) critLines.push(sourceLine(selectedSkillLabel, selectedSkillEffects.critRate));
   if (base.extraCritRate) critLines.push(sourceLine('추가 입력', base.extraCritRate));
   critLines.push(...critEvolution);
 
@@ -3288,6 +3335,7 @@ function buildSourceSummary(current) {
   if (base.engravingEffects?.critDamage) critDamageLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.critDamage));
   if (state.abilityStone?.effects?.critDamage) critDamageLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critDamage));
   if (base.dynamicEnlightenmentCritDamage) critDamageLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritDamage));
+  if (selectedSkillLabel && selectedSkillEffects.critDamage) critDamageLines.push(sourceLine(selectedSkillLabel, selectedSkillEffects.critDamage));
   if (base.extraCritDamage) critDamageLines.push(sourceLine('추가 입력', base.extraCritDamage));
   critDamageLines.push(...critDamageEvolution);
 
@@ -3308,6 +3356,7 @@ function buildSourceSummary(current) {
   if (state.arkGrid.additionalDamage) addLines.push(sourceLine('아크그리드', state.arkGrid.additionalDamage));
   if (base.engravingEffects?.additionalDamage) addLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.additionalDamage));
   if (state.abilityStone?.effects?.additionalDamage) addLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.additionalDamage));
+  if (selectedSkillLabel && selectedSkillEffects.additionalDamage) addLines.push(sourceLine(selectedSkillLabel, selectedSkillEffects.additionalDamage));
   if (base.extraAdditionalDamage) addLines.push(sourceLine('추가 입력', base.extraAdditionalDamage));
   addLines.push(...addEvolution);
 
@@ -3325,6 +3374,8 @@ function buildSourceSummary(current) {
   if (base.arkGridAttackSpeed) attackSpeedLines.push(sourceLine('아크그리드', base.arkGridAttackSpeed));
   if (base.arkGridMoveSpeed) moveSpeedLines.push(sourceLine('아크그리드', base.arkGridMoveSpeed));
   if (base.engravingAttackSpeed) attackSpeedLines.push(sourceLine('각인서/API', base.engravingAttackSpeed));
+  if (selectedSkillLabel && base.skillAttackSpeed) attackSpeedLines.push(sourceLine(selectedSkillLabel, base.skillAttackSpeed));
+  if (selectedSkillLabel && base.skillMoveSpeed) moveSpeedLines.push(sourceLine(selectedSkillLabel, base.skillMoveSpeed));
   if (base.extraAttackSpeed) attackSpeedLines.push(sourceLine('추가 입력', base.extraAttackSpeed));
   if (base.extraMoveSpeed) moveSpeedLines.push(sourceLine('추가 입력', base.extraMoveSpeed));
 
@@ -3336,6 +3387,7 @@ function buildSourceSummary(current) {
   if (base.engravingEffects?.enemyDamage) enemyLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.enemyDamage));
   if (base.replacementEngraving?.effects?.conditionalDamage) enemyLines.push(sourceLine(`${base.replacementEngraving.name} · 조건 충족`, base.replacementEngraving.effects.conditionalDamage));
   if (state.abilityStone?.effects?.enemyDamage) enemyLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.enemyDamage));
+  if (selectedSkillLabel && selectedSkillEffects.enemyDamage) enemyLines.push(sourceLine(selectedSkillLabel, selectedSkillEffects.enemyDamage));
   if (base.extraEnemyDamage) enemyLines.push(sourceLine('추가 입력', base.extraEnemyDamage));
   if (base.backAttackEnemyDamage) enemyLines.push(sourceLine('백어택', base.backAttackEnemyDamage));
   enemyLines.push(...enemyEvolution);
@@ -3345,6 +3397,10 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.attackPower) attackPowerLines.push(sourceLine('어빌리티 스톤', state.abilityStone.attackPower, '기본 공격력 보너스'));
   if (state.abilityStone?.effects?.attackPower) attackPowerLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.attackPower));
   if (base.engravingEffects?.attackPower) attackPowerLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.attackPower));
+  if (selectedSkillLabel && selectedSkillEffects.attackPower) attackPowerLines.push(sourceLine(selectedSkillLabel, selectedSkillEffects.attackPower));
+
+  const skillDamageLines = [];
+  if (selectedSkillLabel && selectedSkillEffects.skillDamage) skillDamageLines.push(sourceLine(selectedSkillLabel, selectedSkillEffects.skillDamage));
 
   const engravingExpectedLines = [];
   if (base.engravingDamageMultiplier !== 1) {
@@ -3359,6 +3415,7 @@ function buildSourceSummary(current) {
     ${sourceGroup('진피', 'orange', evoLines, current.result.evo)}
     ${sourceGroup('추피', 'green', addLines, current.result.additionalDamage)}
     ${sourceGroup('적주피', 'pink', enemyLines, current.result.enemyDamage)}
+    ${skillDamageLines.length ? sourceGroup('스킬 피해', 'orange', skillDamageLines, current.result.skillDamage) : ''}
     ${sourceGroup('공격력 증가', 'green', attackPowerLines, current.result.attackPower)}
     ${engravingExpectedLines.length ? sourceGroup('각인 기대값 보정', 'orange', engravingExpectedLines, (current.result.engravingDamageMultiplier - 1) * 100) : ''}
     ${sourceGroup('공격 속도', 'cyan', attackSpeedLines, current.result.attackSpeed)}
@@ -3663,6 +3720,7 @@ function saveStoredCharacter(name, data) {
   delete cacheableData.raw;
   delete cacheableData.equipment;
   delete cacheableData.gems;
+  delete cacheableData.skills;
   const savedAt = Date.now();
   entries[key] = { data: cacheableData, savedAt };
 
@@ -3748,6 +3806,9 @@ function resetCharacterResultState() {
   state.engraving = emptyEngravingState();
   state.arkGrid = { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   state.enlightenment = { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
+  state.skillEffects = emptySkillEffectState();
+  state.selectedSkillName = '';
+  renderSkillEffectControl();
   simulatorRendered = false;
   document.body.classList.remove('simulatorMode');
 }
@@ -3758,6 +3819,9 @@ function applyCharacterData(data) {
   state.abilityStone = data.abilityStoneEffects || { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
   state.engraving = data.engravingEffects || emptyEngravingState();
   state.arkGrid = data.arkGridEffects || { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+  state.skillEffects = data.skillEffects || emptySkillEffectState();
+  state.selectedSkillName = '';
+  renderSkillEffectControl();
   state.powerSnapshot = data.powerSnapshot || null;
   if (state.powerSnapshot?.profile && !state.powerSnapshot.profile.secondClass) {
     state.powerSnapshot.profile.secondClass = data.arkPassive?.Title || '';
@@ -3843,6 +3907,11 @@ $('characterRefreshButton')?.addEventListener('click', () => {
 $('characterName')?.addEventListener('input', updateCharacterRefreshButton);
 $('simulatorBackButton')?.addEventListener('click', closeSimulatorPage);
 EXTRA_EFFECT_INPUT_IDS.forEach(id => $(id).addEventListener('input', calculateAndRender));
+$('skillEffectSelect')?.addEventListener('change', event => {
+  state.selectedSkillName = event.currentTarget.value || '';
+  renderSkillEffectControl();
+  calculateAndRender();
+});
 $('adrenalineEnabled').addEventListener('change', () => { updateAdrenalineReplacementVisibility(); calculateAndRender(); });
 $('adrenalineBookLevel')?.addEventListener('change', () => { updateEngravingControlPreviews(); calculateAndRender(); });
 $('adrenalineReplacementName')?.addEventListener('change', () => {

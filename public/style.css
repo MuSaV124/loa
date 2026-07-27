@@ -3625,6 +3625,54 @@ select {
 .advancedInputBody {
   padding: 0 16px 16px;
 }
+.skillEffectPicker {
+  display: grid;
+  grid-template-columns: minmax(220px, .75fr) minmax(0, 1.25fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+.skillEffectPicker > label,
+.skillEffectPreview {
+  min-width: 0;
+  min-height: 78px;
+  border: 1px solid var(--softLine);
+  border-radius: 6px;
+  background: #0a111a;
+  padding: 10px;
+}
+.skillEffectPicker > label {
+  display: grid;
+  align-content: center;
+  gap: 7px;
+  color: #bfdbfe;
+  font-size: 12px;
+  font-weight: 850;
+}
+.skillEffectPicker select {
+  width: 100%;
+  min-width: 0;
+}
+.skillEffectPreview {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+}
+.skillEffectPreview b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #f8fafc;
+  font-size: 13px;
+}
+.skillEffectPreview span {
+  color: #9fd7ff;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.skillEffectPreview.muted span {
+  color: var(--muted);
+}
 .manualGrid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -3917,6 +3965,7 @@ body.simulatorMode .wrap {
     min-width: 96px;
   }
   .manualGrid,
+  .skillEffectPicker,
   .powerBuildGrid {
     grid-template-columns: 1fr;
   }

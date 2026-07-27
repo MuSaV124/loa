@@ -1,8 +1,9 @@
 import { isBoundGem } from '../public/gem-math.js';
 import { relicEngravingEffect } from '../public/engraving-math.js';
 import { CHARACTER_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
+import { extractCombatSkillEffects } from '../public/skill-effects.js';
 
-const API_VERSION = '5.8.20';
+const API_VERSION = '5.9.1';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -54,10 +55,12 @@ function setCharacterCache(key, data) {
 async function loadCharacterData(name, apiKey) {
   const url = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}?filters=profiles+equipment+arkpassive+engravings+gems`;
   const arkGridUrl = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}/arkgrid`;
+  const combatSkillsUrl = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}/combat-skills`;
 
-  const [response, arkGrid] = await Promise.all([
+  const [response, arkGrid, combatSkills] = await Promise.all([
     fetchJson(url, apiKey, 9000),
-    fetchOptionalJson(arkGridUrl, apiKey, 9000)
+    fetchOptionalJson(arkGridUrl, apiKey, 9000),
+    fetchOptionalJson(combatSkillsUrl, apiKey, 9000)
   ]);
 
   const data = response.data;
@@ -75,9 +78,11 @@ async function loadCharacterData(name, apiKey) {
   const abilityStoneEffects = extractAbilityStoneEffects(equipment);
   const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
   const arkGridEffects = extractArkGridEffects(arkGrid.data);
-  const powerSnapshot = buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, arkGrid: arkGrid.data });
+  const skills = Array.isArray(combatSkills.data) ? combatSkills.data : [];
+  const skillEffects = extractCombatSkillEffects(skills);
+  const powerSnapshot = buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, skillEffects, arkGrid: arkGrid.data });
 
-  return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, powerSnapshot, raw: data };
+  return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, gems, skills, skillEffects, skillEffectsError: combatSkills.error, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, powerSnapshot, raw: data };
 }
 
 async function fetchJson(url, apiKey, timeoutMs = 9000) {
@@ -160,7 +165,7 @@ function parseTooltip(tooltip) {
 const COMBAT_EQUIPMENT_TYPES = new Set(['무기', '투구', '상의', '하의', '장갑', '어깨']);
 const ACCESSORY_EQUIPMENT_TYPES = new Set(['목걸이', '귀걸이', '반지']);
 
-function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, arkGrid }) {
+function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, skillEffects, arkGrid }) {
   const equipmentSnapshot = extractEquipmentSnapshot(equipment);
   const gemSnapshot = extractGemSnapshot(gems);
   const arkGridSnapshot = extractArkGridSnapshot(arkGrid);
@@ -190,7 +195,13 @@ function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEff
       bracelet: braceletEffects,
       abilityStone: abilityStoneEffects,
       engraving: engravingEffects,
-      arkGrid: arkGridEffects
+      arkGrid: arkGridEffects,
+      skills: {
+        count: skillEffects?.items?.length || 0,
+        calculableCount: skillEffects?.calculableItems?.length || 0,
+        selectedTripodCount: skillEffects?.selectedTripodCount || 0,
+        ignoredCooldownCount: skillEffects?.ignoredCooldownCount || 0
+      }
     },
     coverage: {
       officialCombatPower: Boolean(profile?.CombatPower),
@@ -199,9 +210,12 @@ function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEff
       bracelet: Boolean(equipmentSnapshot.bracelet),
       abilityStone: Boolean(equipmentSnapshot.abilityStone),
       gems: gemSnapshot.items.length,
+      combatSkills: skillEffects?.items?.length || 0,
+      calculableSkills: skillEffects?.calculableItems?.length || 0,
       needsVerification: [
         '강화/상급재련은 장비 Tooltip 문구 기반 파싱이라 실제 샘플로 검증이 필요합니다.',
         '보석은 캐릭터 ArmoryGem 응답 기준으로 레벨/종류/스킬 연결을 구조화했습니다.',
+        '스킬 효과는 combat-skills의 실제 선택 트라이포드만 읽으며 재사용 대기시간 감소는 계산에서 제외합니다.',
         '공식 전투력 산식은 공개값이 아니므로 profile.CombatPower와 샘플 오차 검증으로 보정해야 합니다.'
       ]
     }
