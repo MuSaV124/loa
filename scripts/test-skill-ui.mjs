@@ -37,7 +37,13 @@ const server = createServer(async (req, res) => {
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const port = server.address().port;
 process.env.CHROME_LOG_FILE = join(tmpdir(), 'loa-skill-ui-chrome.log');
-const browser = await chromium.launch({ headless: true, args: ['--disable-gpu'] });
+const systemChromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+const chromePath = process.env.PLAYWRIGHT_CHROME_PATH || await access(systemChromePath).then(() => systemChromePath).catch(() => '');
+const browser = await chromium.launch({
+  headless: true,
+  args: ['--disable-gpu'],
+  ...(chromePath ? { executablePath: chromePath } : {})
+});
 
 const skillItem = {
   name: '표본 기술', icon: '', level: 14, type: '일반', skillType: 1,
@@ -72,7 +78,7 @@ const baselineSkillItem = {
 };
 const characterResponse = {
   ok: true,
-  apiVersion: '5.9.4',
+  apiVersion: '5.9.5',
   profile: {
     CharacterName: '스킬표본', CharacterClassName: '브레이커', ServerName: '아브렐슈드',
     ItemAvgLevel: '1,700.00', CombatPower: '5,000.00', CharacterImage: '',

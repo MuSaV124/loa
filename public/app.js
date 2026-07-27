@@ -1,11 +1,11 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.4';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.4';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.4';
-import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.4';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.4';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.4';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.4';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.4';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.5';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.5';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.5';
+import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.5';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.5';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.5';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.5';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.5';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -14,9 +14,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.9.4';
+} from './cache-policy.js?v=5.9.5';
 
-const VERSION = '5.9.4';
+const VERSION = '5.9.5';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2184,6 +2184,7 @@ function renderSpecScenarioComparison() {
   };
 }
 function renderSpecEfficiencyShell() {
+  const scenarioOpen = window.matchMedia('(min-width: 761px)').matches ? ' open' : '';
   return `<div class="powerSnapshotBlock powerEfficiencyPanel">
     <div class="powerCostHead">
       <div><h3>스펙업 효율 순위</h3><p>전투력 상승률과 기대 골드를 한 줄에서 비교합니다.</p></div>
@@ -2199,12 +2200,11 @@ function renderSpecEfficiencyShell() {
       </div>
       <div id="specPlannerOutput" class="specPlannerOutput"><p class="powerCostHint">후보 비용을 계산하는 중입니다.</p></div>
     </section>
-    <section class="specScenarioPanel">
-      <div class="specWorkspaceHead"><div><h4>A/B 비교</h4><p>A는 검색한 현재 세팅, B는 노드 변경과 선택한 스펙업 후보입니다.</p></div>
-        <div class="specScenarioActions"><button id="specScenarioSaveButton" type="button">B 저장</button><button id="specScenarioRestoreButton" type="button">불러오기</button><button id="specScenarioShareButton" type="button">공유 링크</button><button id="specScenarioClearButton" type="button">선택 해제</button></div>
-      </div>
+    <details class="specScenarioPanel"${scenarioOpen}>
+      <summary class="specScenarioSummary"><span><b>A/B 비교</b><small>A는 검색한 현재 세팅, B는 노드 변경과 선택한 스펙업 후보입니다.</small></span></summary>
+      <div class="specScenarioActions"><button id="specScenarioSaveButton" type="button">B 저장</button><button id="specScenarioRestoreButton" type="button">불러오기</button><button id="specScenarioShareButton" type="button">공유 링크</button><button id="specScenarioClearButton" type="button">선택 해제</button></div>
       <div id="specScenarioOutput" class="specScenarioOutput"></div>
-    </section>
+    </details>
     <div id="combatPowerCoverage" class="combatPowerCoverage"></div>
     <div class="specEfficiencyToolbar" role="group" aria-label="스펙업 종류">
       <button type="button" data-spec-filter="all" class="specEfficiencyFilter active">전체</button>
@@ -2375,8 +2375,9 @@ function renderSpecEfficiencyTable() {
       const confidenceMeta = specConfidenceMeta(row);
       const estimateKey = specEstimateKey(row);
       const scenarioChecked = state.specScenarioSelectedKeys.has(estimateKey) ? ' checked' : '';
+      const scenarioLabel = `${item.name || item.type || '스펙업'} ${stepMainText} B 비교에 적용`;
       const scenarioControl = row.available
-        ? `<label class="specScenarioPick" title="B 비교에 적용"><input type="checkbox" data-spec-scenario-key="${escapeHtml(estimateKey)}"${scenarioChecked}><span>B</span></label>`
+        ? `<label class="specScenarioPick" title="${escapeHtml(scenarioLabel)}"><input type="checkbox" aria-label="${escapeHtml(scenarioLabel)}" data-spec-scenario-key="${escapeHtml(estimateKey)}"${scenarioChecked}><span>B</span></label>`
         : '<span class="specScenarioPick disabled" aria-hidden="true">-</span>';
       return `<div class="specEfficiencyRow ${row.available ? '' : 'disabled'} confidence-${confidenceMeta.className}" data-category="${escapeHtml(row.category || '')}">
         <div class="specEfficiencyTarget">

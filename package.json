@@ -1,6 +1,6 @@
 {
   "name": "lostark-node-recommend-calculator",
-  "version": "5.9.4",
+  "version": "5.9.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,6 +17,7 @@
     "test:spec-planner": "node scripts/test-spec-planner.mjs",
     "test:skill-effects": "node scripts/test-skill-effects.mjs",
     "test:skill-ui": "node scripts/test-skill-ui.mjs",
+    "test:simulator-ui": "node scripts/test-simulator-ui.mjs",
     "update:class-benchmarks": "node scripts/update-class-benchmarks.mjs"
   },
   "dependencies": {
