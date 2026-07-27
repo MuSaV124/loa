@@ -3,6 +3,7 @@ import {
   extractCombatSkillEffects,
   formatSkillEffectSummary,
   hasSkillEffects,
+  minimumSkillEffectProfile,
   parseSkillEffectText,
   skillExperimentItems
 } from '../public/skill-effects.js';
@@ -95,6 +96,53 @@ assert.equal(hasSkillEffects(parsed.items[2].effects), false);
 assert.match(formatSkillEffectSummary(parsed.calculableItems[0].effects), /치적 \+33.2%/);
 assert.doesNotMatch(formatSkillEffectSummary(parsed.calculableItems[0].effects), /쿨/);
 
+const weatherCritProfile = minimumSkillEffectProfile({
+  items: [160, 180, 210].map((critDamage, index) => ({
+    name: `기상 주력기 ${index + 1}`,
+    level: 14,
+    effects: { critDamage },
+    selectedTripods: [{ name: '치명타 피해 증가' }]
+  }))
+});
+assert.equal(weatherCritProfile.effects.critDamage, 160, '같은 스킬 효과는 검출된 0이 아닌 값 중 최솟값을 적용해야 한다.');
+assert.equal(weatherCritProfile.itemCount, 3);
+
+const localPenaltyProfile = minimumSkillEffectProfile({
+  items: [
+    { name: '증가 효과', level: 14, effects: { skillDamage: 35 }, selectedTripods: [{ name: '증가' }] },
+    { name: '로컬 페널티', level: 14, effects: { skillDamage: -30, moveSpeed: -40 }, selectedTripods: [{ name: '감소' }] }
+  ]
+});
+assert.equal(localPenaltyProfile.effects.skillDamage, 35, '스킬 로컬 감소 효과를 추천 전체의 최소 증가치로 적용하면 안 된다.');
+assert.equal(localPenaltyProfile.effects.moveSpeed, 0);
+
+const speedDurationSkills = extractCombatSkillEffects([
+  {
+    Name: '시전 속도 전용', Level: 14,
+    Tripods: [{ Tier: 1, Slot: 0, Name: '재빠른 손놀림', IsSelected: true, Tooltip: '공격 속도가 36% 증가한다.' }]
+  },
+  {
+    Name: '지속 버프', Level: 14,
+    Tripods: [{ Tier: 1, Slot: 0, Name: '속도 강화', IsSelected: true, Tooltip: '공격 적중 시 6초 동안 공격 및 이동 속도가 8% 증가한다.' }]
+  }
+]);
+assert.equal(speedDurationSkills.items[0].timedSpeedEffects.attackSpeed, 0);
+assert.equal(speedDurationSkills.items[1].timedSpeedEffects.attackSpeed, 8);
+assert.equal(speedDurationSkills.items[1].timedSpeedEffects.moveSpeed, 8);
+const speedDurationProfile = minimumSkillEffectProfile(speedDurationSkills);
+assert.equal(speedDurationProfile.effects.attackSpeed, 8, '지속시간 없는 해당 스킬 시전 속도는 전역 추천에 적용하면 안 된다.');
+assert.equal(speedDurationProfile.effects.moveSpeed, 8);
+
+const maximumCritProfile = minimumSkillEffectProfile({
+  items: [40, 60, 100].map((critRate, index) => ({
+    name: `확정 치적 ${index + 1}`,
+    level: 14,
+    effects: { critRate },
+    selectedTripods: [{ name: '치적 증가' }]
+  }))
+});
+assert.equal(maximumCritProfile.effects.critRate, 100, '치적은 검출된 증가 수치 중 최대치를 추천에 적용해야 한다.');
+
 // 2026-07-27 LOAWA 실사용 통계에서 직업별 인기 스킬을 한 개씩 대조한 회귀 표본이다.
 // 파서는 직업명이나 스킬명 화이트리스트 없이 같은 공식 Tooltip 구조를 처리해야 한다.
 const loawaPopularSkillSamples = [
@@ -118,6 +166,7 @@ for (const [className, skillName] of loawaPopularSkillSamples) {
   }]);
   assert.equal(classResult.calculableItems[0]?.name, skillName, `${className} 실사용 스킬 표본 파싱 실패`);
   assert.equal(classResult.calculableItems[0]?.effects?.critRate, 10, `${className} 효과값 파싱 실패`);
+  assert.equal(minimumSkillEffectProfile(classResult).effects.critRate, 10, `${className} 추천 최소치 적용 실패`);
 }
 
 console.log('skill effect tests passed');

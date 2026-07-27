@@ -1,11 +1,11 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.3';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.3';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.3';
-import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.9.3';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.3';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.3';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.3';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.3';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.4';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.4';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.4';
+import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.4';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.4';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.4';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.4';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.4';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -14,9 +14,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.9.3';
+} from './cache-policy.js?v=5.9.4';
 
-const VERSION = '5.9.3';
+const VERSION = '5.9.4';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -83,6 +83,7 @@ function renderSkillEffectControl() {
   const preview = $('skillEffectPreview');
   if (!preview) return;
   const items = skillExperimentItems(state.skillEffects);
+  const minimumProfile = minimumSkillEffectProfile(state.skillEffects);
   const loadedCount = Number(state.skillEffects?.items?.length || 0);
   const conditionalCount = Number(state.skillEffects?.conditionalTripodCount || items.filter(isConditionalSkill).length);
   const ignoredCooldownCount = Number(state.skillEffects?.ignoredCooldownCount || 0);
@@ -92,7 +93,7 @@ function renderSkillEffectControl() {
     return;
   }
   const status = [
-    `동일 지분 ${items.length}개`,
+    `치적 최대 · 나머지 최소 ${minimumProfile.itemCount}개`,
     conditionalCount ? `조건 충족 ${conditionalCount}개` : '',
     ignoredCooldownCount ? `쿨감 제외 ${ignoredCooldownCount}개` : ''
   ].filter(Boolean).join(' · ');
@@ -102,7 +103,11 @@ function renderSkillEffectControl() {
     const detail = flags ? `${flags} · ${effectSummary}` : effectSummary;
     return `<div class="skillEffectRow"><b>${escapeHtml(item.name || '이름 없는 스킬')}${Number(item.level || 0) ? ` Lv.${Number(item.level)}` : ''}</b><span>${escapeHtml(detail)}</span></div>`;
   }).join('');
-  preview.innerHTML = `<div class="skillEffectHeading"><b>사용 스킬 자동 반영</b><span>${escapeHtml(status)}</span></div><div class="skillEffectRows">${rows || '<div class="skillEffectRow muted"><span>계산할 사용 스킬이 없습니다.</span></div>'}</div>`;
+  const minimumSummary = formatSkillEffectSummary(minimumProfile.effects) || '수치 효과 없음';
+  const minimumRow = minimumProfile.itemCount
+    ? `<div class="skillEffectRow"><b>추천 적용 기준값</b><span>${escapeHtml(minimumSummary)}</span></div>`
+    : '';
+  preview.innerHTML = `<div class="skillEffectHeading"><b>사용 스킬 자동 반영</b><span>${escapeHtml(status)}</span></div><div class="skillEffectRows">${minimumRow}${rows || '<div class="skillEffectRow muted"><span>계산할 사용 스킬이 없습니다.</span></div>'}</div>`;
   preview.classList.remove('muted');
 }
 
@@ -3090,6 +3095,7 @@ function applyEffect(stats, effect, sourceLabel = '진화') {
     );
     out.evolutionDamage += sonicDamage;
     out.sonicBreakEvolutionDamage = (out.sonicBreakEvolutionDamage || 0) + sonicDamage;
+    out.sonicBreakEffect = effect.sonicBreak;
   }
   if (effect.additionalDamage) out.additionalDamage += effect.additionalDamage;
   if (effect.enemyDamage) {
@@ -3156,7 +3162,7 @@ function scoreCore(stats) {
   const theoreticalCooldownGain = cooldownReduction > 0 ? (1 / (1 - cooldownReduction / 100) - 1) : 0;
   const cooldownMultiplier = 1 + theoreticalCooldownGain * cooldownRatio;
   const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier * skillDamageMultiplier * engravingDamageMultiplier * cooldownMultiplier;
-  return { value, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, skillDamageMultiplier, engravingDamageMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, skillDamage: stats.skillDamage || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
+  return { value, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, skillDamageMultiplier, engravingDamageMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, skillDamage: stats.skillDamage || 0, sonicBreakEvolutionDamage: stats.sonicBreakEvolutionDamage || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
 }
 
 function applyExperimentalSkillEffects(stats, item) {
@@ -3179,13 +3185,20 @@ function applyExperimentalSkillEffects(stats, item) {
   out.attackSpeed += num(effects.attackSpeed);
   out.moveSpeed += num(effects.moveSpeed);
   out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed);
+  if (out.sonicBreakEffect && (effects.attackSpeed || effects.moveSpeed)) {
+    const previousSonicDamage = num(out.sonicBreakEvolutionDamage);
+    const nextSonicDamage = calculateSonicBreakEvolutionDamage(out.attackSpeed, out.moveSpeed, out.sonicBreakEffect);
+    out.evolutionDamage += nextSonicDamage - previousSonicDamage;
+    out.sonicBreakEvolutionDamage = nextSonicDamage;
+  }
   return out;
 }
 
 function score(stats) {
   const baseResult = scoreCore(stats);
-  const items = skillExperimentItems(state.skillEffects);
-  if (!items.length || !baseResult.value) {
+  const minimumProfile = minimumSkillEffectProfile(state.skillEffects);
+  const items = minimumProfile.items;
+  if (!items.length || !hasNumericSkillEffects(minimumProfile.effects) || !baseResult.value) {
     return {
       ...baseResult,
       skillExperimentMultiplier: 1,
@@ -3207,20 +3220,27 @@ function score(stats) {
       convertedEvolutionDamage: result.convertedEvolutionDamage
     };
   });
-  const averageValue = rows.reduce((sum, row) => sum + row.value, 0) / rows.length;
-  const averageMultiplier = averageValue / baseResult.value;
+  const minimumResult = scoreCore(applyExperimentalSkillEffects(stats, {
+    name: '추천 적용 기준값',
+    effects: minimumProfile.effects
+  }));
+  const minimumMultiplier = minimumResult.value / baseResult.value;
   return {
-    ...baseResult,
-    value: averageValue,
-    skillExperimentMultiplier: averageMultiplier,
+    ...minimumResult,
+    skillExperimentMultiplier: minimumMultiplier,
     skillExperiment: {
       applied: true,
       count: rows.length,
       conditionalAssumed: true,
-      averageGain: (averageMultiplier - 1) * 100,
+      averageGain: (minimumMultiplier - 1) * 100,
+      appliedEffects: minimumProfile.effects,
       items: rows
     }
   };
+}
+
+function hasNumericSkillEffects(effects) {
+  return Object.values(effects || {}).some(value => Math.abs(Number(value || 0)) > 0.0001);
 }
 function cloneBaseStats(stats) {
   return {
@@ -3343,6 +3363,7 @@ function engravingAppliedDetailHtml() {
 
 function buildSourceSummary(current) {
   const base = getBaseStats();
+  const appliedSkillEffects = current.result?.skillExperiment?.appliedEffects || {};
   const critEvolution = [];
   const critDamageEvolution = [];
   const critHitEvolution = [];
@@ -3358,7 +3379,7 @@ function buildSourceSummary(current) {
     if (eff.critHitDamage) critHitEvolution.push(sourceLine(label + ' 치명타 적중 주피', eff.critHitDamage));
     if (eff.evolutionDamage) evoEvolution.push(sourceLine(label, eff.evolutionDamage));
     if (eff.sonicBreak) {
-      const sonicDamage = calculateSonicBreakEvolutionDamage(
+      const sonicDamage = Number(current.result.sonicBreakEvolutionDamage || 0) || calculateSonicBreakEvolutionDamage(
         current.stats.attackSpeed || current.stats.moveAttackSpeed || 100,
         current.stats.moveSpeed || current.stats.moveAttackSpeed || 100,
         eff.sonicBreak
@@ -3381,6 +3402,7 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.effects?.critRate) critLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critRate));
   if (base.dynamicEnlightenmentCritRate) critLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritRate));
   if (base.extraCritRate) critLines.push(sourceLine('추가 입력', base.extraCritRate));
+  if (appliedSkillEffects.critRate) critLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.critRate));
   critLines.push(...critEvolution);
 
   const critDamageLines = [sourceLine('기본 치명타 피해', 200)];
@@ -3392,10 +3414,12 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.effects?.critDamage) critDamageLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critDamage));
   if (base.dynamicEnlightenmentCritDamage) critDamageLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritDamage));
   if (base.extraCritDamage) critDamageLines.push(sourceLine('추가 입력', base.extraCritDamage));
+  if (appliedSkillEffects.critDamage) critDamageLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.critDamage));
   critDamageLines.push(...critDamageEvolution);
 
   const critHitLines = [];
   for (const src of current.stats.critHitDamageSources || []) critHitLines.push(sourceLine(src.label || '치명타 적중 주피', Number(src.value || 0)));
+  if (appliedSkillEffects.critHitDamage) critHitLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.critHitDamage));
   critHitLines.push(...critHitEvolution);
   if (!critHitLines.length && current.stats.critHitDamage) critHitLines.push(sourceLine('치명타 적중 주피', current.stats.critHitDamage));
 
@@ -3412,6 +3436,7 @@ function buildSourceSummary(current) {
   if (base.engravingEffects?.additionalDamage) addLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.additionalDamage));
   if (state.abilityStone?.effects?.additionalDamage) addLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.additionalDamage));
   if (base.extraAdditionalDamage) addLines.push(sourceLine('추가 입력', base.extraAdditionalDamage));
+  if (appliedSkillEffects.additionalDamage) addLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.additionalDamage));
   addLines.push(...addEvolution);
 
   const attackSpeedLines = [sourceLine('기본 + 만찬 + 서폿 진화', 114, '100% + 5% + 9%')];
@@ -3430,6 +3455,8 @@ function buildSourceSummary(current) {
   if (base.engravingAttackSpeed) attackSpeedLines.push(sourceLine('각인서/API', base.engravingAttackSpeed));
   if (base.extraAttackSpeed) attackSpeedLines.push(sourceLine('추가 입력', base.extraAttackSpeed));
   if (base.extraMoveSpeed) moveSpeedLines.push(sourceLine('추가 입력', base.extraMoveSpeed));
+  if (appliedSkillEffects.attackSpeed) attackSpeedLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.attackSpeed));
+  if (appliedSkillEffects.moveSpeed) moveSpeedLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.moveSpeed));
 
   const enemyLines = [];
   if (state.accessory.enemyDamage) enemyLines.push(sourceLine('악세', state.accessory.enemyDamage));
@@ -3441,6 +3468,7 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.effects?.enemyDamage) enemyLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.enemyDamage));
   if (base.extraEnemyDamage) enemyLines.push(sourceLine('추가 입력', base.extraEnemyDamage));
   if (base.backAttackEnemyDamage) enemyLines.push(sourceLine('백어택', base.backAttackEnemyDamage));
+  if (appliedSkillEffects.enemyDamage) enemyLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.enemyDamage));
   enemyLines.push(...enemyEvolution);
 
   const attackPowerLines = [];
@@ -3448,8 +3476,13 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.attackPower) attackPowerLines.push(sourceLine('어빌리티 스톤', state.abilityStone.attackPower, '기본 공격력 보너스'));
   if (state.abilityStone?.effects?.attackPower) attackPowerLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.attackPower));
   if (base.engravingEffects?.attackPower) attackPowerLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.attackPower));
+  if (appliedSkillEffects.attackPower) attackPowerLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.attackPower));
   const skillExperiment = current.result.skillExperiment || { items: [] };
-  const skillExperimentLines = (skillExperiment.items || []).map(row => {
+  const skillExperimentLines = [];
+  if (skillExperiment.applied) {
+    skillExperimentLines.push(sourceLine('추천 적용 기준값', skillExperiment.averageGain, formatSkillEffectSummary(skillExperiment.appliedEffects) || '수치 효과 없음'));
+  }
+  skillExperimentLines.push(...(skillExperiment.items || []).map(row => {
     const flags = [
       row.guaranteedCrit ? '확정 치명' : '',
       row.conditional ? '조건 충족' : '',
@@ -3457,7 +3490,7 @@ function buildSourceSummary(current) {
     ].filter(Boolean);
     const detail = [...flags, row.summary || '수치 효과 없음'].join(' · ');
     return sourceLine(`${row.name}${row.level ? ` Lv.${row.level}` : ''}`, row.gain, detail);
-  });
+  }));
 
   const engravingExpectedLines = [];
   if (base.engravingDamageMultiplier !== 1) {
@@ -3479,7 +3512,7 @@ function buildSourceSummary(current) {
     ${sourceGroup('이동 속도', 'cyan', moveSpeedLines, current.result.moveSpeed)}
     ${enlightenmentAppliedDetailHtml(base)}
     ${engravingAppliedDetailHtml()}
-    <div class="sourceFoot">UI의 치피·진피·추피는 합산 표시이며, 적주피·치명타 적중 주피는 내부 기대값에서 출처별 곱연산으로 적용됩니다. 스킬 효과 실험값은 <b>사용 스킬을 동일 지분으로 두고 조건부 효과를 충족한 값</b>이며 쿨감은 제외합니다. 확정 치명의 치적 +100%도 해당 스킬의 원시 치적에 더해 뭉가 초과 치적 전환에 사용합니다. 뭉가 Lv.2는 <b>기본 진피 15% + 초과 치적 전환 최대 60% = 총 75%</b> 기준입니다.</div>
+    <div class="sourceFoot">UI의 치피·진피·추피는 합산 표시이며, 적주피·치명타 적중 주피는 내부 기대값에서 출처별 곱연산으로 적용됩니다. 스킬 효과 실험값은 치적은 <b>확인된 증가 수치 중 최대치</b>, 나머지 효과는 <b>0보다 큰 증가 수치 중 최솟값</b>을 조건 충족 기준으로 추천 계산 전체에 적용하며 쿨감은 제외합니다. 공이속은 N초 동안/간 지속 문구가 있는 효과만 적용하고, 스킬 자체 속도와 감소 효과는 전역 적용하지 않습니다. 확정 치명의 치적 +100%도 뭉가 초과 치적 전환에 사용합니다. 뭉가 Lv.2는 <b>기본 진피 15% + 초과 치적 전환 최대 60% = 총 75%</b> 기준입니다.</div>
   `;
   const reset = $('resetViewButton');
   if (reset) reset.addEventListener('click', () => { state.selected = JSON.parse(JSON.stringify(state.apiSelected || {})); renderEvolutionTiers(); calculateAndRender(); });
@@ -3490,17 +3523,6 @@ function renderCombatStats(current = statsWithSelection(state.selected)) {
 }
 
 function keenEfficiency(current, bonusCritDamage) {
-  const skillRows = current?.result?.skillExperiment?.items || [];
-  if (skillRows.length && Number(current?.result?.value || 0) > 0) {
-    const afterValue = skillRows.reduce((sum, row) => {
-      const critRate = Math.max(0, Math.min(100, Number(row.effectiveCritRate || 0))) / 100;
-      const critDamage = Number(row.critDamage || 200);
-      const beforeCrit = (1 - critRate) + critRate * (critDamage / 100);
-      const afterCrit = (1 - critRate) + critRate * ((critDamage + bonusCritDamage) / 100);
-      return sum + Number(row.value || 0) * (beforeCrit ? afterCrit / beforeCrit : 1) * 0.98;
-    }, 0) / skillRows.length;
-    return ((afterValue / current.result.value) - 1) * 100;
-  }
   const critRate = Math.max(0, Math.min(100, Number(current?.result?.effectiveCritRate ?? current?.result?.critRate ?? 0))) / 100;
   const critDamage = Number(current?.result?.critDamage || 200);
   const before = (1 - critRate) + critRate * (critDamage / 100);

@@ -182,6 +182,10 @@ function hasGuaranteedCritWording(text, effects) {
     || /항상\s*치명타|확정\s*치명|치명타로\s*적중/gi.test(text);
 }
 
+function hasTimedSpeedWording(text) {
+  return /\d+(?:\.\d+)?\s*초\s*(?:동안|간)/i.test(text);
+}
+
 function parseSelectedTripod(tripod) {
   const texts = collectSkillTooltipTexts(tripod?.Tooltip);
   const joinedText = texts.join(' ');
@@ -207,6 +211,7 @@ function parseSelectedTripod(tripod) {
     name: String(tripod?.Name || '').trim(),
     icon: String(tripod?.Icon || '').trim(),
     effects,
+    timedSpeedBuff: hasTimedSpeedWording(joinedText) && Boolean(effects.attackSpeed || effects.moveSpeed),
     conditional: hasConditionalWording(joinedText),
     guaranteedCrit: hasGuaranteedCritWording(joinedText, effects),
     ignoredCooldown: texts.some(text => /재사용\s*대기시간|쿨타임|쿨다운/i.test(text))
@@ -227,6 +232,12 @@ export function extractCombatSkillEffects(skills) {
     for (const tripod of selectedTripods) mergeTripodEffects(merged, tripod.effects);
     merged.effects.skillDamage = round2((merged.skillDamageMultiplier - 1) * 100);
     for (const key of SKILL_EFFECT_KEYS) merged.effects[key] = round2(merged.effects[key]);
+    const timedSpeedEffects = { attackSpeed: 0, moveSpeed: 0 };
+    for (const tripod of selectedTripods.filter(row => row.timedSpeedBuff)) {
+      for (const key of ['attackSpeed', 'moveSpeed']) {
+        if (Math.abs(Number(tripod.effects?.[key] || 0)) > Math.abs(timedSpeedEffects[key])) timedSpeedEffects[key] = Number(tripod.effects[key]);
+      }
+    }
 
     const item = {
       name: String(skill?.Name || '').trim(),
@@ -235,6 +246,7 @@ export function extractCombatSkillEffects(skills) {
       type: String(skill?.Type || '').trim(),
       skillType: Number(skill?.SkillType || 0),
       effects: merged.effects,
+      timedSpeedEffects,
       conditional: selectedTripods.some(tripod => tripod.conditional),
       guaranteedCrit: selectedTripods.some(tripod => tripod.guaranteedCrit),
       selectedTripods
@@ -249,6 +261,25 @@ export function skillExperimentItems(skillEffects) {
   return (Array.isArray(skillEffects?.items) ? skillEffects.items : [])
     .filter(item => Number(item?.level || 0) > 0)
     .filter(item => (Array.isArray(item?.selectedTripods) && item.selectedTripods.length > 0) || hasSkillEffects(item?.effects));
+}
+
+export function minimumSkillEffectProfile(skillEffects) {
+  const items = skillExperimentItems(skillEffects).filter(item => hasSkillEffects(item?.effects));
+  const effects = emptyEffects();
+  const sources = {};
+  for (const key of SKILL_EFFECT_KEYS) {
+    const rows = items
+      .map(item => ({
+        name: item.name || '이름 없는 스킬',
+        value: Number((key === 'attackSpeed' || key === 'moveSpeed') ? item?.timedSpeedEffects?.[key] : item?.effects?.[key] || 0)
+      }))
+      .filter(row => Number.isFinite(row.value) && row.value > 0.0001);
+    if (!rows.length) continue;
+    const values = rows.map(row => row.value);
+    effects[key] = round2(key === 'critRate' ? Math.max(...values) : Math.min(...values));
+    sources[key] = rows;
+  }
+  return { effects, sources, items, itemCount: items.length };
 }
 
 export function formatSkillEffectSummary(effects) {
