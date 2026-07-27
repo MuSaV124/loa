@@ -3,7 +3,8 @@ import {
   extractCombatSkillEffects,
   formatSkillEffectSummary,
   hasSkillEffects,
-  parseSkillEffectText
+  parseSkillEffectText,
+  skillExperimentItems
 } from '../public/skill-effects.js';
 
 const direct = parseSkillEffectText(`
@@ -28,6 +29,21 @@ assert.equal(jointSpeed.skillDamage, 25);
 const critHit = parseSkillEffectText('치명타 적중 시 적에게 주는 피해가 15% 증가한다.');
 assert.equal(critHit.critHitDamage, 15);
 assert.equal(critHit.enemyDamage, 0, '치명타 적중 조건 피해를 일반 적주피로 중복 계산하면 안 된다.');
+
+const guaranteed = extractCombatSkillEffects([{
+  Name: '적룡포', Level: 14,
+  Tripods: [{
+    Tier: 3,
+    Slot: 0,
+    Name: '확정 치명 표본',
+    IsSelected: true,
+    Tooltip: '피격이상 면역인 적에게 공격 적중 시 치명타 적중률이 100% 증가하며 치명타 피해가 60% 증가한다.'
+  }]
+}]);
+assert.equal(guaranteed.calculableItems[0].guaranteedCrit, true);
+assert.equal(guaranteed.calculableItems[0].conditional, true);
+assert.equal(guaranteed.conditionalTripodCount, 1);
+assert.equal(skillExperimentItems(guaranteed).length, 1);
 
 const skills = [
   {

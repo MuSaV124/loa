@@ -3,7 +3,7 @@ import { relicEngravingEffect } from '../public/engraving-math.js';
 import { CHARACTER_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
 import { extractCombatSkillEffects } from '../public/skill-effects.js';
 
-const API_VERSION = '5.9.1';
+const API_VERSION = '5.9.2';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -200,6 +200,7 @@ function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEff
         count: skillEffects?.items?.length || 0,
         calculableCount: skillEffects?.calculableItems?.length || 0,
         selectedTripodCount: skillEffects?.selectedTripodCount || 0,
+        conditionalTripodCount: skillEffects?.conditionalTripodCount || 0,
         ignoredCooldownCount: skillEffects?.ignoredCooldownCount || 0
       }
     },

@@ -42,26 +42,38 @@ const browser = await chromium.launch({ headless: true, args: ['--disable-gpu'] 
 const skillItem = {
   name: '표본 기술', icon: '', level: 14, type: '일반', skillType: 1,
   effects: {
-    critRate: 10, critDamage: 40, critHitDamage: 5, additionalDamage: 12,
+    critRate: 100, critDamage: 40, critHitDamage: 5, additionalDamage: 12,
     enemyDamage: 8, attackPower: 6, attackSpeed: 4, moveSpeed: 3, skillDamage: 30
   },
-  selectedTripods: []
+  conditional: true,
+  guaranteedCrit: true,
+  selectedTripods: [{ tier: 3, slot: 0, name: '조건부 확정 치명', conditional: true, guaranteedCrit: true }]
+};
+const baselineSkillItem = {
+  name: '기본 기술', icon: '', level: 12, type: '일반', skillType: 1,
+  effects: {
+    critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0,
+    enemyDamage: 0, attackPower: 0, attackSpeed: 0, moveSpeed: 0, skillDamage: 0
+  },
+  conditional: false,
+  guaranteedCrit: false,
+  selectedTripods: [{ tier: 1, slot: 0, name: '일반 트라이포드' }]
 };
 const characterResponse = {
   ok: true,
-  apiVersion: '5.9.1',
+  apiVersion: '5.9.2',
   profile: {
     CharacterName: '스킬표본', CharacterClassName: '브레이커', ServerName: '아브렐슈드',
     ItemAvgLevel: '1,700.00', CombatPower: '5,000.00', CharacterImage: '',
     Stats: [{ Type: '치명', Value: '1500' }, { Type: '신속', Value: '900' }]
   },
-  arkPassive: { Title: '수라의 길', Effects: [] },
+  arkPassive: { Title: '수라의 길', Effects: [{ Name: '뭉툭한 가시', Level: 2, Description: '', Tooltip: '' }] },
   accessoryEffects: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
   braceletEffects: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
   abilityStoneEffects: { attackPower: 0, effects: {}, engravings: [], items: [] },
   engravingEffects: { effects: {}, items: [], adrenaline: { adopted: false, level: 0, critRate: 0, attackPower: 0 } },
   arkGridEffects: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
-  skillEffects: { items: [skillItem], calculableItems: [skillItem], selectedTripodCount: 3, ignoredCooldownCount: 1 },
+  skillEffects: { items: [skillItem, baselineSkillItem], calculableItems: [skillItem], selectedTripodCount: 2, conditionalTripodCount: 1, ignoredCooldownCount: 1 },
   powerSnapshot: null
 };
 
@@ -74,17 +86,22 @@ async function verifyViewport(viewport) {
   await page.getByRole('heading', { name: /스킬표본/ }).waitFor();
   await page.locator('.advancedInputDetails').evaluate(element => { element.open = true; });
 
-  const select = page.getByLabel('대표 스킬 효과');
-  await select.selectOption({ label: '표본 기술 Lv.14' });
-  await page.locator('#skillEffectPreview').getByText('치적 +10%').waitFor();
+  await page.locator('#skillEffectPreview').getByText('사용 스킬 자동 반영').waitFor();
   const preview = await page.locator('#skillEffectPreview').innerText();
+  assert.match(preview, /동일 지분 2개/);
+  assert.match(preview, /확정 치명/);
+  assert.match(preview, /조건 충족/);
+  assert.match(preview, /치적 \+100%/);
   assert.match(preview, /치피 \+40%/);
   assert.match(preview, /스킬 피해 \+30%/);
-  assert.doesNotMatch(preview, /쿨감|재사용 대기시간/);
+  assert.match(preview, /쿨감 제외 1개/);
+  assert.doesNotMatch(preview, /재사용 대기시간/);
 
   const source = await page.locator('#sourceSummary').textContent();
-  assert.match(source, /스킬 · 표본 기술/);
-  assert.match(source, /스킬 피해/);
+  assert.match(source, /스킬 효과 실험값/);
+  assert.match(source, /표본 기술/);
+  assert.match(source, /사용 스킬을 동일 지분/);
+  assert.match(source, /뭉가 전환/, '확정 치명 +100%가 뭉가 초과 치적 전환에 사용되어야 한다.');
   const layout = await page.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth }));
   assert.ok(layout.scrollWidth <= layout.width + 1, `${viewport.width}px 화면에서 가로 넘침: ${layout.scrollWidth} > ${layout.width}`);
   const screenshot = await page.screenshot({ fullPage: true });

@@ -68,7 +68,7 @@ function emptyEffects() {
 }
 
 export function emptySkillEffectState() {
-  return { items: [], calculableItems: [], selectedTripodCount: 0, ignoredCooldownCount: 0 };
+  return { items: [], calculableItems: [], selectedTripodCount: 0, conditionalTripodCount: 0, ignoredCooldownCount: 0 };
 }
 
 function decodeEntities(value) {
@@ -173,8 +173,18 @@ function mergeTripodEffects(target, source) {
   }
 }
 
+function hasConditionalWording(text) {
+  return /(?:적중|공격|스킬|사용|유지|차지|홀딩|폭주|변신|스탠스|게이지|생명력)[^.!?]{0,28}(?:시|동안|경우)|(?:이상|이하)일?\s*때|피격이상\s*면역|백어택|헤드어택|보스\s*등급|조건/gi.test(text);
+}
+
+function hasGuaranteedCritWording(text, effects) {
+  return Number(effects?.critRate || 0) >= 99.99
+    || /항상\s*치명타|확정\s*치명|치명타로\s*적중/gi.test(text);
+}
+
 function parseSelectedTripod(tripod) {
   const texts = collectSkillTooltipTexts(tripod?.Tooltip);
+  const joinedText = texts.join(' ');
   const effects = emptyEffects();
   for (const text of texts) {
     const parsed = parseSkillEffectText(text);
@@ -189,6 +199,8 @@ function parseSelectedTripod(tripod) {
     name: String(tripod?.Name || '').trim(),
     icon: String(tripod?.Icon || '').trim(),
     effects,
+    conditional: hasConditionalWording(joinedText),
+    guaranteedCrit: hasGuaranteedCritWording(joinedText, effects),
     ignoredCooldown: texts.some(text => /재사용\s*대기시간|쿨타임|쿨다운/i.test(text))
   };
 }
@@ -200,6 +212,7 @@ export function extractCombatSkillEffects(skills) {
       .filter(tripod => tripod?.IsSelected === true)
       .map(parseSelectedTripod);
     result.selectedTripodCount += selectedTripods.length;
+    result.conditionalTripodCount += selectedTripods.filter(tripod => tripod.conditional).length;
     result.ignoredCooldownCount += selectedTripods.filter(tripod => tripod.ignoredCooldown).length;
 
     const merged = { effects: emptyEffects(), skillDamageMultiplier: 1 };
@@ -214,12 +227,20 @@ export function extractCombatSkillEffects(skills) {
       type: String(skill?.Type || '').trim(),
       skillType: Number(skill?.SkillType || 0),
       effects: merged.effects,
+      conditional: selectedTripods.some(tripod => tripod.conditional),
+      guaranteedCrit: selectedTripods.some(tripod => tripod.guaranteedCrit),
       selectedTripods
     };
     result.items.push(item);
     if (hasSkillEffects(item.effects)) result.calculableItems.push(item);
   }
   return result;
+}
+
+export function skillExperimentItems(skillEffects) {
+  return (Array.isArray(skillEffects?.items) ? skillEffects.items : [])
+    .filter(item => Number(item?.level || 0) > 0)
+    .filter(item => (Array.isArray(item?.selectedTripods) && item.selectedTripods.length > 0) || hasSkillEffects(item?.effects));
 }
 
 export function formatSkillEffectSummary(effects) {

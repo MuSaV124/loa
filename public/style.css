@@ -3626,45 +3626,65 @@ select {
   padding: 0 16px 16px;
 }
 .skillEffectPicker {
-  display: grid;
-  grid-template-columns: minmax(220px, .75fr) minmax(0, 1.25fr);
-  gap: 10px;
+  display: block;
   margin-top: 14px;
 }
-.skillEffectPicker > label,
 .skillEffectPreview {
   min-width: 0;
-  min-height: 78px;
   border: 1px solid var(--softLine);
   border-radius: 6px;
   background: #0a111a;
-  padding: 10px;
-}
-.skillEffectPicker > label {
-  display: grid;
-  align-content: center;
-  gap: 7px;
-  color: #bfdbfe;
-  font-size: 12px;
-  font-weight: 850;
-}
-.skillEffectPicker select {
-  width: 100%;
-  min-width: 0;
+  padding: 12px;
 }
 .skillEffectPreview {
   display: grid;
-  align-content: center;
-  gap: 6px;
+  gap: 10px;
 }
-.skillEffectPreview b {
+.skillEffectHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.skillEffectHeading b,
+.skillEffectPreview > b {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #f8fafc;
   font-size: 13px;
 }
-.skillEffectPreview span {
+.skillEffectHeading span,
+.skillEffectPreview > span {
+  color: #9fd7ff;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.skillEffectRows {
+  display: grid;
+  max-height: 246px;
+  overflow-y: auto;
+  border-top: 1px solid var(--softLine);
+}
+.skillEffectRow {
+  display: grid;
+  grid-template-columns: minmax(120px, .4fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 8px 2px;
+  border-bottom: 1px solid rgba(148, 163, 184, .12);
+}
+.skillEffectRow:last-child {
+  border-bottom: 0;
+}
+.skillEffectRow b {
+  color: #f8fafc;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.skillEffectRow span {
   color: #9fd7ff;
   font-size: 12px;
   line-height: 1.45;
@@ -3968,6 +3988,15 @@ body.simulatorMode .wrap {
   .skillEffectPicker,
   .powerBuildGrid {
     grid-template-columns: 1fr;
+  }
+  .skillEffectHeading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .skillEffectRow {
+    grid-template-columns: 1fr;
+    gap: 3px;
   }
   .combatPowerCoverage {
     align-items: flex-start;
