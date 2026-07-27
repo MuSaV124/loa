@@ -1,9 +1,10 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.8.20';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.8.20';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.8.20';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.8.20';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.8.20';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.8.20';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.0';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.0';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.0';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.0';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.0';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.0';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.0';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -11,9 +12,9 @@ import {
   canonicalMarketRequestKey,
   formatCooldownClock,
   remainingCooldownMs
-} from './cache-policy.js?v=5.8.20';
+} from './cache-policy.js?v=5.9.0';
 
-const VERSION = '5.8.20';
+const VERSION = '5.9.0';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -37,7 +38,34 @@ function emptyEngravingState() {
 
 const $ = (id) => document.getElementById(id);
 const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
-const state = { evolution: null, index: new Map(), selected: {}, apiSelected: {}, foundEffects: [], profileStats: { crit: 0, swift: 0, spec: 0 }, accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] }, engraving: emptyEngravingState(), arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] }, enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] }, powerSnapshot: null, powerCostEstimates: [], combatPowerModel: null, classBenchmarks: null, specEfficiencyFilter: 'all' };
+const SPEC_OWNED_STORAGE_KEY = 'loa.specOwnedMaterials.v1';
+const SPEC_SCENARIO_STORAGE_KEY = 'loa.specScenario.v1';
+const initialOwnedMaterials = normalizeOwnedMaterials(readStoredObject(SPEC_OWNED_STORAGE_KEY));
+const state = {
+  evolution: null,
+  index: new Map(),
+  selected: {},
+  apiSelected: {},
+  foundEffects: [],
+  profileStats: { crit: 0, swift: 0, spec: 0 },
+  accessory: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
+  bracelet: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
+  abilityStone: { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] },
+  engraving: emptyEngravingState(),
+  arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
+  enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] },
+  powerSnapshot: null,
+  powerCostEstimates: [],
+  combatPowerModel: null,
+  classBenchmarks: null,
+  specEfficiencyFilter: 'all',
+  ownedMaterials: initialOwnedMaterials,
+  specPlannerMode: 'target',
+  specPlannerTarget: 0,
+  specPlannerBudget: 1000000,
+  specScenarioSelectedKeys: new Set(),
+  pendingSharedScenario: null
+};
 let simulatorRendered = false;
 
 function engravingItemByName(name) {
@@ -979,7 +1007,6 @@ function advancedHoningTemperingMaterial(item) {
 function costMaterialNamesForGear(item) {
   const rule = classifyT4GearCostRule(item);
   const slot = isWeaponGear(item) ? 'weapon' : 'armor';
-  if (isLimitBreakGrowth(item, rule)) return [...(rule.limitBreakMaterials || [])];
   const advancedRow = advancedHoningAttemptRowForGear(item);
   const advancedNames = Object.keys(advancedRow?.materials || {}).filter(name => name !== '골드' && name !== '실링');
   const tempering = advancedHoningTemperingMaterial(item);
@@ -989,6 +1016,7 @@ function costMaterialNamesForGear(item) {
     rule.leapstone,
     rule.fusion,
     ...(rule.books?.[slot] || []),
+    ...(isLimitBreakGrowth(item, rule) ? rule.limitBreakMaterials || [] : []),
     ...advancedNames,
     tempering?.name
   ];
@@ -1035,25 +1063,28 @@ function addMaterialAmount(target, name, amount) {
 function mergedNextNormalRefineMaterials(item) {
   const attemptRow = normalCostRowForGear(item, normalRefineCostSetForGear(item));
   if (!attemptRow) return null;
-  const materials = {};
-  for (const [name, amount] of Object.entries(attemptRow.materials || {})) addMaterialAmount(materials, name, amount);
+  const attemptMaterials = { ...(attemptRow.materials || {}) };
+  const growthMaterials = {};
   const growthRow = normalCostRowForGear(item, normalGrowthCostSetForGear(item));
   if (growthRow) {
-    addMaterialAmount(materials, '운명의 파편', growthRow.fragment);
-    addMaterialAmount(materials, '실링', growthRow.silver);
+    addMaterialAmount(growthMaterials, '운명의 파편', growthRow.fragment);
+    addMaterialAmount(growthMaterials, '실링', growthRow.silver);
   }
-  return { from: attemptRow.from, to: attemptRow.to, materials, hasGrowth: Boolean(growthRow) };
+  const rule = classifyT4GearCostRule(item);
+  const growthDataMissing = isLimitBreakGrowth(item, rule) && !growthRow;
+  return {
+    from: attemptRow.from,
+    to: attemptRow.to,
+    attemptMaterials,
+    growthMaterials,
+    materials: mergeMaterials(growthMaterials, attemptMaterials),
+    hasGrowth: Boolean(growthRow) || growthDataMissing,
+    growthDataMissing,
+    growthLabel: growthDataMissing ? rule.limitBreakLabel : growthRow ? rule.growthLabel : ''
+  };
 }
-function materialCostCheckboxNames(name) {
-  if (name === '운명의 파편') return ['운명의 파편 주머니(소)', '운명의 파편 주머니(중)', '운명의 파편 주머니(대)'];
-  return [name];
-}
-function isMaterialCostEnabled(name) {
-  const rows = materialCostCheckboxNames(name)
-    .map(key => document.querySelector(`.powerCostMaterial[data-material-name="${CSS.escape(key)}"] input`))
-    .filter(Boolean);
-  if (!rows.length) return true;
-  return rows.some(input => input.checked);
+function ownedMaterialKey(name) {
+  return String(name || '').startsWith('운명의 파편 주머니') ? '운명의 파편' : name;
 }
 function marketItemForMaterial(priceMap, name) {
   if (!priceMap) return null;
@@ -1072,7 +1103,9 @@ function unitGoldForMaterial(priceMap, name) {
   if (name === '운명의 파편') return Number(item.shardUnitPrice || 0);
   return Number(item.effectiveUnitPrice || item.unitPrice || item.price || 0);
 }
-function calculateMaterialGoldCost(materials, priceMap) {
+function calculateMaterialGoldCost(materials, priceMap, options = {}) {
+  const ownedMaterials = normalizeOwnedMaterials(options.ownedMaterials ?? state.ownedMaterials);
+  const allocation = allocateOwnedMaterials(materials, ownedMaterials);
   const rows = [];
   let tradeGold = 0;
   let fixedGold = 0;
@@ -1090,13 +1123,33 @@ function calculateMaterialGoldCost(materials, priceMap) {
       rows.push({ name, required: qty, unitGold: 0, gold: 0, silver: true });
       continue;
     }
-    const enabled = isMaterialCostEnabled(name);
-    const unitGold = enabled ? unitGoldForMaterial(priceMap, name) : 0;
-    const gold = qty * unitGold;
+    const purchased = Number(allocation.purchasedMaterials?.[name] || 0);
+    const ownedUsed = Number(allocation.ownedUsed?.[name] || 0);
+    const boundOnly = BOUND_ONLY_MATERIALS.has(name);
+    const unitGold = boundOnly ? 0 : unitGoldForMaterial(priceMap, name);
+    const gold = purchased * unitGold;
     tradeGold += gold;
-    rows.push({ name, required: qty, unitGold, gold, enabled, missingPrice: enabled && !unitGold });
+    rows.push({
+      name,
+      required: qty,
+      purchased,
+      ownedUsed,
+      unitGold,
+      gold,
+      boundOnly,
+      boundShortage: boundOnly && purchased > 0,
+      missingPrice: !boundOnly && purchased > 0 && !unitGold
+    });
   }
-  return { rows, tradeGold, fixedGold, silver, totalGold: tradeGold + fixedGold };
+  return {
+    rows,
+    tradeGold,
+    fixedGold,
+    silver,
+    totalGold: tradeGold + fixedGold,
+    ownedUsed: allocation.ownedUsed,
+    remainingOwned: allocation.remainingOwned
+  };
 }
 function normalHoningBaseRatePercent(next) {
   const from = Number(next?.from || 0);
@@ -1180,13 +1233,12 @@ function describeNormalHoningStrategy(strategy) {
   if (strategy?.bookName) parts.push(strategy.useBook ? '책 사용' : '책 미사용');
   return parts.length ? parts.join(' · ') : '보조재료 없음';
 }
-function calculateNormalHoningExpectedCostForStrategy(cost, next, strategy = {}) {
+function calculateNormalHoningAttemptStats(next, strategy = {}) {
   const ratePercent = normalHoningBaseRatePercent(next);
   const supportRatePercent = normalHoningSupportRatePercent(ratePercent, strategy);
   const pityAttempts = normalHoningPityAttempts(ratePercent, supportRatePercent);
   const expectedAttempts = expectedAttemptsWithPity(ratePercent, pityAttempts, supportRatePercent);
   const rateSchedule = buildNormalHoningRateSchedule(ratePercent, Math.min(pityAttempts, 11), supportRatePercent);
-  const totalGold = Number(cost?.totalGold || 0);
   return {
     ratePercent,
     supportRatePercent,
@@ -1194,26 +1246,51 @@ function calculateNormalHoningExpectedCostForStrategy(cost, next, strategy = {})
     expectedAttempts,
     maxRatePercent: normalHoningAttemptRatePercent(ratePercent, 11, supportRatePercent),
     rateSchedule,
-    expectedGold: totalGold > 0 && expectedAttempts > 0 ? totalGold * expectedAttempts : 0,
     basis: ratePercent > 0 ? 'support-optimized-fail-bonus-with-artisan' : 'missing-base-rate'
   };
 }
 function calculateNormalHoningExpectedCost(baseMaterials, next, priceMap) {
-  const optional = normalHoningOptionalNames(next.materials);
-  const maxBreath = Math.floor(Number(optional.breathName ? next.materials?.[optional.breathName] : 0) || 0);
+  const optional = normalHoningOptionalNames(next.attemptMaterials || next.materials);
+  const maxBreath = Math.floor(Number(optional.breathName ? next.attemptMaterials?.[optional.breathName] : 0) || 0);
   const bookOptions = optional.bookName ? [false, true] : [false];
   const rows = [];
   const breathOptions = maxBreath > 0 ? [0, maxBreath] : [0];
   for (const breathCount of breathOptions) {
     for (const useBook of bookOptions) {
       const strategy = { breathCount, maxBreath, useBook, bookName: optional.bookName };
-      const materials = buildNormalHoningStrategyMaterials(baseMaterials, optional, strategy);
-      const cost = calculateMaterialGoldCost(materials, priceMap);
-      const expected = calculateNormalHoningExpectedCostForStrategy(cost, next, strategy);
-      rows.push({ strategy, materials, cost, expectedCost: expected, label: describeNormalHoningStrategy(strategy) });
+      const attemptMaterials = buildNormalHoningStrategyMaterials(baseMaterials, optional, strategy);
+      const attemptStats = calculateNormalHoningAttemptStats(next, strategy);
+      const scenarioCost = attempts => {
+        const materials = buildHoningScenarioMaterials(next.growthMaterials || {}, attemptMaterials, attempts);
+        const cost = calculateMaterialGoldCost(materials, priceMap);
+        return { materials, cost };
+      };
+      const lucky = scenarioCost(1);
+      const expected = scenarioCost(attemptStats.expectedAttempts);
+      const pity = scenarioCost(attemptStats.pityAttempts);
+      rows.push({
+        strategy,
+        materials: attemptMaterials,
+        cost: lucky.cost,
+        expectedCost: {
+          ...attemptStats,
+          expectedGold: expected.cost.totalGold,
+          expectedSilver: expected.cost.silver,
+          expectedMaterials: expected.materials,
+          expectedCostRows: expected.cost.rows,
+          luckyGold: lucky.cost.totalGold,
+          luckySilver: lucky.cost.silver,
+          pityGold: pity.cost.totalGold,
+          pitySilver: pity.cost.silver
+        },
+        label: describeNormalHoningStrategy(strategy)
+      });
     }
   }
   rows.sort((a, b) => {
+    const aMissing = (a.expectedCost?.expectedCostRows || []).some(row => row.missingPrice || row.boundShortage);
+    const bMissing = (b.expectedCost?.expectedCostRows || []).some(row => row.missingPrice || row.boundShortage);
+    if (aMissing !== bMissing) return aMissing ? 1 : -1;
     const av = Number(a.expectedCost?.expectedGold || 0) || Infinity;
     const bv = Number(b.expectedCost?.expectedGold || 0) || Infinity;
     return av - bv;
@@ -1418,14 +1495,23 @@ function calculateNextNormalRefineEstimates(snapshot, priceMap) {
         to: Number(item?.honingLevel || 0) + 1
       };
     }
-    const optional = normalHoningOptionalNames(next.materials);
-    const baseMaterials = cloneMaterialsWithoutOptional(next.materials, optional);
+    const optional = normalHoningOptionalNames(next.attemptMaterials);
+    const baseMaterials = cloneMaterialsWithoutOptional(next.attemptMaterials, optional);
     const optimized = calculateNormalHoningExpectedCost(baseMaterials, next, priceMap);
-    const cost = optimized?.cost || calculateMaterialGoldCost(baseMaterials, priceMap);
+    const cost = optimized?.cost || calculateMaterialGoldCost(mergeMaterials(next.growthMaterials, baseMaterials), priceMap);
     const powerEstimate = estimateNormalHoningPowerDelta(item, snapshot, next);
-    const expectedCost = optimized?.expectedCost || calculateNormalHoningExpectedCostForStrategy(cost, next);
+    const expectedCost = optimized?.expectedCost || { expectedGold: cost.totalGold, expectedSilver: cost.silver, expectedMaterials: next.materials, expectedCostRows: cost.rows };
     const powerVerified = Number(powerEstimate.value || 0) > 0;
-    return { category: 'normalHoning', item, available: powerVerified, reason: powerVerified ? '' : '현재 직업·부위·강화 구간 전투력 미검증', ...next, cost, expectedCost, supportStrategy: optimized?.strategy || null, supportLabel: optimized?.label || '보조재료 없음', powerDelta: powerEstimate.value, powerEstimate };
+    const missingPrice = (expectedCost.expectedCostRows || []).some(row => row.missingPrice);
+    const available = powerVerified && !next.growthDataMissing && !missingPrice && Number(expectedCost.expectedGold || 0) > 0;
+    const reason = next.growthDataMissing
+      ? '한계돌파 고통의 가시·실링 수량표 미입력'
+      : !powerVerified
+      ? '현재 직업·부위·강화 구간 전투력 미검증'
+      : missingPrice
+      ? '필수 재료 시세 없음'
+      : '';
+    return { category: 'normalHoning', item, available, reason, ...next, cost, expectedCost, supportStrategy: optimized?.strategy || null, supportLabel: optimized?.label || '보조재료 없음', powerDelta: powerEstimate.value, powerEstimate };
   });
 }
 function estimateAdvancedHoningPowerDelta(item, snapshot, levels = 1) {
@@ -1450,8 +1536,8 @@ function advancedHoningOptionalCosts(materials, priceMap) {
   const optional = normalHoningOptionalNames(materials);
   const breathAmount = Number(optional.breathName ? materials?.[optional.breathName] : 0) || 0;
   const bookAmount = Number(optional.bookName ? materials?.[optional.bookName] : 0) || 0;
-  const breathCost = optional.breathName ? calculateMaterialGoldCost({ [optional.breathName]: breathAmount }, priceMap) : { totalGold: 0, rows: [] };
-  const bookCost = optional.bookName ? calculateMaterialGoldCost({ [optional.bookName]: bookAmount }, priceMap) : { totalGold: 0, rows: [] };
+  const breathCost = optional.breathName ? calculateMaterialGoldCost({ [optional.breathName]: breathAmount }, priceMap, { ownedMaterials: {} }) : { totalGold: 0, rows: [] };
+  const bookCost = optional.bookName ? calculateMaterialGoldCost({ [optional.bookName]: bookAmount }, priceMap, { ownedMaterials: {} }) : { totalGold: 0, rows: [] };
   return {
     optional,
     breathAmount,
@@ -1471,7 +1557,7 @@ function calculateNextAdvancedHoningEstimates(snapshot, priceMap) {
     if (!attemptRow) return null;
     const optionalCosts = advancedHoningOptionalCosts(attemptRow.materials, priceMap);
     const baseMaterials = cloneMaterialsWithoutOptional(attemptRow.materials, optionalCosts.optional);
-    const baseCost = calculateMaterialGoldCost(baseMaterials, priceMap);
+    const baseCost = calculateMaterialGoldCost(baseMaterials, priceMap, { ownedMaterials: {} });
     const target = advancedHoningTargetLevel(item);
     const remainingLevels = Math.max(1, target - current);
     const optimized = optimizeAdvancedHoning({
@@ -1485,23 +1571,34 @@ function calculateNextAdvancedHoningEstimates(snapshot, priceMap) {
       startExperience: 0,
       startOrbs: 0
     });
-    const expectedGold = Number(optimized.expectedTotalGold || 0);
     const powerEstimate = estimateAdvancedHoningPowerDelta(item, snapshot, remainingLevels);
     const tempering = current % 10 === 0 ? advancedHoningTemperingMaterial(item) : null;
+    const usage = optimized.resourceUsage || {};
+    const expectedMaterials = scaleMaterials(baseMaterials, Number(usage.base || optimized.expectedTotalAttempts || 0));
+    if (optionalCosts.optional.breathName) addMaterialAmount(expectedMaterials, optionalCosts.optional.breathName, optionalCosts.breathAmount * Number(usage.breath || 0));
+    if (optionalCosts.optional.bookName) addMaterialAmount(expectedMaterials, optionalCosts.optional.bookName, optionalCosts.bookAmount * Number(usage.book || 0));
+    if (tempering?.name) addMaterialAmount(expectedMaterials, tempering.name, tempering.amount);
+    const expectedMaterialCost = calculateMaterialGoldCost(expectedMaterials, priceMap);
+    const expectedGold = Number(expectedMaterialCost.totalGold || 0);
+    const missingPrice = expectedMaterialCost.rows.some(row => row.missingPrice);
+    const boundShortage = expectedMaterialCost.rows.filter(row => row.boundShortage).map(row => row.name);
     const supportLabel = summarizeAdvancedHoningStrategy(optimized.usage);
     return {
       category: 'advancedHoning',
       item,
-      available: expectedGold > 0 && powerEstimate.value > 0,
+      available: expectedGold > 0 && powerEstimate.value > 0 && !missingPrice && !boundShortage.length,
       from: current,
       to: target,
-      cost: baseCost,
+      cost: expectedMaterialCost,
       expectedCost: {
         expectedGold,
+        expectedSilver: expectedMaterialCost.silver,
+        expectedMaterials,
+        expectedCostRows: expectedMaterialCost.rows,
         expectedAttempts: Number(optimized.expectedTotalAttempts || 0),
-        expectedTotalGold: Number(optimized.expectedTotalGold || 0),
+        expectedTotalGold: expectedGold,
         expectedTotalAttempts: Number(optimized.expectedTotalAttempts || 0),
-        expectedGoldPerLevel: Number(optimized.expectedGoldPerLevel || 0),
+        expectedGoldPerLevel: remainingLevels > 0 ? expectedGold / remainingLevels : 0,
         expectedAttemptsPerLevel: Number(optimized.expectedAttemptsPerLevel || 0),
         remainingLevels,
         stage,
@@ -1514,7 +1611,11 @@ function calculateNextAdvancedHoningEstimates(snapshot, priceMap) {
       tempering,
       stepLabel: `상재 ${current} → ${target}`,
       stepDetail: `상급 재련 ${stage}단계 · 남은 ${remainingLevels}레벨 전체`,
-      reason: '2026년 6월 완화 · 경험치/구슬 0 기준'
+      reason: boundShortage.length
+        ? `귀속 재료 부족: ${boundShortage.join(', ')}`
+        : missingPrice
+        ? '필수 재료 시세 없음'
+        : '2026년 6월 완화 · 경험치/구슬 0 기준'
     };
   }).filter(Boolean);
 }
@@ -1648,6 +1749,9 @@ function specMarketCost(price, pheonCost = 0) {
 async function calculateAccessorySpecEstimates() {
   const equipped = state.powerSnapshot?.effects?.accessory?.items || state.accessory?.items || [];
   const candidates = accessoryUpgradeCandidates(equipped);
+  if (!candidates.length) {
+    return [{ category: 'accessory', item: { type: '악세', name: '다음 옵션 후보' }, available: false, reason: '현재 악세에서 상상·상중·중상으로 올릴 후보 없음', powerDelta: 0, cost: {}, expectedCost: {} }];
+  }
   const rows = await Promise.all(candidates.map(async candidate => {
     try {
       const data = await fetchMarketJson(`/api/market-prices?mode=accessory&part=${encodeURIComponent(candidate.part)}&combo=${encodeURIComponent(candidate.combo)}`);
@@ -1655,16 +1759,18 @@ async function calculateAccessorySpecEstimates() {
       const price = Number(item?.price || 0);
       const powerEstimate = accessoryPowerEstimate(candidate, state.powerSnapshot);
       const powerDelta = round2(powerEstimate.value);
+      const cost = specMarketCost(price, item?.pheonCost || 0);
       return {
         category: 'accessory',
         item: { type: candidate.instanceLabel, name: candidate.equippedItem?.name || `${candidate.label} ${candidate.comboLabel}`, icon: item?.icon || '', quality: item?.quality },
         available: price > 0 && powerDelta > 0,
         from: '',
         to: candidate.comboLabel,
-        cost: specMarketCost(price, item?.pheonCost || 0),
-        expectedCost: { expectedGold: specMarketCost(price, item?.pheonCost || 0).totalGold },
+        cost,
+        expectedCost: { expectedGold: cost.totalGold, expectedSilver: 0 },
         powerDelta,
         powerEstimate,
+        comparisonEffects: accessoryEffectDelta(candidate),
         supportLabel: `${candidate.label} ${candidate.comboLabel} 최저가`,
         stepLabel: candidate.instanceLabel,
         stepDetail: `${candidate.currentPairLabel} → ${candidate.comboLabel}`,
@@ -1718,7 +1824,7 @@ function gemPowerEstimate(snapshot, currentLevel, nextLevel, count) {
 async function calculateGemSpecEstimates(snapshot) {
   const gems = Array.isArray(snapshot?.gems?.items) ? snapshot.gems.items : [];
   const candidates = gems.filter(gem => Number(gem.level || 0) > 0 && Number(gem.level || 0) < 10);
-  if (!candidates.length) return [];
+  if (!candidates.length) return [{ category: 'gem', item: { type: '보석', name: '다음 보석 후보' }, available: false, reason: '장착 보석이 모두 최고 레벨이거나 파싱되지 않음', powerDelta: 0, cost: {}, expectedCost: {} }];
   let data = null;
   try { data = await fetchMarketJson('/api/market-prices?mode=gemList'); } catch (error) {
     return [{ category: 'gem', item: { type: '보석', name: '보석 시세' }, available: false, reason: error.message || '보석 시세 조회 실패', powerDelta: 0, cost: {}, expectedCost: {} }];
@@ -1747,7 +1853,7 @@ async function calculateGemSpecEstimates(snapshot) {
       from: currentLevel,
       to: nextLevel,
       cost: specMarketCost(price, 0),
-      expectedCost: { expectedGold: price },
+      expectedCost: { expectedGold: price, expectedSilver: 0 },
       powerDelta,
       powerEstimate,
       supportLabel: `${kind} ${currentLevel}레벨 최저가 × ${buyCount}개${bound ? ' · 장착 보석 귀속' : ''}`,
@@ -1764,7 +1870,7 @@ async function calculateGemSpecEstimates(snapshot) {
 async function calculateEngravingSpecEstimates(snapshot) {
   const books = Array.isArray(snapshot?.effects?.engraving?.items) ? snapshot.effects.engraving.items : [];
   const candidates = books.filter(item => item?.grade === '유물' && Number(item.bookLevel || 0) < 4 && item?.deltaEffects && Object.keys(item.deltaEffects).length);
-  if (!candidates.length) return [];
+  if (!candidates.length) return [{ category: 'engraving', item: { type: '각인서', name: '다음 각인서 후보' }, available: false, reason: '유물 각인서 Lv.0~3 업그레이드 후보 없음', powerDelta: 0, cost: {}, expectedCost: {} }];
   const rows = await Promise.all(candidates.map(async book => {
     try {
       const data = await fetchMarketJson(`/api/market-prices?mode=engraving&name=${encodeURIComponent(book.name)}`);
@@ -1781,9 +1887,10 @@ async function calculateEngravingSpecEstimates(snapshot) {
         from: book.bookLevel,
         to: book.nextBookLevel,
         cost: specMarketCost(price, 0),
-        expectedCost: { expectedGold: price },
+        expectedCost: { expectedGold: price, expectedSilver: 0 },
         powerDelta,
         powerEstimate,
+        comparisonEffects: { ...(book.deltaEffects || {}) },
         supportLabel: `${book.name} 유물 각인서 최저가 × ${buyCount}장`,
         stepLabel: `${book.name} 각인서`,
         stepDetail: `Lv.${book.bookLevel} → Lv.${book.nextBookLevel}`,
@@ -1818,12 +1925,243 @@ async function storePowerCostEstimates(priceMap) {
   renderSpecEfficiencyTable();
   return state.powerCostEstimates;
 }
+function specRowCostForInventory(row, ownedMaterials = state.ownedMaterials) {
+  const expectedMaterials = row?.expectedCost?.expectedMaterials;
+  if (expectedMaterials && t4MaterialPriceCache) {
+    const cost = calculateMaterialGoldCost(expectedMaterials, t4MaterialPriceCache, { ownedMaterials });
+    return {
+      gold: Number(cost.totalGold || 0),
+      silver: Number(cost.silver || 0),
+      remainingOwned: cost.remainingOwned,
+      ownedUsed: cost.ownedUsed,
+      rows: cost.rows
+    };
+  }
+  return {
+    gold: Number(row?.expectedCost?.expectedGold || 0),
+    silver: Number(row?.expectedCost?.expectedSilver || row?.cost?.silver || 0),
+    remainingOwned: normalizeOwnedMaterials(ownedMaterials),
+    ownedUsed: {}
+  };
+}
+function currentSpecPlannerPlan() {
+  const currentPower = snapshotOfficialCombatPower(state.powerSnapshot);
+  const targetPower = Number(state.specPlannerTarget || 0) || Math.ceil(currentPower + 100);
+  return buildUpgradePlan({
+    rows: state.powerCostEstimates,
+    currentPower,
+    mode: state.specPlannerMode,
+    targetPower,
+    budget: state.specPlannerBudget,
+    ownedMaterials: state.ownedMaterials,
+    costForRow: specRowCostForInventory
+  });
+}
+function plannerUnavailableSummary() {
+  const rows = (state.powerCostEstimates || []).filter(row => !row?.available && row?.reason);
+  const reasons = [...new Set(rows.map(row => `${row?.item?.type || '후보'}: ${row.reason}`))];
+  if (!reasons.length) return '';
+  return `<details class="specPlannerUnavailable"><summary>제외된 후보 ${reasons.length}개</summary><div>${reasons.map(reason => `<span>${escapeHtml(reason)}</span>`).join('')}</div></details>`;
+}
+function renderSpecPlannerOutput() {
+  const output = $('specPlannerOutput');
+  if (!output) return;
+  const plan = currentSpecPlannerPlan();
+  const mode = state.specPlannerMode;
+  const summaryLabel = mode === 'target'
+    ? plan.reached ? '목표 달성 경로' : '현재 후보로 도달 가능한 경로'
+    : '예산 안의 추천 경로';
+  const statusText = mode === 'target'
+    ? plan.reached
+      ? `목표 ${formatNumber(plan.targetPower)} 달성`
+      : `목표까지 ${formatNumber(plan.remainingTarget)} 부족`
+    : `남은 예산 ${formatGold(plan.remainingBudget)}`;
+  const steps = plan.steps.map((step, index) => {
+    const row = step.row || {};
+    const item = row.item || {};
+    return `<div class="specPlannerStep">
+      <span>${index + 1}</span>
+      <div><b>${escapeHtml(row.stepLabel || item.type || item.name || '-')}</b><small>${escapeHtml(row.stepDetail || item.name || '-')}</small></div>
+      <div><b>${formatGold(step.gold)}</b><small>개별 비용</small></div>
+      <div><b>${formatGold(step.cumulativeGold)}</b><small>누적 사용 골드</small></div>
+      <div><b>${formatNumber(step.projectedPower)}</b><small>예상 전투력</small></div>
+    </div>`;
+  }).join('');
+  output.innerHTML = `<div class="specPlannerResultHead">
+      <div><b>${escapeHtml(summaryLabel)}</b><span>${escapeHtml(statusText)}</span></div>
+      <div><strong>${formatGold(plan.cumulativeGold)}</strong><small>총 누적 골드</small></div>
+      <div><strong>${formatNumber(plan.cumulativeSilver)}</strong><small>총 실링</small></div>
+      <div><strong>+${formatNumber(plan.powerGain)}</strong><small>전투력 증가</small></div>
+    </div>
+    <div class="specPlannerSteps">${steps || '<p class="powerCostHint">현재 검증값과 시세가 모두 있는 추천 후보가 없습니다.</p>'}</div>
+    ${plannerUnavailableSummary()}
+    <p class="powerCostHint">현재 장비에서 바로 가능한 다음 단계 후보를 귀속 재료 부족분과 실시간 시세로 다시 계산합니다. 여러 강화 단계를 건너뛴 장기 경로는 포함하지 않습니다.</p>`;
+}
+function bindSpecPlannerControls() {
+  document.querySelectorAll('[data-planner-mode]').forEach(button => {
+    button.classList.toggle('active', button.dataset.plannerMode === state.specPlannerMode);
+    button.onclick = () => {
+      state.specPlannerMode = button.dataset.plannerMode === 'budget' ? 'budget' : 'target';
+      bindSpecPlannerControls();
+      renderSpecPlannerOutput();
+    };
+  });
+  const targetWrap = $('specPlannerTargetWrap');
+  const budgetWrap = $('specPlannerBudgetWrap');
+  targetWrap?.classList.toggle('hidden', state.specPlannerMode !== 'target');
+  budgetWrap?.classList.toggle('hidden', state.specPlannerMode !== 'budget');
+  const targetInput = $('specPlannerTargetInput');
+  const budgetInput = $('specPlannerBudgetInput');
+  const currentPower = snapshotOfficialCombatPower(state.powerSnapshot);
+  if (targetInput) {
+    if (!(state.specPlannerTarget > 0)) state.specPlannerTarget = Math.ceil(currentPower + 100);
+    targetInput.value = String(Math.round(state.specPlannerTarget));
+    targetInput.onchange = () => {
+      state.specPlannerTarget = Math.max(currentPower, Number(targetInput.value || currentPower));
+      renderSpecPlannerOutput();
+    };
+  }
+  if (budgetInput) {
+    budgetInput.value = String(Math.round(state.specPlannerBudget));
+    budgetInput.onchange = () => {
+      state.specPlannerBudget = Math.max(0, Number(budgetInput.value || 0));
+      renderSpecPlannerOutput();
+    };
+  }
+}
+function selectedScenarioRows() {
+  const selected = state.specScenarioSelectedKeys;
+  return (state.powerCostEstimates || []).filter(row => row?.available && selected.has(specEstimateKey(row)));
+}
+function specComparisonEffectTotals(rows) {
+  const total = { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0 };
+  for (const row of rows || []) {
+    const effects = row?.comparisonEffects || {};
+    for (const key of Object.keys(total)) total[key] += Number(effects[key] || 0);
+  }
+  return total;
+}
+function currentSpecScenarioPayload() {
+  return {
+    version: 1,
+    characterName: state.powerSnapshot?.profile?.name || $('characterName')?.value || '',
+    selectedKeys: [...state.specScenarioSelectedKeys],
+    selectedNodes: cloneSelection(state.selected),
+    ownedMaterials: normalizeOwnedMaterials(state.ownedMaterials),
+    plannerMode: state.specPlannerMode,
+    plannerTarget: state.specPlannerTarget,
+    plannerBudget: state.specPlannerBudget
+  };
+}
+function applySpecScenarioPayload(payload, options = {}) {
+  if (!payload || typeof payload !== 'object') return false;
+  state.specScenarioSelectedKeys = new Set(Array.isArray(payload.selectedKeys) ? payload.selectedKeys : []);
+  if (payload.selectedNodes && typeof payload.selectedNodes === 'object') state.selected = cloneSelection(payload.selectedNodes);
+  if (payload.ownedMaterials && typeof payload.ownedMaterials === 'object') {
+    state.ownedMaterials = normalizeOwnedMaterials(payload.ownedMaterials);
+    writeStoredObject(SPEC_OWNED_STORAGE_KEY, state.ownedMaterials);
+  }
+  state.specPlannerMode = payload.plannerMode === 'budget' ? 'budget' : 'target';
+  state.specPlannerTarget = Math.max(0, Number(payload.plannerTarget || 0));
+  state.specPlannerBudget = Math.max(0, Number(payload.plannerBudget || state.specPlannerBudget));
+  if (!options.deferRender) {
+    renderEvolutionTiers();
+    calculateAndRender();
+    renderSpecEfficiencyTable();
+  }
+  return true;
+}
+function renderSpecScenarioComparison() {
+  const output = $('specScenarioOutput');
+  if (!output || !state.powerSnapshot) return;
+  const rows = selectedScenarioRows();
+  const plan = buildUpgradePlan({
+    rows,
+    currentPower: snapshotOfficialCombatPower(state.powerSnapshot),
+    mode: 'all',
+    ownedMaterials: state.ownedMaterials,
+    costForRow: specRowCostForInventory
+  });
+  const apiSelection = Object.keys(state.apiSelected || {}).length ? state.apiSelected : state.selected;
+  const baseCalc = statsWithSelection(apiSelection);
+  const changedCalc = statsWithSelection(state.selected);
+  const effects = specComparisonEffectTotals(rows);
+  const basePower = snapshotOfficialCombatPower(state.powerSnapshot);
+  const changedPower = basePower + plan.powerGain;
+  const nodeRatio = Number(baseCalc.result.value || 0) > 0 ? Number(changedCalc.result.value || 0) / Number(baseCalc.result.value || 1) : 1;
+  const powerRatio = basePower > 0 ? changedPower / basePower : 1;
+  const damageChange = (nodeRatio * powerRatio - 1) * 100;
+  const selectedNames = rows.map(row => row.stepLabel || row.item?.name || row.item?.type).filter(Boolean);
+  output.innerHTML = `<div class="specScenarioMetrics">
+      <div><span>공식 전투력</span><b>${formatNumber(basePower)}</b><i>→</i><strong>${formatNumber(changedPower)}</strong></div>
+      <div><span>전투력 기준 기대 화력</span><b>기준</b><i>→</i><strong>${damageChange >= 0 ? '+' : ''}${damageChange.toFixed(2)}%</strong></div>
+      <div><span>치명타 확률</span><b>${Number(baseCalc.result.critRate || 0).toFixed(2)}%</b><i>→</i><strong>${(Number(changedCalc.result.critRate || 0) + effects.critRate).toFixed(2)}%</strong></div>
+      <div><span>치명타 피해</span><b>${Number(baseCalc.result.critDamage || 0).toFixed(2)}%</b><i>→</i><strong>${(Number(changedCalc.result.critDamage || 0) + effects.critDamage).toFixed(2)}%</strong></div>
+      <div><span>공격/이동 속도</span><b>${Number(baseCalc.result.attackSpeed || 0).toFixed(2)} / ${Number(baseCalc.result.moveSpeed || 0).toFixed(2)}</b><i>→</i><strong>${(Number(changedCalc.result.attackSpeed || 0) + effects.attackSpeed).toFixed(2)} / ${(Number(changedCalc.result.moveSpeed || 0) + effects.moveSpeed).toFixed(2)}</strong></div>
+      <div><span>예상 비용</span><b>0G</b><i>→</i><strong>${formatGold(plan.cumulativeGold)} · ${formatNumber(plan.cumulativeSilver)} 실링</strong></div>
+    </div>
+    <p class="specScenarioSelection">${selectedNames.length ? `B 적용: ${escapeHtml(selectedNames.join(' · '))}` : '효율표 왼쪽의 B 체크박스로 비교할 변경 사항을 선택하세요.'}</p>`;
+  const saveButton = $('specScenarioSaveButton');
+  const restoreButton = $('specScenarioRestoreButton');
+  const shareButton = $('specScenarioShareButton');
+  const clearButton = $('specScenarioClearButton');
+  if (saveButton) saveButton.onclick = () => {
+    writeStoredObject(SPEC_SCENARIO_STORAGE_KEY, currentSpecScenarioPayload());
+    saveButton.textContent = '저장됨';
+  };
+  if (restoreButton) restoreButton.onclick = () => {
+    const payload = readStoredObject(SPEC_SCENARIO_STORAGE_KEY);
+    if (!payload.characterName) return;
+    const currentName = state.powerSnapshot?.profile?.name || '';
+    if (payload.characterName !== currentName) {
+      state.pendingSharedScenario = payload;
+      $('characterName').value = payload.characterName;
+      searchCharacter(payload.characterName).then(() => {
+        if (state.powerSnapshot) openSimulatorPage();
+      });
+      return;
+    }
+    applySpecScenarioPayload(payload);
+  };
+  if (shareButton) shareButton.onclick = async () => {
+    const encoded = encodeSpecScenario(currentSpecScenarioPayload());
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.searchParams.set('scenario', encoded);
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      shareButton.textContent = '링크 복사됨';
+    } catch {
+      window.prompt('공유 링크', url.toString());
+    }
+  };
+  if (clearButton) clearButton.onclick = () => {
+    state.specScenarioSelectedKeys.clear();
+    renderSpecEfficiencyTable();
+  };
+}
 function renderSpecEfficiencyShell() {
   return `<div class="powerSnapshotBlock powerEfficiencyPanel">
     <div class="powerCostHead">
       <div><h3>스펙업 효율 순위</h3><p>전투력 상승률과 기대 골드를 한 줄에서 비교합니다.</p></div>
       <strong>낮을수록 효율적</strong>
     </div>
+    <section class="specPlannerPanel">
+      <div class="specWorkspaceHead"><div><h4>목표 스펙업 경로</h4><p>효율이 좋은 다음 단계부터 순서대로 계산합니다.</p></div>
+        <div class="specPlannerMode"><button type="button" data-planner-mode="target">목표 전투력</button><button type="button" data-planner-mode="budget">예산</button></div>
+      </div>
+      <div class="specPlannerInputs">
+        <label id="specPlannerTargetWrap"><span>목표 전투력</span><input id="specPlannerTargetInput" type="number" min="0" step="1" /></label>
+        <label id="specPlannerBudgetWrap"><span>사용 가능 골드</span><input id="specPlannerBudgetInput" type="number" min="0" step="1000" /></label>
+      </div>
+      <div id="specPlannerOutput" class="specPlannerOutput"><p class="powerCostHint">후보 비용을 계산하는 중입니다.</p></div>
+    </section>
+    <section class="specScenarioPanel">
+      <div class="specWorkspaceHead"><div><h4>A/B 비교</h4><p>A는 검색한 현재 세팅, B는 노드 변경과 선택한 스펙업 후보입니다.</p></div>
+        <div class="specScenarioActions"><button id="specScenarioSaveButton" type="button">B 저장</button><button id="specScenarioRestoreButton" type="button">불러오기</button><button id="specScenarioShareButton" type="button">공유 링크</button><button id="specScenarioClearButton" type="button">선택 해제</button></div>
+      </div>
+      <div id="specScenarioOutput" class="specScenarioOutput"></div>
+    </section>
     <div id="combatPowerCoverage" class="combatPowerCoverage"></div>
     <div class="specEfficiencyToolbar" role="group" aria-label="스펙업 종류">
       <button type="button" data-spec-filter="all" class="specEfficiencyFilter active">전체</button>
@@ -1871,13 +2209,13 @@ function specEfficiencyReason(row) {
   }
   if (row?.category === 'advancedHoning') {
     if (!row?.available) return row.reason || '상급 재련 비용 또는 전투력 변화량 미확인';
-    const missing = (row.cost?.rows || []).filter(item => item.missingPrice).map(item => item.name);
+    const missing = (row.expectedCost?.expectedCostRows || row.cost?.rows || []).filter(item => item.missingPrice).map(item => item.name);
     if (missing.length) return `시세 없음: ${missing.slice(0, 2).join(', ')}${missing.length > 2 ? ' 외' : ''}`;
     return `${row.reason || '2026년 6월 완화'} · 추정 전투력`;
   }
   if (row?.available && !Number(row.expectedCost?.ratePercent || 0)) return '강화 확률 미확인';
   if (!row?.available) return row.reason || '비용표 없음';
-  const missing = (row.cost?.rows || []).filter(item => item.missingPrice).map(item => item.name);
+  const missing = (row.expectedCost?.expectedCostRows || row.cost?.rows || []).filter(item => item.missingPrice).map(item => item.name);
   if (missing.length) return `시세 없음: ${missing.slice(0, 2).join(', ')}${missing.length > 2 ? ' 외' : ''}`;
   const confidence = row.powerEstimate?.confidence;
   if (confidence === 'verified' || confidence === 'reference-verified') return row.hasGrowth ? '검증 전투력 · 장비 성장 포함' : '검증 전투력';
@@ -1941,6 +2279,9 @@ function renderSpecEfficiencyTable() {
   const estimates = allEstimates.filter(row => specEfficiencyFilterMatches(row, state.specEfficiencyFilter));
   if (!estimates.length) {
     el.innerHTML = `<p class="powerCostHint">${allEstimates.length ? '선택한 종류의 스펙업 후보가 없습니다.' : '재료 시세를 불러오는 중입니다.'}</p>`;
+    bindSpecPlannerControls();
+    renderSpecPlannerOutput();
+    renderSpecScenarioComparison();
     return;
   }
   const sortedEstimates = estimates.sort((a, b) => {
@@ -1959,8 +2300,8 @@ function renderSpecEfficiencyTable() {
       const totalGold = row.available ? Number(cost.totalGold || 0) : 0;
       const tradeGold = Number(cost.tradeGold || 0);
       const fixedGold = Number(cost.fixedGold || 0);
-      const silver = Number(cost.silver || 0);
       const expected = row.expectedCost || {};
+      const silver = Number(expected.expectedSilver || cost.silver || 0);
       const expectedGold = Number(expected.expectedGold || 0);
       const ratePercent = Number(expected.ratePercent || 0);
       const pityAttempts = Number(expected.pityAttempts || 0);
@@ -1975,11 +2316,11 @@ function renderSpecEfficiencyTable() {
       const expectedGoldText = expectedGold > 0 ? formatSpecGold(expectedGold) : '-';
       const temperingText = row.tempering ? ` · 담금질 ${row.tempering.name} ${formatNumber(row.tempering.amount)}개` : '';
       const expectedDetailText = expectedGold > 0 && advancedHoningCostText
-        ? `최저가: ${supportLabel} · 총 기대 ${expectedAttempts.toFixed(2)}회${temperingText}`
+        ? `최저가: ${supportLabel} · 총 기대 ${expectedAttempts.toFixed(2)}회${temperingText} · 실링 ${formatNumber(silver)}`
         : expectedGold > 0 && marketCostText
         ? `최저가: ${supportLabel} · 거래 ${formatGold(tradeGold)}${fixedGold > 0 ? ` · 페온 ${formatGold(fixedGold)}` : ''}`
         : expectedGold > 0
-        ? `최저가: ${supportLabel} · 평균 ${formatGold(expectedGold)} · 장기백 ${formatGold((expected.pityAttempts || 0) * totalGold)}`
+        ? `최저가: ${supportLabel} · 1회 성공 ${formatGold(expected.luckyGold || totalGold)} · 평균 ${formatGold(expectedGold)} · 장기백 ${formatGold(expected.pityGold)} · 실링 ${formatNumber(silver)}`
         : `1회 ${formatGold(totalGold)} · 거래 ${formatGold(tradeGold)} · 고정 ${formatGold(fixedGold)} · 실링 ${formatNumber(silver)}`;
       const powerText = specPowerDeltaText(row, powerDelta);
       const stepMainText = row.stepLabel || `+${Number(row.from || item.honingLevel || 0)} → +${Number(row.to || 0)}`;
@@ -1989,8 +2330,14 @@ function renderSpecEfficiencyTable() {
       const rankText = Number.isFinite(score) ? String(++rankedIndex) : '-';
       const meterWidth = bestScore > 0 && Number.isFinite(score) ? Math.max(8, Math.min(100, (bestScore / score) * 100)) : 0;
       const confidenceMeta = specConfidenceMeta(row);
+      const estimateKey = specEstimateKey(row);
+      const scenarioChecked = state.specScenarioSelectedKeys.has(estimateKey) ? ' checked' : '';
+      const scenarioControl = row.available
+        ? `<label class="specScenarioPick" title="B 비교에 적용"><input type="checkbox" data-spec-scenario-key="${escapeHtml(estimateKey)}"${scenarioChecked}><span>B</span></label>`
+        : '<span class="specScenarioPick disabled" aria-hidden="true">-</span>';
       return `<div class="specEfficiencyRow ${row.available ? '' : 'disabled'} confidence-${confidenceMeta.className}" data-category="${escapeHtml(row.category || '')}">
         <div class="specEfficiencyTarget">
+          ${scenarioControl}
           <span class="specEfficiencyRank">${rankText}</span>
           ${powerItemIcon(item, { hideQuality: true })}
           <div>
@@ -2015,6 +2362,17 @@ function renderSpecEfficiencyTable() {
     <span>스펙업 목표</span><span>효율</span><span>비용</span><span>비용/효율</span>
   </div>${rows}
   <p class="powerCostHint">1% 상승당 기대 골드가 낮은 순서로 정렬하고, 효율이 같으면 검증 범위가 높은 후보를 먼저 표시합니다. 상급 재련은 현재 단계에서 다음 10단위 완료 지점까지의 총 기대비용을 사용합니다. ${escapeHtml(combatPowerAccuracyHint())}</p>`;
+  el.querySelectorAll('[data-spec-scenario-key]').forEach(input => {
+    input.onchange = () => {
+      const key = input.dataset.specScenarioKey || '';
+      if (input.checked) state.specScenarioSelectedKeys.add(key);
+      else state.specScenarioSelectedKeys.delete(key);
+      renderSpecScenarioComparison();
+    };
+  });
+  bindSpecPlannerControls();
+  renderSpecPlannerOutput();
+  renderSpecScenarioComparison();
 }
 function renderAdvancedHoningAttemptCostTable() {
   const renderRows = (rows = []) => rows.map(row => {
@@ -2068,7 +2426,7 @@ function renderNormalGearGrowthCostTable() {
       ${renderTable('방어구', data.armor)}
       ${renderTable('무기', data.weapon)}
     </div>
-    <p class="powerCostHint">장비 성장은 골드 없이 운명의 파편과 실링만 사용합니다. 이후 1회 재련 재료표와 합쳐서 총 강화 비용으로 계산할 예정입니다.</p>
+    <p class="powerCostHint">장비 성장은 최초 1회만 반영하고, 재련 재료는 기대 시도 횟수만큼 반영해 총 비용을 계산합니다.</p>
   </div>`;
 }
 function renderNormalRefineAttemptCostTable() {
@@ -2111,7 +2469,7 @@ function renderNormalRefineAttemptCostTable() {
   return `<div class="advancedHoningCostTable normalRefineCostTable">
     <div class="powerBuildHeader"><b>일반 재련 1회 재료</b><span>성장 재료 미포함</span></div>
     ${ruleSets.map(renderRuleSet).join('')}
-    <p class="powerCostHint">세르카 무기 표는 데이터가 들어오는 대로 같은 구조에 추가합니다.</p>
+    <p class="powerCostHint">에기르·세르카 방어구와 무기 구간을 분리해 적용하며, 성장 재료는 시도 횟수와 별도로 최초 1회만 더합니다.</p>
   </div>`;
 }
 function renderPowerCostPrep(snapshot) {
@@ -2131,14 +2489,18 @@ function renderPowerCostPrep(snapshot) {
       <small>${escapeHtml(materialText)}</small>
     </div>`;
   }).join('');
-  const materialRows = prep.materialNames.map(name => `<label class="powerCostMaterial" data-material-name="${escapeHtml(name)}">
-    <input type="checkbox" checked />
-    <span><b>${escapeHtml(name)}</b><small>단가 확인 중 · 체크 해제 시 귀속재료로 간주해 0골드</small></span>
+  const materialRows = prep.materialNames.map(name => {
+    const ownedKey = ownedMaterialKey(name);
+    const displayName = ownedKey === '운명의 파편' ? '운명의 파편' : name;
+    return `<label class="powerCostMaterial" data-material-name="${escapeHtml(name)}" data-owned-material="${escapeHtml(ownedKey)}">
+    <span class="powerCostMaterialInfo"><b>${escapeHtml(displayName)}</b><small>단가 확인 중</small></span>
+    <span class="ownedMaterialControl"><small>보유 귀속</small><input class="ownedMaterialInput" type="number" min="0" step="1" inputmode="numeric" value="${Math.floor(Number(state.ownedMaterials?.[ownedKey] || 0))}" aria-label="${escapeHtml(displayName)} 보유 귀속 수량" /></span>
+  </label>`;
+  }).join('');
+  const boundRows = prep.boundMaterialNames.map(name => `<label class="powerCostMaterial boundOnly" data-owned-material="${escapeHtml(name)}">
+    <span class="powerCostMaterialInfo"><b>${escapeHtml(name)}</b><small>${name === '고통의 가시' ? '그림자 레이드 세르카' : '상급 재련 담금질'} 귀속 전용 · 골드 비용 0</small></span>
+    <span class="ownedMaterialControl"><small>보유 수량</small><input class="ownedMaterialInput" type="number" min="0" step="1" inputmode="numeric" value="${Math.floor(Number(state.ownedMaterials?.[name] || 0))}" aria-label="${escapeHtml(name)} 보유 수량" /></span>
   </label>`).join('');
-  const boundRows = prep.boundMaterialNames.map(name => `<div class="powerCostMaterial boundOnly">
-    <input type="checkbox" checked disabled />
-    <span><b>${escapeHtml(name)}</b><small>${name === '고통의 가시' ? '그림자 레이드 세르카' : '상급 재련 담금질'} 귀속 재료 · 골드 비용 0</small></span>
-  </div>`).join('');
   return `<div class="powerSnapshotBlock powerCostPrep">
     <div class="powerCostHead">
       <div><h3>T4 비용 계산</h3><p>일반 재련과 상급 재련의 거래 재료·귀속 재료·고정 골드를 나눠 기대 비용을 계산합니다.</p></div>
@@ -2162,7 +2524,7 @@ function renderPowerCostPrep(snapshot) {
       <div>
         <h4>재료 비용 적용</h4>
         <div id="powerCostMaterialList" class="powerCostMaterialList">${[materialRows, boundRows].filter(Boolean).join('') || '<p>적용할 재료가 없습니다.</p>'}</div>
-        <p class="powerCostHint">원자료 표는 화면에 표시하지 않고, 현재 장비의 다음 재련 비용 계산에만 사용합니다. 체크 해제한 재료는 귀속으로 간주해 골드 비용에서 제외합니다.</p>
+        <p class="powerCostHint">보유 귀속 수량을 먼저 차감한 뒤 부족한 수량만 거래소 시세로 계산합니다. 입력값은 이 브라우저에 저장됩니다.</p>
       </div>
     </div>
   </div>`;
@@ -2246,22 +2608,30 @@ async function hydratePowerCostMaterialPrices() {
       const small = row.querySelector('small');
       if (!small) return;
       if (!item || item.missing || !Number(item.price || 0)) {
-        small.textContent = '시세 없음 · 체크 해제 시 귀속재료로 간주해 0골드';
+        small.textContent = '시세 없음 · 부족 수량은 비용 계산에서 제외됨';
         row.classList.add('missing');
         return;
       }
       if (Number(item.shardCount || 0) && Number(item.shardUnitPrice || 0)) {
-        small.textContent = `파편 1개당 ${formatGold(item.shardUnitPrice)} · 주머니당 파편 ${Number(item.shardCount).toLocaleString('ko-KR')}개 기준 · 체크 해제 시 귀속재료로 간주해 0골드`;
+        small.textContent = `가장 싼 주머니 기준 파편 1개당 ${formatGold(item.shardUnitPrice)} · ${Number(item.shardCount).toLocaleString('ko-KR')}개 묶음`;
         return;
       }
       const unit = Number(item.effectiveUnitPrice || item.unitPrice || item.price || 0);
-      small.textContent = `단가 ${formatGold(unit)} · 체크 해제 시 귀속재료로 간주해 0골드`;
+      small.textContent = `거래소 단가 ${formatGold(unit)} · 부족분만 구매 비용 반영`;
+    });
+    list.querySelectorAll('.ownedMaterialInput').forEach(input => {
+      input.addEventListener('change', () => {
+        const row = input.closest('[data-owned-material]');
+        const name = row?.dataset?.ownedMaterial || '';
+        if (!name) return;
+        state.ownedMaterials[name] = Math.max(0, Math.floor(Number(input.value || 0)));
+        if (!state.ownedMaterials[name]) delete state.ownedMaterials[name];
+        writeStoredObject(SPEC_OWNED_STORAGE_KEY, state.ownedMaterials);
+        storePowerCostEstimates(priceMap);
+      });
     });
     await loadCombatPowerModel();
     await storePowerCostEstimates(priceMap);
-    list.querySelectorAll('.powerCostMaterial input').forEach(input => {
-      input.addEventListener('change', () => storePowerCostEstimates(priceMap));
-    });
   } catch {
     state.powerCostEstimates = [];
     renderSpecEfficiencyTable();
@@ -3246,6 +3616,7 @@ function calculateAndRender() {
       </div>
     </article>`;
   }).join('')}</div>` : `<div class="emptyNotice">추천 가능한 2/4/5티어 조합이 없습니다. 쿨감 효과 제외 상태에서는 끝없는 마나/최적화 훈련 등 쿨감 노드가 추천 후보에서 제거됩니다.</div>`;
+  renderSpecScenarioComparison();
 }
 
 async function loadDb() {
@@ -3371,6 +3742,8 @@ function resetCharacterResultState() {
   state.apiSelected = {};
   state.powerSnapshot = null;
   state.powerCostEstimates = [];
+  state.specPlannerTarget = 0;
+  state.specScenarioSelectedKeys = new Set();
   state.abilityStone = { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
   state.engraving = emptyEngravingState();
   state.arkGrid = { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
@@ -3395,7 +3768,12 @@ function applyCharacterData(data) {
   state.enlightenment = extractEnlightenmentEffects(state.foundEffects);
   state.selected = classifyEvolution(state.foundEffects);
   state.apiSelected = JSON.parse(JSON.stringify(state.selected));
-  applyProfileDefaults(data.profile, state.selected);
+  const sharedScenario = state.pendingSharedScenario;
+  if (sharedScenario && (!sharedScenario.characterName || sharedScenario.characterName === data.profile.CharacterName)) {
+    applySpecScenarioPayload(sharedScenario, { deferRender: true });
+    state.pendingSharedScenario = null;
+  }
+  applyProfileDefaults(data.profile, state.apiSelected);
   renderPowerSnapshot(state.powerSnapshot);
   renderEvolutionTiers();
   renderSummary(data.profile, data.arkPassive);
@@ -4421,7 +4799,23 @@ if (!window.__lostarkCalculatorBootedV506) {
   preloadMarketPriceLists();
   loadLostarkNoticeCard();
   loadClassBenchmarks();
-  loadDb().catch((error) => setMessage(error.message || '진화 노드 데이터를 불러오지 못했습니다.'));
+  const sharedScenario = decodeSpecScenario(new URLSearchParams(window.location.search).get('scenario'));
+  if (sharedScenario?.characterName) {
+    state.pendingSharedScenario = sharedScenario;
+    state.ownedMaterials = normalizeOwnedMaterials(sharedScenario.ownedMaterials || state.ownedMaterials);
+    $('characterName').value = sharedScenario.characterName;
+  }
+  const boot = loadDb().catch((error) => {
+    setMessage(error.message || '진화 노드 데이터를 불러오지 못했습니다.');
+    return null;
+  });
+  if (sharedScenario?.characterName) {
+    boot.then(async loaded => {
+      if (!loaded && !state.evolution) return;
+      await searchCharacter(sharedScenario.characterName);
+      if (state.powerSnapshot) openSimulatorPage();
+    });
+  }
 }
 
 function renderMaterialPriceGrid(container, data) {

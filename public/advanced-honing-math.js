@@ -57,12 +57,18 @@ export function advancedHoningStageForLevel(level) {
 }
 
 function emptyResult() {
-  return { gold: 0, attempts: 0, usage: {} };
+  return { gold: 0, attempts: 0, usage: {}, resources: { base: 0, breath: 0, book: 0 } };
 }
 
 function addUsage(target, source, weight = 1) {
   for (const [key, value] of Object.entries(source || {})) {
     target[key] = Number(target[key] || 0) + Number(value || 0) * weight;
+  }
+}
+
+function addResources(target, source, weight = 1) {
+  for (const key of ['base', 'breath', 'book']) {
+    target[key] = Number(target[key] || 0) + Number(source?.[key] || 0) * weight;
   }
 }
 
@@ -157,7 +163,12 @@ export function optimizeAdvancedHoning(input = {}) {
       const candidate = {
         gold: actionGold(action, options, state.free),
         attempts: 1,
-        usage: { [`${mode}:${action.key}`]: 1 }
+        usage: { [`${mode}:${action.key}`]: 1 },
+        resources: {
+          base: state.free ? 0 : 1,
+          breath: action.breath ? 1 : 0,
+          book: action.book ? 1 : 0
+        }
       };
       for (const outcome of ADVANCED_HONING_OUTCOMES[action.key]) {
         for (const effect of effects) {
@@ -167,6 +178,7 @@ export function optimizeAdvancedHoning(input = {}) {
           candidate.gold += child.gold * probability;
           candidate.attempts += child.attempts * probability;
           addUsage(candidate.usage, child.usage, probability);
+          addResources(candidate.resources, child.resources, probability);
         }
       }
       if (!best || candidate.gold < best.gold - 0.000001 || (Math.abs(candidate.gold - best.gold) <= 0.000001 && candidate.attempts < best.attempts)) {
@@ -191,6 +203,7 @@ export function optimizeAdvancedHoning(input = {}) {
     expectedAttemptsPerLevel: total.attempts / divisor,
     usage: total.usage,
     usagePerLevel,
+    resourceUsage: total.resources,
     june2026Relaxation: true,
     ancestorOrbGain: 2
   };

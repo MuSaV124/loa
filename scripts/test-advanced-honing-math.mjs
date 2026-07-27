@@ -26,6 +26,9 @@ const expensiveSupport = optimizeAdvancedHoning({
 });
 assert.ok(expensiveSupport.expectedGoldPerLevel > 0);
 assert.ok(expensiveSupport.expectedAttemptsPerLevel > 0);
+assert.ok(expensiveSupport.resourceUsage.base > 0);
+assert.equal(expensiveSupport.resourceUsage.breath, 0);
+assert.equal(expensiveSupport.resourceUsage.book, 0);
 assert.match(summarizeAdvancedHoningStrategy(expensiveSupport.usage), /일반 보조 없음/);
 
 const freeSupport = optimizeAdvancedHoning({
@@ -37,6 +40,7 @@ const freeSupport = optimizeAdvancedHoning({
 });
 assert.ok(freeSupport.expectedGoldPerLevel < expensiveSupport.expectedGoldPerLevel);
 assert.ok(freeSupport.expectedAttemptsPerLevel < expensiveSupport.expectedAttemptsPerLevel);
+assert.ok(freeSupport.resourceUsage.breath > 0 || freeSupport.resourceUsage.book > 0);
 
 const lateStage = optimizeAdvancedHoning({
   stage: 3,
