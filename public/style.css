@@ -1182,6 +1182,128 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .powerPheonPanel .powerBuildHeader {
   margin-bottom: 8px;
 }
+.armguardCostPanel {
+  border-top: 1px solid rgba(96, 165, 250, .18);
+  border-bottom: 1px solid rgba(96, 165, 250, .18);
+  padding: 12px 0;
+}
+.armguardCostHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+.armguardCostHeader h4,
+.armguardCostHeader p {
+  margin: 0;
+}
+.armguardCostHeader h4 {
+  color: #f8fafc;
+  font-size: 16px;
+}
+.armguardCostHeader p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.armguardRangeControls {
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+}
+.armguardRangeControls label {
+  display: grid;
+  gap: 4px;
+}
+.armguardRangeControls span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+}
+.armguardRangeControls select {
+  min-width: 88px;
+  border: 1px solid rgba(96, 165, 250, .28);
+  border-radius: 6px;
+  background: #08111f;
+  color: #f8fafc;
+  padding: 7px 26px 7px 9px;
+  font-weight: 900;
+}
+.armguardRangeControls i {
+  padding-bottom: 8px;
+  color: #60a5fa;
+  font-style: normal;
+  font-weight: 900;
+}
+.armguardCostResult {
+  margin-top: 10px;
+}
+.armguardCostLoading,
+.armguardCostWarning {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.armguardCostSummary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+.armguardCostSummary > div {
+  min-width: 0;
+  border-left: 3px solid rgba(96, 165, 250, .64);
+  background: rgba(2, 6, 23, .34);
+  padding: 8px 9px;
+}
+.armguardCostSummary span,
+.armguardCostSummary small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+}
+.armguardCostSummary strong {
+  display: block;
+  margin: 3px 0;
+  color: #fbbf24;
+  font-size: 16px;
+  line-height: 1.2;
+}
+.armguardMaterialList {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 7px;
+}
+.armguardMaterialRow {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  border: 1px solid rgba(148, 163, 184, .14);
+  background: rgba(15, 23, 42, .36);
+  padding: 7px 8px;
+}
+.armguardMaterialRow span,
+.armguardMaterialRow small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.armguardMaterialRow span {
+  color: #cbd5e1;
+  font-size: 10px;
+}
+.armguardMaterialRow b {
+  color: #f8fafc;
+  font-size: 12px;
+}
+.armguardMaterialRow small {
+  color: #93c5fd;
+  font-size: 9px;
+}
+.armguardMaterialRow.missing small,
+.armguardCostWarning {
+  color: #fca5a5;
+}
 .powerPheonGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3338,6 +3460,22 @@ body:not(.calculatorReady):not(.marketMode):not(.ratioMode) #keenPanel {
   .powerPheonGrid,
   .powerPheonRules {
     grid-template-columns: 1fr;
+  }
+  .armguardCostHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .armguardRangeControls label {
+    flex: 1;
+  }
+  .armguardRangeControls select {
+    width: 100%;
+  }
+  .armguardCostSummary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .armguardMaterialList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .specEfficiencyHeader {
     display: none;

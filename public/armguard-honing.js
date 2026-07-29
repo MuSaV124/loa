@@ -63,3 +63,9 @@ export function armguardHoningRowForCurrentStage(currentStage) {
   const from = Math.max(0, Math.floor(Number(currentStage || 0)));
   return ARMGUARD_HONING_ROWS.find(row => row.from === from) || null;
 }
+
+export function armguardHoningRowsBetween(fromStage, toStage) {
+  const from = Math.max(0, Math.min(24, Math.floor(Number(fromStage || 0))));
+  const to = Math.max(from + 1, Math.min(25, Math.floor(Number(toStage || 25))));
+  return ARMGUARD_HONING_ROWS.filter(row => row.from >= from && row.to <= to);
+}

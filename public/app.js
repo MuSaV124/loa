@@ -1,12 +1,12 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.6';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.6';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.6';
-import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.6';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.6';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.6';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.6';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.6';
-import { armguardHoningRowForCurrentStage } from './armguard-honing.js?v=5.9.6';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.7';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.7';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.7';
+import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.7';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.7';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.7';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.7';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.7';
+import { armguardHoningRowForCurrentStage, armguardHoningRowsBetween } from './armguard-honing.js?v=5.9.7';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -15,9 +15,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.9.6';
+} from './cache-policy.js?v=5.9.7';
 
-const VERSION = '5.9.6';
+const VERSION = '5.9.7';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -67,6 +67,7 @@ const state = {
   specPlannerMode: 'target',
   specPlannerTarget: 0,
   specPlannerBudget: 1000000,
+  armguardRange: { from: 0, to: 25 },
   specScenarioSelectedKeys: new Set(),
   pendingSharedScenario: null
 };
@@ -1373,6 +1374,33 @@ function calculateNormalHoningExpectedCost(baseMaterials, next, priceMap) {
   });
   return rows[0] || null;
 }
+
+function calculateArmguardRangeExpectedCost(fromStage, toStage, priceMap) {
+  const rows = armguardHoningRowsBetween(fromStage, toStage);
+  let expectedMaterials = {};
+  let expectedAttempts = 0;
+  let pityAttempts = 0;
+  const stages = rows.map(row => {
+    const stats = calculateNormalHoningAttemptStats(row);
+    expectedAttempts += stats.expectedAttempts;
+    pityAttempts += stats.pityAttempts;
+    expectedMaterials = mergeMaterials(
+      expectedMaterials,
+      buildHoningScenarioMaterials(row.growthMaterials, row.attemptMaterials, stats.expectedAttempts)
+    );
+    return { ...row, ...stats };
+  });
+  const cost = calculateMaterialGoldCost(expectedMaterials, priceMap);
+  return {
+    from: rows[0]?.from ?? Number(fromStage || 0),
+    to: rows.at(-1)?.to ?? Number(toStage || 0),
+    stages,
+    expectedAttempts,
+    pityAttempts,
+    expectedMaterials,
+    cost
+  };
+}
 let combatPowerModelPromise = null;
 async function loadCombatPowerModel() {
   if (state.combatPowerModel) return state.combatPowerModel;
@@ -2579,6 +2607,8 @@ function renderPowerCostPrep(snapshot) {
     <span class="powerCostMaterialInfo"><b>${escapeHtml(name)}</b><small>${name === '고통의 가시' ? '그림자 레이드 세르카' : '상급 재련 담금질'} 귀속 전용 · 골드 비용 0</small></span>
     <span class="ownedMaterialControl"><small>보유 수량</small><input class="ownedMaterialInput" type="number" min="0" step="1" inputmode="numeric" value="${Math.floor(Number(state.ownedMaterials?.[name] || 0))}" aria-label="${escapeHtml(name)} 보유 수량" /></span>
   </label>`).join('');
+  const armguardFromOptions = Array.from({ length: 25 }, (_, stage) => `<option value="${stage}"${stage === state.armguardRange.from ? ' selected' : ''}>${stage}강</option>`).join('');
+  const armguardToOptions = Array.from({ length: 25 }, (_, index) => index + 1).map(stage => `<option value="${stage}"${stage === state.armguardRange.to ? ' selected' : ''}>${stage}강</option>`).join('');
   return `<div class="powerSnapshotBlock powerCostPrep">
     <div class="powerCostHead">
       <div><h3>T4 비용 계산</h3><p>일반 재련과 상급 재련의 거래 재료·귀속 재료·고정 골드를 나눠 기대 비용을 계산합니다.</p></div>
@@ -2594,6 +2624,20 @@ function renderPowerCostPrep(snapshot) {
       <div class="powerPheonRules">${PHEON_COST_RULES.map(rule => `<span><b>${escapeHtml(rule.label)}</b>${Number(rule.cost).toLocaleString('ko-KR')}페온<small>${escapeHtml(rule.note)}</small></span>`).join('')}</div>
       <p id="crystalPriceSourceText" class="powerCostHint">보석 제외 경매장 구매 비용 계산용입니다. 아바타는 거래 가능 횟수 3이면 페온 제외로 처리할 예정입니다.</p>
     </div>
+    <section class="armguardCostPanel" aria-labelledby="armguardCostTitle">
+      <div class="armguardCostHeader">
+        <div><h4 id="armguardCostTitle">완갑 재련 기대비용</h4><p>장비 성장과 장인의 기운 천장을 포함한 구간별 평균 비용입니다.</p></div>
+        <div class="armguardRangeControls">
+          <label><span>현재 단계</span><select id="armguardFromStage">${armguardFromOptions}</select></label>
+          <i aria-hidden="true">→</i>
+          <label><span>목표 단계</span><select id="armguardToStage">${armguardToOptions}</select></label>
+        </div>
+      </div>
+      <div id="armguardCostResult" class="armguardCostResult" aria-live="polite">
+        <p class="armguardCostLoading">재료 시세를 불러오는 중입니다.</p>
+      </div>
+      <p class="powerCostHint">각 단계의 장비 성장 재료는 1회, 재련 재료는 실패 보정과 장인의 기운을 반영한 기대 시도 횟수만큼 합산합니다. 숨결은 단계별 최대 사용 개수가 공개되기 전까지 제외합니다.</p>
+    </section>
     <div class="powerCostGrid">
       <div>
         <h4>현재 장비 규칙</h4>
@@ -2606,6 +2650,58 @@ function renderPowerCostPrep(snapshot) {
       </div>
     </div>
   </div>`;
+}
+
+function formatExpectedAmount(value) {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount)) return '-';
+  return amount.toLocaleString('ko-KR', { maximumFractionDigits: amount < 100 ? 1 : 0 });
+}
+
+function renderArmguardExpectedCost(priceMap) {
+  const result = $('armguardCostResult');
+  if (!result) return;
+  const plan = calculateArmguardRangeExpectedCost(state.armguardRange.from, state.armguardRange.to, priceMap);
+  const cost = plan.cost || { rows: [], totalGold: 0, tradeGold: 0, fixedGold: 0, silver: 0 };
+  const materialRows = (cost.rows || []).filter(row => !row.fixed && !row.silver).map(row => {
+    const detail = row.boundOnly
+      ? row.boundShortage ? '귀속 재료 부족' : '귀속 전용'
+      : row.missingPrice ? '시세 확인 필요' : `구매 ${formatExpectedAmount(row.purchased)} · ${formatGold(row.gold)}`;
+    return `<div class="armguardMaterialRow${row.missingPrice || row.boundShortage ? ' missing' : ''}">
+      <span>${escapeHtml(row.name)}</span><b>${formatExpectedAmount(row.required)}</b><small>${escapeHtml(detail)}</small>
+    </div>`;
+  }).join('');
+  const hasMissingPrice = (cost.rows || []).some(row => row.missingPrice);
+  result.innerHTML = `
+    <div class="armguardCostSummary">
+      <div><span>${plan.from}→${plan.to}강 기대 골드</span><strong>${formatGold(cost.totalGold)}</strong><small>거래 ${formatGold(cost.tradeGold)} · 재련 ${formatGold(cost.fixedGold)}</small></div>
+      <div><span>기대 실링</span><strong>${formatNumber(Math.round(cost.silver || 0))}</strong><small>성장과 재련 시도 합계</small></div>
+      <div><span>기대 재련 횟수</span><strong>${formatExpectedAmount(plan.expectedAttempts)}회</strong><small>${plan.stages.length}개 단계 합산</small></div>
+      <div><span>장기백 기준 횟수</span><strong>${formatNumber(plan.pityAttempts)}회</strong><small>단계별 천장 합산</small></div>
+    </div>
+    <div class="armguardMaterialList">${materialRows}</div>
+    ${hasMissingPrice ? '<p class="armguardCostWarning">시세가 없는 재료는 기대 골드 합계에서 제외되었습니다.</p>' : ''}`;
+}
+
+function bindArmguardCostControls(priceMap) {
+  const fromSelect = $('armguardFromStage');
+  const toSelect = $('armguardToStage');
+  if (!fromSelect || !toSelect) return;
+  const update = changed => {
+    let from = Math.max(0, Math.min(24, Number(fromSelect.value || 0)));
+    let to = Math.max(1, Math.min(25, Number(toSelect.value || 25)));
+    if (to <= from) {
+      if (changed === 'from') to = Math.min(25, from + 1);
+      else from = Math.max(0, to - 1);
+    }
+    state.armguardRange = { from, to };
+    fromSelect.value = String(from);
+    toSelect.value = String(to);
+    renderArmguardExpectedCost(priceMap);
+  };
+  fromSelect.addEventListener('change', () => update('from'));
+  toSelect.addEventListener('change', () => update('to'));
+  update();
 }
 async function loadT4MaterialPriceMap() {
   if (t4MaterialPriceCache) return t4MaterialPriceCache;
@@ -2679,6 +2775,7 @@ async function hydratePowerCostMaterialPrices() {
   if (!list) return;
   try {
     const priceMap = await loadT4MaterialPriceMap();
+    bindArmguardCostControls(priceMap);
     list.querySelectorAll('.powerCostMaterial').forEach(row => {
       const name = row.dataset.materialName || '';
       if (!name || BOUND_ONLY_MATERIALS.has(name)) return;
@@ -2705,6 +2802,7 @@ async function hydratePowerCostMaterialPrices() {
         state.ownedMaterials[name] = Math.max(0, Math.floor(Number(input.value || 0)));
         if (!state.ownedMaterials[name]) delete state.ownedMaterials[name];
         writeStoredObject(SPEC_OWNED_STORAGE_KEY, state.ownedMaterials);
+        renderArmguardExpectedCost(priceMap);
         storePowerCostEstimates(priceMap);
       });
     });
@@ -2716,6 +2814,7 @@ async function hydratePowerCostMaterialPrices() {
     list.querySelectorAll('.powerCostMaterial small').forEach(small => {
       small.textContent = '시세 확인 실패 · 시세탭 재료에서 다시 확인 가능';
     });
+    bindArmguardCostControls(new Map());
   }
 }
 function renderPowerSnapshot(snapshot) {

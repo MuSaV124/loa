@@ -49,6 +49,28 @@ function simulatorMarkup({ mobile }) {
                 </div>
               </div>
             </div>
+            <div class="powerSnapshotBlock powerCostPrep">
+              <section class="armguardCostPanel" aria-labelledby="armguardCostTitle">
+                <div class="armguardCostHeader">
+                  <div><h4 id="armguardCostTitle">완갑 재련 기대비용</h4><p>장비 성장과 장인의 기운 천장을 포함한 구간별 평균 비용입니다.</p></div>
+                  <div class="armguardRangeControls">
+                    <label><span>현재 단계</span><select><option>0강</option></select></label><i>→</i>
+                    <label><span>목표 단계</span><select><option>25강</option></select></label>
+                  </div>
+                </div>
+                <div class="armguardCostResult">
+                  <div class="armguardCostSummary">
+                    <div><span>0→25강 기대 골드</span><strong>12,345,678G</strong><small>거래 9,000,000G · 재련 3,345,678G</small></div>
+                    <div><span>기대 실링</span><strong>123,456,789</strong><small>성장과 재련 시도 합계</small></div>
+                    <div><span>기대 재련 횟수</span><strong>321.5회</strong><small>25개 단계 합산</small></div>
+                    <div><span>장기백 기준 횟수</span><strong>999회</strong><small>단계별 천장 합산</small></div>
+                  </div>
+                  <div class="armguardMaterialList">
+                    ${['운명의 파편', '운명의 파괴석 결정', '운명의 수호석 결정', '운명의 돌파석', '상급 아비도스 융화제'].map(name => `<div class="armguardMaterialRow"><span>${name}</span><b>1,234,567</b><small>구매 1,234,567 · 99,999G</small></div>`).join('')}
+                  </div>
+                </div>
+              </section>
+            </div>
           </div>
         </div>
       </section>
@@ -69,6 +91,9 @@ async function verifyViewport(viewport) {
     children: Array.from(element.children).map(child => ({ className: child.className, client: child.clientWidth, scroll: child.scrollWidth }))
   }));
   assert.ok(widths.scroll <= widths.client + 1, `${viewport.width}px 시뮬레이터가 잘립니다: ${JSON.stringify(widths)}`);
+  const armguardPanel = page.locator('.armguardCostPanel');
+  const armguardFits = await armguardPanel.evaluate(element => element.scrollWidth <= element.clientWidth + 1);
+  assert.ok(armguardFits, `${viewport.width}px 완갑 기대비용 패널이 잘립니다.`);
 
   if (mobile) {
     const rowColumns = await page.locator('.specEfficiencyRow').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length);
@@ -79,6 +104,8 @@ async function verifyViewport(viewport) {
     assert.ok(scenarioFits, '모바일 A/B 비교값이 화면 안에 표시되어야 합니다.');
     const toolbarRows = await page.locator('.specEfficiencyToolbar').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length);
     assert.equal(toolbarRows, 3, '모바일 스펙업 필터는 3열이어야 합니다.');
+    const armguardSummaryColumns = await page.locator('.armguardCostSummary').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length);
+    assert.equal(armguardSummaryColumns, 2, '모바일 완갑 요약은 2열이어야 합니다.');
   }
 
   const scenarioName = await page.locator('.specScenarioPick input').getAttribute('aria-label');
