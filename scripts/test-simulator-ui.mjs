@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { access, readFile } from 'node:fs/promises';
+import { access, mkdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { chromium } from 'playwright';
 
 const systemChromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
@@ -66,6 +67,7 @@ function simulatorMarkup({ mobile }) {
                 <div class="armguardBreathMode" role="radiogroup" aria-label="완갑 숨결 적용 방식"><label><input type="radio" name="armguardBreathMode" value="none" /><span>노숨</span></label><label><input type="radio" name="armguardBreathMode" value="optimal" checked /><span>최적</span></label><label><input type="radio" name="armguardBreathMode" value="full" /><span>풀숨</span></label></div>
                 <div class="armguardCostResult">
                   <div class="armguardCostSummary">
+                    <div class="armguardPowerSummary"><span>0→25강 예상 전투력</span><strong>+838.15</strong><small>브레이커 기준 · 5,449.29 → 6,287.44 · +15.38%</small></div>
                     <div><span>0→25강 기대 골드</span><strong>12,345,678G</strong><small>거래 9,000,000G · 재련 3,345,678G</small></div>
                     <div><span>기대 실링</span><strong>123,456,789</strong><small>성장과 재련 시도 합계</small></div>
                     <div><span>기대 재련 횟수</span><strong>321.5회</strong><small>25개 단계 합산</small></div>
@@ -78,6 +80,7 @@ function simulatorMarkup({ mobile }) {
                     <section><div class="armguardMaterialHead"><span><b>재련 시도 재료</b><small>기대 시도 횟수 반영</small></span><strong>12,345,678G · 99,999,999 실링</strong></div><div class="armguardMaterialList">${['운명의 파편', '운명의 파괴석 결정', '운명의 수호석 결정', '운명의 돌파석', '상급 아비도스 융화제', '용암의 숨결', '빙하의 숨결', '골드', '실링'].map(name => `<div class="armguardMaterialRow"><span>${name}</span><b>1,234,567</b><small>구매 1,234,567 · 99,999G</small></div>`).join('')}</div></section>
                   </div>
                   <details class="armguardBreathDetails"><summary><span><b>단계별 숨결 최적 수량</b><small>용암·빙하 시세 기준</small></span></summary><div class="armguardBreathList"><div class="armguardBreathRow"><b>16→17강</b><span>용암 4 + 빙하 4</span><small>합산 8/20</small></div></div></details>
+                  <p class="powerCostHint armguardPowerEstimateNote">검색 캐릭터 기준 완갑 출시 전 예상치입니다.</p>
                 </div>
               </section>
               </div>
@@ -108,6 +111,7 @@ async function verifyViewport(viewport) {
   assert.equal(await page.locator('.armguardBreathMode input').count(), 3, '노숨·최적·풀숨 선택지가 모두 있어야 합니다.');
   assert.equal(await page.locator('.armguardBreathMode input:checked').getAttribute('value'), 'optimal', '최적 모드가 기본 선택이어야 합니다.');
   assert.equal(await page.locator('.armguardMaterialSections > section').count(), 2, '성장 재료와 재련 재료가 분리되어야 합니다.');
+  assert.equal(await page.locator('.armguardPowerSummary').count(), 1, '검색 캐릭터 기준 완갑 예상 전투력이 표시되어야 합니다.');
   const materialSectionsFit = await page.locator('.armguardMaterialSections').evaluate(element => element.scrollWidth <= element.clientWidth + 1);
   assert.ok(materialSectionsFit, `${viewport.width}px 재료 카드의 글자가 잘립니다.`);
   if (!mobile) {
@@ -135,6 +139,10 @@ async function verifyViewport(viewport) {
   const gemFold = page.getByText('장착 보석', { exact: true });
   await gemFold.click();
   assert.equal(await page.locator('.powerSnapshotColumns > .simulatorFold').nth(1).getAttribute('open'), null, '장착 보석 카드가 접혀야 합니다.');
+  if (process.env.SIMULATOR_SCREENSHOT_DIR) {
+    await mkdir(process.env.SIMULATOR_SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({ path: join(process.env.SIMULATOR_SCREENSHOT_DIR, `simulator-${viewport.width}.png`), fullPage: true });
+  }
   await page.close();
 }
 

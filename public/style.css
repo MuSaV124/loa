@@ -1347,6 +1347,20 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   font-size: 16px;
   line-height: 1.2;
 }
+.armguardCostSummary > .armguardPowerSummary {
+  border-left-color: #34d399;
+  background: rgba(6, 78, 59, .16);
+}
+.armguardCostSummary > .armguardPowerSummary strong {
+  color: #6ee7b7;
+}
+.armguardCostSummary > .armguardPowerSummary.unavailable {
+  border-left-color: rgba(148, 163, 184, .54);
+  background: rgba(15, 23, 42, .34);
+}
+.armguardCostSummary > .armguardPowerSummary.unavailable strong {
+  color: #cbd5e1;
+}
 .armguardMaterialList {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
@@ -1427,6 +1441,13 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
   border-left: 3px solid #fbbf24;
   background: rgba(251, 191, 36, .06);
   padding: 7px 9px;
+}
+.armguardPowerEstimateNote {
+  margin: 9px 0 0;
+  border-left: 3px solid #34d399;
+  background: rgba(16, 185, 129, .06);
+  padding: 7px 9px;
+  line-height: 1.55;
 }
 .armguardBreathDetails {
   margin-top: 8px;

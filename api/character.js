@@ -3,7 +3,7 @@ import { relicEngravingEffect } from '../public/engraving-math.js';
 import { CHARACTER_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
 import { extractCombatSkillEffects } from '../public/skill-effects.js';
 
-const API_VERSION = '5.9.10';
+const API_VERSION = '5.9.11';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -162,6 +162,21 @@ function parseTooltip(tooltip) {
   return typeof tooltip === 'object' ? tooltip : null;
 }
 
+export function extractProfileAttackBreakdown(profile) {
+  const attack = (Array.isArray(profile?.Stats) ? profile.Stats : []).find(row => row?.Type === '공격력');
+  const text = (Array.isArray(attack?.Tooltip) ? attack.Tooltip : [attack?.Tooltip])
+    .filter(Boolean)
+    .map(stripHtml)
+    .join(' ');
+  const baseMatch = text.match(/기본 공격력은\s*([\d,]+)/);
+  const adjustmentMatch = text.match(/공격력 증감 효과로 공격력이\s*([\d,]+)\s*증가/);
+  return {
+    attackPower: parseNumber(attack?.Value),
+    baseAttackPower: parseNumber(baseMatch?.[1]),
+    attackPowerAdjustment: parseNumber(adjustmentMatch?.[1])
+  };
+}
+
 const COMBAT_EQUIPMENT_TYPES = new Set(['무기', '투구', '상의', '하의', '장갑', '어깨', '완갑']);
 const ACCESSORY_EQUIPMENT_TYPES = new Set(['목걸이', '귀걸이', '반지']);
 
@@ -169,6 +184,7 @@ function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEff
   const equipmentSnapshot = extractEquipmentSnapshot(equipment);
   const gemSnapshot = extractGemSnapshot(gems);
   const arkGridSnapshot = extractArkGridSnapshot(arkGrid);
+  const attackBreakdown = extractProfileAttackBreakdown(profile);
   return {
     version: API_VERSION,
     source: 'lostark-open-api',
@@ -185,6 +201,9 @@ function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEff
       itemAvgLevel: parseNumber(profile?.ItemAvgLevel),
       itemMaxLevel: parseNumber(profile?.ItemMaxLevel),
       combatPower: parseNumber(profile?.CombatPower),
+      attackPower: attackBreakdown.attackPower,
+      baseAttackPower: attackBreakdown.baseAttackPower,
+      attackPowerAdjustment: attackBreakdown.attackPowerAdjustment,
       stats: Array.isArray(profile?.Stats) ? profile.Stats.map(row => ({ type: row.Type, value: parseNumber(row.Value), raw: row.Value })) : []
     },
     equipment: equipmentSnapshot,

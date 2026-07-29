@@ -1,12 +1,13 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.10';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.10';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.10';
-import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.10';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.10';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.10';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.10';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.10';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.9.10';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.11';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.11';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.11';
+import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.11';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.11';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.11';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.11';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.11';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.9.11';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.9.11';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -15,9 +16,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.9.10';
+} from './cache-policy.js?v=5.9.11';
 
-const VERSION = '5.9.10';
+const VERSION = '5.9.11';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -1602,6 +1603,21 @@ function findNormalHoningCalibration(snapshot, item, next = null) {
   return found ? { key, ...found } : null;
 }
 function estimateNormalHoningPowerDelta(item, snapshot, next = null) {
+  if (powerGearSlot(item) === 'armguard') {
+    const estimate = estimateArmguardCombatPower(
+      snapshot,
+      Number(next?.from ?? item?.honingLevel ?? 0),
+      Number(next?.to ?? Number(item?.honingLevel || 0) + 1)
+    );
+    if (estimate.available && Number(estimate.powerGain || 0) > 0) {
+      return {
+        value: round2(estimate.powerGain),
+        percent: round2(estimate.gainPercent),
+        confidence: 'estimated',
+        basis: estimate.basis
+      };
+    }
+  }
   const calibration = findNormalHoningCalibration(snapshot, item, next);
   if (calibration) {
     const official = snapshotOfficialCombatPower(snapshot);
@@ -2735,6 +2751,7 @@ function renderArmguardExpectedCost(priceMap) {
   const result = $('armguardCostResult');
   if (!result) return;
   const plan = calculateArmguardRangeExpectedCost(state.armguardRange.from, state.armguardRange.to, priceMap, state.armguardBreathMode);
+  const powerEstimate = estimateArmguardCombatPower(state.powerSnapshot, plan.from, plan.to);
   const cost = plan.cost || { rows: [], totalGold: 0, tradeGold: 0, fixedGold: 0, silver: 0 };
   const growthMaterialRows = renderArmguardMaterialRows(plan.growthCost);
   const refineMaterialRows = renderArmguardMaterialRows(plan.refineCost);
@@ -2770,8 +2787,12 @@ function renderArmguardExpectedCost(priceMap) {
       <b>${stage.from}→${stage.to}강</b><span>${escapeHtml(recommendation)}</span><small>${escapeHtml(combined)} · 기대 ${formatExpectedAmount(stage.expectedAttempts)}회 · ${escapeHtml(saving)}</small>
     </div>`;
   }).join('');
+  const powerSummary = powerEstimate.available
+    ? `<div class="armguardPowerSummary"><span>${plan.from}→${plan.to}강 예상 전투력</span><strong>+${formatNumber(Number(powerEstimate.powerGain || 0).toFixed(2))}</strong><small>${escapeHtml(powerEstimate.className || '검색 캐릭터')} 기준 · ${formatNumber(Number(powerEstimate.fromPower || 0).toFixed(2))} → ${formatNumber(Number(powerEstimate.toPower || 0).toFixed(2))} · +${Number(powerEstimate.gainPercent || 0).toFixed(2)}%</small></div>`
+    : `<div class="armguardPowerSummary unavailable"><span>${plan.from}→${plan.to}강 예상 전투력</span><strong>계산 대기</strong><small>${escapeHtml(powerEstimate.reason || '캐릭터 기준값 확인 필요')}</small></div>`;
   result.innerHTML = `
     <div class="armguardCostSummary">
+      ${powerSummary}
       <div><span>${plan.from}→${plan.to}강 기대 골드</span><strong>${formatGold(cost.totalGold)}</strong><small>거래 ${formatGold(cost.tradeGold)} · 재련 ${formatGold(cost.fixedGold)}</small></div>
       <div><span>기대 실링</span><strong>${formatNumber(Math.round(cost.silver || 0))}</strong><small>성장과 재련 시도 합계</small></div>
       <div><span>기대 재련 횟수</span><strong>${formatExpectedAmount(plan.expectedAttempts)}회</strong><small>${plan.stages.length}개 단계 합산</small></div>
@@ -2793,6 +2814,7 @@ function renderArmguardExpectedCost(priceMap) {
       <summary><span><b>단계별 숨결 최적 수량</b><small>${plan.hasBreathPrices ? `용암 ${formatGold(plan.lavaUnitGold)} · 빙하 ${formatGold(plan.glacierUnitGold)}` : '두 숨결 시세 확인 필요'}</small></span></summary>
       <div class="armguardBreathList">${breathRows}</div>
     </details>
+    <p class="powerCostHint armguardPowerEstimateNote">완갑 전투력은 공개된 +10/+15/+20/+25 효과와 역산한 +0 효과를 검색 캐릭터의 기본 공격력·무기 공격력·공식 전투력에 적용한 출시 전 예상치입니다. 10→11, 15→16, 20→21강은 등급 돌파 증가를 크게 반영했으며 실제 출시 데이터 확인 후 교체합니다.</p>
     ${hasMissingPrice ? '<p class="armguardCostWarning">시세가 없는 재료는 기대 골드 합계에서 제외되었습니다.</p>' : ''}`;
 }
 
