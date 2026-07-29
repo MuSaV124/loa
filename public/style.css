@@ -1246,7 +1246,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 }
 .armguardCostSummary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 7px;
 }
 .armguardCostSummary > div {

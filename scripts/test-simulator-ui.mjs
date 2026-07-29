@@ -64,6 +64,7 @@ function simulatorMarkup({ mobile }) {
                     <div><span>기대 실링</span><strong>123,456,789</strong><small>성장과 재련 시도 합계</small></div>
                     <div><span>기대 재련 횟수</span><strong>321.5회</strong><small>25개 단계 합산</small></div>
                     <div><span>장기백 기준 횟수</span><strong>999회</strong><small>단계별 천장 합산</small></div>
+                    <div><span>예상 장기백</span><strong>약 1.24회</strong><small>선택 구간 단계별 기대값 합산</small></div>
                   </div>
                   <div class="armguardMaterialList">
                     ${['운명의 파편', '운명의 파괴석 결정', '운명의 수호석 결정', '운명의 돌파석', '상급 아비도스 융화제'].map(name => `<div class="armguardMaterialRow"><span>${name}</span><b>1,234,567</b><small>구매 1,234,567 · 99,999G</small></div>`).join('')}
@@ -94,6 +95,10 @@ async function verifyViewport(viewport) {
   const armguardPanel = page.locator('.armguardCostPanel');
   const armguardFits = await armguardPanel.evaluate(element => element.scrollWidth <= element.clientWidth + 1);
   assert.ok(armguardFits, `${viewport.width}px 완갑 기대비용 패널이 잘립니다.`);
+  if (!mobile) {
+    const armguardSummaryColumns = await page.locator('.armguardCostSummary').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length);
+    assert.equal(armguardSummaryColumns, 5, '데스크톱 완갑 요약은 5열이어야 합니다.');
+  }
 
   if (mobile) {
     const rowColumns = await page.locator('.specEfficiencyRow').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length);

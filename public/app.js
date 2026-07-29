@@ -1,12 +1,12 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.7';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.7';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.7';
-import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.7';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.7';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.7';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.7';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.7';
-import { armguardHoningRowForCurrentStage, armguardHoningRowsBetween } from './armguard-honing.js?v=5.9.7';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.8';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.8';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.8';
+import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.8';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.8';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.8';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.8';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.8';
+import { NORMAL_HONING_PITY_RULES, armguardExpectedPityCount, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.9.8';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -15,9 +15,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.9.7';
+} from './cache-policy.js?v=5.9.8';
 
-const VERSION = '5.9.7';
+const VERSION = '5.9.8';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -285,10 +285,10 @@ const T4_NORMAL_HONING_BASE_RATES = {
   23: 0.5,
   24: 0.5
 };
-const T4_NORMAL_HONING_FAIL_BONUS_RATE = 0.1;
-const T4_NORMAL_HONING_MAX_RATE_MULTIPLIER = 2;
-const T4_NORMAL_HONING_ARTISAN_FACTOR = 0.46511;
-const T4_NORMAL_HONING_ARTISAN_LIMIT = 100;
+const T4_NORMAL_HONING_FAIL_BONUS_RATE = NORMAL_HONING_PITY_RULES.failBonusRate;
+const T4_NORMAL_HONING_MAX_RATE_MULTIPLIER = NORMAL_HONING_PITY_RULES.maxRateMultiplier;
+const T4_NORMAL_HONING_ARTISAN_FACTOR = NORMAL_HONING_PITY_RULES.artisanFactor;
+const T4_NORMAL_HONING_ARTISAN_LIMIT = NORMAL_HONING_PITY_RULES.artisanLimit;
 const T4_NORMAL_HONING_BOOK_BONUS_MULTIPLIER = 1;
 const T4_NORMAL_HONING_FULL_BREATH_BONUS_MULTIPLIER = 1;
 const T4_NORMAL_REFINE_ATTEMPT_COSTS = {
@@ -1380,15 +1380,17 @@ function calculateArmguardRangeExpectedCost(fromStage, toStage, priceMap) {
   let expectedMaterials = {};
   let expectedAttempts = 0;
   let pityAttempts = 0;
+  const expectedPityCount = armguardExpectedPityCount(fromStage, toStage);
   const stages = rows.map(row => {
     const stats = calculateNormalHoningAttemptStats(row);
+    const pityProbability = armguardPityProbability(row.ratePercent);
     expectedAttempts += stats.expectedAttempts;
     pityAttempts += stats.pityAttempts;
     expectedMaterials = mergeMaterials(
       expectedMaterials,
       buildHoningScenarioMaterials(row.growthMaterials, row.attemptMaterials, stats.expectedAttempts)
     );
-    return { ...row, ...stats };
+    return { ...row, ...stats, pityProbability };
   });
   const cost = calculateMaterialGoldCost(expectedMaterials, priceMap);
   return {
@@ -1397,6 +1399,7 @@ function calculateArmguardRangeExpectedCost(fromStage, toStage, priceMap) {
     stages,
     expectedAttempts,
     pityAttempts,
+    expectedPityCount,
     expectedMaterials,
     cost
   };
@@ -2678,6 +2681,7 @@ function renderArmguardExpectedCost(priceMap) {
       <div><span>기대 실링</span><strong>${formatNumber(Math.round(cost.silver || 0))}</strong><small>성장과 재련 시도 합계</small></div>
       <div><span>기대 재련 횟수</span><strong>${formatExpectedAmount(plan.expectedAttempts)}회</strong><small>${plan.stages.length}개 단계 합산</small></div>
       <div><span>장기백 기준 횟수</span><strong>${formatNumber(plan.pityAttempts)}회</strong><small>단계별 천장 합산</small></div>
+      <div><span>예상 장기백</span><strong>약 ${Number(plan.expectedPityCount || 0).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}회</strong><small>선택 구간 단계별 기대값 합산</small></div>
     </div>
     <div class="armguardMaterialList">${materialRows}</div>
     ${hasMissingPrice ? '<p class="armguardCostWarning">시세가 없는 재료는 기대 골드 합계에서 제외되었습니다.</p>' : ''}`;

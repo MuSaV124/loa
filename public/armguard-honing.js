@@ -27,6 +27,13 @@ const RAW_ARMGUARD_HONING_ROWS = [
   [25, 1.5, 607000, 6070000, 38470, 1280, 4015, 94, 62, 13160, 240000]
 ];
 
+export const NORMAL_HONING_PITY_RULES = Object.freeze({
+  failBonusRate: 0.1,
+  maxRateMultiplier: 2,
+  artisanFactor: 0.46511,
+  artisanLimit: 100
+});
+
 export const ARMGUARD_HONING_ROWS = RAW_ARMGUARD_HONING_ROWS.map(([
   stage,
   ratePercent,
@@ -68,4 +75,34 @@ export function armguardHoningRowsBetween(fromStage, toStage) {
   const from = Math.max(0, Math.min(24, Math.floor(Number(fromStage || 0))));
   const to = Math.max(from + 1, Math.min(25, Math.floor(Number(toStage || 25))));
   return ARMGUARD_HONING_ROWS.filter(row => row.from >= from && row.to <= to);
+}
+
+function armguardAttemptRatePercent(ratePercent, attempt) {
+  const base = Number(ratePercent || 0);
+  const bonus = base * NORMAL_HONING_PITY_RULES.failBonusRate * (Math.max(1, attempt) - 1);
+  return Math.min(base * NORMAL_HONING_PITY_RULES.maxRateMultiplier, base + bonus);
+}
+
+function armguardPityAttempts(ratePercent) {
+  let artisan = 0;
+  for (let attempt = 1; attempt < 10000; attempt += 1) {
+    artisan += armguardAttemptRatePercent(ratePercent, attempt) * NORMAL_HONING_PITY_RULES.artisanFactor;
+    if (artisan >= NORMAL_HONING_PITY_RULES.artisanLimit) return attempt + 1;
+  }
+  return 0;
+}
+
+export function armguardPityProbability(ratePercent) {
+  const pityAttempts = armguardPityAttempts(ratePercent);
+  if (!pityAttempts) return 0;
+  let probability = 1;
+  for (let attempt = 1; attempt < pityAttempts; attempt += 1) {
+    probability *= Math.max(0, 1 - armguardAttemptRatePercent(ratePercent, attempt) / 100);
+  }
+  return probability;
+}
+
+export function armguardExpectedPityCount(fromStage, toStage) {
+  return armguardHoningRowsBetween(fromStage, toStage)
+    .reduce((total, row) => total + armguardPityProbability(row.ratePercent), 0);
 }

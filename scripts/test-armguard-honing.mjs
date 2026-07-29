@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { ARMGUARD_HONING_ROWS, armguardHoningRowForCurrentStage, armguardHoningRowsBetween } from '../public/armguard-honing.js';
+import { ARMGUARD_HONING_ROWS, armguardExpectedPityCount, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from '../public/armguard-honing.js';
 
 assert.equal(ARMGUARD_HONING_ROWS.length, 25);
 assert.deepEqual(ARMGUARD_HONING_ROWS.map(row => row.stage), Array.from({ length: 25 }, (_, index) => index + 1));
@@ -37,5 +37,8 @@ assert.deepEqual(armguardHoningRowsBetween(0, 25).map(row => row.stage), Array.f
 assert.deepEqual(armguardHoningRowsBetween(10, 15).map(row => row.stage), [11, 12, 13, 14, 15]);
 assert.deepEqual(armguardHoningRowsBetween(24, 25).map(row => row.stage), [25]);
 assert.deepEqual(armguardHoningRowsBetween(20, 20).map(row => row.stage), [21]);
+assert.ok(Math.abs(armguardPityProbability(15) - 0.08477009984753305) < 1e-12);
+assert.ok(Math.abs(armguardExpectedPityCount(0, 25) - 2.4200610360786188) < 1e-12);
+assert.ok(armguardExpectedPityCount(10, 15) > 0);
 
 console.log('armguard honing tests passed');

@@ -1,4 +1,9 @@
-# Lost Ark Node Recommend Calculator v5.9.7
+# Lost Ark Node Recommend Calculator v5.9.8
+
+## v5.9.8
+
+- 완갑 선택 구간에서 평균적으로 예상되는 장기백 횟수를 추가했습니다.
+- 기존 장기백 기준 최대 재련 횟수는 별도 지표로 유지합니다.
 
 ## v5.9.7
 
