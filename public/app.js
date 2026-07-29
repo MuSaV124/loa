@@ -1,12 +1,12 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.8';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.8';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.8';
-import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.8';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.8';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.8';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.8';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.8';
-import { NORMAL_HONING_PITY_RULES, armguardExpectedPityCount, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.9.8';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.9';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.9';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.9';
+import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.9';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.9';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.9';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.9';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.9';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.9.9';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -15,9 +15,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.9.8';
+} from './cache-policy.js?v=5.9.9';
 
-const VERSION = '5.9.8';
+const VERSION = '5.9.9';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -68,6 +68,7 @@ const state = {
   specPlannerTarget: 0,
   specPlannerBudget: 1000000,
   armguardRange: { from: 0, to: 25 },
+  armguardBreathMode: 'optimal',
   specScenarioSelectedKeys: new Set(),
   pendingSharedScenario: null
 };
@@ -1331,7 +1332,7 @@ function calculateNormalHoningExpectedCost(baseMaterials, next, priceMap) {
   const maxBreath = Math.floor(Number(optional.breathName ? next.attemptMaterials?.[optional.breathName] : 0) || 0);
   const bookOptions = optional.bookName ? [false, true] : [false];
   const rows = [];
-  const breathOptions = maxBreath > 0 ? [0, maxBreath] : [0];
+  const breathOptions = maxBreath > 0 ? Array.from({ length: maxBreath + 1 }, (_, count) => count) : [0];
   for (const breathCount of breathOptions) {
     for (const useBook of bookOptions) {
       const strategy = { breathCount, maxBreath, useBook, bookName: optional.bookName };
@@ -1375,23 +1376,59 @@ function calculateNormalHoningExpectedCost(baseMaterials, next, priceMap) {
   return rows[0] || null;
 }
 
-function calculateArmguardRangeExpectedCost(fromStage, toStage, priceMap) {
+function calculateArmguardRangeExpectedCost(fromStage, toStage, priceMap, breathMode = 'optimal') {
   const rows = armguardHoningRowsBetween(fromStage, toStage);
+  const lavaUnitGold = unitGoldForMaterial(priceMap, '용암의 숨결');
+  const glacierUnitGold = unitGoldForMaterial(priceMap, '빙하의 숨결');
+  const hasBreathPrices = lavaUnitGold > 0 && glacierUnitGold > 0;
   let expectedMaterials = {};
+  let expectedGrowthMaterials = {};
+  let expectedRefineMaterials = {};
   let expectedAttempts = 0;
   let pityAttempts = 0;
-  const expectedPityCount = armguardExpectedPityCount(fromStage, toStage);
+  let expectedPityCount = 0;
   const stages = rows.map(row => {
-    const stats = calculateNormalHoningAttemptStats(row);
-    const pityProbability = armguardPityProbability(row.ratePercent);
+    const maxBreath = armguardBreathMaxCombined(row.to);
+    const breathOptions = armguardBreathMixesForMode(row.to, breathMode, hasBreathPrices);
+    const candidates = breathOptions.map(mix => {
+      const breathCount = mix.total;
+      const strategy = { breathCount, maxBreath };
+      const stats = calculateNormalHoningAttemptStats(row, strategy);
+      const attemptMaterials = { ...(row.attemptMaterials || {}) };
+      if (mix.lava > 0) addMaterialAmount(attemptMaterials, '용암의 숨결', mix.lava);
+      if (mix.glacier > 0) addMaterialAmount(attemptMaterials, '빙하의 숨결', mix.glacier);
+      const materials = buildHoningScenarioMaterials(row.growthMaterials, attemptMaterials, stats.expectedAttempts);
+      const cost = calculateMaterialGoldCost(materials, priceMap, { ownedMaterials: {} });
+      return { mix, breathCount, strategy, stats, attemptMaterials, materials, cost };
+    }).sort((a, b) => Number(a.cost.totalGold || 0) - Number(b.cost.totalGold || 0) || a.breathCount - b.breathCount);
+    const selected = candidates[0];
+    const baseline = candidates.find(candidate => candidate.breathCount === 0) || selected;
+    const stats = selected.stats;
+    const pityProbability = armguardPityProbability(row.ratePercent, stats.supportRatePercent);
     expectedAttempts += stats.expectedAttempts;
     pityAttempts += stats.pityAttempts;
+    expectedPityCount += pityProbability;
+    expectedGrowthMaterials = mergeMaterials(expectedGrowthMaterials, row.growthMaterials);
+    expectedRefineMaterials = mergeMaterials(expectedRefineMaterials, scaleMaterials(selected.attemptMaterials, stats.expectedAttempts));
     expectedMaterials = mergeMaterials(
       expectedMaterials,
-      buildHoningScenarioMaterials(row.growthMaterials, row.attemptMaterials, stats.expectedAttempts)
+      selected.materials
     );
-    return { ...row, ...stats, pityProbability };
+    return {
+      ...row,
+      ...stats,
+      pityProbability,
+      breathCount: selected.breathCount,
+      maxBreath,
+      lavaCount: selected.mix.lava,
+      glacierCount: selected.mix.glacier,
+      expectedGold: selected.cost.totalGold,
+      noBreathExpectedGold: baseline.cost.totalGold,
+      expectedSavings: Math.max(0, Number(baseline.cost.totalGold || 0) - Number(selected.cost.totalGold || 0))
+    };
   });
+  const growthCost = calculateMaterialGoldCost(expectedGrowthMaterials, priceMap);
+  const refineCost = calculateMaterialGoldCost(expectedRefineMaterials, priceMap, { ownedMaterials: growthCost.remainingOwned });
   const cost = calculateMaterialGoldCost(expectedMaterials, priceMap);
   return {
     from: rows[0]?.from ?? Number(fromStage || 0),
@@ -1400,6 +1437,15 @@ function calculateArmguardRangeExpectedCost(fromStage, toStage, priceMap) {
     expectedAttempts,
     pityAttempts,
     expectedPityCount,
+    breathMode,
+    hasBreathPrices,
+    lavaUnitGold,
+    glacierUnitGold,
+    breathEstimate: ARMGUARD_BREATH_ESTIMATE,
+    expectedGrowthMaterials,
+    expectedRefineMaterials,
+    growthCost,
+    refineCost,
     expectedMaterials,
     cost
   };
@@ -2250,11 +2296,12 @@ function renderSpecScenarioComparison() {
 }
 function renderSpecEfficiencyShell() {
   const scenarioOpen = window.matchMedia('(min-width: 761px)').matches ? ' open' : '';
-  return `<div class="powerSnapshotBlock powerEfficiencyPanel">
-    <div class="powerCostHead">
+  return `<details class="powerSnapshotBlock powerEfficiencyPanel simulatorFold" open>
+    <summary class="powerCostHead simulatorFoldSummary">
       <div><h3>스펙업 효율 순위</h3><p>전투력 상승률과 기대 골드를 한 줄에서 비교합니다.</p></div>
       <strong>낮을수록 효율적</strong>
-    </div>
+    </summary>
+    <div class="simulatorFoldBody">
     <section class="specPlannerPanel">
       <div class="specWorkspaceHead"><div><h4>목표 스펙업 경로</h4><p>효율이 좋은 다음 단계부터 순서대로 계산합니다.</p></div>
         <div class="specPlannerMode"><button type="button" data-planner-mode="target">목표 전투력</button><button type="button" data-planner-mode="budget">예산</button></div>
@@ -2282,7 +2329,8 @@ function renderSpecEfficiencyShell() {
     <div id="specEfficiencyTable" class="specEfficiencyTable">
       <p class="powerCostHint">재료 시세를 불러오는 중입니다.</p>
     </div>
-  </div>`;
+    </div>
+  </details>`;
 }
 function specEfficiencyScore(row) {
   const expectedGold = Number(row?.expectedCost?.expectedGold || 0);
@@ -2612,11 +2660,17 @@ function renderPowerCostPrep(snapshot) {
   </label>`).join('');
   const armguardFromOptions = Array.from({ length: 25 }, (_, stage) => `<option value="${stage}"${stage === state.armguardRange.from ? ' selected' : ''}>${stage}강</option>`).join('');
   const armguardToOptions = Array.from({ length: 25 }, (_, index) => index + 1).map(stage => `<option value="${stage}"${stage === state.armguardRange.to ? ' selected' : ''}>${stage}강</option>`).join('');
-  return `<div class="powerSnapshotBlock powerCostPrep">
-    <div class="powerCostHead">
+  const armguardBreathModes = [
+    { value: 'none', label: '노숨' },
+    { value: 'optimal', label: '최적' },
+    { value: 'full', label: '풀숨' }
+  ].map(mode => `<label><input type="radio" name="armguardBreathMode" value="${mode.value}"${state.armguardBreathMode === mode.value ? ' checked' : ''} /><span>${mode.label}</span></label>`).join('');
+  return `<details class="powerSnapshotBlock powerCostPrep simulatorFold" open>
+    <summary class="powerCostHead simulatorFoldSummary">
       <div><h3>T4 비용 계산</h3><p>일반 재련과 상급 재련의 거래 재료·귀속 재료·고정 골드를 나눠 기대 비용을 계산합니다.</p></div>
       <strong>시세 계산 연결</strong>
-    </div>
+    </summary>
+    <div class="simulatorFoldBody powerCostFoldBody">
     <div class="powerPheonPanel">
       <div class="powerBuildHeader"><b>페온/크리스탈 기준</b><span>LOSPI 최신 1시간 close</span></div>
       <div class="powerPheonGrid">
@@ -2636,10 +2690,11 @@ function renderPowerCostPrep(snapshot) {
           <label><span>목표 단계</span><select id="armguardToStage">${armguardToOptions}</select></label>
         </div>
       </div>
+      <div class="armguardBreathMode" role="radiogroup" aria-label="완갑 숨결 적용 방식">${armguardBreathModes}</div>
       <div id="armguardCostResult" class="armguardCostResult" aria-live="polite">
         <p class="armguardCostLoading">재료 시세를 불러오는 중입니다.</p>
       </div>
-      <p class="powerCostHint">각 단계의 장비 성장 재료는 1회, 재련 재료는 실패 보정과 장인의 기운을 반영한 기대 시도 횟수만큼 합산합니다. 숨결은 단계별 최대 사용 개수가 공개되기 전까지 제외합니다.</p>
+      <p class="powerCostHint armguardEstimateNote">예상 규칙: 목표 1~19강은 용암 5개+빙하 15개, 20~23강은 10개+15개, 24~25강은 20개+30개까지 함께 사용합니다. 공식 수량 공개 전 임시 배분이며 확인 즉시 교체합니다. 두 숨결을 단계별 비율로 함께 늘려 거래소 시세와 기대 성공률을 비교하고, 보유 재료는 최종 구매 비용에서 차감합니다.</p>
     </section>
     <div class="powerCostGrid">
       <div>
@@ -2652,7 +2707,8 @@ function renderPowerCostPrep(snapshot) {
         <p class="powerCostHint">보유 귀속 수량을 먼저 차감한 뒤 부족한 수량만 거래소 시세로 계산합니다. 입력값은 이 브라우저에 저장됩니다.</p>
       </div>
     </div>
-  </div>`;
+    </div>
+  </details>`;
 }
 
 function formatExpectedAmount(value) {
@@ -2661,20 +2717,59 @@ function formatExpectedAmount(value) {
   return amount.toLocaleString('ko-KR', { maximumFractionDigits: amount < 100 ? 1 : 0 });
 }
 
-function renderArmguardExpectedCost(priceMap) {
-  const result = $('armguardCostResult');
-  if (!result) return;
-  const plan = calculateArmguardRangeExpectedCost(state.armguardRange.from, state.armguardRange.to, priceMap);
-  const cost = plan.cost || { rows: [], totalGold: 0, tradeGold: 0, fixedGold: 0, silver: 0 };
-  const materialRows = (cost.rows || []).filter(row => !row.fixed && !row.silver).map(row => {
-    const detail = row.boundOnly
-      ? row.boundShortage ? '귀속 재료 부족' : '귀속 전용'
-      : row.missingPrice ? '시세 확인 필요' : `구매 ${formatExpectedAmount(row.purchased)} · ${formatGold(row.gold)}`;
+function renderArmguardMaterialRows(cost) {
+  return (cost?.rows || []).map(row => {
+    let detail = '';
+    if (row.fixed) detail = '고정 골드 소모';
+    else if (row.silver) detail = '실링 소모';
+    else if (row.boundOnly) detail = row.boundShortage ? '귀속 재료 부족' : '귀속 전용';
+    else if (row.missingPrice) detail = '시세 확인 필요';
+    else detail = `구매 ${formatExpectedAmount(row.purchased)} · ${formatGold(row.gold)}`;
     return `<div class="armguardMaterialRow${row.missingPrice || row.boundShortage ? ' missing' : ''}">
       <span>${escapeHtml(row.name)}</span><b>${formatExpectedAmount(row.required)}</b><small>${escapeHtml(detail)}</small>
     </div>`;
   }).join('');
+}
+
+function renderArmguardExpectedCost(priceMap) {
+  const result = $('armguardCostResult');
+  if (!result) return;
+  const plan = calculateArmguardRangeExpectedCost(state.armguardRange.from, state.armguardRange.to, priceMap, state.armguardBreathMode);
+  const cost = plan.cost || { rows: [], totalGold: 0, tradeGold: 0, fixedGold: 0, silver: 0 };
+  const growthMaterialRows = renderArmguardMaterialRows(plan.growthCost);
+  const refineMaterialRows = renderArmguardMaterialRows(plan.refineCost);
   const hasMissingPrice = (cost.rows || []).some(row => row.missingPrice);
+  const breathStages = plan.stages.filter(stage => Number(stage.breathCount || 0) > 0);
+  const firstBreathStage = breathStages[0] || null;
+  const modeLabel = plan.breathMode === 'none' ? '노숨' : plan.breathMode === 'full' ? '풀숨' : '최적';
+  const breathStartText = plan.breathMode === 'none'
+    ? '노숨 적용'
+    : plan.breathMode === 'full'
+      ? '풀숨 적용'
+      : !plan.hasBreathPrices
+        ? '시세 확인 필요'
+        : firstBreathStage
+          ? `${firstBreathStage.from}→${firstBreathStage.to}강`
+          : '선택 구간 미사용';
+  const breathStartDetail = plan.breathMode === 'none'
+    ? '모든 단계에서 숨결 재료 제외'
+    : plan.breathMode === 'full'
+      ? '모든 단계에서 예상 최대 배분 사용'
+      : firstBreathStage
+        ? `용암 ${formatExpectedAmount(firstBreathStage.lavaCount)} + 빙하 ${formatExpectedAmount(firstBreathStage.glacierCount)} · 합산 ${firstBreathStage.breathCount}/${firstBreathStage.maxBreath}`
+        : plan.hasBreathPrices
+          ? '현재 시세에서는 숨결 미사용이 최저 비용'
+          : '용암·빙하 시세를 불러오면 자동 계산';
+  const breathRows = plan.stages.map(stage => {
+    const recommendation = stage.breathCount > 0
+      ? `용암 ${formatExpectedAmount(stage.lavaCount)} + 빙하 ${formatExpectedAmount(stage.glacierCount)}`
+      : '미사용';
+    const combined = stage.breathCount > 0 ? `합산 ${stage.breathCount}/${stage.maxBreath}` : `합산 최대 ${stage.maxBreath}`;
+    const saving = stage.expectedSavings > 0 ? `${formatGold(stage.expectedSavings)} 절약` : '숨결 이득 없음';
+    return `<div class="armguardBreathRow">
+      <b>${stage.from}→${stage.to}강</b><span>${escapeHtml(recommendation)}</span><small>${escapeHtml(combined)} · 기대 ${formatExpectedAmount(stage.expectedAttempts)}회 · ${escapeHtml(saving)}</small>
+    </div>`;
+  }).join('');
   result.innerHTML = `
     <div class="armguardCostSummary">
       <div><span>${plan.from}→${plan.to}강 기대 골드</span><strong>${formatGold(cost.totalGold)}</strong><small>거래 ${formatGold(cost.tradeGold)} · 재련 ${formatGold(cost.fixedGold)}</small></div>
@@ -2682,14 +2777,29 @@ function renderArmguardExpectedCost(priceMap) {
       <div><span>기대 재련 횟수</span><strong>${formatExpectedAmount(plan.expectedAttempts)}회</strong><small>${plan.stages.length}개 단계 합산</small></div>
       <div><span>장기백 기준 횟수</span><strong>${formatNumber(plan.pityAttempts)}회</strong><small>단계별 천장 합산</small></div>
       <div><span>예상 장기백</span><strong>약 ${Number(plan.expectedPityCount || 0).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}회</strong><small>선택 구간 단계별 기대값 합산</small></div>
+      <div><span>숨결 방식 · ${escapeHtml(modeLabel)}</span><strong>${escapeHtml(breathStartText)}</strong><small>${escapeHtml(breathStartDetail)}</small></div>
     </div>
-    <div class="armguardMaterialList">${materialRows}</div>
+    <div class="armguardMaterialSections">
+      <section>
+        <div class="armguardMaterialHead"><span><b>장비 성장 재료</b><small>선택 구간마다 1회 소모</small></span><strong>${formatGold(plan.growthCost?.totalGold || 0)} · ${formatNumber(Math.round(plan.growthCost?.silver || 0))} 실링</strong></div>
+        <div class="armguardMaterialList">${growthMaterialRows || '<p>성장 재료가 없습니다.</p>'}</div>
+      </section>
+      <section>
+        <div class="armguardMaterialHead"><span><b>재련 시도 재료</b><small>기대 시도 횟수와 숨결 방식 반영</small></span><strong>${formatGold(plan.refineCost?.totalGold || 0)} · ${formatNumber(Math.round(plan.refineCost?.silver || 0))} 실링</strong></div>
+        <div class="armguardMaterialList">${refineMaterialRows || '<p>재련 재료가 없습니다.</p>'}</div>
+      </section>
+    </div>
+    <details class="armguardBreathDetails">
+      <summary><span><b>단계별 숨결 최적 수량</b><small>${plan.hasBreathPrices ? `용암 ${formatGold(plan.lavaUnitGold)} · 빙하 ${formatGold(plan.glacierUnitGold)}` : '두 숨결 시세 확인 필요'}</small></span></summary>
+      <div class="armguardBreathList">${breathRows}</div>
+    </details>
     ${hasMissingPrice ? '<p class="armguardCostWarning">시세가 없는 재료는 기대 골드 합계에서 제외되었습니다.</p>' : ''}`;
 }
 
 function bindArmguardCostControls(priceMap) {
   const fromSelect = $('armguardFromStage');
   const toSelect = $('armguardToStage');
+  const modeInputs = [...document.querySelectorAll('input[name="armguardBreathMode"]')];
   if (!fromSelect || !toSelect) return;
   const update = changed => {
     let from = Math.max(0, Math.min(24, Number(fromSelect.value || 0)));
@@ -2705,6 +2815,11 @@ function bindArmguardCostControls(priceMap) {
   };
   fromSelect.addEventListener('change', () => update('from'));
   toSelect.addEventListener('change', () => update('to'));
+  modeInputs.forEach(input => input.addEventListener('change', () => {
+    if (!input.checked) return;
+    state.armguardBreathMode = ['none', 'full'].includes(input.value) ? input.value : 'optimal';
+    renderArmguardExpectedCost(priceMap);
+  }));
   update();
 }
 async function loadT4MaterialPriceMap() {
@@ -2867,9 +2982,13 @@ function renderPowerSnapshot(snapshot) {
         <div><h3>현재 장비 분석</h3><p>효율 계산에 사용한 API 원자료를 확인합니다.</p></div>
         <span>보석 · 장비 · 악세 · 아크그리드</span>
       </div>
-      <div class="powerSnapshotBlock"><h3>장착 보석</h3><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
-      <div class="powerSnapshotBlock powerBuildPanel">
-        <h3>장비 파싱</h3>
+      <details class="powerSnapshotBlock simulatorFold" open>
+        <summary class="simulatorFoldSummary"><span><h3>장착 보석</h3><small>장착 중인 보석 11개와 귀속 여부</small></span></summary>
+        <div class="simulatorFoldBody"><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
+      </details>
+      <details class="powerSnapshotBlock powerBuildPanel simulatorFold" open>
+        <summary class="simulatorFoldSummary"><span><h3>장비 파싱</h3><small>장비 · 악세사리 · 아크그리드 원자료</small></span></summary>
+        <div class="simulatorFoldBody">
         <div class="powerBuildGrid">
           <div class="powerBuildColumn">
             <div class="powerBuildHeader"><b>장비</b><span>아바타 제외</span></div>
@@ -2880,7 +2999,8 @@ function renderPowerSnapshot(snapshot) {
             <div class="powerAccessoryList">${accessoryPanelRows || '<p>악세사리 정보를 찾지 못했습니다.</p>'}</div>
           </div>
         </div>
-      </div>
+        </div>
+      </details>
       ${renderPowerCostPrep(snapshot)}
     </div>
     <p class="powerSnapshotNote">일반/상급 재련 단계는 공식 API Tooltip에서 읽습니다. 상급 재련 전투력 상승량은 공개 산식이 없어 현재 공식 전투력 비율 기반 추정값으로 표시합니다.</p>

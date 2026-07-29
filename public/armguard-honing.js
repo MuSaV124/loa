@@ -34,6 +34,16 @@ export const NORMAL_HONING_PITY_RULES = Object.freeze({
   artisanLimit: 100
 });
 
+// Provisional until Smilegate publishes the armguard support-material caps.
+export const ARMGUARD_BREATH_ESTIMATE = Object.freeze({
+  official: false,
+  capsByTarget: Object.freeze([
+    Object.freeze({ min: 1, max: 19, lava: 5, glacier: 15 }),
+    Object.freeze({ min: 20, max: 23, lava: 10, glacier: 15 }),
+    Object.freeze({ min: 24, max: 25, lava: 20, glacier: 30 })
+  ])
+});
+
 export const ARMGUARD_HONING_ROWS = RAW_ARMGUARD_HONING_ROWS.map(([
   stage,
   ratePercent,
@@ -92,12 +102,20 @@ function armguardPityAttempts(ratePercent) {
   return 0;
 }
 
-export function armguardPityProbability(ratePercent) {
-  const pityAttempts = armguardPityAttempts(ratePercent);
+export function armguardPityProbability(ratePercent, supportRatePercent = 0) {
+  const support = Math.max(0, Number(supportRatePercent || 0));
+  const pityAttempts = (() => {
+    let artisan = 0;
+    for (let attempt = 1; attempt < 10000; attempt += 1) {
+      artisan += (armguardAttemptRatePercent(ratePercent, attempt) + support) * NORMAL_HONING_PITY_RULES.artisanFactor;
+      if (artisan >= NORMAL_HONING_PITY_RULES.artisanLimit) return attempt + 1;
+    }
+    return 0;
+  })();
   if (!pityAttempts) return 0;
   let probability = 1;
   for (let attempt = 1; attempt < pityAttempts; attempt += 1) {
-    probability *= Math.max(0, 1 - armguardAttemptRatePercent(ratePercent, attempt) / 100);
+    probability *= Math.max(0, 1 - (armguardAttemptRatePercent(ratePercent, attempt) + support) / 100);
   }
   return probability;
 }
@@ -105,4 +123,38 @@ export function armguardPityProbability(ratePercent) {
 export function armguardExpectedPityCount(fromStage, toStage) {
   return armguardHoningRowsBetween(fromStage, toStage)
     .reduce((total, row) => total + armguardPityProbability(row.ratePercent), 0);
+}
+
+export function armguardBreathMaxCombined(targetStage) {
+  const target = Math.max(1, Math.min(25, Math.floor(Number(targetStage || 1))));
+  const cap = ARMGUARD_BREATH_ESTIMATE.capsByTarget.find(row => target >= row.min && target <= row.max);
+  return Number(cap?.lava || 0) + Number(cap?.glacier || 0);
+}
+
+function greatestCommonDivisor(a, b) {
+  let left = Math.abs(Math.floor(Number(a || 0)));
+  let right = Math.abs(Math.floor(Number(b || 0)));
+  while (right) [left, right] = [right, left % right];
+  return left || 1;
+}
+
+export function armguardBreathMixes(targetStage) {
+  const target = Math.max(1, Math.min(25, Math.floor(Number(targetStage || 1))));
+  const cap = ARMGUARD_BREATH_ESTIMATE.capsByTarget.find(row => target >= row.min && target <= row.max);
+  if (!cap) return Object.freeze([{ lava: 0, glacier: 0, total: 0 }]);
+  const steps = greatestCommonDivisor(cap.lava, cap.glacier);
+  const lavaPerStep = cap.lava / steps;
+  const glacierPerStep = cap.glacier / steps;
+  return Object.freeze(Array.from({ length: steps + 1 }, (_, index) => Object.freeze({
+    lava: lavaPerStep * index,
+    glacier: glacierPerStep * index,
+    total: (lavaPerStep + glacierPerStep) * index
+  })));
+}
+
+export function armguardBreathMixesForMode(targetStage, mode = 'optimal', hasPrices = true) {
+  const mixes = armguardBreathMixes(targetStage);
+  if (mode === 'none') return Object.freeze([mixes[0]]);
+  if (mode === 'full') return Object.freeze([mixes.at(-1)]);
+  return hasPrices ? mixes : Object.freeze([mixes[0]]);
 }

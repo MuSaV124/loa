@@ -23,8 +23,9 @@ function simulatorMarkup({ mobile }) {
         </div>
         <div class="powerSnapshotView">
           <div class="powerSnapshotColumns">
-            <div class="powerSnapshotBlock powerEfficiencyPanel">
-              <div class="powerCostHead"><div><h3>스펙업 효율 순위</h3><p>전투력 상승률과 기대 골드를 비교합니다.</p></div></div>
+            <details class="powerSnapshotBlock powerEfficiencyPanel simulatorFold" open>
+              <summary class="powerCostHead simulatorFoldSummary"><div><h3>스펙업 효율 순위</h3><p>전투력 상승률과 기대 골드를 비교합니다.</p></div></summary>
+              <div class="simulatorFoldBody">
               <section class="specPlannerPanel">
                 <div class="specWorkspaceHead"><div><h4>목표 스펙업 경로</h4><p>효율이 좋은 다음 단계부터 계산합니다.</p></div><div class="specPlannerMode"><button>목표 전투력</button><button>예산</button></div></div>
                 <div class="specPlannerInputs"><label><span>목표 전투력</span><input value="5547" /></label></div>
@@ -47,9 +48,13 @@ function simulatorMarkup({ mobile }) {
                   <div class="specEfficiencyCost"><b>97.2만</b><span>1% 상승당</span></div>
                   <div class="specEfficiencyDetail">Lv.8 → Lv.9 · 최저가 기준 · 추정 전투력</div>
                 </div>
-              </div>
-            </div>
-            <div class="powerSnapshotBlock powerCostPrep">
+              </div></div>
+            </details>
+            <details class="powerSnapshotBlock simulatorFold" open><summary class="simulatorFoldSummary"><span><h3>장착 보석</h3></span></summary><div class="simulatorFoldBody"><div class="powerGemList"><span>보석</span></div></div></details>
+            <details class="powerSnapshotBlock powerBuildPanel simulatorFold" open><summary class="simulatorFoldSummary"><span><h3>장비 파싱</h3></span></summary><div class="simulatorFoldBody"><div class="powerBuildGrid"><div></div><div></div></div></div></details>
+            <details class="powerSnapshotBlock powerCostPrep simulatorFold" open>
+              <summary class="powerCostHead simulatorFoldSummary"><div><h3>T4 비용 계산</h3></div></summary>
+              <div class="simulatorFoldBody powerCostFoldBody">
               <section class="armguardCostPanel" aria-labelledby="armguardCostTitle">
                 <div class="armguardCostHeader">
                   <div><h4 id="armguardCostTitle">완갑 재련 기대비용</h4><p>장비 성장과 장인의 기운 천장을 포함한 구간별 평균 비용입니다.</p></div>
@@ -58,6 +63,7 @@ function simulatorMarkup({ mobile }) {
                     <label><span>목표 단계</span><select><option>25강</option></select></label>
                   </div>
                 </div>
+                <div class="armguardBreathMode" role="radiogroup" aria-label="완갑 숨결 적용 방식"><label><input type="radio" name="armguardBreathMode" value="none" /><span>노숨</span></label><label><input type="radio" name="armguardBreathMode" value="optimal" checked /><span>최적</span></label><label><input type="radio" name="armguardBreathMode" value="full" /><span>풀숨</span></label></div>
                 <div class="armguardCostResult">
                   <div class="armguardCostSummary">
                     <div><span>0→25강 기대 골드</span><strong>12,345,678G</strong><small>거래 9,000,000G · 재련 3,345,678G</small></div>
@@ -65,13 +71,17 @@ function simulatorMarkup({ mobile }) {
                     <div><span>기대 재련 횟수</span><strong>321.5회</strong><small>25개 단계 합산</small></div>
                     <div><span>장기백 기준 횟수</span><strong>999회</strong><small>단계별 천장 합산</small></div>
                     <div><span>예상 장기백</span><strong>약 1.24회</strong><small>선택 구간 단계별 기대값 합산</small></div>
+                    <div><span>숨결 추천 시작</span><strong>16→17강</strong><small>용암 4 + 빙하 12</small></div>
                   </div>
-                  <div class="armguardMaterialList">
-                    ${['운명의 파편', '운명의 파괴석 결정', '운명의 수호석 결정', '운명의 돌파석', '상급 아비도스 융화제'].map(name => `<div class="armguardMaterialRow"><span>${name}</span><b>1,234,567</b><small>구매 1,234,567 · 99,999G</small></div>`).join('')}
+                  <div class="armguardMaterialSections">
+                    <section><div class="armguardMaterialHead"><span><b>장비 성장 재료</b><small>선택 구간마다 1회 소모</small></span><strong>0G · 12,345,678 실링</strong></div><div class="armguardMaterialList">${['운명의 파편', '실링'].map(name => `<div class="armguardMaterialRow"><span>${name}</span><b>1,234,567</b><small>고정 소모</small></div>`).join('')}</div></section>
+                    <section><div class="armguardMaterialHead"><span><b>재련 시도 재료</b><small>기대 시도 횟수 반영</small></span><strong>12,345,678G · 99,999,999 실링</strong></div><div class="armguardMaterialList">${['운명의 파편', '운명의 파괴석 결정', '운명의 수호석 결정', '운명의 돌파석', '상급 아비도스 융화제', '용암의 숨결', '빙하의 숨결', '골드', '실링'].map(name => `<div class="armguardMaterialRow"><span>${name}</span><b>1,234,567</b><small>구매 1,234,567 · 99,999G</small></div>`).join('')}</div></section>
                   </div>
+                  <details class="armguardBreathDetails"><summary><span><b>단계별 숨결 최적 수량</b><small>용암·빙하 시세 기준</small></span></summary><div class="armguardBreathList"><div class="armguardBreathRow"><b>16→17강</b><span>용암 4 + 빙하 12</span><small>합산 16/20</small></div></div></details>
                 </div>
               </section>
-            </div>
+              </div>
+            </details>
           </div>
         </div>
       </section>
@@ -95,9 +105,14 @@ async function verifyViewport(viewport) {
   const armguardPanel = page.locator('.armguardCostPanel');
   const armguardFits = await armguardPanel.evaluate(element => element.scrollWidth <= element.clientWidth + 1);
   assert.ok(armguardFits, `${viewport.width}px 완갑 기대비용 패널이 잘립니다.`);
+  assert.equal(await page.locator('.armguardBreathMode input').count(), 3, '노숨·최적·풀숨 선택지가 모두 있어야 합니다.');
+  assert.equal(await page.locator('.armguardBreathMode input:checked').getAttribute('value'), 'optimal', '최적 모드가 기본 선택이어야 합니다.');
+  assert.equal(await page.locator('.armguardMaterialSections > section').count(), 2, '성장 재료와 재련 재료가 분리되어야 합니다.');
+  const materialSectionsFit = await page.locator('.armguardMaterialSections').evaluate(element => element.scrollWidth <= element.clientWidth + 1);
+  assert.ok(materialSectionsFit, `${viewport.width}px 재료 카드의 글자가 잘립니다.`);
   if (!mobile) {
     const armguardSummaryColumns = await page.locator('.armguardCostSummary').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length);
-    assert.equal(armguardSummaryColumns, 5, '데스크톱 완갑 요약은 5열이어야 합니다.');
+    assert.equal(armguardSummaryColumns, 3, '데스크톱 완갑 요약은 3열이어야 합니다.');
   }
 
   if (mobile) {
@@ -115,6 +130,11 @@ async function verifyViewport(viewport) {
 
   const scenarioName = await page.locator('.specScenarioPick input').getAttribute('aria-label');
   assert.match(scenarioName || '', /파천섬광 겁화/, 'B 체크박스가 비교 후보 이름을 포함해야 합니다.');
+  const foldCards = page.locator('.powerSnapshotColumns > .simulatorFold');
+  assert.equal(await foldCards.count(), 4, '시뮬레이터 주요 하위 카드 4개가 접기 UI여야 합니다.');
+  const gemFold = page.getByText('장착 보석', { exact: true });
+  await gemFold.click();
+  assert.equal(await page.locator('.powerSnapshotColumns > .simulatorFold').nth(1).getAttribute('open'), null, '장착 보석 카드가 접혀야 합니다.');
   await page.close();
 }
 
