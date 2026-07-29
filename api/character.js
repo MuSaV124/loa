@@ -3,7 +3,7 @@ import { relicEngravingEffect } from '../public/engraving-math.js';
 import { CHARACTER_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
 import { extractCombatSkillEffects } from '../public/skill-effects.js';
 
-const API_VERSION = '5.9.5';
+const API_VERSION = '5.9.6';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -162,7 +162,7 @@ function parseTooltip(tooltip) {
   return typeof tooltip === 'object' ? tooltip : null;
 }
 
-const COMBAT_EQUIPMENT_TYPES = new Set(['무기', '투구', '상의', '하의', '장갑', '어깨']);
+const COMBAT_EQUIPMENT_TYPES = new Set(['무기', '투구', '상의', '하의', '장갑', '어깨', '완갑']);
 const ACCESSORY_EQUIPMENT_TYPES = new Set(['목걸이', '귀걸이', '반지']);
 
 function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, skillEffects, arkGrid }) {
@@ -251,7 +251,7 @@ function parseEquipmentSnapshotItem(item) {
     honingLevel: firstFiniteNumber([
       item?.HoningLevel,
       matchNumber(name, [/^\s*\+([0-9]+)/]),
-      matchNumber(text, [/강화\s*단계[^0-9]{0,12}([0-9]+)/, /\+([0-9]+)\s*강/])
+      matchNumber(text, [/완갑\s*재련\s*단계[^0-9]{0,12}([0-9]+)/, /강화\s*단계[^0-9]{0,12}([0-9]+)/, /\+([0-9]+)\s*강/])
     ]),
     advancedHoningLevel: advancedHoningExcluded ? null : firstFiniteNumber([
       item?.AdvancedHoningLevel,

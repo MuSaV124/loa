@@ -1,11 +1,12 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.5';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.5';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.5';
-import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.5';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.5';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.5';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.5';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.5';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.6';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.6';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.6';
+import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.6';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.6';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.6';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.6';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.6';
+import { armguardHoningRowForCurrentStage } from './armguard-honing.js?v=5.9.6';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -14,9 +15,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.9.5';
+} from './cache-policy.js?v=5.9.6';
 
-const VERSION = '5.9.5';
+const VERSION = '5.9.6';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -193,6 +194,15 @@ const T4_GEAR_COST_RULES = {
     growthLabel: '장비 성장',
     limitBreakLabel: '한계돌파',
     limitBreakMaterials: ['고통의 가시'],
+    books: { weapon: [], armor: [] }
+  },
+  armguard: {
+    label: '완갑',
+    names: ['완갑'],
+    materials: ['운명의 파괴석 결정', '운명의 수호석 결정'],
+    leapstone: '운명의 돌파석',
+    fusion: '상급 아비도스 융화제',
+    growthLabel: '완갑 장비 성장',
     books: { weapon: [], armor: [] }
   }
 };
@@ -978,7 +988,7 @@ function renderPowerAccessoryRow(item, effects, extra = '', options = {}) {
   </div>`;
 }
 function sortCombatEquipmentForDisplay(items = []) {
-  const order = { '투구': 0, '머리장식': 0, '어깨': 1, '견갑': 1, '상의': 2, '하의': 3, '장갑': 4, '무기': 5 };
+  const order = { '투구': 0, '머리장식': 0, '어깨': 1, '견갑': 1, '상의': 2, '하의': 3, '장갑': 4, '무기': 5, '완갑': 6 };
   return items.slice().sort((a, b) => {
     const av = order[a?.type] ?? 99;
     const bv = order[b?.type] ?? 99;
@@ -1009,7 +1019,8 @@ function renderPowerArkGridPanel(arkGrid) {
   </div>`;
 }
 function classifyT4GearCostRule(item) {
-  const source = `${item?.name || ''} ${item?.grade || ''}`;
+  const source = `${item?.type || ''} ${item?.name || ''} ${item?.grade || ''}`;
+  if (source.includes('완갑')) return { key: 'armguard', ...T4_GEAR_COST_RULES.armguard };
   if (source.includes('전율')) return { key: 'upperAncient', ...T4_GEAR_COST_RULES.upperAncient };
   if (source.includes('결단') || source.includes('업화')) return { key: 'standard', ...T4_GEAR_COST_RULES.standard };
   return { key: 'unknown', label: '미분류', names: [], stone: {}, leapstone: '', fusion: '', books: { weapon: [], armor: [] } };
@@ -1055,6 +1066,7 @@ function costMaterialNamesForGear(item) {
   const tempering = advancedHoningTemperingMaterial(item);
   const names = [
     ...T4_SHARED_COST_MATERIALS,
+    ...(rule.materials || []),
     rule.stone?.[slot],
     rule.leapstone,
     rule.fusion,
@@ -1083,12 +1095,14 @@ function buildT4CostPrep(snapshot) {
 }
 function normalRefineCostSetForGear(item) {
   const rule = classifyT4GearCostRule(item);
+  if (rule.key === 'armguard') return 'armguard';
   if (rule.key === 'standard') return T4_NORMAL_REFINE_ATTEMPT_COSTS.ancient;
   if (rule.key === 'upperAncient') return T4_NORMAL_REFINE_ATTEMPT_COSTS.upperAncient;
   return null;
 }
 function normalGrowthCostSetForGear(item) {
   const rule = classifyT4GearCostRule(item);
+  if (rule.key === 'armguard') return 'armguard';
   if (rule.key === 'standard') return T4_NORMAL_GEAR_GROWTH_COSTS.ancient;
   return null;
 }
@@ -1104,6 +1118,23 @@ function addMaterialAmount(target, name, amount) {
   target[name] = Number(target[name] || 0) + qty;
 }
 function mergedNextNormalRefineMaterials(item) {
+  if (normalRefineCostSetForGear(item) === 'armguard') {
+    const row = armguardHoningRowForCurrentStage(item?.honingLevel);
+    if (!row) return null;
+    const attemptMaterials = { ...(row.attemptMaterials || {}) };
+    const growthMaterials = { ...(row.growthMaterials || {}) };
+    return {
+      from: row.from,
+      to: row.to,
+      ratePercent: row.ratePercent,
+      attemptMaterials,
+      growthMaterials,
+      materials: mergeMaterials(growthMaterials, attemptMaterials),
+      hasGrowth: true,
+      growthDataMissing: false,
+      growthLabel: '완갑 장비 성장'
+    };
+  }
   const attemptRow = normalCostRowForGear(item, normalRefineCostSetForGear(item));
   if (!attemptRow) return null;
   const attemptMaterials = { ...(attemptRow.materials || {}) };
@@ -1195,6 +1226,8 @@ function calculateMaterialGoldCost(materials, priceMap, options = {}) {
   };
 }
 function normalHoningBaseRatePercent(next) {
+  const explicitRate = Number(next?.ratePercent || 0);
+  if (Number.isFinite(explicitRate) && explicitRate > 0) return explicitRate;
   const from = Number(next?.from || 0);
   const rate = Number(T4_NORMAL_HONING_BASE_RATES[from] || 0);
   return Number.isFinite(rate) && rate > 0 ? rate : 0;
@@ -1362,6 +1395,7 @@ function isPowerWeaponItem(item) {
 }
 function powerGearSlot(item) {
   const text = `${item?.type || ''} ${item?.name || ''}`;
+  if (text.includes('완갑')) return 'armguard';
   if (text.includes('무기') || text.includes('臾닿린')) return 'weapon';
   if (text.includes('투구') || text.includes('머리') || text.includes('?ш뎄')) return 'head';
   if (text.includes('상의') || text.includes('?곸쓽')) return 'top';

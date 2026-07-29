@@ -1,4 +1,9 @@
-# Lost Ark Node Recommend Calculator v5.9.5
+# Lost Ark Node Recommend Calculator v5.9.6
+
+## v5.9.6
+
+- 완갑 1~25단계 장비 성장 비용, 1회 재련 재료, 기본 성공률을 추가했습니다.
+- 완갑은 기존 장인의 기운 계산을 재사용하며, 숨결은 단계별 최대 투입량이 확정되기 전까지 비용 계산에서 제외합니다.
 
 ## v5.9.5
 
