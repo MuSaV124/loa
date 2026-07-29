@@ -1,4 +1,9 @@
-# Lost Ark Node Recommend Calculator v5.9.9
+# Lost Ark Node Recommend Calculator v5.9.10
+
+## v5.9.10
+
+- 완갑 숨결 예상 배분을 단계별 `용암/빙하 10/10`, `15/15`, `25/25`의 동일 수량으로 변경했습니다.
+- 최적 모드는 부분 투입 없이 단계별 `노숨`과 고정 수량 `풀숨`의 현재 시세 기준 기대비용만 비교합니다.
 
 ## v5.9.9
 

@@ -38,9 +38,9 @@ export const NORMAL_HONING_PITY_RULES = Object.freeze({
 export const ARMGUARD_BREATH_ESTIMATE = Object.freeze({
   official: false,
   capsByTarget: Object.freeze([
-    Object.freeze({ min: 1, max: 19, lava: 5, glacier: 15 }),
-    Object.freeze({ min: 20, max: 23, lava: 10, glacier: 15 }),
-    Object.freeze({ min: 24, max: 25, lava: 20, glacier: 30 })
+    Object.freeze({ min: 1, max: 19, lava: 10, glacier: 10 }),
+    Object.freeze({ min: 20, max: 23, lava: 15, glacier: 15 }),
+    Object.freeze({ min: 24, max: 25, lava: 25, glacier: 25 })
   ])
 });
 
@@ -156,5 +156,5 @@ export function armguardBreathMixesForMode(targetStage, mode = 'optimal', hasPri
   const mixes = armguardBreathMixes(targetStage);
   if (mode === 'none') return Object.freeze([mixes[0]]);
   if (mode === 'full') return Object.freeze([mixes.at(-1)]);
-  return hasPrices ? mixes : Object.freeze([mixes[0]]);
+  return hasPrices ? Object.freeze([mixes[0], mixes.at(-1)]) : Object.freeze([mixes[0]]);
 }

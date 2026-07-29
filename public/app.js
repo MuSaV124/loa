@@ -1,12 +1,12 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.9';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.9';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.9';
-import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.9';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.9';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.9';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.9';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.9';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.9.9';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.10';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.10';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.10';
+import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.10';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.10';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.10';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.10';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.10';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.9.10';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -15,9 +15,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.9.9';
+} from './cache-policy.js?v=5.9.10';
 
-const VERSION = '5.9.9';
+const VERSION = '5.9.10';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2694,7 +2694,7 @@ function renderPowerCostPrep(snapshot) {
       <div id="armguardCostResult" class="armguardCostResult" aria-live="polite">
         <p class="armguardCostLoading">재료 시세를 불러오는 중입니다.</p>
       </div>
-      <p class="powerCostHint armguardEstimateNote">예상 규칙: 목표 1~19강은 용암 5개+빙하 15개, 20~23강은 10개+15개, 24~25강은 20개+30개까지 함께 사용합니다. 공식 수량 공개 전 임시 배분이며 확인 즉시 교체합니다. 두 숨결을 단계별 비율로 함께 늘려 거래소 시세와 기대 성공률을 비교하고, 보유 재료는 최종 구매 비용에서 차감합니다.</p>
+      <p class="powerCostHint armguardEstimateNote">예상 규칙: 목표 1~19강은 용암 10개+빙하 10개, 20~23강은 15개+15개, 24~25강은 25개+25개를 고정으로 함께 사용합니다. 공식 수량 공개 전 임시 배분이며 확인 즉시 교체합니다. 최적 모드는 노숨과 해당 단계 풀숨의 거래소 시세·기대 성공률만 비교하고, 보유 재료는 최종 구매 비용에서 차감합니다.</p>
     </section>
     <div class="powerCostGrid">
       <div>

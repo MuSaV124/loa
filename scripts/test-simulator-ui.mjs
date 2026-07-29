@@ -71,13 +71,13 @@ function simulatorMarkup({ mobile }) {
                     <div><span>기대 재련 횟수</span><strong>321.5회</strong><small>25개 단계 합산</small></div>
                     <div><span>장기백 기준 횟수</span><strong>999회</strong><small>단계별 천장 합산</small></div>
                     <div><span>예상 장기백</span><strong>약 1.24회</strong><small>선택 구간 단계별 기대값 합산</small></div>
-                    <div><span>숨결 추천 시작</span><strong>16→17강</strong><small>용암 4 + 빙하 12</small></div>
+                    <div><span>숨결 추천 시작</span><strong>16→17강</strong><small>용암 4 + 빙하 4</small></div>
                   </div>
                   <div class="armguardMaterialSections">
                     <section><div class="armguardMaterialHead"><span><b>장비 성장 재료</b><small>선택 구간마다 1회 소모</small></span><strong>0G · 12,345,678 실링</strong></div><div class="armguardMaterialList">${['운명의 파편', '실링'].map(name => `<div class="armguardMaterialRow"><span>${name}</span><b>1,234,567</b><small>고정 소모</small></div>`).join('')}</div></section>
                     <section><div class="armguardMaterialHead"><span><b>재련 시도 재료</b><small>기대 시도 횟수 반영</small></span><strong>12,345,678G · 99,999,999 실링</strong></div><div class="armguardMaterialList">${['운명의 파편', '운명의 파괴석 결정', '운명의 수호석 결정', '운명의 돌파석', '상급 아비도스 융화제', '용암의 숨결', '빙하의 숨결', '골드', '실링'].map(name => `<div class="armguardMaterialRow"><span>${name}</span><b>1,234,567</b><small>구매 1,234,567 · 99,999G</small></div>`).join('')}</div></section>
                   </div>
-                  <details class="armguardBreathDetails"><summary><span><b>단계별 숨결 최적 수량</b><small>용암·빙하 시세 기준</small></span></summary><div class="armguardBreathList"><div class="armguardBreathRow"><b>16→17강</b><span>용암 4 + 빙하 12</span><small>합산 16/20</small></div></div></details>
+                  <details class="armguardBreathDetails"><summary><span><b>단계별 숨결 최적 수량</b><small>용암·빙하 시세 기준</small></span></summary><div class="armguardBreathList"><div class="armguardBreathRow"><b>16→17강</b><span>용암 4 + 빙하 4</span><small>합산 8/20</small></div></div></details>
                 </div>
               </section>
               </div>

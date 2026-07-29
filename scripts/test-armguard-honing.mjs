@@ -43,23 +43,28 @@ assert.ok(armguardExpectedPityCount(10, 15) > 0);
 assert.equal(ARMGUARD_BREATH_ESTIMATE.official, false);
 assert.equal(armguardBreathMaxCombined(1), 20);
 assert.equal(armguardBreathMaxCombined(19), 20);
-assert.equal(armguardBreathMaxCombined(20), 25);
-assert.equal(armguardBreathMaxCombined(23), 25);
+assert.equal(armguardBreathMaxCombined(20), 30);
+assert.equal(armguardBreathMaxCombined(23), 30);
 assert.equal(armguardBreathMaxCombined(24), 50);
 assert.equal(armguardBreathMaxCombined(25), 50);
-assert.deepEqual(armguardBreathMixes(19), [
-  { lava: 0, glacier: 0, total: 0 },
-  { lava: 1, glacier: 3, total: 4 },
-  { lava: 2, glacier: 6, total: 8 },
-  { lava: 3, glacier: 9, total: 12 },
-  { lava: 4, glacier: 12, total: 16 },
-  { lava: 5, glacier: 15, total: 20 }
-]);
-assert.deepEqual(armguardBreathMixes(20)[2], { lava: 4, glacier: 6, total: 10 });
-assert.deepEqual(armguardBreathMixes(25).at(-1), { lava: 20, glacier: 30, total: 50 });
+assert.equal(armguardBreathMixes(19).length, 11);
+assert.deepEqual(armguardBreathMixes(19)[4], { lava: 4, glacier: 4, total: 8 });
+assert.deepEqual(armguardBreathMixes(20)[10], { lava: 10, glacier: 10, total: 20 });
+assert.deepEqual(armguardBreathMixes(25).at(-1), { lava: 25, glacier: 25, total: 50 });
 assert.deepEqual(armguardBreathMixesForMode(19, 'none', true), [{ lava: 0, glacier: 0, total: 0 }]);
-assert.deepEqual(armguardBreathMixesForMode(20, 'full', false), [{ lava: 10, glacier: 15, total: 25 }]);
-assert.equal(armguardBreathMixesForMode(25, 'optimal', true).length, 11);
+assert.deepEqual(armguardBreathMixesForMode(20, 'full', false), [{ lava: 15, glacier: 15, total: 30 }]);
+assert.deepEqual(armguardBreathMixesForMode(19, 'optimal', true), [
+  { lava: 0, glacier: 0, total: 0 },
+  { lava: 10, glacier: 10, total: 20 }
+]);
+assert.deepEqual(armguardBreathMixesForMode(20, 'optimal', true), [
+  { lava: 0, glacier: 0, total: 0 },
+  { lava: 15, glacier: 15, total: 30 }
+]);
+assert.deepEqual(armguardBreathMixesForMode(25, 'optimal', true), [
+  { lava: 0, glacier: 0, total: 0 },
+  { lava: 25, glacier: 25, total: 50 }
+]);
 assert.deepEqual(armguardBreathMixesForMode(25, 'optimal', false), [{ lava: 0, glacier: 0, total: 0 }]);
 
 console.log('armguard honing tests passed');
