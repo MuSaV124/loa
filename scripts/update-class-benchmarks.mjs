@@ -10,7 +10,7 @@ const settingStatsUrl = 'https://loagg.com/stats';
 const slotOrder = new Map([['해', 0], ['달', 1], ['별', 2]]);
 
 function normalize(value) {
-  return String(value || '').replace(/\s+/g, '').replace(/[·:]/g, '').toLowerCase();
+  return String(value || '').replace(/컴파인/g, '컴바인').replace(/\s+/g, '').replace(/[·:]/g, '').toLowerCase();
 }
 
 function resolveCombination(coreNumberCatalog, className, cores) {
@@ -149,7 +149,8 @@ function resolveCores(row, catalogItem, previousBuild, popularBuild) {
     };
   });
   if (cores.length && (cores.length !== 3 || cores.some(core => !slotOrder.has(core.slot)))) {
-    throw new Error(`${catalogItem.className} ${catalogItem.engraving}: 해/달/별 슬롯을 모두 확인하지 못했습니다.`);
+    const unresolved = cores.filter(core => !slotOrder.has(core.slot)).map(core => core.name).join(', ');
+    throw new Error(`${catalogItem.className} ${catalogItem.engraving}: 해/달/별 슬롯을 모두 확인하지 못했습니다. 미확인: ${unresolved || '없음'}`);
   }
   return cores.sort((a, b) => slotOrder.get(a.slot) - slotOrder.get(b.slot));
 }
@@ -168,7 +169,9 @@ function groupCatalog(scraped, previous, popularBuilds, coreNumberCatalog) {
     const builds = CLASS_BENCHMARK_CATALOG
       .filter(item => item.className === className)
       .map(item => {
-        const previousBuild = previousBuilds.get(`${normalize(className)}:${normalize(item.engraving)}`);
+        const previousBuild = [item.engraving, ...(item.previousEngravings || [])]
+          .map(engraving => previousBuilds.get(`${normalize(className)}:${normalize(engraving)}`))
+          .find(Boolean);
         const popularBuild = popularBuilds.get(`${normalize(className)}:${normalize(item.engraving)}`);
         const cores = resolveCores(row, item, previousBuild, popularBuild);
         const combination = resolveCombination(coreNumberCatalog, className, cores);
@@ -177,6 +180,7 @@ function groupCatalog(scraped, previous, popularBuilds, coreNumberCatalog) {
         }
         return {
           engraving: item.engraving,
+          role: item.role || 'dealer',
           cores,
           evolution: popularBuild?.evolution || item.evolution || previousBuild?.evolution,
           ratio: item.ratio,
@@ -202,8 +206,21 @@ async function main() {
     fs.readFile(outputPath, 'utf8').then(JSON.parse),
     fs.readFile(coreNumberPath, 'utf8').then(JSON.parse)
   ]);
+  const browserCandidates = [
+    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE,
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+  ].filter(Boolean);
+  let executablePath;
+  for (const candidate of browserCandidates) {
+    if (await fs.access(candidate).then(() => true).catch(() => false)) {
+      executablePath = candidate;
+      break;
+    }
+  }
   const browser = await chromium.launch({
     headless: true,
+    ...(executablePath ? { executablePath } : {}),
     args: ['--disable-blink-features=AutomationControlled']
   });
   try {
@@ -219,7 +236,7 @@ async function main() {
     ]);
     const classes = groupCatalog(scraped, previous, popularBuilds, coreNumberCatalog);
     const updated = {
-      version: 2,
+      version: 3,
       updatedAt: new Date().toISOString(),
       popularSettingsDate: scraped.dataDate,
       ratioBasisDate: '2026-07-22',
@@ -237,11 +254,11 @@ async function main() {
         { label: 'LOAGG 직업각인별 대표 세팅 통계', url: settingStatsUrl },
         { label: '7월 22일 밸런스 패치 후 루메루스 배율 표본', url: 'https://www.inven.co.kr/board/lostark/6271/3927487' }
       ],
-      excludedClasses: ['바드', '도화가'],
+      excludedClasses: [],
       classes
     };
     await fs.writeFile(outputPath, `${JSON.stringify(updated, null, 2)}\n`, 'utf8');
-    console.log(`updated ${classes.length} dealer classes, ${classes.reduce((sum, row) => sum + row.builds.length, 0)} engravings and ${popularBuilds.size} popular settings for ${scraped.dataDate}`);
+    console.log(`updated ${classes.length} classes, ${classes.reduce((sum, row) => sum + row.builds.length, 0)} engravings and ${popularBuilds.size} popular settings for ${scraped.dataDate}`);
   } finally {
     await browser.close();
   }

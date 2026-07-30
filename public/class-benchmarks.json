@@ -1,7 +1,7 @@
 {
-  "version": 2,
-  "updatedAt": "2026-07-26T21:44:23.990Z",
-  "popularSettingsDate": "2026-07-27",
+  "version": 3,
+  "updatedAt": "2026-07-30T09:52:25.337Z",
+  "popularSettingsDate": "2026-07-30",
   "ratioBasisDate": "2026-07-22",
   "filters": {
     "minCombatPower": 4500,
@@ -26,10 +26,7 @@
       "url": "https://www.inven.co.kr/board/lostark/6271/3927487"
     }
   ],
-  "excludedClasses": [
-    "바드",
-    "도화가"
-  ],
+  "excludedClasses": [],
   "classes": [
     {
       "className": "디스트로이어",
@@ -37,23 +34,24 @@
       "builds": [
         {
           "engraving": "분노의 망치",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "어스 웨이브",
-              "adoption": 3.8784067085953877,
+              "adoption": 3.877551020408163,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "중력 질주",
-              "adoption": 3.8784067085953877,
+              "adoption": 3.877551020408163,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "무모한 한방",
-              "adoption": 3.8784067085953877,
+              "adoption": 3.8945578231292517,
               "group": "질서"
             }
           ],
@@ -65,28 +63,29 @@
           },
           "combination": "333",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5343/147648",
-          "sampleUsers": 78,
+          "sampleUsers": 83,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%B6%84%EB%85%B8%EC%9D%98%20%EB%A7%9D%EC%B9%98"
         },
         {
           "engraving": "중력 수련",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "그라비티 코어",
-              "adoption": 8.193570929419986,
+              "adoption": 7.891156462585034,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "몰아치는 중력",
-              "adoption": 8.193570929419986,
+              "adoption": 7.891156462585034,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "대지 부수기",
-              "adoption": 8.193570929419986,
+              "adoption": 7.891156462585034,
               "group": "질서"
             }
           ],
@@ -98,7 +97,7 @@
           },
           "combination": "333",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5343/147648",
-          "sampleUsers": 172,
+          "sampleUsers": 159,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%A4%91%EB%A0%A5%20%EC%88%98%EB%A0%A8"
         }
       ]
@@ -109,23 +108,24 @@
       "builds": [
         {
           "engraving": "빛의 기사",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "종언",
-              "adoption": 5.156012176560122,
+              "adoption": 5.133767172812726,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "종언의 기사",
-              "adoption": 5.175038051750381,
+              "adoption": 5.151843817787419,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "진정한 종언",
-              "adoption": 5.878995433789954,
+              "adoption": 5.730296456977585,
               "group": "질서"
             }
           ],
@@ -139,6 +139,37 @@
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6335/3597",
           "sampleUsers": 152,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%B9%9B%EC%9D%98%20%EA%B8%B0%EC%82%AC"
+        },
+        {
+          "engraving": "해방자",
+          "role": "support",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "빛이 생명을 새긴다",
+              "adoption": 5.6941431670282,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "여명이 세상을 깨우는 순간",
+              "adoption": 5.89298626174982,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "성휘의 재",
+              "adoption": 9.219088937093275,
+              "group": "질서"
+            }
+          ],
+          "evolution": "마나 용광로",
+          "ratio": null,
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6335/3597",
+          "sampleUsers": 63,
+          "sourceUrl": "https://loagg.com/stats/setting/%ED%95%B4%EB%B0%A9%EC%9E%90",
+          "status": "서포트"
         }
       ]
     },
@@ -148,23 +179,24 @@
       "builds": [
         {
           "engraving": "광기",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "다크 파워",
-              "adoption": 8.014861995753716,
+              "adoption": 8.082329317269076,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "어둠의 격류",
-              "adoption": 8.09447983014862,
+              "adoption": 8.182730923694779,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "광란",
-              "adoption": 8.04140127388535,
+              "adoption": 8.082329317269076,
               "group": "질서"
             }
           ],
@@ -176,28 +208,29 @@
           },
           "combination": "111",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5341/150300",
-          "sampleUsers": 93,
+          "sampleUsers": 111,
           "sourceUrl": "https://loagg.com/stats/setting/%EA%B4%91%EA%B8%B0"
         },
         {
           "engraving": "광전사의 비기",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "콤비네이션",
-              "adoption": 5.201698513800425,
+              "adoption": 5.195783132530121,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "피의 순환",
-              "adoption": 6.714437367303609,
+              "adoption": 6.576305220883534,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "분쇄 폭풍",
-              "adoption": 4.750530785562633,
+              "adoption": 4.643574297188755,
               "group": "질서"
             }
           ],
@@ -210,7 +243,7 @@
           },
           "combination": "111",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5341/150300",
-          "sampleUsers": 66,
+          "sampleUsers": 83,
           "sourceUrl": "https://loagg.com/stats/setting/%EA%B4%91%EC%A0%84%EC%82%AC%EC%9D%98%20%EB%B9%84%EA%B8%B0"
         }
       ]
@@ -221,23 +254,24 @@
       "builds": [
         {
           "engraving": "처단자",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "격노폭발",
-              "adoption": 3.3642293168554755,
+              "adoption": 3.3880903490759753,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "교차된 힘",
-              "adoption": 3.3642293168554755,
+              "adoption": 3.3880903490759753,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "신중한 강타",
-              "adoption": 3.3642293168554755,
+              "adoption": 3.3880903490759753,
               "group": "질서"
             }
           ],
@@ -249,28 +283,29 @@
           },
           "combination": "333",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5995/42676",
-          "sampleUsers": 121,
+          "sampleUsers": 120,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%B2%98%EB%8B%A8%EC%9E%90"
         },
         {
           "engraving": "포식자",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "회오리",
-              "adoption": 10.727772056299347,
+              "adoption": 10.8145106091718,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "소용돌이",
-              "adoption": 13.027806385169928,
+              "adoption": 12.953456536618754,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "파괴의 바람",
-              "adoption": 10.8479231033299,
+              "adoption": 10.882956878850102,
               "group": "질서"
             }
           ],
@@ -282,7 +317,7 @@
           },
           "combination": "333",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5995/42676",
-          "sampleUsers": 73,
+          "sampleUsers": 131,
           "sourceUrl": "https://loagg.com/stats/setting/%ED%8F%AC%EC%8B%9D%EC%9E%90"
         }
       ]
@@ -293,23 +328,24 @@
       "builds": [
         {
           "engraving": "고독한 기사",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "전술 제어",
-              "adoption": 8.249294070189592,
+              "adoption": 8.397985572342453,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "방어 전술",
-              "adoption": 8.417372596477074,
+              "adoption": 8.561317544576017,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "방어 포격",
-              "adoption": 8.63251311012505,
+              "adoption": 8.731455015652648,
               "group": "질서"
             }
           ],
@@ -326,23 +362,24 @@
         },
         {
           "engraving": "전투 태세",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "천둥",
-              "adoption": 2.756487831114697,
+              "adoption": 2.633728052266231,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "번개폭풍",
-              "adoption": 2.7833803953206937,
+              "adoption": 2.660950047638492,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "광역 낙뢰",
-              "adoption": 4.3095334140110255,
+              "adoption": 4.158159793112835,
               "group": "질서"
             }
           ],
@@ -365,23 +402,24 @@
       "builds": [
         {
           "engraving": "심판자",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "성스러운 일격",
-              "adoption": 1.2031558185404339,
+              "adoption": 1.2946979038224413,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "천상의 검",
-              "adoption": 1.26232741617357,
+              "adoption": 1.2946979038224413,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "신성한 검",
-              "adoption": 1.222879684418146,
+              "adoption": 1.2741471434443075,
               "group": "질서"
             }
           ],
@@ -395,6 +433,37 @@
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5558/83545",
           "sampleUsers": 19,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%8B%AC%ED%8C%90%EC%9E%90"
+        },
+        {
+          "engraving": "축복의 오라",
+          "role": "support",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "진정한 정의",
+              "adoption": 8.75462392108508,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "신성한 대의",
+              "adoption": 8.13810110974106,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "검의 기도",
+              "adoption": 13.501849568434032,
+              "group": "질서"
+            }
+          ],
+          "evolution": "마나 용광로",
+          "ratio": null,
+          "combination": "221",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5558/83545",
+          "sampleUsers": 71,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%B6%95%EB%B3%B5%EC%9D%98%20%EC%98%A4%EB%9D%BC",
+          "status": "서포트"
         }
       ]
     },
@@ -403,24 +472,25 @@
       "group": "무도가",
       "builds": [
         {
-          "engraving": "세맥타통",
+          "engraving": "무상신공",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "무상기연",
-              "adoption": 3.234750462107209,
+              "adoption": 3.1572556162720096,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "신장대멸겁",
-              "adoption": 3.2655576093653726,
+              "adoption": 3.1572556162720096,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "불영세",
-              "adoption": 3.3271719038817005,
+              "adoption": 3.248330297510625,
               "group": "질서"
             }
           ],
@@ -432,28 +502,29 @@
           },
           "combination": "222",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5344/126192",
-          "sampleUsers": 50,
+          "sampleUsers": 67,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%AC%B4%EC%83%81%EC%8B%A0%EA%B3%B5"
         },
         {
           "engraving": "역천지체",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "광류연파",
-              "adoption": 7.424522489217498,
+              "adoption": 6.830601092896175,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "천류섬열풍",
-              "adoption": 7.424522489217498,
+              "adoption": 6.830601092896175,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "파공나선",
-              "adoption": 7.362908194701171,
+              "adoption": 6.769884638737098,
               "group": "질서"
             }
           ],
@@ -465,7 +536,7 @@
           },
           "combination": "222",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5344/126192",
-          "sampleUsers": 138,
+          "sampleUsers": 140,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%97%AD%EC%B2%9C%EC%A7%80%EC%B2%B4"
         }
       ]
@@ -476,23 +547,24 @@
       "builds": [
         {
           "engraving": "초심",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "극의귀원",
-              "adoption": 11.39405811296115,
+              "adoption": 11.237062592410053,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "초순환",
-              "adoption": 13.026444662095985,
+              "adoption": 12.978478725151962,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "용류 강화",
-              "adoption": 11.508325171400587,
+              "adoption": 11.483489403647116,
               "group": "질서"
             }
           ],
@@ -509,23 +581,24 @@
         },
         {
           "engraving": "오의 강화",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "오기강체",
-              "adoption": 2.0241593209271955,
+              "adoption": 2.1192705766387383,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "심안",
-              "adoption": 2.3832843617368593,
+              "adoption": 2.480696566453097,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "창풍극의",
-              "adoption": 1.7303297420829253,
+              "adoption": 1.7742730409068506,
               "group": "질서"
             }
           ],
@@ -548,23 +621,24 @@
       "builds": [
         {
           "engraving": "권왕파천무",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "충전된 충격",
-              "adoption": 9.823848238482384,
+              "adoption": 9.674634794156706,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "충격 충전",
-              "adoption": 9.776422764227643,
+              "adoption": 9.634794156706507,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "권왕십이식",
-              "adoption": 9.715447154471544,
+              "adoption": 9.594953519256308,
               "group": "질서"
             }
           ],
@@ -576,28 +650,29 @@
           },
           "combination": "331",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6155/32361",
-          "sampleUsers": 215,
+          "sampleUsers": 240,
           "sourceUrl": "https://loagg.com/stats/setting/%EA%B6%8C%EC%99%95%ED%8C%8C%EC%B2%9C%EB%AC%B4"
         },
         {
           "engraving": "수라의 길",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "그림자 주먹",
-              "adoption": 6.632791327913279,
+              "adoption": 6.766268260292165,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "수라결",
-              "adoption": 6.720867208672087,
+              "adoption": 6.852589641434263,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "수라",
-              "adoption": 6.7682926829268295,
+              "adoption": 6.905710491367862,
               "group": "질서"
             }
           ],
@@ -621,23 +696,24 @@
       "builds": [
         {
           "engraving": "오의난무",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "광파섬",
-              "adoption": 4.474548440065681,
+              "adoption": 4.77376504773765,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "풍뢰보",
-              "adoption": 4.289819376026273,
+              "adoption": 4.6699875466998755,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "신왕화신",
-              "adoption": 4.433497536945813,
+              "adoption": 4.6699875466998755,
               "group": "질서"
             }
           ],
@@ -654,23 +730,24 @@
         },
         {
           "engraving": "일격필살",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "뇌호",
-              "adoption": 9.339080459770114,
+              "adoption": 9.028642590286426,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "벽뢰호각",
-              "adoption": 9.339080459770114,
+              "adoption": 9.028642590286426,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "섬호뇌격",
-              "adoption": 9.35960591133005,
+              "adoption": 9.04939809049398,
               "group": "질서"
             }
           ],
@@ -693,23 +770,24 @@
       "builds": [
         {
           "engraving": "극의: 체술",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "대지 붕괴",
-              "adoption": 14.676173499702912,
+              "adoption": 14.430714916151809,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "투지 강화",
-              "adoption": 14.66131907308378,
+              "adoption": 14.416004707266843,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "대지 파괴",
-              "adoption": 14.66131907308378,
+              "adoption": 14.416004707266843,
               "group": "질서"
             }
           ],
@@ -726,23 +804,24 @@
         },
         {
           "engraving": "충격 단련",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "충격 억제",
-              "adoption": 1.0546642899584076,
+              "adoption": 0.9267431597528685,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "기력 절약",
-              "adoption": 1.0843731431966726,
+              "adoption": 0.9561635775228008,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "역발산",
-              "adoption": 1.0546642899584076,
+              "adoption": 0.9267431597528685,
               "group": "질서"
             }
           ],
@@ -765,23 +844,24 @@
       "builds": [
         {
           "engraving": "절정",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "연가 창식",
-              "adoption": 9.237210519429544,
+              "adoption": 9.196725505244308,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "청룡기",
-              "adoption": 9.132539578699463,
+              "adoption": 9.094397544128933,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "맹룡 회도",
-              "adoption": 10.79419076278948,
+              "adoption": 10.833972883090304,
               "group": "질서"
             }
           ],
@@ -798,23 +878,24 @@
         },
         {
           "engraving": "절제",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "연가일섬",
-              "adoption": 2.0672510794190764,
+              "adoption": 2.110514198004605,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "연환 타격",
-              "adoption": 2.211173622922936,
+              "adoption": 2.3919160910718853,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "환영",
-              "adoption": 2.224257490514196,
+              "adoption": 2.251215144538245,
               "group": "질서"
             }
           ],
@@ -837,23 +918,24 @@
       "builds": [
         {
           "engraving": "피스메이커",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "연회의 잔향",
-              "adoption": 6.149425287356322,
+              "adoption": 6.270627062706271,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "체인지 암즈",
-              "adoption": 6.045977011494253,
+              "adoption": 6.164545025931164,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "블로우 백",
-              "adoption": 6.137931034482759,
+              "adoption": 6.294200848656295,
               "group": "질서"
             }
           ],
@@ -865,28 +947,29 @@
           },
           "combination": "222",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5708/140969",
-          "sampleUsers": 172,
+          "sampleUsers": 166,
           "sourceUrl": "https://loagg.com/stats/setting/%ED%94%BC%EC%8A%A4%EB%A9%94%EC%9D%B4%EC%BB%A4"
         },
         {
           "engraving": "사냥의 시간",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "무법지대",
-              "adoption": 7.574712643678161,
+              "adoption": 7.307873644507308,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "불릿 무빙",
-              "adoption": 7.586206896551724,
+              "adoption": 7.31966053748232,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "풀 매거진",
-              "adoption": 7.64367816091954,
+              "adoption": 7.355021216407355,
               "group": "질서"
             }
           ],
@@ -898,7 +981,7 @@
           },
           "combination": "222",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5708/140969",
-          "sampleUsers": 159,
+          "sampleUsers": 148,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%82%AC%EB%83%A5%EC%9D%98%20%EC%8B%9C%EA%B0%84"
         }
       ]
@@ -908,24 +991,25 @@
       "group": "헌터",
       "builds": [
         {
-          "engraving": "전술 탄환",
+          "engraving": "강화 무기",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "샷건 오버로드",
-              "adoption": 14.628482972136222,
+              "adoption": 14.27882296189098,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "광란의 해결사",
-              "adoption": 14.628482972136222,
+              "adoption": 14.254703328509407,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "지배자의 탄환",
-              "adoption": 14.37048503611971,
+              "adoption": 13.965267727930536,
               "group": "질서"
             }
           ],
@@ -942,23 +1026,24 @@
         },
         {
           "engraving": "핸드거너",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "섀도우 불릿",
-              "adoption": 1.0319917440660475,
+              "adoption": 1.20598166907863,
               "group": "질서"
             },
             {
               "slot": "달",
-              "name": "이터널 리볼버",
-              "adoption": 0.41279669762641896,
+              "name": "하늘의 지배자",
+              "adoption": 0.8200675349734684,
               "group": "질서"
             },
             {
               "slot": "별",
-              "name": "끝없는 나선",
-              "adoption": 0.6965944272445821,
+              "name": "불릿 샤워",
+              "adoption": 0.8200675349734684,
               "group": "질서"
             }
           ],
@@ -968,9 +1053,10 @@
             "min": 0.88,
             "max": 0.92
           },
-          "combination": "133",
+          "combination": "111",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5345/156136",
-          "sourceUrl": "https://www.inven.co.kr/board/lostark/5345/162449"
+          "sampleUsers": 6,
+          "sourceUrl": "https://loagg.com/stats/setting/%ED%95%B8%EB%93%9C%EA%B1%B0%EB%84%88"
         }
       ]
     },
@@ -980,23 +1066,24 @@
       "builds": [
         {
           "engraving": "포격 강화",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "포화 전차",
-              "adoption": 13.303303303303304,
+              "adoption": 13.149847094801224,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "세이프 존",
-              "adoption": 13.093093093093094,
+              "adoption": 12.935779816513762,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "초토화",
-              "adoption": 13.153153153153154,
+              "adoption": 12.905198776758409,
               "group": "질서"
             }
           ],
@@ -1013,23 +1100,24 @@
         },
         {
           "engraving": "화력 강화",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "점핑맨",
-              "adoption": 1.8918918918918919,
+              "adoption": 1.926605504587156,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "질풍 포병",
-              "adoption": 1.5915915915915917,
+              "adoption": 1.5902140672782874,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "오토 락온",
-              "adoption": 2.2822822822822824,
+              "adoption": 2.293577981651376,
               "group": "질서"
             }
           ],
@@ -1052,23 +1140,24 @@
       "builds": [
         {
           "engraving": "아르데타인의 기술",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "펄스 노바",
-              "adoption": 1.7474447741510055,
+              "adoption": 1.8593644354293442,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "에너지 아포칼립스",
-              "adoption": 1.6155621496867787,
+              "adoption": 1.6227180527383367,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "제로백 버스트",
-              "adoption": 1.714474118034949,
+              "adoption": 1.8593644354293442,
               "group": "질서"
             }
           ],
@@ -1085,23 +1174,24 @@
         },
         {
           "engraving": "진화의 유산",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "타이탄 슈트",
-              "adoption": 8.572370590174744,
+              "adoption": 8.045977011494253,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "어썰트 타이탄",
-              "adoption": 9.858226178700956,
+              "adoption": 9.432048681541582,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "코어 리액터 증폭",
-              "adoption": 9.891196834817013,
+              "adoption": 9.364435429344152,
               "group": "질서"
             }
           ],
@@ -1124,23 +1214,24 @@
       "builds": [
         {
           "engraving": "두 번째 동료",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "TA-64 리퍼 볼트",
-              "adoption": 4.216867469879518,
+              "adoption": 4.233750745378653,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "HSU-08 고강도 케이블",
-              "adoption": 4.216867469879518,
+              "adoption": 4.293381037567084,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "HSU-57 근력 보조 장갑",
-              "adoption": 4.159495123350545,
+              "adoption": 4.203935599284437,
               "group": "질서"
             }
           ],
@@ -1157,23 +1248,24 @@
         },
         {
           "engraving": "죽음의 습격",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "TA-09 피어싱 애로우",
-              "adoption": 6.282271944922547,
+              "adoption": 5.307096004770424,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "HSU-13 특제 고폭약",
-              "adoption": 5.479059093516925,
+              "adoption": 4.3231961836613,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "HSU-04 자동 제어 스코프",
-              "adoption": 9.495123350545038,
+              "adoption": 7.9308288610614195,
               "group": "질서"
             }
           ],
@@ -1191,28 +1283,97 @@
       ]
     },
     {
+      "className": "바드",
+      "group": "마법사",
+      "builds": [
+        {
+          "engraving": "진실된 용맹",
+          "role": "dealer",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "템페스트 리프레인",
+              "adoption": 0.37620670073821694,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "세컨드 임팩트",
+              "adoption": 0.5820556501987507,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "사운드 블리츠",
+              "adoption": 0.5820556501987507,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": null,
+          "combination": "222",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5350/169602",
+          "sampleUsers": 7,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%A7%84%EC%8B%A4%EB%90%9C%20%EC%9A%A9%EB%A7%B9",
+          "status": "배율 표본 집계 중"
+        },
+        {
+          "engraving": "절실한 구원",
+          "role": "support",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "아리아 엑센트",
+              "adoption": 10.682850653038047,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "아리아 펄스",
+              "adoption": 10.469903463940943,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "벅샷 가속",
+              "adoption": 10.80352072685974,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": null,
+          "combination": "333",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5350/169602",
+          "sampleUsers": 25,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%A0%88%EC%8B%A4%ED%95%9C%20%EA%B5%AC%EC%9B%90",
+          "status": "서포트"
+        }
+      ]
+    },
+    {
       "className": "서머너",
       "group": "마법사",
       "builds": [
         {
           "engraving": "넘치는 교감",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "정령 결속",
-              "adoption": 1.944177093358999,
+              "adoption": 2.0011657276083157,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "결속 증폭",
-              "adoption": 1.9249278152069298,
+              "adoption": 2.0011657276083157,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "증폭 공명",
-              "adoption": 1.6554379210779595,
+              "adoption": 1.7680202059452108,
               "group": "질서"
             }
           ],
@@ -1229,23 +1390,24 @@
         },
         {
           "engraving": "상급 소환사",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "고대의 유산",
-              "adoption": 12.839268527430221,
+              "adoption": 12.725859724111134,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "오쉬의 지원",
-              "adoption": 13.801732435033687,
+              "adoption": 13.522440256460074,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "창세의 힘",
-              "adoption": 13.820981713185756,
+              "adoption": 13.522440256460074,
               "group": "질서"
             }
           ],
@@ -1268,23 +1430,24 @@
       "builds": [
         {
           "engraving": "점화",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "종말의 시작",
-              "adoption": 8.886534839924671,
+              "adoption": 8.778901734104046,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "반복된 종말",
-              "adoption": 8.898305084745763,
+              "adoption": 8.790944123314066,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "종말의 시",
-              "adoption": 8.780602636534839,
+              "adoption": 8.646435452793835,
               "group": "질서"
             }
           ],
@@ -1301,23 +1464,24 @@
         },
         {
           "engraving": "환류",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "편향",
-              "adoption": 4.119585687382298,
+              "adoption": 4.0101156069364166,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "교류",
-              "adoption": 2.7895480225988702,
+              "adoption": 2.8179190751445087,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "무결",
-              "adoption": 3.7900188323917137,
+              "adoption": 3.672928709055877,
               "group": "질서"
             }
           ],
@@ -1340,23 +1504,24 @@
       "builds": [
         {
           "engraving": "황제의 칙령",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "노말 인핸스",
-              "adoption": 6.830122591943958,
+              "adoption": 6.772312752279863,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "스택 홀드",
-              "adoption": 5.896088733216579,
+              "adoption": 5.755718343549111,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "셔플 댄스",
-              "adoption": 6.684179801517805,
+              "adoption": 6.503214232321723,
               "group": "질서"
             }
           ],
@@ -1373,23 +1538,24 @@
         },
         {
           "engraving": "황후의 은총",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "인피니티 덱",
-              "adoption": 8.756567425569177,
+              "adoption": 8.910150994169532,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "엣지 콤보",
-              "adoption": 5.750145942790426,
+              "adoption": 5.875317685752728,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "스트림 오브 엣지",
-              "adoption": 5.531231757151197,
+              "adoption": 5.755718343549111,
               "group": "질서"
             }
           ],
@@ -1409,23 +1575,24 @@
       "builds": [
         {
           "engraving": "멈출 수 없는 충동",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "오미너스",
-              "adoption": 13.307493540051679,
+              "adoption": 13.295880149812733,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "제노사이드",
-              "adoption": 11.434108527131784,
+              "adoption": 11.51685393258427,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "치명적인 할퀴기",
-              "adoption": 13.921188630490956,
+              "adoption": 14.169787765293384,
               "group": "질서"
             }
           ],
@@ -1437,28 +1604,29 @@
           },
           "combination": "332",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5498/68243",
-          "sampleUsers": 121,
+          "sampleUsers": 130,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%A9%88%EC%B6%9C%20%EC%88%98%20%EC%97%86%EB%8A%94%20%EC%B6%A9%EB%8F%99"
         },
         {
           "engraving": "완벽한 억제",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "매시브 컨슘",
-              "adoption": 1.2919896640826873,
+              "adoption": 1.0299625468164795,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "서브 스톰",
-              "adoption": 1.2919896640826873,
+              "adoption": 1.0299625468164795,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "파괴 광선",
-              "adoption": 1.2919896640826873,
+              "adoption": 1.0299625468164795,
               "group": "질서"
             }
           ],
@@ -1470,7 +1638,7 @@
           },
           "combination": "333",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5498/68243",
-          "sampleUsers": 43,
+          "sampleUsers": 41,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%99%84%EB%B2%BD%ED%95%9C%20%EC%96%B5%EC%A0%9C"
         }
       ]
@@ -1481,23 +1649,24 @@
       "builds": [
         {
           "engraving": "갈증",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "갈증의 악몽",
-              "adoption": 12.754107490949597,
+              "adoption": 12.606473594548552,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "치명적 악몽",
-              "adoption": 12.684489000278473,
+              "adoption": 12.56388415672913,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "치명적 연계",
-              "adoption": 9.454191033138402,
+              "adoption": 9.412265758091992,
               "group": "질서"
             }
           ],
@@ -1509,28 +1678,29 @@
           },
           "combination": "112",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5647/123288",
-          "sampleUsers": 157,
+          "sampleUsers": 153,
           "sourceUrl": "https://loagg.com/stats/setting/%EA%B0%88%EC%A6%9D"
         },
         {
           "engraving": "달의 소리",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
-              "name": "달의 향기",
-              "adoption": 1.6012252854358118,
+              "name": "달의 낙하",
+              "adoption": 1.8313458262350937,
               "group": "질서"
             },
             {
               "slot": "달",
-              "name": "페르소나",
-              "adoption": 1.670843776106934,
+              "name": "사일런트",
+              "adoption": 1.8313458262350937,
               "group": "질서"
             },
             {
               "slot": "별",
-              "name": "할루시네이션",
-              "adoption": 1.6290726817042607,
+              "name": "암살자의 그림자",
+              "adoption": 1.8313458262350937,
               "group": "질서"
             }
           ],
@@ -1540,9 +1710,9 @@
             "min": 1.24,
             "max": 1.24
           },
-          "combination": "111",
+          "combination": "222",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5647/123288",
-          "sampleUsers": 43,
+          "sampleUsers": 41,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%8B%AC%EC%9D%98%20%EC%86%8C%EB%A6%AC"
         }
       ]
@@ -1553,23 +1723,24 @@
       "builds": [
         {
           "engraving": "버스트",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "블레이드 버스트",
-              "adoption": 3.0913266207383856,
+              "adoption": 3.2818875288273905,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "버스트 코어",
-              "adoption": 3.1266560678325384,
+              "adoption": 3.3084974277097747,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "일격",
-              "adoption": 2.640876170287935,
+              "adoption": 2.82064928153273,
               "group": "질서"
             }
           ],
@@ -1586,23 +1757,24 @@
         },
         {
           "engraving": "잔재된 기운",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "일섬",
-              "adoption": 9.892245186362834,
+              "adoption": 9.411034238069895,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "블레이드 웨이브",
-              "adoption": 9.680268503797915,
+              "adoption": 9.25137484477559,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "죽음의 검기",
-              "adoption": 9.892245186362834,
+              "adoption": 9.428774170658151,
               "group": "질서"
             }
           ],
@@ -1625,23 +1797,24 @@
       "builds": [
         {
           "engraving": "그믐의 경계",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "사신의 부름",
-              "adoption": 5.923821548821548,
+              "adoption": 6.042536275094415,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "광월야",
-              "adoption": 5.892255892255892,
+              "adoption": 6.022659511031604,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "사신의 힘",
-              "adoption": 5.871212121212121,
+              "adoption": 5.992844364937389,
               "group": "질서"
             }
           ],
@@ -1653,28 +1826,29 @@
           },
           "combination": "222",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5996/29864",
-          "sampleUsers": 126,
+          "sampleUsers": 132,
           "sourceUrl": "https://loagg.com/stats/setting/%EA%B7%B8%EB%AF%90%EC%9D%98%20%EA%B2%BD%EA%B3%84"
         },
         {
           "engraving": "만월의 집행자",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "망자의 발걸음",
-              "adoption": 9.280303030303031,
+              "adoption": 9.073742794673027,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "소울 코어",
-              "adoption": 9.196127946127946,
+              "adoption": 8.994235738421786,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "빙의",
-              "adoption": 9.206649831649832,
+              "adoption": 9.00417412045319,
               "group": "질서"
             }
           ],
@@ -1686,7 +1860,7 @@
           },
           "combination": "333",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5996/29864",
-          "sampleUsers": 209,
+          "sampleUsers": 211,
           "sourceUrl": "https://loagg.com/stats/setting/%EB%A7%8C%EC%9B%94%EC%9D%98%20%EC%A7%91%ED%96%89%EC%9E%90"
         }
       ]
@@ -1697,23 +1871,24 @@
       "builds": [
         {
           "engraving": "질풍노도",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "비연참",
-              "adoption": 8.732476635514018,
+              "adoption": 8.87608069164265,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "우산의 춤",
-              "adoption": 8.800623052959502,
+              "adoption": 8.962536023054755,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "휘몰아치기",
-              "adoption": 13.950545171339565,
+              "adoption": 14.073006724303553,
               "group": "질서"
             }
           ],
@@ -1725,28 +1900,29 @@
           },
           "combination": "111",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5862/77546",
-          "sampleUsers": 143,
+          "sampleUsers": 136,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%A7%88%ED%92%8D%EB%85%B8%EB%8F%84"
         },
         {
           "engraving": "이슬비",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "해와 바람",
-              "adoption": 0.7496105919003115,
+              "adoption": 0.6532180595581172,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "뜨거운 햇볕",
-              "adoption": 1.4602803738317758,
+              "adoption": 1.4024975984630164,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "나그네의 외투를 벗긴건",
-              "adoption": 1.1779595015576323,
+              "adoption": 1.0278578290105667,
               "group": "질서"
             }
           ],
@@ -1758,8 +1934,76 @@
           },
           "combination": "333",
           "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5862/77546",
-          "sampleUsers": 52,
+          "sampleUsers": 55,
           "sourceUrl": "https://loagg.com/stats/setting/%EC%9D%B4%EC%8A%AC%EB%B9%84"
+        }
+      ]
+    },
+    {
+      "className": "도화가",
+      "group": "스페셜리스트",
+      "builds": [
+        {
+          "engraving": "회귀",
+          "role": "dealer",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "일필휘지",
+              "adoption": 0.4168793602177982,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "명필",
+              "adoption": 0.3232941977199251,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "끝없는 파죽",
+              "adoption": 0.3658329079462311,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": null,
+          "combination": "221",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5861/57733",
+          "sampleUsers": 14,
+          "sourceUrl": "https://loagg.com/stats/setting/%ED%9A%8C%EA%B7%80",
+          "status": "배율 표본 집계 중"
+        },
+        {
+          "engraving": "만개",
+          "role": "support",
+          "cores": [
+            {
+              "slot": "해",
+              "name": "몽글몽글",
+              "adoption": 10.660200782712268,
+              "group": "질서"
+            },
+            {
+              "slot": "달",
+              "name": "환영문짝",
+              "adoption": 10.073166581589247,
+              "group": "질서"
+            },
+            {
+              "slot": "별",
+              "name": "붓 콩콩",
+              "adoption": 15.866938914412115,
+              "group": "질서"
+            }
+          ],
+          "evolution": "입식 타격가",
+          "ratio": null,
+          "combination": "221",
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/5861/57733",
+          "sampleUsers": 62,
+          "sourceUrl": "https://loagg.com/stats/setting/%EB%A7%8C%EA%B0%9C",
+          "status": "서포트"
         }
       ]
     },
@@ -1768,24 +2012,25 @@
       "group": "스페셜리스트",
       "builds": [
         {
-          "engraving": "공간의 지배자",
+          "engraving": "공간 검사",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "차원 절단",
-              "adoption": 3.240740740740741,
+              "adoption": 4.513888888888889,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "정밀 조작",
-              "adoption": 3.240740740740741,
+              "adoption": 4.513888888888889,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "다중 절단",
-              "adoption": 3.240740740740741,
+              "adoption": 4.513888888888889,
               "group": "질서"
             }
           ],
@@ -1796,27 +2041,30 @@
             "max": 1.36
           },
           "combination": "333",
-          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6543/210"
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6543/210",
+          "sampleUsers": 24,
+          "sourceUrl": "https://loagg.com/stats/setting/%EA%B3%B5%EA%B0%84%20%EA%B2%80%EC%82%AC"
         },
         {
-          "engraving": "시간의 지배자",
+          "engraving": "시간 관리자",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "타임 키퍼",
-              "adoption": 7.407407407407407,
+              "adoption": 4.166666666666667,
               "group": "질서"
             },
             {
               "slot": "달",
-              "name": "컴바인 웨폰",
-              "adoption": 7.407407407407407,
+              "name": "컴파인 웨폰",
+              "adoption": 4.166666666666667,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "결합 강화",
-              "adoption": 7.407407407407407,
+              "adoption": 4.166666666666667,
               "group": "질서"
             }
           ],
@@ -1827,7 +2075,9 @@
             "max": 1
           },
           "combination": "111",
-          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6543/210"
+          "combinationSourceUrl": "https://www.inven.co.kr/board/lostark/6543/210",
+          "sampleUsers": 214,
+          "sourceUrl": "https://loagg.com/stats/setting/%EC%8B%9C%EA%B0%84%20%EA%B4%80%EB%A6%AC%EC%9E%90"
         }
       ]
     },
@@ -1837,23 +2087,24 @@
       "builds": [
         {
           "engraving": "야성",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "곰은 사람을 찢어",
-              "adoption": 13.875786163522013,
+              "adoption": 13.818181818181818,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "센 곰",
-              "adoption": 13.482704402515724,
+              "adoption": 13.535353535353535,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "필살 곰",
-              "adoption": 13.875786163522013,
+              "adoption": 13.818181818181818,
               "group": "질서"
             }
           ],
@@ -1870,23 +2121,24 @@
         },
         {
           "engraving": "환수 각성",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "무한 각성",
-              "adoption": 2.4764150943396226,
+              "adoption": 2.525252525252525,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "빙글빙글",
-              "adoption": 0.9237421383647799,
+              "adoption": 0.9494949494949495,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "붕붕 펀치",
-              "adoption": 2.161949685534591,
+              "adoption": 2.1818181818181817,
               "group": "질서"
             }
           ],
@@ -1909,23 +2161,24 @@
       "builds": [
         {
           "engraving": "드레드 로어",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "브랜디쉬",
-              "adoption": 4.383475244402397,
+              "adoption": 4.450757575757576,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "도미넌트",
-              "adoption": 6.117943866288237,
+              "adoption": 6.139520202020202,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "일당백",
-              "adoption": 4.446546830652791,
+              "adoption": 4.482323232323233,
               "group": "질서"
             }
           ],
@@ -1942,23 +2195,24 @@
         },
         {
           "engraving": "업화의 계승자",
+          "role": "dealer",
           "cores": [
             {
               "slot": "해",
               "name": "피니셔",
-              "adoption": 6.165247555976033,
+              "adoption": 6.123737373737374,
               "group": "질서"
             },
             {
               "slot": "달",
               "name": "노바 플레임",
-              "adoption": 6.102175969725638,
+              "adoption": 6.076388888888889,
               "group": "질서"
             },
             {
               "slot": "별",
               "name": "라스트 스탠드",
-              "adoption": 6.133711762850836,
+              "adoption": 6.092171717171717,
               "group": "질서"
             }
           ],

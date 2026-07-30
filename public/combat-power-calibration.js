@@ -43,6 +43,7 @@ export function classSpecArkGridMatches(row, snapshot) {
 
 export function findClassHoningSample(rows, snapshot, slot, fromLevel, toLevel) {
   const className = normalizeCalibrationText(snapshot?.profile?.className);
+  const secondClass = normalizeCalibrationText(snapshot?.profile?.secondClass);
   const targetSlot = normalizeCalibrationText(slot);
   const from = Number(fromLevel);
   const to = Number(toLevel);
@@ -54,18 +55,26 @@ export function findClassHoningSample(rows, snapshot, slot, fromLevel, toLevel) 
     && Number(row?.to) === to
   );
   if (!matches.length) return null;
-  const percents = matches.map(row => Number(row?.percent)).filter(value => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
+  const exactBuildMatches = matches.filter(row => classSpecArkGridMatches(row, snapshot));
+  const sameSpecMatches = matches.filter(row =>
+    Boolean(secondClass)
+    && normalizeCalibrationText(row?.secondClass || row?.scope?.secondClass) === secondClass
+  );
+  const selected = exactBuildMatches.length ? exactBuildMatches : sameSpecMatches.length ? sameSpecMatches : matches;
+  const percents = selected.map(row => Number(row?.percent)).filter(value => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
   if (!percents.length) return null;
   const middle = Math.floor(percents.length / 2);
   const percent = percents.length % 2 ? percents[middle] : (percents[middle - 1] + percents[middle]) / 2;
   return {
-    ...matches[0],
+    ...selected[0],
     percent,
-    sampleCount: matches.length,
-    confidence: 'class-sampled',
-    basis: matches.length > 1
-      ? `${matches.length} same-class slot/range samples median`
-      : 'same-class slot/range sample'
+    sampleCount: selected.length,
+    confidence: exactBuildMatches.length ? 'build-sampled' : sameSpecMatches.length ? 'spec-sampled' : 'class-sampled',
+    basis: exactBuildMatches.length
+      ? `${selected.length} same Ark Grid build slot/range sample${selected.length > 1 ? 's median' : ''}`
+      : sameSpecMatches.length
+        ? `${selected.length} same class engraving slot/range sample${selected.length > 1 ? 's median' : ''}`
+        : `${selected.length} same-class slot/range sample${selected.length > 1 ? 's median' : ''}`
   };
 }
 
@@ -94,7 +103,8 @@ export function calibrationScopeMatches(row, snapshot) {
 
 export function confidenceTier(confidence) {
   if (confidence === 'verified' || confidence === 'reference-verified') return 0;
-  if (confidence === 'class-sampled') return 1;
-  if (confidence === 'estimated' || confidence === 'class-estimated') return 2;
-  return 3;
+  if (['build-analyzed', 'build-sampled', 'spec-sampled'].includes(confidence)) return 1;
+  if (confidence === 'class-sampled') return 2;
+  if (['estimated', 'class-estimated', 'build-estimated'].includes(confidence)) return 3;
+  return 4;
 }

@@ -26,6 +26,7 @@ assert.equal(classSpecArkGridMatches({ className: '브레이커', secondClass: '
 assert.equal(classSpecArkGridMatches({ className: '브레이커', secondClass: '권왕파천무', arkGridSignature: '그림자 주먹:전설:20' }, snapshot), false);
 assert.equal(classSpecArkGridMatches({ className: '브레이커', secondClass: '수라의 길' }, snapshot), false);
 assert.ok(confidenceTier('verified') < confidenceTier('class-sampled'));
+assert.ok(confidenceTier('build-sampled') < confidenceTier('class-sampled'));
 assert.ok(confidenceTier('class-sampled') < confidenceTier('estimated'));
 
 const samples = JSON.parse(await readFile(new URL('./combat-power-class-samples.json', import.meta.url), 'utf8'));
@@ -88,6 +89,7 @@ for (const row of valkyrieRows) {
     row.to
   );
   assert.ok(match, `missing Valkyrie class sample for ${row.slot}`);
+  assert.equal(match.confidence, 'build-sampled');
 }
 
 const differentValkyrieBuild = {
@@ -95,13 +97,15 @@ const differentValkyrieBuild = {
   arkGrid: { slots: [{ name: '다른 코어', grade: '전설', point: 1 }] }
 };
 const valkyrieHead = valkyrieRows.find(row => row.slot === 'head');
-assert.ok(findClassHoningSample(
+const differentBuildMatch = findClassHoningSample(
   model.upgradeDelta.normalHoning.scopedSamples,
   differentValkyrieBuild,
   valkyrieHead.slot,
   valkyrieHead.from,
   valkyrieHead.to
-));
+);
+assert.ok(differentBuildMatch);
+assert.equal(differentBuildMatch.confidence, 'class-sampled');
 assert.ok(Math.abs(findClassHoningSample([
   { className: '발키리', slot: 'head', from: 21, to: 22, percent: 0.2 },
   { className: '발키리', slot: 'head', from: 21, to: 22, percent: 0.4 }

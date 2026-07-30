@@ -1,6 +1,6 @@
 {
   "name": "lostark-node-recommend-calculator",
-  "version": "5.9.12",
+  "version": "5.11.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,6 +11,9 @@
     "test:armguard-honing": "node scripts/test-armguard-honing.mjs",
     "test:armguard-power": "node scripts/test-armguard-power.mjs",
     "test:gem": "node scripts/test-gem-math.mjs",
+    "test:combat-analyzer": "node scripts/test-combat-analyzer.mjs",
+    "test:dealer-audit": "node scripts/test-dealer-simulator-audit.mjs",
+    "test:support-power": "node scripts/test-support-power.mjs",
     "test:combat-power": "node scripts/test-combat-power-calibration.mjs",
     "test:engraving": "node scripts/test-engraving-math.mjs",
     "test:class-benchmark": "node scripts/test-class-benchmark.mjs",
@@ -20,7 +23,8 @@
     "test:skill-effects": "node scripts/test-skill-effects.mjs",
     "test:skill-ui": "node scripts/test-skill-ui.mjs",
     "test:simulator-ui": "node scripts/test-simulator-ui.mjs",
-    "update:class-benchmarks": "node scripts/update-class-benchmarks.mjs"
+    "update:class-benchmarks": "node scripts/update-class-benchmarks.mjs",
+    "update:combat-analyzer": "node scripts/update-combat-analyzer-data.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.6.1",

@@ -1,6 +1,6 @@
 import { MARKET_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
 
-const API_VERSION = '5.8.20';
+const API_VERSION = '5.11.0';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -20,11 +20,28 @@ const ACCESSORY_RULES = {
     options: { primary: { key: 'critDamage', label: '치명타 피해', values: { high: 4.00, mid: 2.40, low: 1.10 } }, secondary: { key: 'critRate', label: '치명타 적중률', values: { high: 1.55, mid: 0.95, low: 0.40 } } }
   }
 };
+const SUPPORT_ACCESSORY_RULES = {
+  necklace: {
+    role: 'support', label: '목걸이', categoryCandidates: [200010, 200000, null], icon: 'https://cdn-lostark.game.onstove.com/efui_iconatlas/acc/acc_215.png',
+    options: { primary: { key: 'brandPower', label: '낙인력', values: { high: 8.00, mid: 4.80, low: 2.15 } }, secondary: { key: 'identityGain', label: '세레나데, 신앙, 조화 게이지 획득량', values: { high: 6.00, mid: 3.60, low: 1.60 } } }
+  },
+  earring: {
+    role: 'support', label: '귀걸이', categoryCandidates: [200020, 200000, null], icon: 'https://cdn-lostark.game.onstove.com/efui_iconatlas/acc/acc_115.png',
+    options: { primary: { key: 'partyHeal', label: '파티원 회복 효과', values: { high: 3.50, mid: 2.10, low: 0.95 } }, secondary: { key: 'partyShield', label: '파티원 보호막 효과', values: { high: 3.50, mid: 2.10, low: 0.95 } } }
+  },
+  ring: {
+    role: 'support', label: '반지', categoryCandidates: [200030, 200000, null], icon: 'https://cdn-lostark.game.onstove.com/efui_iconatlas/acc/acc_22.png',
+    options: { primary: { key: 'allyAttackBuff', label: '아군 공격력 강화 효과', values: { high: 5.00, mid: 3.00, low: 1.35 } }, secondary: { key: 'allyDamageBuff', label: '아군 피해량 강화 효과', values: { high: 7.50, mid: 4.50, low: 2.00 } } }
+  }
+};
 
 const COMBO_RULES = {
   highHigh: { label: '상상', primary: 'high', secondary: 'high' },
   highMid: { label: '상중', primary: 'high', secondary: 'mid' },
-  reverseHighMid: { label: '리버스 상중', primary: 'mid', secondary: 'high' }
+  reverseHighMid: { label: '리버스 상중', primary: 'mid', secondary: 'high' },
+  supportHighHigh: { label: '상상', primary: 'high', secondary: 'high' },
+  supportHighMid: { label: '상중', primary: 'high', secondary: 'mid' },
+  supportReverseHighMid: { label: '리버스 상중', primary: 'mid', secondary: 'high' }
 };
 
 const AUCTION_ETC_OPTION_FALLBACK = {
@@ -46,7 +63,7 @@ const ACCESSORY_REFINING_LABELS = [
   '적에게 주는 피해', '추가 피해', '공격력', '무기 공격력', '치명타 피해', '치명타 적중률',
   '최대 생명력', '최대 마나', '아군 공격력 강화 효과', '아군 피해량 강화 효과', '낙인력',
   '상태이상 공격 지속시간', '상태이상 공격 지속 시간', '전투 중 생명력 회복량', '회복 아이덴티티 획득량',
-  '무력화 피해', '파티원 보호막 효과', '파티원 회복 효과'
+  '무력화 피해', '파티원 보호막 효과', '파티원 회복 효과', '세레나데, 신앙, 조화 게이지 획득량'
 ];
 
 const GEM_RULES = {
@@ -144,7 +161,7 @@ async function makeAccessorySearchPlans(apiKey, rule, target, comboKey, partKey 
   // v5.4.5: 검증된 공식 연마 옵션 코드로 바로 검색해 cold start 요청 수를 줄인다.
   // 값은 auctionOptions의 EtcValues.Value 규칙(예: 2.00% => 200)을 사용한다.
   // 최종 판정은 응답의 ACCESSORY_UPGRADE 3개와 실제 Value만 사용한다.
-  const fallback = AUCTION_ETC_OPTION_FALLBACK[partKey] || {};
+  const fallback = rule?.role === 'support' ? {} : (AUCTION_ETC_OPTION_FALLBACK[partKey] || {});
   const hasVerifiedFallback = Boolean(fallback.primary && fallback.secondary);
   const optionData = hasVerifiedFallback ? null : await getAuctionOptionDataCached(apiKey);
   const primaryOfficial = optionData ? findAuctionEtcOption(optionData, target.primary.label) : null;
@@ -242,11 +259,13 @@ function resolveAuctionEtcValue(option, displayValue) {
 async function searchAccessory(apiKey, query) {
   const part = String(query.part || 'necklace');
   const combo = String(query.combo || 'highHigh');
-  const rule = ACCESSORY_RULES[part] || ACCESSORY_RULES.necklace;
+  const role = String(query.role || 'dealer') === 'support' ? 'support' : 'dealer';
+  const rules = role === 'support' ? SUPPORT_ACCESSORY_RULES : ACCESSORY_RULES;
+  const rule = rules[part] || rules.necklace;
   const comboRule = COMBO_RULES[combo] || COMBO_RULES.highHigh;
   const target = makeAccessoryTarget(rule, comboRule);
   const force = String(query.force || '') === '1';
-  const indexResult = await getAccessoryComboIndex(apiKey, { part, combo, rule, comboRule, target, force });
+  const indexResult = await getAccessoryComboIndex(apiKey, { role, part, combo, rule, comboRule, target, force });
   const matched = [...indexResult.items].sort((a, b) => a.price - b.price);
 
   return {
@@ -254,6 +273,7 @@ async function searchAccessory(apiKey, query) {
     apiVersion: API_VERSION,
     source: 'auctions/items-index-cache',
     mode: 'accessory',
+    role,
     part,
     partLabel: rule.label,
     combo,
@@ -276,7 +296,7 @@ async function searchAccessory(apiKey, query) {
 }
 
 async function getAccessoryComboIndex(apiKey, context) {
-  const cacheKey = `${context.part}:${context.combo}`;
+  const cacheKey = `${context.role || 'dealer'}:${context.part}:${context.combo}`;
   const now = Date.now();
   const cached = accessoryComboCache.get(cacheKey);
   if (!context.force && cached && cached.expiresAt > now) return { ...cached.data, cached: true };

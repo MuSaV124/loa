@@ -5042,3 +5042,39 @@ body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .tabNav {
     width: 100%;
   }
 }
+.supportPowerPanel {
+  border-color: rgba(95, 211, 186, .28);
+  background: linear-gradient(145deg, rgba(20, 53, 59, .84), rgba(18, 27, 42, .94));
+}
+.supportPowerGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.supportPowerMetric {
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid rgba(130, 218, 204, .16);
+  border-radius: 12px;
+  background: rgba(8, 18, 31, .46);
+}
+.supportPowerMetric span,
+.supportPowerMetric small {
+  display: block;
+  color: var(--muted, #9aa8bc);
+}
+.supportPowerMetric b {
+  display: block;
+  margin: 4px 0 3px;
+  color: #8ce8d2;
+  font-size: 1.23rem;
+}
+.supportPowerPanel > p {
+  margin: 11px 2px 0;
+  color: var(--muted, #9aa8bc);
+  font-size: .83rem;
+}
+@media (max-width: 760px) {
+  .supportPowerGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

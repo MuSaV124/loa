@@ -1,13 +1,15 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.12';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.12';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.12';
-import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.12';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.12';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.12';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.12';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.12';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.9.12';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.9.12';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.11.0';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.11.0';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.11.0';
+import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.11.0';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.11.0';
+import { findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.11.0';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.11.0';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.11.0';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.11.0';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.11.0';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.11.0';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.11.0';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -16,9 +18,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.9.12';
+} from './cache-policy.js?v=5.11.0';
 
-const VERSION = '5.9.12';
+const VERSION = '5.11.0';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -62,6 +64,7 @@ const state = {
   powerSnapshot: null,
   powerCostEstimates: [],
   combatPowerModel: null,
+  combatAnalyzer: null,
   classBenchmarks: null,
   specEfficiencyFilter: 'all',
   ownedMaterials: initialOwnedMaterials,
@@ -678,7 +681,7 @@ function extractEnlightenmentEffects(effects) {
     if (applied.has(sig)) continue;
     applied.add(sig);
     for (const key of ['critRate','critDamage','critHitDamage','evolutionDamage','enemyDamage','additionalDamage','attackSpeed','moveSpeed']) result[key] += Number(parsed[key] || 0);
-    result.items.push({ name: effect.name || '깨달음 효과', level: effect.level || 0, effects: parsed });
+    result.items.push({ name: effect.name || '깨달음 효과', level: effect.level || 0, effects: parsed, rawText: joined });
   }
   for (const key of ['critRate','critDamage','critHitDamage','evolutionDamage','enemyDamage','additionalDamage','attackSpeed','moveSpeed']) result[key] = Math.round(result[key] * 100) / 100;
   return result;
@@ -1468,6 +1471,25 @@ async function loadCombatPowerModel() {
   }
   return combatPowerModelPromise;
 }
+let combatAnalyzerPromise = null;
+async function loadCombatAnalyzer() {
+  if (state.combatAnalyzer) return state.combatAnalyzer;
+  if (!combatAnalyzerPromise) {
+    combatAnalyzerPromise = fetch('/combat-analyzer.json', { cache: 'no-store' })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        state.combatAnalyzer = data || null;
+        const summary = $('gemAnalyzerSummary');
+        if (summary && state.powerSnapshot) summary.innerHTML = gemAnalyzerSummaryHtml(state.powerSnapshot);
+        return state.combatAnalyzer;
+      })
+      .catch(() => {
+        state.combatAnalyzer = null;
+        return null;
+      });
+  }
+  return combatAnalyzerPromise;
+}
 function isPowerWeaponItem(item) {
   return powerGearSlot(item) === 'weapon';
 }
@@ -1560,7 +1582,7 @@ function normalHoningFallback(snapshot, item, next = null) {
     return {
       value: official * scopedPercent / 100,
       percent: scopedPercent,
-      confidence: 'class-sampled',
+      confidence: scopedSample?.confidence || 'class-sampled',
       basis: scopedSample?.basis || 'Lopec same-class slot/range before-after sample'
     };
   }
@@ -1575,7 +1597,7 @@ function normalHoningFallback(snapshot, item, next = null) {
     return {
       value: official * legacyClassPercent / 100,
       percent: legacyClassPercent,
-      confidence: 'class-sampled',
+      confidence: legacyClassSample?.confidence || 'class-sampled',
       basis: legacyClassSample?.basis || 'Lopec same-class slot/range before-after sample'
     };
   }
@@ -1800,10 +1822,21 @@ const SPEC_ACCESSORY_CANDIDATES = [
   { part: 'ring', label: '반지', combo: 'highMid', comboLabel: '상중', gradePair: ['상', '중'], gradeKeys: ['critDamage', 'critRate'], effects: { critDamage: 4.0, critRate: 0.95 } },
   { part: 'ring', label: '반지', combo: 'reverseHighMid', comboLabel: '중상', gradePair: ['중', '상'], gradeKeys: ['critDamage', 'critRate'], effects: { critDamage: 2.4, critRate: 1.55 } }
 ];
+const SUPPORT_ACCESSORY_CANDIDATES = [
+  { part: 'necklace', label: '목걸이', combo: 'supportHighHigh', comboLabel: '상상', gradePair: ['상', '상'], gradeKeys: ['brandPower', 'identityGain'], effects: { brandPower: 8.0, identityGain: 6.0 } },
+  { part: 'necklace', label: '목걸이', combo: 'supportHighMid', comboLabel: '상중', gradePair: ['상', '중'], gradeKeys: ['brandPower', 'identityGain'], effects: { brandPower: 8.0, identityGain: 3.6 } },
+  { part: 'necklace', label: '목걸이', combo: 'supportReverseHighMid', comboLabel: '중상', gradePair: ['중', '상'], gradeKeys: ['brandPower', 'identityGain'], effects: { brandPower: 4.8, identityGain: 6.0 } },
+  { part: 'earring', label: '귀걸이', combo: 'supportHighHigh', comboLabel: '상상', gradePair: ['상', '상'], gradeKeys: ['partyHeal', 'partyShield'], effects: { partyHeal: 3.5, partyShield: 3.5 } },
+  { part: 'earring', label: '귀걸이', combo: 'supportHighMid', comboLabel: '상중', gradePair: ['상', '중'], gradeKeys: ['partyHeal', 'partyShield'], effects: { partyHeal: 3.5, partyShield: 2.1 } },
+  { part: 'earring', label: '귀걸이', combo: 'supportReverseHighMid', comboLabel: '중상', gradePair: ['중', '상'], gradeKeys: ['partyHeal', 'partyShield'], effects: { partyHeal: 2.1, partyShield: 3.5 } },
+  { part: 'ring', label: '반지', combo: 'supportHighHigh', comboLabel: '상상', gradePair: ['상', '상'], gradeKeys: ['allyAttackBuff', 'allyDamageBuff'], effects: { allyAttackBuff: 5.0, allyDamageBuff: 7.5 } },
+  { part: 'ring', label: '반지', combo: 'supportHighMid', comboLabel: '상중', gradePair: ['상', '중'], gradeKeys: ['allyAttackBuff', 'allyDamageBuff'], effects: { allyAttackBuff: 5.0, allyDamageBuff: 4.5 } },
+  { part: 'ring', label: '반지', combo: 'supportReverseHighMid', comboLabel: '중상', gradePair: ['중', '상'], gradeKeys: ['allyAttackBuff', 'allyDamageBuff'], effects: { allyAttackBuff: 3.0, allyDamageBuff: 7.5 } }
+];
 const ACCESSORY_GRADE_SCORE = { 하: 1, 중: 2, 상: 3 };
-function accessoryUpgradeCandidates(equipped) {
+function accessoryUpgradeCandidates(equipped, support = false) {
   const rows = [];
-  for (const candidate of SPEC_ACCESSORY_CANDIDATES) {
+  for (const candidate of support ? SUPPORT_ACCESSORY_CANDIDATES : SPEC_ACCESSORY_CANDIDATES) {
     const matching = (equipped || []).filter(item => item?.type === candidate.label);
     matching.forEach((equippedItem, itemIndex) => {
       const grades = equippedItem?.effects?.optionGrades || {};
@@ -1871,6 +1904,37 @@ function accessoryPowerEstimate(candidate, snapshot = state.powerSnapshot) {
     basis: 'Lopec accessory option transition calibration; five dealer-class samples, build-specific estimate'
   };
 }
+function supportModelContext() {
+  return { selection: state.selected, skillEffects: state.skillEffects, enlightenmentItems: state.enlightenment?.items || [] };
+}
+function supportCombinedPowerEstimate(snapshot, upgradedSnapshot, officialPercent, basis) {
+  const before = supportContributionModel(snapshot, supportModelContext());
+  const after = supportContributionModel(upgradedSnapshot, supportModelContext());
+  const impact = supportUpgradeImpact({ before, after, officialPercent });
+  const official = snapshotOfficialCombatPower(snapshot);
+  return {
+    value: round2(official * Math.max(0, Number(impact.combinedPercent || 0)) / 100),
+    officialValue: round2(official * Math.max(0, Number(impact.officialPercent || 0)) / 100),
+    percent: round2(Math.max(0, Number(impact.combinedPercent || 0))),
+    officialPercent: round2(impact.officialPercent),
+    partyPercent: round2(impact.partyPercent),
+    carePercent: round2(impact.carePercent),
+    confidence: 'support-modeled',
+    basis,
+    metric: 'support-combined',
+    before,
+    after,
+    weights: impact.weights
+  };
+}
+function supportAccessoryPowerEstimate(candidate, snapshot = state.powerSnapshot) {
+  return supportCombinedPowerEstimate(
+    snapshot,
+    snapshotWithAccessoryCandidate(snapshot, candidate),
+    supportOfficialAccessoryTransition(candidate),
+    '공식 전투력 악세 계수 + 파티 버프/케어 기여 모델 (30/60/10)'
+  );
+}
 function combatPowerFeaturePerUnit(key) {
   const value = Number(state.combatPowerModel?.features?.[key]?.perUnit || 0);
   return Number.isFinite(value) && value > 0 ? value : 0;
@@ -1918,22 +1982,23 @@ function specMarketCost(price, pheonCost = 0) {
 }
 async function calculateAccessorySpecEstimates() {
   const equipped = state.powerSnapshot?.effects?.accessory?.items || state.accessory?.items || [];
-  const candidates = accessoryUpgradeCandidates(equipped);
+  const support = isSupportPowerSnapshot(state.powerSnapshot);
+  const candidates = accessoryUpgradeCandidates(equipped, support);
   if (!candidates.length) {
     return [{ category: 'accessory', item: { type: '악세', name: '다음 옵션 후보' }, available: false, reason: '현재 악세에서 상상·상중·중상으로 올릴 후보 없음', powerDelta: 0, cost: {}, expectedCost: {} }];
   }
   const rows = await Promise.all(candidates.map(async candidate => {
     try {
-      const data = await fetchMarketJson(`/api/market-prices?mode=accessory&part=${encodeURIComponent(candidate.part)}&combo=${encodeURIComponent(candidate.combo)}`);
+      const data = await fetchMarketJson(`/api/market-prices?mode=accessory&role=${support ? 'support' : 'dealer'}&part=${encodeURIComponent(candidate.part)}&combo=${encodeURIComponent(candidate.combo)}`);
       const item = data.lowest || data.items?.[0] || null;
       const price = Number(item?.price || 0);
-      const powerEstimate = accessoryPowerEstimate(candidate, state.powerSnapshot);
+      const powerEstimate = support ? supportAccessoryPowerEstimate(candidate, state.powerSnapshot) : accessoryPowerEstimate(candidate, state.powerSnapshot);
       const powerDelta = round2(powerEstimate.value);
       const cost = specMarketCost(price, item?.pheonCost || 0);
       return {
         category: 'accessory',
         item: { type: candidate.instanceLabel, name: candidate.equippedItem?.name || `${candidate.label} ${candidate.comboLabel}`, icon: item?.icon || '', quality: item?.quality },
-        available: price > 0 && powerDelta > 0,
+        available: price > 0 && Number(powerEstimate.percent || 0) > 0,
         from: '',
         to: candidate.comboLabel,
         cost,
@@ -1958,11 +2023,7 @@ function gemKindLabel(gem) {
   return '겁화';
 }
 function isSupportPowerSnapshot(snapshot) {
-  const className = normalizePowerModelText(snapshot?.profile?.className);
-  if (['바드', '도화가', '홀리나이트'].includes(className)) return true;
-  const items = Array.isArray(snapshot?.effects?.accessory?.items) ? snapshot.effects.accessory.items : [];
-  const supportTotal = items.reduce((sum, item) => sum + ['brandPower', 'allyAttackBuff', 'allyDamageBuff'].reduce((part, key) => part + Number(item?.effects?.[key] || 0), 0), 0);
-  return className === '발키리' && supportTotal > 0;
+  return isSupportSnapshot(snapshot);
 }
 function gemPowerEstimate(snapshot, currentLevel, nextLevel, count) {
   const role = isSupportPowerSnapshot(snapshot) ? 'support' : 'dealer';
@@ -1991,6 +2052,38 @@ function gemPowerEstimate(snapshot, currentLevel, nextLevel, count) {
     basis: row.basis || `Lopec ${role} gem level transition calibration`
   };
 }
+function gemAnalyzerPowerEstimate(snapshot, gem, nextLevel) {
+  const analysis = gemUpgradeEfficiency({
+    data: state.combatAnalyzer,
+    snapshot,
+    skillEffects: state.skillEffects,
+    gem,
+    nextLevel,
+    support: isSupportPowerSnapshot(snapshot)
+  });
+  if (!analysis) return null;
+  const official = snapshotOfficialCombatPower(snapshot);
+  const percent = Math.max(0, Number(analysis.gainPercent || 0));
+  return {
+    value: round2(official * percent / 100),
+    percent: round2(percent),
+    confidence: analysis.match === 'ark-grid' ? 'build-analyzed' : 'build-estimated',
+    basis: analysis.match === 'ark-grid'
+      ? `Ark Grid combat analyzer ${analysis.analyzerTag}`
+      : `class engraving combat analyzer fallback ${analysis.analyzerTag}`,
+    metric: 'damage',
+    analysis
+  };
+}
+function supportGemPowerEstimate(snapshot, gem, nextLevel) {
+  const officialEstimate = gemPowerEstimate(snapshot, Number(gem?.level || 0), nextLevel, 1);
+  return supportCombinedPowerEstimate(
+    snapshot,
+    snapshotWithGemLevel(snapshot, gem, nextLevel),
+    Number(officialEstimate?.percent || 0),
+    `${officialEstimate?.basis || '공식 전투력 보석 보정 표본'} + 파티 버프/케어 기여 모델 (30/60/10)`
+  );
+}
 async function calculateGemSpecEstimates(snapshot) {
   const gems = Array.isArray(snapshot?.gems?.items) ? snapshot.gems.items : [];
   const candidates = gems.filter(gem => Number(gem.level || 0) > 0 && Number(gem.level || 0) < 10);
@@ -2000,6 +2093,7 @@ async function calculateGemSpecEstimates(snapshot) {
     return [{ category: 'gem', item: { type: '보석', name: '보석 시세' }, available: false, reason: error.message || '보석 시세 조회 실패', powerDelta: 0, cost: {}, expectedCost: {} }];
   }
   return candidates.map(gem => {
+    const support = isSupportPowerSnapshot(snapshot);
     const kind = gemKindLabel(gem);
     const currentLevel = Number(gem.level || 0);
     const nextLevel = currentLevel + 1;
@@ -2008,9 +2102,10 @@ async function calculateGemSpecEstimates(snapshot) {
     const bound = isBoundGem(gem);
     const buyCount = gemFusionPurchaseCount(gem);
     const price = Number(market?.price || 0) * buyCount;
-    const calibration = gemPowerEstimate(snapshot, currentLevel, nextLevel, 1);
+    const analyzedEstimate = support ? null : gemAnalyzerPowerEstimate(snapshot, gem, nextLevel);
+    const calibration = support ? supportGemPowerEstimate(snapshot, gem, nextLevel) : analyzedEstimate || gemPowerEstimate(snapshot, currentLevel, nextLevel, 1);
     const perGemDelta = combatPowerFeaturePerUnit('gemAverage') / Math.max(1, gems.length || 11);
-    const powerDelta = calibration?.value || round2(perGemDelta);
+    const powerDelta = calibration ? Number(calibration.value || 0) : round2(perGemDelta);
     const powerEstimate = calibration
       ? calibration
       : { confidence: 'estimated', basis: 'gem average combat-power coefficient model' };
@@ -2019,7 +2114,7 @@ async function calculateGemSpecEstimates(snapshot) {
     return {
       category: 'gem',
       item: { type: '보석', name: `${slotLabel} ${kind} ${currentLevel}→${nextLevel}레벨`, icon: gem.icon || market?.icon || '' },
-      available: price > 0 && powerDelta > 0,
+      available: price > 0 && Number(powerEstimate.percent || 0) > 0,
       from: currentLevel,
       to: nextLevel,
       cost: specMarketCost(price, 0),
@@ -2028,11 +2123,13 @@ async function calculateGemSpecEstimates(snapshot) {
       powerEstimate,
       supportLabel: `${kind} ${currentLevel}레벨 최저가 × ${buyCount}개${bound ? ' · 장착 보석 귀속' : ''}`,
       stepLabel: `${slotLabel} ${kind}`,
-      stepDetail: `Lv.${currentLevel} → Lv.${nextLevel}`,
+      stepDetail: support
+        ? `Lv.${currentLevel} → Lv.${nextLevel} · 공식 전투력+파티 기여 복합 계산`
+        : analyzedEstimate
+        ? `Lv.${currentLevel} → Lv.${nextLevel} · ${analyzedEstimate.analysis.analyzerTag}${kind === '겁화' ? ` · 딜 지분 ${round2(analyzedEstimate.analysis.skillShare * 100)}%` : ' · 전체 작열 지수가중 평균'}`
+        : `Lv.${currentLevel} → Lv.${nextLevel}`,
       reason: price > 0
-        ? bound
-          ? '장착 보석 귀속 · 같은 레벨 3개 구매 후 합성 기준'
-          : '보유 1개 + 구매 2개 합성 기준'
+        ? `${bound ? '장착 보석 귀속 · 같은 레벨 3개 구매 후 합성 기준' : '보유 1개 + 구매 2개 합성 기준'}${analyzedEstimate ? analyzedEstimate.analysis.match === 'ark-grid' ? ' · 아크그리드 전투분석 일치' : ' · 직업각인 전투분석 추정' : ''}`
         : '보석 시세 없음'
     };
   });
@@ -2080,15 +2177,34 @@ async function calculateMarketSpecEstimates(snapshot) {
   ]);
   return [...accessories, ...gems, ...engravings];
 }
+function withSupportRecommendation(row, snapshot = state.powerSnapshot) {
+  if (!isSupportPowerSnapshot(snapshot) || row?.powerEstimate?.metric === 'support-combined') return row;
+  const directPercent = Number(row?.powerEstimate?.percent || 0);
+  const official = snapshotOfficialCombatPower(snapshot);
+  const fallbackPercent = official > 0 ? Number(row?.powerDelta || 0) / official * 100 : 0;
+  const officialPercent = directPercent > 0 ? directPercent : fallbackPercent;
+  if (!(officialPercent > 0)) return row;
+  const powerEstimate = supportCombinedPowerEstimate(
+    snapshot,
+    snapshot,
+    officialPercent,
+    `${row?.powerEstimate?.basis || '공식 전투력 변화'} + 파티 기여 복합 추천 (공식 30/파티 60/케어 10)`
+  );
+  return {
+    ...row,
+    powerDelta: powerEstimate.value,
+    powerEstimate
+  };
+}
 async function storePowerCostEstimates(priceMap) {
   const honingRows = calculateNextNormalRefineEstimates(state.powerSnapshot, priceMap);
   const advancedHoningRows = calculateNextAdvancedHoningEstimates(state.powerSnapshot, priceMap);
-  const gearRows = [...honingRows, ...advancedHoningRows];
+  const gearRows = [...honingRows, ...advancedHoningRows].map(row => withSupportRecommendation(row));
   state.powerCostEstimates = gearRows;
   renderSpecEfficiencyTable();
   try {
     const marketRows = await calculateMarketSpecEstimates(state.powerSnapshot);
-    state.powerCostEstimates = [...gearRows, ...marketRows];
+    state.powerCostEstimates = [...gearRows, ...marketRows.map(row => withSupportRecommendation(row))];
   } catch {
     state.powerCostEstimates = gearRows;
   }
@@ -2127,6 +2243,9 @@ function currentSpecPlannerPlan() {
     costForRow: specRowCostForInventory
   });
 }
+function hasModeledRecommendationMetrics(rows = state.powerCostEstimates) {
+  return (rows || []).some(row => ['damage', 'support-combined'].includes(row?.powerEstimate?.metric));
+}
 function plannerUnavailableSummary() {
   const rows = (state.powerCostEstimates || []).filter(row => !row?.available && row?.reason);
   const reasons = [...new Set(rows.map(row => `${row?.item?.type || '후보'}: ${row.reason}`))];
@@ -2138,6 +2257,8 @@ function renderSpecPlannerOutput() {
   if (!output) return;
   const plan = currentSpecPlannerPlan();
   const mode = state.specPlannerMode;
+  const modeled = hasModeledRecommendationMetrics(plan.steps.map(step => step.row));
+  const indexLabel = isSupportPowerSnapshot(state.powerSnapshot) ? '복합 기여 지수' : modeled ? '화력 환산 지수' : '예상 전투력';
   const summaryLabel = mode === 'target'
     ? plan.reached ? '목표 달성 경로' : '현재 후보로 도달 가능한 경로'
     : '예산 안의 추천 경로';
@@ -2154,18 +2275,18 @@ function renderSpecPlannerOutput() {
       <div><b>${escapeHtml(row.stepLabel || item.type || item.name || '-')}</b><small>${escapeHtml(row.stepDetail || item.name || '-')}</small></div>
       <div><b>${formatGold(step.gold)}</b><small>개별 비용</small></div>
       <div><b>${formatGold(step.cumulativeGold)}</b><small>누적 사용 골드</small></div>
-      <div><b>${formatNumber(step.projectedPower)}</b><small>예상 전투력</small></div>
+      <div><b>${formatNumber(step.projectedPower)}</b><small>${escapeHtml(indexLabel)}</small></div>
     </div>`;
   }).join('');
   output.innerHTML = `<div class="specPlannerResultHead">
       <div><b>${escapeHtml(summaryLabel)}</b><span>${escapeHtml(statusText)}</span></div>
       <div><strong>${formatGold(plan.cumulativeGold)}</strong><small>총 누적 골드</small></div>
       <div><strong>${formatNumber(plan.cumulativeSilver)}</strong><small>총 실링</small></div>
-      <div><strong>+${formatNumber(plan.powerGain)}</strong><small>전투력 증가</small></div>
+      <div><strong>+${formatNumber(plan.powerGain)}</strong><small>${escapeHtml(indexLabel)} 증가</small></div>
     </div>
     <div class="specPlannerSteps">${steps || '<p class="powerCostHint">현재 검증값과 시세가 모두 있는 추천 후보가 없습니다.</p>'}</div>
     ${plannerUnavailableSummary()}
-    <p class="powerCostHint">현재 장비에서 바로 가능한 다음 단계 후보를 귀속 재료 부족분과 실시간 시세로 다시 계산합니다. 여러 강화 단계를 건너뛴 장기 경로는 포함하지 않습니다.</p>`;
+    <p class="powerCostHint">현재 장비에서 바로 가능한 다음 단계 후보를 귀속 재료 부족분과 실시간 시세로 다시 계산합니다. ${modeled ? '보석 딜 효율과 서포터 복합 기여는 공식 전투력이 아니라 현재 전투력 크기에 맞춘 비교용 환산 지수입니다. ' : ''}여러 강화 단계를 건너뛴 장기 경로는 포함하지 않습니다.</p>`;
 }
 function bindSpecPlannerControls() {
   document.querySelectorAll('[data-planner-mode]').forEach(button => {
@@ -2184,6 +2305,8 @@ function bindSpecPlannerControls() {
   const budgetInput = $('specPlannerBudgetInput');
   const currentPower = snapshotOfficialCombatPower(state.powerSnapshot);
   if (targetInput) {
+    const targetLabel = $('specPlannerTargetWrap')?.querySelector('span');
+    if (targetLabel) targetLabel.textContent = isSupportPowerSnapshot(state.powerSnapshot) ? '목표 복합 기여 지수' : hasModeledRecommendationMetrics() ? '목표 화력 환산 지수' : '목표 전투력';
     if (!(state.specPlannerTarget > 0)) state.specPlannerTarget = Math.ceil(currentPower + 100);
     targetInput.value = String(Math.round(state.specPlannerTarget));
     targetInput.onchange = () => {
@@ -2257,14 +2380,24 @@ function renderSpecScenarioComparison() {
   const changedCalc = statsWithSelection(state.selected);
   const effects = specComparisonEffectTotals(rows);
   const basePower = snapshotOfficialCombatPower(state.powerSnapshot);
-  const changedPower = basePower + plan.powerGain;
+  const support = isSupportPowerSnapshot(state.powerSnapshot);
+  const officialPowerGain = rows.reduce((sum, row) => {
+    if (row?.powerEstimate?.metric === 'support-combined') return sum + Number(row.powerEstimate.officialValue || 0);
+    if (row?.powerEstimate?.metric === 'damage') return sum;
+    return sum + Number(row?.powerDelta || 0);
+  }, 0);
+  const changedPower = basePower + officialPowerGain;
   const nodeRatio = Number(baseCalc.result.value || 0) > 0 ? Number(changedCalc.result.value || 0) / Number(baseCalc.result.value || 1) : 1;
   const powerRatio = basePower > 0 ? changedPower / basePower : 1;
-  const damageChange = (nodeRatio * powerRatio - 1) * 100;
+  const modeledRatio = rows.reduce((factor, row) => {
+    if (!['damage', 'support-combined'].includes(row?.powerEstimate?.metric)) return factor;
+    return factor * (1 + Math.max(0, Number(row?.powerEstimate?.percent || 0)) / 100);
+  }, 1);
+  const damageChange = (nodeRatio * modeledRatio * (support ? 1 : powerRatio) - 1) * 100;
   const selectedNames = rows.map(row => row.stepLabel || row.item?.name || row.item?.type).filter(Boolean);
   output.innerHTML = `<div class="specScenarioMetrics">
       <div><span>공식 전투력</span><b>${formatNumber(basePower)}</b><i>→</i><strong>${formatNumber(changedPower)}</strong></div>
-      <div><span>전투력 기준 기대 화력</span><b>기준</b><i>→</i><strong>${damageChange >= 0 ? '+' : ''}${damageChange.toFixed(2)}%</strong></div>
+      <div><span>${support ? '복합 파티 기여' : '전투력+분석 기대 화력'}</span><b>기준</b><i>→</i><strong>${damageChange >= 0 ? '+' : ''}${damageChange.toFixed(2)}%</strong></div>
       <div><span>치명타 확률</span><b>${Number(baseCalc.result.critRate || 0).toFixed(2)}%</b><i>→</i><strong>${(Number(changedCalc.result.critRate || 0) + effects.critRate).toFixed(2)}%</strong></div>
       <div><span>치명타 피해</span><b>${Number(baseCalc.result.critDamage || 0).toFixed(2)}%</b><i>→</i><strong>${(Number(changedCalc.result.critDamage || 0) + effects.critDamage).toFixed(2)}%</strong></div>
       <div><span>공격/이동 속도</span><b>${Number(baseCalc.result.attackSpeed || 0).toFixed(2)} / ${Number(baseCalc.result.moveSpeed || 0).toFixed(2)}</b><i>→</i><strong>${(Number(changedCalc.result.attackSpeed || 0) + effects.attackSpeed).toFixed(2)} / ${(Number(changedCalc.result.moveSpeed || 0) + effects.moveSpeed).toFixed(2)}</strong></div>
@@ -2312,9 +2445,10 @@ function renderSpecScenarioComparison() {
 }
 function renderSpecEfficiencyShell() {
   const scenarioOpen = window.matchMedia('(min-width: 761px)').matches ? ' open' : '';
+  const support = isSupportPowerSnapshot(state.powerSnapshot);
   return `<details class="powerSnapshotBlock powerEfficiencyPanel simulatorFold" open>
     <summary class="powerCostHead simulatorFoldSummary">
-      <div><h3>스펙업 효율 순위</h3><p>전투력 상승률과 기대 골드를 한 줄에서 비교합니다.</p></div>
+      <div><h3>스펙업 효율 순위</h3><p>${support ? '공식 전투력 30% · 파티 기여 60% · 케어 10%의 복합 상승률로 비교합니다.' : '전투력 상승률과 기대 골드를 한 줄에서 비교합니다.'}</p></div>
       <strong>낮을수록 효율적</strong>
     </summary>
     <div class="simulatorFoldBody">
@@ -2371,10 +2505,18 @@ function formatSpecGold(value) {
   return `${Math.round(n).toLocaleString('ko-KR')}G`;
 }
 function specEfficiencyReason(row) {
+  if (row?.powerEstimate?.metric === 'support-combined') {
+    const reason = row.reason || '공식 전투력·파티 기여 계산';
+    return `${reason} · 공식 30/파티 60/케어 10`;
+  }
   if (row?.category === 'accessory' || row?.category === 'gem' || row?.category === 'engraving') {
     const reason = row.reason || '시세 기준';
     const confidence = row.powerEstimate?.confidence;
     if (confidence === 'verified') return `${reason} · 검증 전투력`;
+    if (confidence === 'build-analyzed') return `${reason} · 현재 아크그리드 전투분석`;
+    if (confidence === 'build-estimated') return `${reason} · 직업각인 전투분석 추정`;
+    if (confidence === 'build-sampled') return `${reason} · 동일 아크그리드 표본`;
+    if (confidence === 'spec-sampled') return `${reason} · 동일 직업각인 표본`;
     if (confidence === 'class-sampled') return `${reason} · 동일 직업 표본`;
     if (confidence === 'class-estimated') return `${reason} · 직업별 추정 전투력`;
     return `${reason} · 추정 전투력`;
@@ -2391,6 +2533,8 @@ function specEfficiencyReason(row) {
   if (missing.length) return `시세 없음: ${missing.slice(0, 2).join(', ')}${missing.length > 2 ? ' 외' : ''}`;
   const confidence = row.powerEstimate?.confidence;
   if (confidence === 'verified' || confidence === 'reference-verified') return row.hasGrowth ? '검증 전투력 · 장비 성장 포함' : '검증 전투력';
+  if (confidence === 'build-sampled') return row.hasGrowth ? '동일 아크그리드 표본 · 장비 성장 포함' : '동일 아크그리드 표본';
+  if (confidence === 'spec-sampled') return row.hasGrowth ? '동일 직업각인 표본 · 장비 성장 포함' : '동일 직업각인 표본';
   if (confidence === 'class-sampled') return row.hasGrowth ? '동일 직업 표본 · 장비 성장 포함' : '동일 직업 표본';
   if (confidence === 'class-estimated') return row.hasGrowth ? '직업별 추정 · 장비 성장 포함' : '직업별 추정';
   if (confidence === 'estimated') return row.hasGrowth ? '추정 전투력 · 장비 성장 포함' : '추정 전투력';
@@ -2398,14 +2542,20 @@ function specEfficiencyReason(row) {
   return '전투력 미검증';
 }
 function combatPowerAccuracyHint() {
+  if (isSupportPowerSnapshot(state.powerSnapshot)) return '서포터는 공식 전투력 변화와 상시·풀·종합 버프, 공증 가동률, 낙인, 아이덴티티, 케어 옵션을 함께 계산합니다.';
   const validation = state.combatPowerModel?.validation || {};
   const classSamples = Number(validation.honing?.scopedTransitionSamples || validation.honing?.classSpecSamples || 0);
-  return `로펙 전후값 ${classSamples}개 표본과 공식 API 현재 전투력을 대조합니다. 같은 직업·부위·강화 구간의 표본을 공통 적용하며, 세부 직업과 아크그리드는 매칭 조건에서 제외합니다.`;
+  const analyzerProfiles = Number(state.combatAnalyzer?.presets?.length || 0);
+  return `재련은 로펙 전후값 ${classSamples}개 중 현재 아크그리드·직업각인·직업 순으로 가까운 표본을 적용합니다. 보석은 ${analyzerProfiles}개 전투분석 프로필의 스킬별 딜 지분과 겁화/작열 공식을 우선 적용합니다.`;
 }
 function specPowerDeltaText(row, powerDelta) {
-  if (!(powerDelta > 0)) return '전투력 -';
   const confidence = row?.powerEstimate?.confidence;
+  if (row?.powerEstimate?.metric === 'support-combined') return `복합 기여 +${Number(row.powerEstimate.percent || 0).toFixed(3)}%`;
+  if (!(powerDelta > 0)) return '전투력 -';
+  if (row?.powerEstimate?.metric === 'damage') return `${confidence === 'build-analyzed' ? '딜' : '딜 추정'} +${Number(row.powerEstimate.percent || 0).toFixed(3)}%`;
   if (confidence === 'verified' || confidence === 'reference-verified') return `전투력 +${powerDelta.toFixed(2)}`;
+  if (confidence === 'build-sampled') return `빌드 표본 +${powerDelta.toFixed(2)}`;
+  if (confidence === 'spec-sampled') return `각인 표본 +${powerDelta.toFixed(2)}`;
   if (confidence === 'class-sampled') return `표본 +${powerDelta.toFixed(2)}`;
   return `전투력 약 +${powerDelta.toFixed(2)}`;
 }
@@ -2415,9 +2565,13 @@ function specEfficiencyFilterMatches(row, filter) {
 }
 function specConfidenceMeta(row) {
   const confidence = row?.powerEstimate?.confidence || 'unverified';
+  if (confidence === 'support-modeled') return { className: 'verified', label: '서폿 복합' };
   if (confidence === 'verified' || confidence === 'reference-verified') return { className: 'verified', label: '검증' };
+  if (confidence === 'build-analyzed') return { className: 'verified', label: '빌드 분석' };
+  if (confidence === 'build-sampled') return { className: 'sampled', label: '빌드 표본' };
+  if (confidence === 'spec-sampled') return { className: 'sampled', label: '각인 표본' };
   if (confidence === 'class-sampled') return { className: 'sampled', label: '직업 표본' };
-  if (confidence === 'estimated' || confidence === 'class-estimated') return { className: 'estimated', label: '추정' };
+  if (confidence === 'estimated' || confidence === 'class-estimated' || confidence === 'build-estimated') return { className: 'estimated', label: '추정' };
   return { className: 'unverified', label: '미검증' };
 }
 function bindSpecEfficiencyFilters() {
@@ -2435,12 +2589,19 @@ function updateCombatPowerCoverage(estimates) {
   if (!el) return;
   const profile = state.powerSnapshot?.profile || {};
   const confidenceValues = estimates.map(row => row?.powerEstimate?.confidence || 'unverified');
+  const supportModeled = confidenceValues.filter(value => value === 'support-modeled').length;
   const verified = confidenceValues.filter(value => confidenceTier(value) === 0).length;
-  const sampled = confidenceValues.filter(value => value === 'class-sampled').length;
-  const status = verified > 0 ? 'verified' : sampled > 0 ? 'sampled' : 'estimated';
-  const label = verified > 0 ? '현재 빌드 검증값 있음' : sampled > 0 ? '동일 직업 표본 있음' : '현재 구간은 미검증';
+  const analyzed = confidenceValues.filter(value => value === 'build-analyzed').length;
+  const sampled = confidenceValues.filter(value => ['build-sampled', 'spec-sampled', 'class-sampled'].includes(value)).length;
+  const status = supportModeled > 0 || verified > 0 || analyzed > 0 ? 'verified' : sampled > 0 ? 'sampled' : 'estimated';
+  const label = supportModeled > 0 ? '공식 전투력+파티 기여 복합 모델' : analyzed > 0 ? '현재 아크그리드 전투분석 일치' : verified > 0 ? '현재 빌드 검증값 있음' : sampled > 0 ? '근접 빌드 표본 있음' : '현재 구간은 미검증';
   el.className = `combatPowerCoverage ${status}`;
-  el.innerHTML = `<div><span>${escapeHtml(profile.className || '-')} · ${escapeHtml(profile.secondClass || '세팅 미확인')}</span><b>${escapeHtml(label)}</b></div><p>검증 ${verified} · 직업 표본 ${sampled} · 추정/미검증 ${Math.max(0, estimates.length - verified - sampled)}</p>`;
+  el.innerHTML = `<div><span>${escapeHtml(profile.className || '-')} · ${escapeHtml(profile.secondClass || '세팅 미확인')}</span><b>${escapeHtml(label)}</b></div><p>${supportModeled ? `서폿 복합 ${supportModeled} · ` : ''}검증 ${verified} · 전투분석 ${analyzed} · 표본 ${sampled} · 추정/미검증 ${Math.max(0, estimates.length - supportModeled - verified - analyzed - sampled)}</p>`;
+}
+function supportEstimateDetail(row) {
+  const estimate = row?.powerEstimate;
+  if (estimate?.metric !== 'support-combined') return '';
+  return `공식 +${Number(estimate.officialPercent || 0).toFixed(3)}% · 파티 +${Number(estimate.partyPercent || 0).toFixed(3)}% · 케어 +${Number(estimate.carePercent || 0).toFixed(3)}%`;
 }
 function renderSpecEfficiencyTable() {
   const el = $('specEfficiencyTable');
@@ -2497,6 +2658,7 @@ function renderSpecEfficiencyTable() {
       const powerText = specPowerDeltaText(row, powerDelta);
       const stepMainText = row.stepLabel || `+${Number(row.from || item.honingLevel || 0)} → +${Number(row.to || 0)}`;
       const upgradeDetailText = row.stepDetail || stepMainText;
+      const supportDetailText = supportEstimateDetail(row);
       const powerDeltaText = powerText;
       const score = specEfficiencyScore(row);
       const rankText = Number.isFinite(score) ? String(++rankedIndex) : '-';
@@ -2528,13 +2690,13 @@ function renderSpecEfficiencyTable() {
           <b>${escapeHtml(scoreText)}</b>
           <span>1% 상승당</span>
         </div>
-        <div class="specEfficiencyDetail">${escapeHtml(upgradeDetailText)} · ${escapeHtml(expectedDetailText)} · ${escapeHtml(specEfficiencyReason(row))}</div>
+        <div class="specEfficiencyDetail">${escapeHtml(upgradeDetailText)}${supportDetailText ? ` · ${escapeHtml(supportDetailText)}` : ''} · ${escapeHtml(expectedDetailText)} · ${escapeHtml(specEfficiencyReason(row))}</div>
       </div>`;
     }).join('');
   el.innerHTML = `<div class="specEfficiencyHeader">
     <span>스펙업 목표</span><span>효율</span><span>비용</span><span>비용/효율</span>
   </div>${rows}
-  <p class="powerCostHint">1% 상승당 기대 골드가 낮은 순서로 정렬하고, 효율이 같으면 검증 범위가 높은 후보를 먼저 표시합니다. 상급 재련은 현재 단계에서 다음 10단위 완료 지점까지의 총 기대비용을 사용합니다. ${escapeHtml(combatPowerAccuracyHint())}</p>`;
+  <p class="powerCostHint">1% 상승당 기대 골드가 낮은 순서로 정렬하고, 효율이 같으면 검증 범위가 높은 후보를 먼저 표시합니다. ${isSupportPowerSnapshot(state.powerSnapshot) ? '서포터의 1%는 복합 기여 1%입니다.' : ''} 상급 재련은 현재 단계에서 다음 10단위 완료 지점까지의 총 기대비용을 사용합니다. ${escapeHtml(combatPowerAccuracyHint())}</p>`;
   el.querySelectorAll('[data-spec-scenario-key]').forEach(input => {
     input.onchange = () => {
       const key = input.dataset.specScenarioKey || '';
@@ -2947,7 +3109,7 @@ async function hydratePowerCostMaterialPrices() {
         storePowerCostEstimates(priceMap);
       });
     });
-    await loadCombatPowerModel();
+    await Promise.all([loadCombatPowerModel(), loadCombatAnalyzer()]);
     await storePowerCostEstimates(priceMap);
   } catch {
     state.powerCostEstimates = [];
@@ -2957,6 +3119,30 @@ async function hydratePowerCostMaterialPrices() {
     });
     bindArmguardCostControls(new Map());
   }
+}
+function gemAnalyzerSummaryHtml(snapshot) {
+  if (isSupportPowerSnapshot(snapshot)) return '<b>서포트 보석 효율</b><span>공식 전투력과 공증·낙인·아이덴티티·케어 기여를 함께 계산합니다.</span>';
+  if (!state.combatAnalyzer) return '<b>전투분석 로딩 중</b><span>아크그리드와 보석 스킬을 대조하고 있습니다.</span>';
+  const profile = findCombatAnalyzerProfile(state.combatAnalyzer, snapshot, state.skillEffects);
+  const exact = profile.match === 'ark-grid';
+  return `<b>${exact ? '아크그리드 전투분석 일치' : '직업각인 전투분석 추정'}</b><span>${escapeHtml(profile.tag || '-')} · ${exact ? '코어·조건 보석 일치' : '동일 직업각인 또는 장착 보석 기반'}</span>`;
+}
+function renderSupportContributionPanel(snapshot) {
+  const model = supportContributionModel(snapshot, supportModelContext());
+  if (!model) return '';
+  const metric = (label, value, detail) => `<div class="supportPowerMetric"><span>${escapeHtml(label)}</span><b>${Number(value || 0).toFixed(2)}%</b><small>${escapeHtml(detail)}</small></div>`;
+  return `<div class="powerSnapshotBlock supportPowerPanel">
+    <div class="powerBuildHeader"><b>서포터 파티 기여 모델</b><span>실전 가동률 반영 · 추천 가중치 공식 30 / 파티 60 / 케어 10</span></div>
+    <div class="supportPowerGrid">
+      ${metric('상시 버프', model.allTimePercent, '공증·낙인·진화')}
+      ${metric('풀 버프', model.fullPercent, '상시+아이덴티티+각성')}
+      ${metric('종합 버프', model.totalPercent, '실전 가동률 가중')}
+      ${metric('공증 가동률', model.detail.overallAttackUptime * 100, 'A/B 공증 교대')}
+      ${metric('아이덴티티 가동률', model.detail.identityUptime * 100, '특화·쿨감·획득량')}
+      ${metric('케어 보정', model.carePercent, '회복·보호막 옵션')}
+    </div>
+    <p>공격력 ${Math.round(model.detail.attackPower).toLocaleString('ko-KR')} · 낙인 보너스 ${model.detail.brandBonus.toFixed(2)}% · 아군 공격 강화 ${model.detail.allyAttackA.toFixed(2)}% · 아군 피해 강화 ${model.detail.allyDamageBonus.toFixed(2)}%</p>
+  </div>`;
 }
 function renderPowerSnapshot(snapshot) {
   const panel = $('powerSnapshotPanel');
@@ -3006,8 +3192,9 @@ function renderPowerSnapshot(snapshot) {
       </div>
       <details class="powerSnapshotBlock simulatorFold" open>
         <summary class="simulatorFoldSummary"><span><h3>장착 보석</h3><small>장착 중인 보석 11개와 귀속 여부</small></span></summary>
-        <div class="simulatorFoldBody"><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
+        <div class="simulatorFoldBody"><div id="gemAnalyzerSummary" class="powerBuildHeader">${gemAnalyzerSummaryHtml(snapshot)}</div><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
       </details>
+      ${renderSupportContributionPanel(snapshot)}
       <details class="powerSnapshotBlock powerBuildPanel simulatorFold" open>
         <summary class="simulatorFoldSummary"><span><h3>장비 파싱</h3><small>장비 · 악세사리 · 아크그리드 원자료</small></span></summary>
         <div class="simulatorFoldBody">
@@ -3025,7 +3212,7 @@ function renderPowerSnapshot(snapshot) {
       </details>
       ${renderPowerCostPrep(snapshot)}
     </div>
-    <p class="powerSnapshotNote">일반/상급 재련 단계는 공식 API Tooltip에서 읽습니다. 상급 재련 전투력 상승량은 공개 산식이 없어 현재 공식 전투력 비율 기반 추정값으로 표시합니다.</p>
+    <p class="powerSnapshotNote">일반/상급 재련 단계는 공식 API Tooltip에서 읽습니다. 딜러 보석은 현재 아크그리드 전투분석의 스킬별 지분과 겁화/작열 공식을 적용합니다. 서포터는 공식 전투력과 실전 파티 기여 모델을 30/60/10으로 결합하며, 파티 조합·보스 패턴에 따라 실제 효율은 달라질 수 있습니다.</p>
   `;
   hydratePowerCostMaterialPrices();
   hydrateCrystalPrice();
@@ -5142,7 +5329,7 @@ function renderRatioPanel() {
   }
   view.innerHTML = `
     <div class="ratioColumnHead">
-      <span>직업</span><span>직업각인</span><span>조합</span><span>배율</span>
+      <span>직업</span><span>직업각인</span><span>조합</span><span>배율/역할</span>
       <span class="ratioCoreHead"><i>해</i><i>달</i><i>별</i></span>
     </div>
     ${groups.map(group => `
@@ -5150,7 +5337,8 @@ function renderRatioPanel() {
         <h3>${escapeHtml(group.name)}</h3>
         <div class="ratioBuildList">${group.classes.flatMap(row => row.builds.map(build => {
         const representative = Number(build.ratio?.representative || 0);
-        const ratioText = representative > 0 ? `${representative.toFixed(3)}배` : escapeHtml(build.status || '자료 부족');
+        const support = build.role === 'support';
+        const ratioText = representative > 0 ? `${representative.toFixed(3)}배` : escapeHtml(support ? '서포트' : build.status || '자료 부족');
         const range = formatBenchmarkRange(build.ratio);
         const cores = sortedBenchmarkCores(build.cores).map(core => `
           <span class="ratioCore ratioCore${core.slot === '해' ? 'Sun' : core.slot === '달' ? 'Moon' : 'Star'}">
@@ -5160,13 +5348,16 @@ function renderRatioPanel() {
           <div class="ratioClassName">${escapeHtml(row.className)}</div>
           <div class="ratioBuildIdentity"><strong>${escapeHtml(build.engraving)}</strong><small>${escapeHtml(build.evolution || '-')}</small></div>
           <div class="ratioCombination">${build.combination ? `<strong>${escapeHtml(build.combination)}</strong><small>해·달·별</small>` : '<span>확인 중</span>'}</div>
-          <div class="ratioBuildMetric"><strong>${ratioText}</strong>${range ? `<small>표본 ${escapeHtml(range)}</small>` : '<small>추가 표본 필요</small>'}</div>
+          <div class="ratioBuildMetric"><strong>${ratioText}</strong>${range ? `<small>표본 ${escapeHtml(range)}</small>` : support ? '<small>버프·케어 세팅</small>' : '<small>추가 표본 필요</small>'}</div>
           <div class="ratioCoreList">${cores || '<span class="ratioCorePending">대표 세팅 집계 중</span>'}</div>
         </article>`;
       })).join('')}</div>
       </section>`).join('')}`;
   const meta = $('ratioMeta');
-  if (meta) meta.innerHTML = `<span>대표 세팅 ${benchmarkDateLabel(data.popularSettingsDate)} · 배율 ${benchmarkDateLabel(data.ratioBasisDate)}</span><span>실전 사이클, 치명 편차와 숙련도에 따라 달라질 수 있습니다.</span>`;
+  if (meta) {
+    const buildCount = (data.classes || []).reduce((sum, row) => sum + Number(row.builds?.length || 0), 0);
+    meta.innerHTML = `<span>${Number(data.classes?.length || 0)}개 직업 · ${buildCount}개 세팅 · 대표 세팅 ${benchmarkDateLabel(data.popularSettingsDate)} · 배율 ${benchmarkDateLabel(data.ratioBasisDate)}</span><span>실전 사이클, 치명 편차와 숙련도에 따라 달라질 수 있습니다.</span>`;
+  }
 }
 
 async function loadMarketCrystalPrice(force = false) {
@@ -5216,8 +5407,8 @@ function renderCrystalMarketPrice(container, data) {
 // v5.0.4 boot fix: 5.0.2에서 전설 아바타 코드가 뒤에 붙으면서 초기화 호출이 빠져
 // 진화 DB가 로드되지 않고, 탭 버튼 이벤트도 연결되지 않았습니다.
 // DOM 요소와 모든 함수가 정의된 뒤 한 번만 초기화합니다.
-if (!window.__lostarkCalculatorBootedV506) {
-  window.__lostarkCalculatorBootedV506 = true;
+if (!window.__lostarkCalculatorBootedV5110) {
+  window.__lostarkCalculatorBootedV5110 = true;
   populateAdrenalineReplacementOptions(true);
   updateEngravingControlPreviews();
   window.addEventListener('scroll', refreshFocusedNodeTooltip, { passive: true });
@@ -5231,6 +5422,7 @@ if (!window.__lostarkCalculatorBootedV506) {
   preloadMarketPriceLists();
   loadLostarkNoticeCard();
   loadClassBenchmarks();
+  loadCombatAnalyzer();
   const sharedScenario = decodeSpecScenario(new URLSearchParams(window.location.search).get('scenario'));
   if (sharedScenario?.characterName) {
     state.pendingSharedScenario = sharedScenario;

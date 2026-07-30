@@ -2714,5 +2714,55 @@
         "name": "파멸"
       }
     ]
+  },
+  "바드": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5350",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5350/169602",
+    "title": "[정보] 바드 아크 그리드 정보",
+    "cores": [
+      { "slot": "해", "number": 1, "name": "불굴의 세레나데" },
+      { "slot": "해", "number": 2, "name": "템페스트 리프레인" },
+      { "slot": "해", "number": 3, "name": "쇼크 루프" },
+      { "slot": "달", "number": 1, "name": "기원의 세레나데" },
+      { "slot": "달", "number": 2, "name": "세컨드 임팩트" },
+      { "slot": "달", "number": 3, "name": "조화의 연주" },
+      { "slot": "별", "number": 1, "name": "음파 강화" },
+      { "slot": "별", "number": 2, "name": "사운드 블리츠" },
+      { "slot": "별", "number": 3, "name": "듀얼 쇼크" },
+      { "slot": "해", "number": 1, "name": "세라픽 엑센트" },
+      { "slot": "해", "number": 2, "name": "브레이브 엑센트" },
+      { "slot": "해", "number": 3, "name": "아리아 엑센트" },
+      { "slot": "달", "number": 1, "name": "세라픽 펄스" },
+      { "slot": "달", "number": 2, "name": "브레이브 펄스" },
+      { "slot": "달", "number": 3, "name": "아리아 펄스" },
+      { "slot": "별", "number": 1, "name": "풍요의 바람" },
+      { "slot": "별", "number": 2, "name": "사운드 플러드" },
+      { "slot": "별", "number": 3, "name": "벅샷 가속" }
+    ]
+  },
+  "도화가": {
+    "boardUrl": "https://www.inven.co.kr/board/lostark/5861",
+    "articleUrl": "https://www.inven.co.kr/board/lostark/5861/57733",
+    "title": "[정보] 도화가 아크 그리드 정보",
+    "cores": [
+      { "slot": "해", "number": 1, "name": "파죽지세" },
+      { "slot": "해", "number": 2, "name": "일필휘지" },
+      { "slot": "해", "number": 3, "name": "묵법화" },
+      { "slot": "달", "number": 1, "name": "조화의 완성" },
+      { "slot": "달", "number": 2, "name": "명필" },
+      { "slot": "달", "number": 3, "name": "정월 대보름" },
+      { "slot": "별", "number": 1, "name": "끝없는 파죽" },
+      { "slot": "별", "number": 2, "name": "재빠른 붓" },
+      { "slot": "별", "number": 3, "name": "쏟아지는 두루미" },
+      { "slot": "해", "number": 1, "name": "햇살의 품" },
+      { "slot": "해", "number": 2, "name": "몽글몽글" },
+      { "slot": "해", "number": 3, "name": "해님이 지켜줘요" },
+      { "slot": "달", "number": 1, "name": "따뜻한 해" },
+      { "slot": "달", "number": 2, "name": "환영문짝" },
+      { "slot": "달", "number": 3, "name": "달이 내린 예언" },
+      { "slot": "별", "number": 1, "name": "붓 콩콩" },
+      { "slot": "별", "number": 2, "name": "차원의 문" },
+      { "slot": "별", "number": 3, "name": "먹물 뿌리기" }
+    ]
   }
 }

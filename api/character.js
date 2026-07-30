@@ -3,7 +3,7 @@ import { relicEngravingEffect } from '../public/engraving-math.js';
 import { CHARACTER_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
 import { extractCombatSkillEffects } from '../public/skill-effects.js';
 
-const API_VERSION = '5.9.12';
+const API_VERSION = '5.11.0';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -312,6 +312,8 @@ function extractGemSnapshot(gemData) {
       level,
       kind,
       bound,
+      attackBonus: /겁화|작열/u.test(`${name} ${text} ${effectText}`),
+      valid: Boolean(effect?.Name || parseGemSkillName(effectText)),
       grade: gem?.Grade || '',
       icon: normalizeIconUrl(gem?.Icon || gem?.IconPath || findIconPath(gem?.Tooltip) || ''),
       skillName: effect?.Name || parseGemSkillName(effectText),
@@ -877,7 +879,7 @@ function round2(value) {
 const ACCESSORY_OPTION_GRADE_VALUES = {
   '목걸이': {
     enemyDamage: { high: 2.00, mid: 1.20, low: 0.55 },
-    additionalDamage: { high: 2.60, mid: 1.60, low: 0.60 },
+    additionalDamage: { high: 2.60, mid: 1.60, low: 0.70 },
     attackPowerFlat: { high: 390, mid: 195, low: 80 },
     weaponPowerFlat: { high: 960, mid: 480, low: 195 },
     identityGain: { high: 6.00, mid: 3.60, low: 1.60 },

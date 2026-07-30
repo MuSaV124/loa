@@ -85,6 +85,12 @@ function simulatorMarkup({ mobile }) {
               </section>
               </div>
             </details>
+            <div class="powerSnapshotBlock supportPowerPanel">
+              <div class="powerBuildHeader"><b>서포터 파티 기여 모델</b><span>공식 30 / 파티 60 / 케어 10</span></div>
+              <div class="supportPowerGrid">
+                ${['상시 버프', '풀 버프', '종합 버프', '공증 가동률', '아이덴티티 가동률', '케어 보정'].map((label, index) => `<div class="supportPowerMetric"><span>${label}</span><b>${(18 + index).toFixed(2)}%</b><small>검산 항목</small></div>`).join('')}
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -143,6 +149,11 @@ async function verifyViewport(viewport) {
     await mkdir(process.env.SIMULATOR_SCREENSHOT_DIR, { recursive: true });
     await page.screenshot({ path: join(process.env.SIMULATOR_SCREENSHOT_DIR, `simulator-${viewport.width}.png`), fullPage: true });
   }
+  const supportPanel = page.locator('.supportPowerPanel');
+  const supportFits = await supportPanel.evaluate(element => element.scrollWidth <= element.clientWidth + 1);
+  assert.ok(supportFits, `${viewport.width}px 서포터 기여 패널이 화면 안에 표시되어야 합니다.`);
+  const supportColumns = await page.locator('.supportPowerGrid').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length);
+  assert.equal(supportColumns, mobile ? 2 : 3, `서포터 지표 열 수가 ${viewport.width}px 화면에 맞아야 합니다.`);
   await page.close();
 }
 

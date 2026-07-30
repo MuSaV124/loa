@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LOSTARK 진화 노드 추천 계산기</title>
-  <link rel="stylesheet" href="/style.css?v=5.9.12" />
+  <link rel="stylesheet" href="/style.css?v=5.11.0" />
 </head>
 <body>
   <main class="wrap">
@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v5.9.12 · 완갑 재련 재료 교정</span>
+        <span class="badge">v5.11.0 · 서포터 복합 기여·딜러 검산</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -43,7 +43,7 @@
 
     <section id="powerSnapshotPanel" class="panel powerSnapshotPanel hidden simulatorPanel">
       <div class="sectionHead">
-        <div><h2>스펙업 효율 시뮬레이터</h2><p class="hint">현재 빌드의 전투력 상승량과 실시간 비용을 비교합니다.</p></div>
+        <div><h2>스펙업 효율 시뮬레이터</h2><p class="hint">현재 직업각인·아크그리드·스킬별 딜 지분과 실시간 비용을 비교합니다.</p></div>
         <button id="simulatorBackButton" class="simulatorBackButton" type="button">계산기로 돌아가기</button>
       </div>
       <div id="powerSnapshotView" class="powerSnapshotView"></div>
@@ -149,9 +149,9 @@
     <section id="ratioPanel" class="panel ratioPanel tabContent hidden">
       <div class="ratioHero">
         <div>
-          <span class="ratioEyebrow">7월 22일 밸런스 패치 기준</span>
-          <h2>직업각인별 루메루스 배율</h2>
-          <p class="hint">전투력 5,000 캐릭터가 체력 1,000억 루메루스를 공격한 표본과 대표 아크그리드를 함께 봅니다.</p>
+          <span class="ratioEyebrow">30개 직업 · 60개 세팅</span>
+          <h2>모든 직업 아크그리드·전투분석</h2>
+          <p class="hint">최신 대표 아크그리드와 딜러의 루메루스 배율, 서포트 역할을 한 표에서 확인합니다.</p>
         </div>
         <label class="ratioSearch">
           <span>직업 또는 직업각인 검색</span>
@@ -262,7 +262,7 @@
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <div class="version">Version 5.9.12</div>
-  <script type="module" src="/app.js?v=5.9.12"></script>
+  <div class="version">Version 5.11.0</div>
+  <script type="module" src="/app.js?v=5.11.0"></script>
 </body>
 </html>

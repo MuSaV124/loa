@@ -34,11 +34,11 @@ assert.ok(Math.abs(benchmarkKillSeconds(fixture, fixture.classes[0].builds[0]) -
 
 const data = JSON.parse(fs.readFileSync(new URL('../public/class-benchmarks.json', import.meta.url), 'utf8'));
 const coreNumberCatalog = JSON.parse(fs.readFileSync(new URL('./ark-grid-core-numbers.json', import.meta.url), 'utf8'));
-assert.equal(data.version, 2);
-assert.equal(data.classes.length, 28);
-assert.equal(Object.keys(coreNumberCatalog).length, 28);
-assert.deepEqual(data.excludedClasses, ['바드', '도화가']);
-assert.equal(data.classes.reduce((sum, row) => sum + row.builds.length, 0), 54);
+assert.equal(data.version, 3);
+assert.equal(data.classes.length, 30);
+assert.equal(Object.keys(coreNumberCatalog).length, 30);
+assert.deepEqual(data.excludedClasses, []);
+assert.equal(data.classes.reduce((sum, row) => sum + row.builds.length, 0), 60);
 assert.deepEqual(
   [...new Set(data.classes.map(row => row.group))],
   ['전사', '무도가', '헌터', '마법사', '암살자', '스페셜리스트', '오리지널']
@@ -60,7 +60,7 @@ const asura = data.classes.find(row => row.className === '브레이커')?.builds
 const handgunner = data.classes.find(row => row.className === '데빌헌터')?.builds.find(build => build.engraving === '핸드거너');
 assert.equal(dreadRoar?.combination, '232');
 assert.equal(asura?.combination, '322');
-assert.equal(handgunner?.combination, '133');
+assert.equal(handgunner?.combination, '111');
 for (const row of data.classes) {
   assert.ok(row.builds.length >= 1, `${row.className}: 직업각인`);
   for (const build of row.builds) {
@@ -71,9 +71,7 @@ for (const row of data.classes) {
     if (build.ratio) {
       assert.ok(Number(build.ratio.representative) > 0, `${row.className} ${build.engraving}: 대표 배율`);
       assert.ok(benchmarkKillSeconds(data, build) > 0, `${row.className} ${build.engraving}: 처치 시간`);
-    } else {
-      assert.equal(build.status, '자료 부족');
-    }
+    } else assert.ok(['자료 부족', '배율 표본 집계 중', '서포트'].includes(build.status));
   }
 }
 
