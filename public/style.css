@@ -4045,6 +4045,50 @@ select {
 .skillEffectPreview.muted span {
   color: var(--muted);
 }
+.skillCycleNote,
+.skillCycleRecommendationHint {
+  color: #93c5fd;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.skillCycleNote {
+  padding: 8px 10px;
+  border: 1px solid rgba(59, 130, 246, .22);
+  border-radius: 6px;
+  background: rgba(30, 64, 175, .10);
+}
+.skillCycleRecommendationHint {
+  margin: -4px 0 14px;
+  padding: 9px 11px;
+  border-left: 3px solid #38bdf8;
+  background: rgba(14, 165, 233, .08);
+}
+.skillCycleTable {
+  display: grid;
+  min-width: 640px;
+}
+.skillCyclePanel .simulatorFoldBody {
+  overflow-x: auto;
+}
+.skillCycleRow {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.3fr) 72px 72px 88px minmax(180px, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 38px;
+  padding: 7px 4px;
+  border-bottom: 1px solid rgba(148, 163, 184, .12);
+  color: #cbd5e1;
+  font-size: 12px;
+}
+.skillCycleRow b { color: #f8fafc; }
+.skillCycleRow b small { color: var(--muted); font-weight: 600; }
+.skillCycleRow strong { color: #7dd3fc; }
+.skillCycleRow > small { color: #94a3b8; }
+.skillCycleHeader {
+  color: #94a3b8;
+  font-weight: 800;
+}
 .manualGrid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }

@@ -68,7 +68,17 @@ function emptyEffects() {
 }
 
 export function emptySkillEffectState() {
-  return { items: [], calculableItems: [], selectedTripodCount: 0, conditionalTripodCount: 0, ignoredCooldownCount: 0 };
+  return {
+    items: [],
+    calculableItems: [],
+    cycleItems: [],
+    selectedTripodCount: 0,
+    conditionalTripodCount: 0,
+    cooldownTripodCount: 0,
+    stochasticCooldownCount: 0,
+    ignoredCooldownCount: 0,
+    usedSkillCount: 0
+  };
 }
 
 function decodeEntities(value) {
@@ -186,6 +196,87 @@ function hasTimedSpeedWording(text) {
   return /\d+(?:\.\d+)?\s*초\s*(?:동안|간)/i.test(text);
 }
 
+function round3(value) {
+  return Math.round(Number(value || 0) * 1000) / 1000;
+}
+
+function cooldownDirection(direction) {
+  return /증가|늘어/.test(String(direction || '')) ? -1 : 1;
+}
+
+export function parseCooldownRuleText(value) {
+  const text = decodeEntities(value);
+  const out = {
+    flatSeconds: 0,
+    percentReduction: 0,
+    setSeconds: null,
+    resetChance: 0,
+    stochastic: /일정\s*확률|확률로|랜덤/i.test(text),
+    text
+  };
+  if (!text || !/재사용\s*대기시간|쿨타임|쿨다운/i.test(text)) return out;
+
+  const setMatch = text.match(/재사용\s*대기시간(?:이|을|은|는)?\s*(\d+(?:\.\d+)?)\s*초로\s*(?:변경|증가|감소|고정)/i);
+  if (setMatch) out.setSeconds = round3(setMatch[1]);
+
+  const percentMatch = text.match(/재사용\s*대기시간(?:이|을|은|는)?[^%]{0,30}?(\d+(?:\.\d+)?)\s*%\s*(감소|증가|줄어|늘어)/i);
+  if (percentMatch) out.percentReduction = round3(Number(percentMatch[1]) * cooldownDirection(percentMatch[2]));
+
+  if (!setMatch) {
+    const flatMatch = text.match(/재사용\s*대기시간(?:이|을|은|는)?[^초%]{0,30}?(\d+(?:\.\d+)?)\s*초\s*(감소|증가|줄어|늘어)/i);
+    if (flatMatch) out.flatSeconds = round3(Number(flatMatch[1]) * cooldownDirection(flatMatch[2]));
+  }
+
+  const resetMatch = text.match(/(\d+(?:\.\d+)?)\s*%\s*확률로[^.!?]{0,40}?재사용\s*대기시간(?:이|을)?\s*(?:초기화|100\s*%\s*감소)/i);
+  if (resetMatch) {
+    out.resetChance = round3(resetMatch[1]);
+    out.stochastic = true;
+  }
+  return out;
+}
+
+function mergeCooldownRules(rules) {
+  const deterministic = rules.filter(rule => !rule.stochastic);
+  const setRows = deterministic.filter(rule => Number(rule.setSeconds) > 0);
+  return {
+    flatSeconds: round3(deterministic.reduce((sum, rule) => sum + Number(rule.flatSeconds || 0), 0)),
+    percentReduction: round3(100 * (1 - deterministic.reduce((factor, rule) => factor * (1 - Number(rule.percentReduction || 0) / 100), 1))),
+    setSeconds: setRows.length ? Number(setRows[setRows.length - 1].setSeconds) : null,
+    stochastic: rules.some(rule => rule.stochastic),
+    rules
+  };
+}
+
+function baseCooldownSeconds(skill) {
+  for (const text of collectSkillTooltipTexts(skill?.Tooltip)) {
+    const match = text.match(/(?:^|\s)재사용\s*대기시간\s*(\d+(?:\.\d+)?)\s*초(?:\s*$|\s*[|·])/i);
+    if (match) return round3(match[1]);
+  }
+  return 0;
+}
+
+function skillCategory(skill) {
+  for (const text of collectSkillTooltipTexts(skill?.Tooltip)) {
+    const match = text.match(/\[([^\]]+\s*스킬)\]/);
+    if (match) return match[1].replace(/\s+/g, ' ').trim();
+  }
+  return '';
+}
+
+function runeSummary(rune) {
+  if (!rune) return null;
+  const text = collectSkillTooltipTexts(rune?.Tooltip).join(' ');
+  const cooldownMatch = text.match(/전체\s*재사용\s*대기\s*시간(?:이|을)?\s*(\d+(?:\.\d+)?)\s*%\s*감소/i);
+  return {
+    name: String(rune?.Name || '').trim(),
+    grade: String(rune?.Grade || '').trim(),
+    icon: String(rune?.Icon || '').trim(),
+    cooldownPercent: round3(cooldownMatch?.[1] || 0),
+    stochastic: Boolean(cooldownMatch) && /일정\s*확률|확률로/i.test(text),
+    text
+  };
+}
+
 function parseSelectedTripod(tripod) {
   const texts = collectSkillTooltipTexts(tripod?.Tooltip);
   const joinedText = texts.join(' ');
@@ -214,6 +305,8 @@ function parseSelectedTripod(tripod) {
     timedSpeedBuff: hasTimedSpeedWording(joinedText) && Boolean(effects.attackSpeed || effects.moveSpeed),
     conditional: hasConditionalWording(joinedText),
     guaranteedCrit: hasGuaranteedCritWording(joinedText, effects),
+    description: joinedText,
+    cooldown: mergeCooldownRules(texts.map(parseCooldownRuleText).filter(rule => /재사용\s*대기시간|쿨타임|쿨다운/i.test(rule.text))),
     ignoredCooldown: texts.some(text => /재사용\s*대기시간|쿨타임|쿨다운/i.test(text))
   };
 }
@@ -226,7 +319,9 @@ export function extractCombatSkillEffects(skills) {
       .map(parseSelectedTripod);
     result.selectedTripodCount += selectedTripods.length;
     result.conditionalTripodCount += selectedTripods.filter(tripod => tripod.conditional).length;
-    result.ignoredCooldownCount += selectedTripods.filter(tripod => tripod.ignoredCooldown).length;
+    result.cooldownTripodCount += selectedTripods.filter(tripod => tripod.ignoredCooldown).length;
+    result.stochasticCooldownCount += selectedTripods.filter(tripod => tripod.cooldown?.stochastic).length;
+    result.ignoredCooldownCount = result.stochasticCooldownCount;
 
     const merged = { effects: emptyEffects(), skillDamageMultiplier: 1 };
     for (const tripod of selectedTripods) mergeTripodEffects(merged, tripod.effects);
@@ -239,12 +334,20 @@ export function extractCombatSkillEffects(skills) {
       }
     }
 
+    const rune = runeSummary(skill?.Rune);
+    const cooldown = mergeCooldownRules(selectedTripods.flatMap(tripod => tripod.cooldown?.rules || []));
+    const currentTree = Number(skill?.Level || 0) > 1 || selectedTripods.length > 0 || Boolean(rune?.name);
     const item = {
       name: String(skill?.Name || '').trim(),
       icon: String(skill?.Icon || '').trim(),
       level: Number(skill?.Level || 0),
       type: String(skill?.Type || '').trim(),
       skillType: Number(skill?.SkillType || 0),
+      category: skillCategory(skill),
+      baseCooldownSeconds: baseCooldownSeconds(skill),
+      cooldown,
+      rune,
+      currentTree,
       effects: merged.effects,
       timedSpeedEffects,
       conditional: selectedTripods.some(tripod => tripod.conditional),
@@ -252,6 +355,8 @@ export function extractCombatSkillEffects(skills) {
       selectedTripods
     };
     result.items.push(item);
+    if (currentTree && item.baseCooldownSeconds > 0) result.cycleItems.push(item);
+    if (currentTree) result.usedSkillCount += 1;
     if (hasSkillEffects(item.effects)) result.calculableItems.push(item);
   }
   return result;

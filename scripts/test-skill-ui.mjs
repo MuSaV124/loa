@@ -47,6 +47,7 @@ const browser = await chromium.launch({
 
 const skillItem = {
   name: '표본 기술', icon: '', level: 14, type: '일반', skillType: 1,
+  baseCooldownSeconds: 20, currentTree: true, cooldown: { flatSeconds: 2, percentReduction: 0 },
   effects: {
     critRate: 100, critDamage: 160, critHitDamage: 5, additionalDamage: 12,
     enemyDamage: 8, attackPower: 6, attackSpeed: 4, moveSpeed: 3, skillDamage: 30
@@ -58,6 +59,7 @@ const skillItem = {
 };
 const higherCritDamageSkillItem = {
   name: '상위 치피 기술', icon: '', level: 14, type: '일반', skillType: 1,
+  baseCooldownSeconds: 16, currentTree: true, cooldown: { flatSeconds: 0, percentReduction: 0 },
   effects: {
     critRate: 0, critDamage: 210, critHitDamage: 0, additionalDamage: 0,
     enemyDamage: 0, attackPower: 0, attackSpeed: 0, moveSpeed: 0, skillDamage: 0
@@ -68,6 +70,7 @@ const higherCritDamageSkillItem = {
 };
 const baselineSkillItem = {
   name: '기본 기술', icon: '', level: 12, type: '일반', skillType: 1,
+  baseCooldownSeconds: 12, currentTree: true, cooldown: { flatSeconds: 0, percentReduction: 0 },
   effects: {
     critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0,
     enemyDamage: 0, attackPower: 0, attackSpeed: 0, moveSpeed: 0, skillDamage: 0
@@ -90,8 +93,11 @@ const characterResponse = {
   abilityStoneEffects: { attackPower: 0, effects: {}, engravings: [], items: [] },
   engravingEffects: { effects: {}, items: [], adrenaline: { adopted: false, level: 0, critRate: 0, attackPower: 0 } },
   arkGridEffects: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
-  skillEffects: { items: [skillItem, higherCritDamageSkillItem, baselineSkillItem], calculableItems: [skillItem, higherCritDamageSkillItem], selectedTripodCount: 3, conditionalTripodCount: 1, ignoredCooldownCount: 1 },
-  powerSnapshot: null
+  skillEffects: { items: [skillItem, higherCritDamageSkillItem, baselineSkillItem], cycleItems: [skillItem, higherCritDamageSkillItem, baselineSkillItem], calculableItems: [skillItem, higherCritDamageSkillItem], selectedTripodCount: 3, conditionalTripodCount: 1, cooldownTripodCount: 1, stochasticCooldownCount: 0, usedSkillCount: 3 },
+  powerSnapshot: {
+    profile: { className: '브레이커', secondClass: '수라의 길', combatPower: 5000, stats: [{ type: '신속', value: 900 }] },
+    equipment: { combat: [], accessories: [] }, gems: { items: [], summary: {} }, arkGrid: { slots: [] }, effects: { arkGrid: { items: [] } }, coverage: {}
+  }
 };
 
 async function verifyViewport(viewport) {
@@ -103,9 +109,9 @@ async function verifyViewport(viewport) {
   await page.getByRole('heading', { name: /스킬표본/ }).waitFor();
   await page.locator('.advancedInputDetails').evaluate(element => { element.open = true; });
 
-  await page.locator('#skillEffectPreview').getByText('사용 스킬 자동 반영').waitFor();
+  await page.locator('#skillEffectPreview').getByText('현재 스킬트리 자동 반영').waitFor();
   const preview = await page.locator('#skillEffectPreview').innerText();
-  assert.match(preview, /치적 최대 · 나머지 최소 2개/);
+  assert.match(preview, /현재 트리 3개 · 효과값 2개/);
   assert.match(preview, /추천 적용 기준값/);
   assert.match(preview, /확정 치명/);
   assert.match(preview, /조건 충족/);
@@ -113,8 +119,8 @@ async function verifyViewport(viewport) {
   assert.match(preview, /치피 \+160%/);
   assert.match(preview, /치피 \+210%/);
   assert.match(preview, /스킬 피해 \+30%/);
-  assert.match(preview, /쿨감 제외 1개/);
-  assert.doesNotMatch(preview, /재사용 대기시간/);
+  assert.match(preview, /쿨 트포 1개/);
+  assert.match(preview, /기본 20.0초 → 장착효과/);
 
   const source = await page.locator('#sourceSummary').textContent();
   assert.match(source, /스킬 효과 실험값/);
@@ -135,9 +141,53 @@ async function verifyViewport(viewport) {
   await page.close();
 }
 
+async function verifySupportRecommendation() {
+  const supportSkill = (name, baseCooldownSeconds, flatSeconds) => ({
+    name, icon: '', level: 14, type: '일반', skillType: 0, currentTree: true, baseCooldownSeconds,
+    cooldown: { flatSeconds, percentReduction: 0 }, effects: {
+      critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0,
+      attackPower: 0, attackSpeed: 0, moveSpeed: 0, skillDamage: 0
+    },
+    selectedTripods: [{ name: flatSeconds ? '빠른 준비' : '지원 효과' }]
+  });
+  const supportSkills = [supportSkill('천상의 연주', 30, 6), supportSkill('음파 진동', 24, 0)];
+  const response = {
+    ...characterResponse,
+    profile: { ...characterResponse.profile, CharacterName: '서폿표본', CharacterClassName: '바드', Stats: [{ Type: '신속', Value: '1800' }, { Type: '특화', Value: '600' }] },
+    arkPassive: { Title: '절실한 구원', Effects: [
+      { Name: '축복의 여신', Level: 3 }, { Name: '정열의 춤사위', Level: 2 },
+      { Name: '선각자', Level: 1 }, { Name: '진군', Level: 1 }, { Name: '마나 용광로', Level: 2 }
+    ] },
+    skillEffects: { items: supportSkills, cycleItems: supportSkills, calculableItems: [], selectedTripodCount: 2, conditionalTripodCount: 0, cooldownTripodCount: 1, stochasticCooldownCount: 0, usedSkillCount: 2 },
+    powerSnapshot: {
+      profile: { className: '바드', secondClass: '절실한 구원', combatPower: 5000, stats: [{ type: '공격력', value: 170000 }, { type: '신속', value: 1800 }, { type: '특화', value: 600 }] },
+      equipment: { combat: [], accessories: [] },
+      gems: { items: [
+        { skillName: '천상의 연주', kind: 'cooldown', level: 8, attackBonus: true, valid: true },
+        { skillName: '음파 진동', kind: 'cooldown', level: 8, attackBonus: true, valid: true }
+      ], summary: {} },
+      arkGrid: { slots: [] }, effects: { accessory: { items: [] }, bracelet: { items: [] }, arkGrid: { items: [] } }, coverage: {}
+    }
+  };
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) }));
+  await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
+  await page.getByPlaceholder('캐릭터명 입력').fill('서폿표본');
+  await page.getByRole('button', { name: '검색', exact: true }).click();
+  await page.getByRole('heading', { name: /서폿표본/ }).waitFor();
+  const recommendation = await page.locator('#recommendPanel').innerText();
+  assert.match(recommendation, /서포터 진화 노드/);
+  assert.match(recommendation, /축복의 여신/);
+  assert.match(recommendation, /종합 파티 기여/);
+  assert.match(recommendation, /공증 가동률/);
+  assert.match(recommendation, /현재 스킬 주기·파티 기여 기준/);
+  await page.close();
+}
+
 try {
   await verifyViewport({ width: 1440, height: 1000 });
   await verifyViewport({ width: 390, height: 844 });
+  await verifySupportRecommendation();
   console.log('skill effect UI tests passed');
 } finally {
   await browser.close();

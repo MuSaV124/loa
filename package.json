@@ -1,6 +1,6 @@
 {
   "name": "lostark-node-recommend-calculator",
-  "version": "5.11.1",
+  "version": "5.12.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -21,6 +21,7 @@
     "test:market-cache": "node scripts/test-market-cache.mjs",
     "test:spec-planner": "node scripts/test-spec-planner.mjs",
     "test:skill-effects": "node scripts/test-skill-effects.mjs",
+    "test:skill-cycle": "node scripts/test-skill-cycle.mjs",
     "test:skill-ui": "node scripts/test-skill-ui.mjs",
     "test:simulator-ui": "node scripts/test-simulator-ui.mjs",
     "update:class-benchmarks": "node scripts/update-class-benchmarks.mjs",

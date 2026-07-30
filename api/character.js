@@ -3,7 +3,7 @@ import { relicEngravingEffect } from '../public/engraving-math.js';
 import { CHARACTER_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
 import { extractCombatSkillEffects } from '../public/skill-effects.js';
 
-const API_VERSION = '5.11.1';
+const API_VERSION = '5.12.0';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -177,6 +177,16 @@ export function extractProfileAttackBreakdown(profile) {
   };
 }
 
+export function extractProfileCooldownReduction(profile) {
+  const swift = (Array.isArray(profile?.Stats) ? profile.Stats : []).find(row => row?.Type === '신속');
+  const text = (Array.isArray(swift?.Tooltip) ? swift.Tooltip : [swift?.Tooltip])
+    .filter(Boolean)
+    .map(stripHtml)
+    .join(' ');
+  const match = text.match(/스킬\s*재사용\s*대기시간(?:이|을)?\s*(\d+(?:\.\d+)?)\s*%\s*감소/);
+  return match ? Number(match[1]) : null;
+}
+
 const COMBAT_EQUIPMENT_TYPES = new Set(['무기', '투구', '상의', '하의', '장갑', '어깨', '완갑']);
 const ACCESSORY_EQUIPMENT_TYPES = new Set(['목걸이', '귀걸이', '반지']);
 
@@ -204,6 +214,7 @@ function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEff
       attackPower: attackBreakdown.attackPower,
       baseAttackPower: attackBreakdown.baseAttackPower,
       attackPowerAdjustment: attackBreakdown.attackPowerAdjustment,
+      swiftCooldownReduction: extractProfileCooldownReduction(profile),
       stats: Array.isArray(profile?.Stats) ? profile.Stats.map(row => ({ type: row.Type, value: parseNumber(row.Value), raw: row.Value })) : []
     },
     equipment: equipmentSnapshot,
@@ -220,7 +231,10 @@ function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEff
         calculableCount: skillEffects?.calculableItems?.length || 0,
         selectedTripodCount: skillEffects?.selectedTripodCount || 0,
         conditionalTripodCount: skillEffects?.conditionalTripodCount || 0,
-        ignoredCooldownCount: skillEffects?.ignoredCooldownCount || 0
+        cooldownTripodCount: skillEffects?.cooldownTripodCount || 0,
+        stochasticCooldownCount: skillEffects?.stochasticCooldownCount || 0,
+        usedSkillCount: skillEffects?.usedSkillCount || 0,
+        cycleCount: skillEffects?.cycleItems?.length || 0
       }
     },
     coverage: {
@@ -235,7 +249,8 @@ function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEff
       needsVerification: [
         '강화/상급재련은 장비 Tooltip 문구 기반 파싱이라 실제 샘플로 검증이 필요합니다.',
         '보석은 캐릭터 ArmoryGem 응답 기준으로 레벨/종류/스킬 연결을 구조화했습니다.',
-        '스킬 효과는 combat-skills의 실제 선택 트라이포드만 읽으며 재사용 대기시간 감소는 계산에서 제외합니다.',
+        '스킬 주기는 combat-skills의 현재 스킬 레벨·선택 트라이포드·룬과 프로필 신속, 장착 보석을 결합합니다.',
+        '확률이 공개되지 않은 속행 룬과 조건부 아크그리드 쿨감은 감지하되 임의 확률로 직접 환산하지 않고 일치 전투분석 지분으로 보정합니다.',
         '공식 전투력 산식은 공개값이 아니므로 profile.CombatPower와 샘플 오차 검증으로 보정해야 합니다.'
       ]
     }
@@ -379,7 +394,7 @@ const ARK_GRID_CORE_ORDER = [
   { side: '혼돈', symbol: '별' }
 ];
 
-function extractArkGridSnapshot(arkGrid) {
+export function extractArkGridSnapshot(arkGrid) {
   const slots = Array.isArray(arkGrid?.Slots) ? arkGrid.Slots : [];
   if (!slots.length) return { slots: [], gemSummary: [] };
   const usedSlotIndexes = new Set();
@@ -399,7 +414,7 @@ function extractArkGridSnapshot(arkGrid) {
       icon: normalizeIconUrl(slot?.Icon || slot?.IconPath || findIconPath(slot?.Tooltip) || ''),
       gemName: stripHtml(slot?.GemName || slot?.JewelName || slot?.Gem?.Name || slot?.Jewel?.Name || ''),
       gemIcon: normalizeIconUrl(slot?.GemIcon || slot?.JewelIcon || slot?.Gem?.Icon || slot?.Jewel?.Icon || ''),
-      activeTexts: activeTexts.map(row => row.slice(0, 180)),
+      activeTexts: activeTexts.map(row => row.slice(0, 1500)),
       rawKnownKeys: Object.keys(slot || {}).sort()
     };
   });

@@ -1,3 +1,5 @@
+import { buildSkillCycleModel, normalizeSkillCycleName } from './skill-cycle.js';
+
 const DEFAULT_GEM_TABLES = {
   legacyDamage: [3, 6, 9, 12, 15, 18, 21, 24, 30, 40],
   tier4Damage: [8, 12, 16, 20, 24, 28, 32, 36, 40, 44],
@@ -113,7 +115,7 @@ export function findCombatAnalyzerProfile(data, snapshot, skillEffects, { suppor
   };
 }
 
-function flattenedShares(value) {
+export function combatAnalyzerSkillShares(value) {
   if (Array.isArray(value)) return Object.assign({}, ...value.filter(item => item && typeof item === 'object'));
   return value && typeof value === 'object' ? value : {};
 }
@@ -130,9 +132,8 @@ function gemBonus(gem, tables, kind) {
 export function combatAnalyzerGemFactors(data, snapshot, skillEffects, options = {}) {
   const support = Boolean(options.support);
   const profile = findCombatAnalyzerProfile(data, snapshot, skillEffects, { support });
-  const shares = flattenedShares(profile.value);
-  const identitySkills = new Set(data?.identitySkills || []);
-  const skillNames = Object.keys(shares).filter(name => !identitySkills.has(name));
+  const shares = combatAnalyzerSkillShares(profile.value);
+  const skillNames = Object.keys(shares).filter(name => Number(shares[name] || 0) > 0);
   const gems = Array.isArray(snapshot?.gems?.items) ? snapshot.gems.items : [];
   const tables = { ...DEFAULT_GEM_TABLES, ...(data?.gemTables || {}) };
   const totalShare = skillNames.reduce((sum, name) => sum + Number(shares[name] || 0), 0);
@@ -144,8 +145,7 @@ export function combatAnalyzerGemFactors(data, snapshot, skillEffects, options =
     );
     return sum + (gem ? gemBonus(gem, tables, 'damage') * Number(shares[name] || 0) : 0);
   }, 0);
-  const fallbackPenalty = profile.fallback && options.disableFallbackPenalty !== true ? 0.7 : 1;
-  const damageFactor = totalShare > 0 ? 1 + (weightedDamage / totalShare) * fallbackPenalty / 100 : 1;
+  const damageFactor = totalShare > 0 ? 1 + (weightedDamage / totalShare) / 100 : 1;
   const cooldownGems = gems.filter(gem => profileGemKind(gem) === 'cooldown' && gem?.valid !== false);
   let cooldownWeight = 0;
   const weightedCooldown = cooldownGems.reduce((sum, gem) => {
@@ -153,9 +153,21 @@ export function combatAnalyzerGemFactors(data, snapshot, skillEffects, options =
     cooldownWeight += weight;
     return sum + gemBonus(gem, tables, 'cooldown') * weight;
   }, 0);
-  const averageCooldown = cooldownWeight > 0 ? weightedCooldown / cooldownWeight : 0;
-  const cooldownFactor = 1 / (1 - 0.9 * averageCooldown / 100);
-  return { profile, shares, damageFactor, cooldownFactor, totalFactor: damageFactor * cooldownFactor, averageCooldown };
+  let averageCooldown = cooldownWeight > 0 ? weightedCooldown / cooldownWeight : 0;
+  let cooldownFactor = 1 / (1 - 0.9 * averageCooldown / 100);
+  const cycle = buildSkillCycleModel({
+    skillEffects,
+    snapshot,
+    shares,
+    identitySkills: data?.identitySkills || [],
+    analyzerTag: profile.tag,
+    analyzerMatch: profile.match
+  });
+  if (cycle.items.length && cycle.mappedShare > 0) {
+    cooldownFactor = cycle.gemCooldownMultiplier;
+    averageCooldown = cycle.weightedGemCooldown;
+  }
+  return { profile, shares, damageFactor, cooldownFactor, totalFactor: damageFactor * cooldownFactor, averageCooldown, cycle };
 }
 
 export function gemUpgradeEfficiency({ data, snapshot, skillEffects, gem, nextLevel, support = false } = {}) {
@@ -174,8 +186,8 @@ export function gemUpgradeEfficiency({ data, snapshot, skillEffects, gem, nextLe
   const afterFactor = kind === 'cooldown' ? after.cooldownFactor : after.damageFactor;
   const gainPercent = beforeFactor > 0 ? (afterFactor / beforeFactor - 1) * 100 : 0;
   const skillName = gemSkillName(gem);
-  const normalizedSkillName = normalizeCombatAnalyzerText(skillName);
-  const skillShare = Object.entries(before.shares).find(([name]) => normalizeCombatAnalyzerText(name) === normalizedSkillName)?.[1] || 0;
+  const normalizedSkillName = normalizeSkillCycleName(skillName);
+  const skillShare = Object.entries(before.shares).find(([name]) => normalizeSkillCycleName(name) === normalizedSkillName)?.[1] || 0;
   return {
     gainPercent,
     kind,

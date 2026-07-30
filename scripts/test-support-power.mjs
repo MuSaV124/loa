@@ -89,6 +89,19 @@ const tier4CooldownSnapshot = { ...snapshot, gems: { items: [{ skillName: '천�
 const legacyCooldownSnapshot = { ...snapshot, gems: { items: [{ skillName: '천상의 연주', kind: 'cooldown', level: 8, attackBonus: false, valid: true }] } };
 assert.ok(supportContributionModel(tier4CooldownSnapshot).detail.uptimeA > supportContributionModel(legacyCooldownSnapshot).detail.uptimeA);
 
+const exactSkillEffects = {
+  items: [
+    { name: '천상의 연주', level: 14, currentTree: true, baseCooldownSeconds: 30, cooldown: { flatSeconds: 6, percentReduction: 0 } },
+    { name: '음파 진동', level: 14, currentTree: true, baseCooldownSeconds: 24, cooldown: { flatSeconds: 0, percentReduction: 0 } }
+  ]
+};
+const exactSupport = supportContributionModel(snapshot, { selection: { 선각자: { level: 1 } }, skillEffects: exactSkillEffects });
+assert.equal(exactSupport.detail.skillCycleApplied, true);
+assert.ok(Math.abs(exactSupport.detail.actualCooldownA - exactSupport.detail.actualCooldownB) < 0.01, '천상의 연주 30-6초와 음파 진동 24초의 현재 트리를 같은 기준으로 계산해야 한다.');
+const manaSupport = supportContributionModel(snapshot, { selection: { '마나 용광로': { level: 2 } }, skillEffects: exactSkillEffects });
+const stableSupport = supportContributionModel(snapshot, { selection: { '안정된 관리자': { level: 2 } }, skillEffects: exactSkillEffects });
+assert.ok(stableSupport.totalBuffPower < manaSupport.totalBuffPower, '안정된 관리자의 아이덴티티 획득량 -6%를 서포터 노드 추천에 반영해야 한다.');
+
 const exactCombined = supportUpgradeImpact({
   before: { totalBuffPower: 1, carePower: 1 },
   after: { totalBuffPower: 1.02, carePower: 1.03 },

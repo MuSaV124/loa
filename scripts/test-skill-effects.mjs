@@ -76,7 +76,10 @@ const parsed = extractCombatSkillEffects(skills);
 assert.equal(parsed.items.length, 3);
 assert.equal(parsed.calculableItems.length, 2);
 assert.equal(parsed.selectedTripodCount, 9);
-assert.equal(parsed.ignoredCooldownCount, 2);
+assert.equal(parsed.cooldownTripodCount, 2);
+assert.equal(parsed.ignoredCooldownCount, 0, '확정 쿨감 트라이포드는 더 이상 계산에서 제외하지 않는다.');
+assert.equal(parsed.items[0].cooldown.flatSeconds, 2);
+assert.equal(parsed.items[2].cooldown.flatSeconds, 8);
 assert.deepEqual(parsed.calculableItems[0].effects, {
   critRate: 33.2,
   critDamage: 0,

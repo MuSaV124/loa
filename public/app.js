@@ -1,15 +1,16 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.11.1';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.11.1';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.11.1';
-import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.11.1';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.11.1';
-import { findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.11.1';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.11.1';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.11.1';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.11.1';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.11.1';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.11.1';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.11.1';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.12.0';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.12.0';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.12.0';
+import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.12.0';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.12.0';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.12.0';
+import { buildSkillCycleModel, evaluateEvolutionCooldown } from './skill-cycle.js?v=5.12.0';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.12.0';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.12.0';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.12.0';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.12.0';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.12.0';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.12.0';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -18,10 +19,10 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.11.1';
+} from './cache-policy.js?v=5.12.0';
 
-const VERSION = '5.11.1';
-const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
+const VERSION = '5.12.0';
+const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function isNoManaMainSkillEnabled() { return Boolean(document.getElementById('noManaMainSkill')?.checked); }
@@ -61,6 +62,7 @@ const state = {
   arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
   enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] },
   skillEffects: emptySkillEffectState(),
+  skillCycle: null,
   powerSnapshot: null,
   powerCostEstimates: [],
   combatPowerModel: null,
@@ -93,28 +95,37 @@ function renderSkillEffectControl() {
   const minimumProfile = minimumSkillEffectProfile(state.skillEffects);
   const loadedCount = Number(state.skillEffects?.items?.length || 0);
   const conditionalCount = Number(state.skillEffects?.conditionalTripodCount || items.filter(isConditionalSkill).length);
-  const ignoredCooldownCount = Number(state.skillEffects?.ignoredCooldownCount || 0);
+  const cooldownTripodCount = Number(state.skillEffects?.cooldownTripodCount || 0);
+  const stochasticCooldownCount = Number(state.skillEffects?.stochasticCooldownCount || 0);
+  const cycle = state.skillCycle;
   if (!loadedCount) {
     preview.innerHTML = '<b>사용 스킬 자동 반영</b><span>캐릭터 검색 후 표시</span>';
     preview.classList.add('muted');
     return;
   }
   const status = [
-    `치적 최대 · 나머지 최소 ${minimumProfile.itemCount}개`,
+    cycle?.usedSkillCount ? `현재 트리 ${cycle.usedSkillCount}개` : '',
+    cycle?.mappedSharePercent > 0 ? `분석 지분 ${cycle.mappedSharePercent.toFixed(1)}%` : '',
+    cycle?.weightedCooldownSeconds > 0 ? `평균 ${cycle.weightedCooldownSeconds.toFixed(2)}초` : '',
+    `효과값 ${minimumProfile.itemCount}개`,
     conditionalCount ? `조건 충족 ${conditionalCount}개` : '',
-    ignoredCooldownCount ? `쿨감 제외 ${ignoredCooldownCount}개` : ''
+    cooldownTripodCount ? `쿨 트포 ${cooldownTripodCount}개` : '',
+    stochasticCooldownCount ? `확률 쿨감 ${stochasticCooldownCount}개 별도` : ''
   ].filter(Boolean).join(' · ');
   const rows = items.map(item => {
     const effectSummary = formatSkillEffectSummary(item.effects) || '수치 효과 없음';
     const flags = [isGuaranteedCritSkill(item) ? '확정 치명' : '', isConditionalSkill(item) ? '조건 충족' : ''].filter(Boolean).join(' · ');
-    const detail = flags ? `${flags} · ${effectSummary}` : effectSummary;
+    const cycleItem = cycle?.items?.find(row => String(row.name || '').replace(/\s+/g, '') === String(item.name || '').replace(/\s+/g, ''));
+    const seconds = cycleItem ? `기본 ${Number(cycleItem.baseCooldownSeconds).toFixed(1)}초 → 장착효과 ${Number(cycleItem.effectiveCooldownSeconds).toFixed(2)}초` : '';
+    const detail = [flags, seconds, effectSummary].filter(Boolean).join(' · ');
     return `<div class="skillEffectRow"><b>${escapeHtml(item.name || '이름 없는 스킬')}${Number(item.level || 0) ? ` Lv.${Number(item.level)}` : ''}</b><span>${escapeHtml(detail)}</span></div>`;
   }).join('');
   const minimumSummary = formatSkillEffectSummary(minimumProfile.effects) || '수치 효과 없음';
   const minimumRow = minimumProfile.itemCount
     ? `<div class="skillEffectRow"><b>추천 적용 기준값</b><span>${escapeHtml(minimumSummary)}</span></div>`
     : '';
-  preview.innerHTML = `<div class="skillEffectHeading"><b>사용 스킬 자동 반영</b><span>${escapeHtml(status)}</span></div><div class="skillEffectRows">${minimumRow}${rows || '<div class="skillEffectRow muted"><span>계산할 사용 스킬이 없습니다.</span></div>'}</div>`;
+  const cycleNote = cycle ? `<div class="skillCycleNote">신속 ${Number(cycle.swiftCooldownReduction || 0).toFixed(2)}% · 보석 가중 ${Number(cycle.weightedGemCooldown || 0).toFixed(2)}% · ${escapeHtml(cycle.analyzerTag || '장착 스킬 추정')}${cycle.conditionalGridRules?.length ? ` · 조건부 아크그리드 ${cycle.conditionalGridRules.length}건은 일치 전투분석 지분 반영` : ''}${cycle.stochasticRuneCount ? ` · 속행 ${cycle.stochasticRuneCount}개는 확률 미공개로 직접 환산 제외` : ''}</div>` : '';
+  preview.innerHTML = `<div class="skillEffectHeading"><b>현재 스킬트리 자동 반영</b><span>${escapeHtml(status)}</span></div>${cycleNote}<div class="skillEffectRows">${minimumRow}${rows || '<div class="skillEffectRow muted"><span>계산할 사용 스킬이 없습니다.</span></div>'}</div>`;
   preview.classList.remove('muted');
 }
 
@@ -1472,6 +1483,28 @@ async function loadCombatPowerModel() {
   return combatPowerModelPromise;
 }
 let combatAnalyzerPromise = null;
+function refreshSkillCycleModel() {
+  if (!state.powerSnapshot) {
+    state.skillCycle = null;
+    return null;
+  }
+  const support = isSupportPowerSnapshot(state.powerSnapshot);
+  const profile = state.combatAnalyzer
+    ? findCombatAnalyzerProfile(state.combatAnalyzer, state.powerSnapshot, state.skillEffects, { support })
+    : null;
+  const supportShares = Object.fromEntries((state.skillEffects?.cycleItems || [])
+    .filter(item => item?.currentTree !== false && Number(item?.baseCooldownSeconds || 0) > 0)
+    .map(item => [item.name, 1]));
+  state.skillCycle = buildSkillCycleModel({
+    skillEffects: state.skillEffects,
+    snapshot: state.powerSnapshot,
+    shares: support ? supportShares : combatAnalyzerSkillShares(profile?.value),
+    identitySkills: state.combatAnalyzer?.identitySkills || [],
+    analyzerTag: profile?.tag || '',
+    analyzerMatch: profile?.match || ''
+  });
+  return state.skillCycle;
+}
 async function loadCombatAnalyzer() {
   if (state.combatAnalyzer) return state.combatAnalyzer;
   if (!combatAnalyzerPromise) {
@@ -1479,8 +1512,11 @@ async function loadCombatAnalyzer() {
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         state.combatAnalyzer = data || null;
+        refreshSkillCycleModel();
+        renderSkillEffectControl();
         const summary = $('gemAnalyzerSummary');
-        if (summary && state.powerSnapshot) summary.innerHTML = gemAnalyzerSummaryHtml(state.powerSnapshot);
+        if (state.powerSnapshot && simulatorRendered) renderPowerSnapshot(state.powerSnapshot);
+        else if (summary && state.powerSnapshot) summary.innerHTML = gemAnalyzerSummaryHtml(state.powerSnapshot);
         return state.combatAnalyzer;
       })
       .catch(() => {
@@ -3167,7 +3203,35 @@ function renderSupportContributionPanel(snapshot) {
       ${metric('아이덴티티 가동률', model.detail.identityUptime * 100, '특화·쿨감·획득량')}
       ${metric('케어 보정', model.carePercent, '회복·보호막 옵션')}
     </div>
-    <p>공격력 ${Math.round(model.detail.attackPower).toLocaleString('ko-KR')} · 낙인 보너스 ${model.detail.brandBonus.toFixed(2)}% · 아군 공격 강화 ${model.detail.allyAttackA.toFixed(2)}% · 아군 피해 강화 ${model.detail.allyDamageBonus.toFixed(2)}%</p></div>
+    <p>공격력 ${Math.round(model.detail.attackPower).toLocaleString('ko-KR')} · 낙인 보너스 ${model.detail.brandBonus.toFixed(2)}% · 아군 공격 강화 ${model.detail.allyAttackA.toFixed(2)}% · 아군 피해 강화 ${model.detail.allyDamageBonus.toFixed(2)}%${model.detail.skillCycleApplied ? ` · 공증 주기 ${model.detail.actualCooldownA.toFixed(2)}초 / ${model.detail.actualCooldownB.toFixed(2)}초` : ''}</p></div>
+  </details>`;
+}
+function renderSkillCyclePanel() {
+  const cycle = state.skillCycle;
+  if (!cycle?.items?.length) return '';
+  const rows = cycle.items
+    .slice()
+    .sort((left, right) => Number(right.normalizedShare || 0) - Number(left.normalizedShare || 0) || Number(right.level || 0) - Number(left.level || 0))
+    .map(item => {
+      const tripod = Number(item.cooldown?.flatSeconds || 0)
+        ? `트포 ${Number(item.cooldown.flatSeconds) > 0 ? '-' : '+'}${Math.abs(Number(item.cooldown.flatSeconds)).toFixed(1)}초`
+        : Number(item.cooldown?.percentReduction || 0)
+          ? `트포 ${Number(item.cooldown.percentReduction).toFixed(1)}%`
+          : '';
+      const factors = [
+        tripod,
+        Number(item.gemCooldownReduction || 0) ? `보석 ${Number(item.gemCooldownReduction).toFixed(0)}%` : '',
+        item.rune?.name ? `${item.rune.name}${item.rune.stochastic ? '(확률)' : ''}` : ''
+      ].filter(Boolean).join(' · ') || '신속만 적용';
+      return `<div class="skillCycleRow"><b>${escapeHtml(item.name)} <small>Lv.${Number(item.level || 0)}</small></b><span>${item.normalizedShare > 0 ? `${(item.normalizedShare * 100).toFixed(1)}%` : '-'}</span><span>${Number(item.baseCooldownSeconds).toFixed(1)}초</span><strong>${Number(item.effectiveCooldownSeconds).toFixed(2)}초</strong><small>${escapeHtml(factors)}</small></div>`;
+    }).join('');
+  const warnings = [
+    cycle.conditionalGridRules?.length ? `조건부 아크그리드 ${cycle.conditionalGridRules.length}건은 ${cycle.analyzerTag || '일치 프로필'} 딜 지분에 반영` : '',
+    cycle.stochasticRuneCount ? `속행 ${cycle.stochasticRuneCount}개는 발동 확률 미공개로 직접 초 환산 제외` : ''
+  ].filter(Boolean).join(' · ');
+  return `<details class="powerSnapshotBlock skillCyclePanel simulatorFold">
+    <summary class="simulatorFoldSummary"><span><h3>현재 스킬 사이클</h3><small>${cycle.usedSkillCount}개 · 분석 지분 ${cycle.mappedSharePercent.toFixed(1)}% · 가중 평균 ${cycle.weightedCooldownSeconds.toFixed(2)}초</small></span><strong>초단위</strong></summary>
+    <div class="simulatorFoldBody"><div class="skillCycleTable"><div class="skillCycleRow skillCycleHeader"><b>스킬</b><span>딜 지분</span><span>기본</span><strong>장착효과</strong><small>적용 요소</small></div>${rows}</div>${warnings ? `<p>${escapeHtml(warnings)}</p>` : ''}</div>
   </details>`;
 }
 function renderPowerSnapshot(snapshot) {
@@ -3220,6 +3284,7 @@ function renderPowerSnapshot(snapshot) {
         <summary class="simulatorFoldSummary"><span><h3>장착 보석</h3><small>장착 중인 보석 11개와 귀속 여부</small></span></summary>
         <div class="simulatorFoldBody"><div id="gemAnalyzerSummary" class="powerBuildHeader">${gemAnalyzerSummaryHtml(snapshot)}</div><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
       </details>
+      ${renderSkillCyclePanel()}
       ${renderSupportContributionPanel(snapshot)}
       <details class="powerSnapshotBlock powerBuildPanel simulatorFold">
         <summary class="simulatorFoldSummary"><span><h3>장비 파싱</h3><small>장비 · 악세사리 · 아크그리드 원자료</small></span></summary>
@@ -3651,11 +3716,13 @@ function scoreCore(stats) {
   const cooldownExcluded = isCooldownExcluded();
   const cooldownReduction = cooldownExcluded ? 0 : Math.max(0, Math.min(Number(stats.cooldownReduction || 0), 95));
   const mainSkillDamageSharePct = cooldownExcluded ? 0 : Math.max(0, Math.min(Number($('mainSkillDamageShare')?.value ?? 60), 100));
-  const cooldownRatio = mainSkillDamageSharePct / 100;
-  const theoreticalCooldownGain = cooldownReduction > 0 ? (1 / (1 - cooldownReduction / 100) - 1) : 0;
-  const cooldownMultiplier = 1 + theoreticalCooldownGain * cooldownRatio;
+  const cooldownEvaluation = cooldownExcluded
+    ? { multiplier: 1, affectedSharePercent: 0, modeled: Boolean(state.skillCycle?.items?.length) }
+    : evaluateEvolutionCooldown(state.skillCycle, cooldownReduction, { fallbackSharePercent: mainSkillDamageSharePct });
+  const cooldownRatio = cooldownEvaluation.affectedSharePercent / 100;
+  const cooldownMultiplier = cooldownEvaluation.multiplier;
   const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier * skillDamageMultiplier * engravingDamageMultiplier * cooldownMultiplier;
-  return { value, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, skillDamageMultiplier, engravingDamageMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, skillDamage: stats.skillDamage || 0, sonicBreakEvolutionDamage: stats.sonicBreakEvolutionDamage || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
+  return { value, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, cooldownModeled: cooldownEvaluation.modeled, skillDamageMultiplier, engravingDamageMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, skillDamage: stats.skillDamage || 0, sonicBreakEvolutionDamage: stats.sonicBreakEvolutionDamage || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
 }
 
 function applyExperimentalSkillEffects(stats, item) {
@@ -4094,7 +4161,7 @@ function manaConditionNoteText(calc) {
   const text = [...new Set(notes.map(x => x.note).filter(Boolean))].join(' · ');
   return text;
 }
-function candidateMemo(tier2Entries, fourNames, fiveName, calc) {
+function candidateMemo(tier2Entries, fourNames, fiveName, calc, supportMode = false) {
   const bits = [];
   if (hasSameTier245(state.selected, tier2Entries, fourNames, fiveName)) bits.push('현재 조합');
   else bits.push(`${tier4PairLabel(fourNames)} / ${fiveName}`);
@@ -4103,8 +4170,9 @@ function candidateMemo(tier2Entries, fourNames, fiveName, calc) {
   const manaNote = manaConditionNoteText(calc);
   if (manaNote) bits.push(manaNote);
   if (calc?.result?.sonicBreakEvolutionDamage > 0) bits.push(`음속 진피 ${fmt(calc.result.sonicBreakEvolutionDamage)}%`);
-  if (fiveName === '입식 타격가') bits.push('6중첩 최대 기준');
-  if (fiveName === '마나 용광로') bits.push('마나 계수 최대 기준');
+  if (supportMode) bits.push('현재 스킬 주기·파티 기여 기준');
+  else if (fiveName === '입식 타격가') bits.push('6중첩 최대 기준');
+  else if (fiveName === '마나 용광로') bits.push('마나 계수 최대 기준');
   return bits.join(' / ');
 }
 function tier2ChipHtml(entries) {
@@ -4152,14 +4220,29 @@ function calculateAndRender() {
   const current = statsWithSelection(state.selected);
   const apiSelection = Object.keys(state.apiSelected || {}).length ? state.apiSelected : state.selected;
   const apiBase = statsWithSelection(apiSelection);
+  const supportMode = isSupportPowerSnapshot(state.powerSnapshot);
+  const recommendDescription = $('recommendDescription');
+  if (recommendDescription) recommendDescription.textContent = supportMode
+    ? '현재 공증 스킬 주기와 낙인·아이덴티티·파티 버프를 반영해 서포터 진화 노드를 비교합니다.'
+    : '공식 기대값과 치적 안정성·단타·마나 조건을 반영한 실전 추천값을 함께 비교합니다.';
+  for (const id of ['singleHitMainSkill', 'noManaMainSkill', 'manaShortageClass']) {
+    const label = $(id)?.closest('label');
+    if (label) label.classList.toggle('hidden', supportMode);
+  }
   renderCombatStats(current);
   renderKeenEfficiency(current);
   const apiBaseValue = Number(apiBase.result.value || 0);
   const currentValue = Number(current.result.value || 0);
   const noManaMainSkill = Boolean($('noManaMainSkill')?.checked);
   const manaShortageClass = Boolean($('manaShortageClass')?.checked) && !noManaMainSkill;
-  const apiAdjustment = practicalRecommendationFor(tier5NameFromSelection(apiSelection), apiBase, apiSelection);
-  const currentAdjustment = practicalRecommendationFor(tier5NameFromSelection(state.selected), current, state.selected);
+  const apiSupportModel = supportMode ? supportContributionModel(state.powerSnapshot, { ...supportModelContext(), selection: apiSelection }) : null;
+  const currentSupportModel = supportMode ? supportContributionModel(state.powerSnapshot, { ...supportModelContext(), selection: state.selected }) : null;
+  const apiAdjustment = supportMode
+    ? { value: Number(apiSupportModel?.totalBuffPower || 1), singleHitPenalty: 0, critOverPenalty: 0, critLowPenalty: 0, manaStabilityBonus: 0 }
+    : practicalRecommendationFor(tier5NameFromSelection(apiSelection), apiBase, apiSelection);
+  const currentAdjustment = supportMode
+    ? { value: Number(currentSupportModel?.totalBuffPower || 1), singleHitPenalty: 0, critOverPenalty: 0, critLowPenalty: 0, manaStabilityBonus: 0 }
+    : practicalRecommendationFor(tier5NameFromSelection(state.selected), current, state.selected);
   const apiPracticalValue = Number(apiAdjustment.value);
   const currentPracticalValue = Number(currentAdjustment.value);
   const baseValue = apiPracticalValue > 0 ? apiPracticalValue : (apiBaseValue || currentPracticalValue || currentValue || 1);
@@ -4169,21 +4252,32 @@ function calculateAndRender() {
   const shareInput = $('mainSkillDamageShare');
   const shareControl = document.querySelector('.shareControl');
   if (shareInput) {
-    shareInput.disabled = excludeCooldown;
+    shareInput.disabled = excludeCooldown || Boolean(state.skillCycle?.mappedShare > 0);
     shareInput.dataset.effectiveValue = excludeCooldown ? '0' : String(Math.max(0, Math.min(Number(shareInput.value || 60), 100)));
   }
-  if (shareControl) shareControl.classList.toggle('disabled', excludeCooldown);
+  if (shareControl) {
+    shareControl.classList.toggle('disabled', excludeCooldown);
+    shareControl.classList.toggle('hidden', Boolean(state.skillCycle?.mappedShare > 0));
+  }
+  const cycleHint = $('skillCycleRecommendationHint');
+  if (cycleHint) {
+    cycleHint.textContent = state.skillCycle?.mappedShare > 0
+      ? `현재 스킬트리 ${state.skillCycle.mappedSkillCount}개 · 분석 딜 지분 ${state.skillCycle.mappedSharePercent.toFixed(1)}% · ${state.skillCycle.analyzerTag || '장착 스킬 추정'} 기준으로 쿨감 노드를 자동 계산합니다.`
+      : '스킬 주기나 전투분석 지분이 없을 때만 아래 수동 지분을 사용합니다.';
+  }
   // 효과 데이터가 없는 서포터 노드는 딜러 추천에서 제외합니다.
-  const tier2Options = allOptions(2).filter(name => {
-    if (!getNode(name) || name === '축복의 여신') return false;
+  const tier2Options = (supportMode ? ['축복의 여신'] : allOptions(2)).filter(name => {
+    if (!getNode(name) || (!supportMode && name === '축복의 여신')) return false;
     if (excludeCooldown && hasCooldownEffect(name)) return false;
-    if (noManaMainSkill && MANA_SKILL_NODE_NAMES.includes(name)) return false;
+    if (!supportMode && noManaMainSkill && MANA_SKILL_NODE_NAMES.includes(name)) return false;
     return true;
   });
   const tier2Candidates = tier2Allocations(tier2Options);
   const hasDealerEffect = name => Object.keys(getNode(name)?.levels || {}).length > 0;
-  const tier4Options = allOptions(4).filter(hasDealerEffect);
-  const tier5Options = allOptions(5).filter(name => hasDealerEffect(name) && !((noManaMainSkill || manaShortageClass) && name === '마나 용광로'));
+  const tier4Options = supportMode ? ['선각자', '진군', '기원'] : allOptions(4).filter(hasDealerEffect);
+  const tier5Options = supportMode
+    ? ['입식 타격가', '마나 용광로', '안정된 관리자']
+    : allOptions(5).filter(name => hasDealerEffect(name) && !((noManaMainSkill || manaShortageClass) && name === '마나 용광로'));
 
   const tier4Pairs = [];
   for (let i = 0; i < tier4Options.length; i++) {
@@ -4203,12 +4297,16 @@ function calculateAndRender() {
         for (const fourName of fourNames) next[fourName] = { level: fourLevel, source: 'candidate' };
         next[fiveName] = { level: fiveLevel, source: 'candidate' };
         const calc = statsWithSelection(next);
-        const adjustment = practicalRecommendationFor(fiveName, calc, next);
+        const supportModel = supportMode ? supportContributionModel(state.powerSnapshot, { ...supportModelContext(), selection: next }) : null;
+        const adjustment = supportMode
+          ? { value: Number(supportModel?.totalBuffPower || 1), singleHitPenalty: 0, critOverPenalty: 0, critLowPenalty: 0, manaStabilityBonus: 0 }
+          : practicalRecommendationFor(fiveName, calc, next);
         const adjustedValue = Number(adjustment.value);
         const recValue = Number.isFinite(adjustedValue) ? adjustedValue : Number(calc.result.value || 0);
         candidates.push({
           tier2Entries, fourNames, fourLevel, fiveName, fiveLevel, calc, recValue,
-          expectedValue: Number(calc.result.value || 0),
+          expectedValue: supportMode ? Number(supportModel?.totalBuffPower || 1) : Number(calc.result.value || 0),
+          supportModel,
           singleHitPenalty: adjustment.singleHitPenalty,
           critOverPenalty: adjustment.critOverPenalty,
           critLowPenalty: adjustment.critLowPenalty,
@@ -4225,19 +4323,29 @@ function calculateAndRender() {
   const currentManaConditionNote = manaConditionNoteText(current);
   const apiPracticalParts = [...practicalAdjustmentParts(apiAdjustment), ...(apiManaConditionNote ? [apiManaConditionNote] : [])];
   const currentPracticalParts = [...practicalAdjustmentParts(currentAdjustment), ...(currentManaConditionNote ? [currentManaConditionNote] : [])];
-  const apiPracticalLabel = `<small>실전 ${apiAdjustment.value.toFixed(4)}${apiPracticalParts.length ? ` · ${escapeHtml(apiPracticalParts.join(' · '))}` : ''}</small>`;
-  const currentPracticalLabel = `<small>실전 ${currentAdjustment.value.toFixed(4)}${currentPracticalParts.length ? ` · ${escapeHtml(currentPracticalParts.join(' · '))}` : ''}</small>`;
+  const apiPracticalLabel = supportMode
+    ? `<small>공증 가동률 ${(Number(apiSupportModel?.detail?.overallAttackUptime || 0) * 100).toFixed(1)}%</small>`
+    : `<small>실전 ${apiAdjustment.value.toFixed(4)}${apiPracticalParts.length ? ` · ${escapeHtml(apiPracticalParts.join(' · '))}` : ''}</small>`;
+  const currentPracticalLabel = supportMode
+    ? `<small>공증 가동률 ${(Number(currentSupportModel?.detail?.overallAttackUptime || 0) * 100).toFixed(1)}%</small>`
+    : `<small>실전 ${currentAdjustment.value.toFixed(4)}${currentPracticalParts.length ? ` · ${escapeHtml(currentPracticalParts.join(' · '))}` : ''}</small>`;
+  const apiScoreLabel = supportMode ? 'API 종합 기여' : 'API 기대값';
+  const currentScoreLabel = supportMode ? '현재 종합 기여' : '현재 기대값';
+  const apiScoreValue = supportMode ? `${((apiAdjustment.value - 1) * 100).toFixed(2)}%` : apiBaseValue.toFixed(4);
+  const currentScoreValue = supportMode ? `${((currentAdjustment.value - 1) * 100).toFixed(2)}%` : currentValue.toFixed(4);
   $('currentScore').innerHTML = `<div class="apiBaselineRow">
-    <div><span>API 기대값</span><b>${apiBaseValue.toFixed(4)}</b>${apiPracticalLabel}</div>
-    <div><span>현재 기대값</span><b>${currentValue.toFixed(4)}</b>${currentPracticalLabel}</div>
-    <div><span>실전값 API 대비</span><b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>
-    <p>기대값은 피해 공식만 계산하고, 실전 추천값은 치적 안정성·단타 주력기·마나 부족 설정을 별도 반영합니다.</p>
+    <div><span>${apiScoreLabel}</span><b>${apiScoreValue}</b>${apiPracticalLabel}</div>
+    <div><span>${currentScoreLabel}</span><b>${currentScoreValue}</b>${currentPracticalLabel}</div>
+    <div><span>${supportMode ? '파티 기여 API 대비' : '실전값 API 대비'}</span><b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>
+    <p>${supportMode ? '서포터는 현재 공증 스킬 주기·낙인·아이덴티티·진화 노드로 종합 파티 기여를 계산합니다.' : '기대값은 피해 공식만 계산하고, 실전 추천값은 치적 안정성·단타 주력기·마나 부족 설정을 별도 반영합니다.'}</p>
   </div>`;
   const apiManaDetail = apiManaConditionNote ? ` · ${escapeHtml(apiManaConditionNote)}` : '';
-  $('baseInfo').innerHTML = `<b>API 기준 상세</b><span>치명 ${Math.round(apiBase.stats.critStat || 0)} · 최종치적 ${fmt(apiBase.result.critRate)}% · 치피 ${fmt(apiBase.result.critDamage)}% · 치적주피 ${fmt(apiBase.result.critHitDamage)}% · 진피 ${fmt(apiBase.result.evo)}% · 추피 ${fmt(apiBase.result.additionalDamage)}% · 적주피 ${fmt(apiBase.result.enemyDamage)}% · 공증 ${fmt(apiBase.result.attackPower)}%${apiManaDetail}</span>`;
+  $('baseInfo').innerHTML = supportMode
+    ? `<b>API 기준 상세</b><span>상시 버프 ${Number(apiSupportModel?.allTimePercent || 0).toFixed(2)}% · 풀 버프 ${Number(apiSupportModel?.fullPercent || 0).toFixed(2)}% · 공증 가동률 ${(Number(apiSupportModel?.detail?.overallAttackUptime || 0) * 100).toFixed(1)}% · 아이덴티티 가동률 ${(Number(apiSupportModel?.detail?.identityUptime || 0) * 100).toFixed(1)}%</span>`
+    : `<b>API 기준 상세</b><span>치명 ${Math.round(apiBase.stats.critStat || 0)} · 최종치적 ${fmt(apiBase.result.critRate)}% · 치피 ${fmt(apiBase.result.critDamage)}% · 치적주피 ${fmt(apiBase.result.critHitDamage)}% · 진피 ${fmt(apiBase.result.evo)}% · 추피 ${fmt(apiBase.result.additionalDamage)}% · 적주피 ${fmt(apiBase.result.enemyDamage)}% · 공증 ${fmt(apiBase.result.attackPower)}%${apiManaDetail}</span>`;
   $('recommendList').innerHTML = top.length ? `<div class="comboRows">${top.map((c, i) => {
     const cls = c.diff >= 0 ? 'up' : 'down';
-    const memo = candidateMemo(c.tier2Entries, c.fourNames, c.fiveName, c.calc);
+    const memo = candidateMemo(c.tier2Entries, c.fourNames, c.fiveName, c.calc, supportMode);
     return `<article class="comboRow ${i === 0 ? 'best' : ''}">
       <div class="rankBadge">${i + 1}</div>
       <div class="rowBuild">
@@ -4250,9 +4358,9 @@ function calculateAndRender() {
         ${practicalNoteHtml(c)}
       </div>
       <div class="rowMetrics">
-        <div class="rowMetric"><span>실전 추천값</span><b>${c.recValue.toFixed(4)}</b><small>기대값 ${c.expectedValue.toFixed(4)}</small></div>
-        <div class="rowMetric"><span>실전 API 대비</span><b class="${cls}">${pct(c.diff)}</b></div>
-        <div class="rowMetric"><span>치적</span><b>${fmt(c.calc.result.critRate)}%</b></div>
+        <div class="rowMetric"><span>${supportMode ? '종합 파티 기여' : '실전 추천값'}</span><b>${supportMode ? `${((c.recValue - 1) * 100).toFixed(2)}%` : c.recValue.toFixed(4)}</b><small>${supportMode ? `상시 ${Number(c.supportModel?.allTimePercent || 0).toFixed(2)}%` : `기대값 ${c.expectedValue.toFixed(4)}`}</small></div>
+        <div class="rowMetric"><span>${supportMode ? '파티 기여 API 대비' : '실전 API 대비'}</span><b class="${cls}">${pct(c.diff)}</b></div>
+        <div class="rowMetric"><span>${supportMode ? '공증 가동률' : '치적'}</span><b>${supportMode ? `${(Number(c.supportModel?.detail?.overallAttackUptime || 0) * 100).toFixed(1)}%` : `${fmt(c.calc.result.critRate)}%`}</b></div>
       </div>
     </article>`;
   }).join('')}</div>` : `<div class="emptyNotice">추천 가능한 2/4/5티어 조합이 없습니다. 쿨감 효과 제외 상태에서는 끝없는 마나/최적화 훈련 등 쿨감 노드가 추천 후보에서 제거됩니다.</div>`;
@@ -4390,6 +4498,7 @@ function resetCharacterResultState() {
   state.arkGrid = { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   state.enlightenment = { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
   state.skillEffects = emptySkillEffectState();
+  state.skillCycle = null;
   renderSkillEffectControl();
   simulatorRendered = false;
   document.body.classList.remove('simulatorMode');
@@ -4402,7 +4511,6 @@ function applyCharacterData(data) {
   state.engraving = data.engravingEffects || emptyEngravingState();
   state.arkGrid = data.arkGridEffects || { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   state.skillEffects = data.skillEffects || emptySkillEffectState();
-  renderSkillEffectControl();
   state.powerSnapshot = data.powerSnapshot || null;
   if (state.powerSnapshot?.profile && !state.powerSnapshot.profile.secondClass) {
     state.powerSnapshot.profile.secondClass = data.arkPassive?.Title || '';
@@ -4413,6 +4521,8 @@ function applyCharacterData(data) {
   state.enlightenment = extractEnlightenmentEffects(state.foundEffects);
   state.selected = classifyEvolution(state.foundEffects);
   state.apiSelected = JSON.parse(JSON.stringify(state.selected));
+  refreshSkillCycleModel();
+  renderSkillEffectControl();
   const sharedScenario = state.pendingSharedScenario;
   if (sharedScenario && (!sharedScenario.characterName || sharedScenario.characterName === data.profile.CharacterName)) {
     applySpecScenarioPayload(sharedScenario, { deferRender: true });

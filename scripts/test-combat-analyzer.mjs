@@ -32,13 +32,19 @@ const snapshot = {
 
 assert.equal(findCombatAnalyzerProfile(data, snapshot, null).tag, '322 수라');
 const factors = combatAnalyzerGemFactors(data, snapshot, null);
-assert.ok(Math.abs(factors.damageFactor - 1.4) < 1e-12);
+assert.ok(Math.abs(factors.damageFactor - (1 + 0.4 / 1.2)) < 1e-12, '아이덴티티를 포함한 전체 양수 딜 지분으로 보석 효율을 정규화해야 한다.');
 assert.ok(Math.abs(factors.cooldownFactor - (1 / (1 - 0.9 * 0.22))) < 1e-12);
 const damageUpgrade = gemUpgradeEfficiency({ data, snapshot, gem: snapshot.gems.items[0], nextLevel: 10 });
-assert.ok(damageUpgrade.gainPercent > 1.7 && damageUpgrade.gainPercent < 1.8);
+assert.ok(damageUpgrade.gainPercent > 1.49 && damageUpgrade.gainPercent < 1.51);
 assert.equal(damageUpgrade.skillShare, 0.6);
 const cooldownUpgrade = gemUpgradeEfficiency({ data, snapshot, gem: snapshot.gems.items[2], nextLevel: 10 });
 assert.ok(cooldownUpgrade.gainPercent > 2.29 && cooldownUpgrade.gainPercent < 2.31);
+
+const currentTreeEffects = {
+  items: [{ name: '비상격', level: 14, currentTree: true, baseCooldownSeconds: 20, cooldown: { flatSeconds: 0, percentReduction: 0 } }]
+};
+const cycleCooldownUpgrade = gemUpgradeEfficiency({ data, snapshot, skillEffects: currentTreeEffects, gem: snapshot.gems.items[2], nextLevel: 10 });
+assert.ok(cycleCooldownUpgrade.gainPercent > 0, '현재 스킬 초단위 모델에서도 작열 레벨 상승 효율이 증가해야 한다.');
 
 const fallbackSnapshot = {
   ...snapshot,
@@ -49,7 +55,7 @@ const fallbackSnapshot = {
 const fallback = findCombatAnalyzerProfile(data, fallbackSnapshot, null);
 assert.equal(fallback.tag, '강화 무기');
 assert.equal(fallback.match, 'second-class');
-assert.equal(combatAnalyzerGemFactors(data, fallbackSnapshot, null).damageFactor, 1.28);
+assert.equal(combatAnalyzerGemFactors(data, fallbackSnapshot, null).damageFactor, 1.4, '직업각인 폴백에도 임의 0.7 감점을 적용하지 않는다.');
 
 const currentData = JSON.parse(await readFile(new URL('../public/combat-analyzer.json', import.meta.url), 'utf8'));
 assert.equal(currentData.version, 1);

@@ -1,3 +1,5 @@
+import { buildSkillCycleModel, findSkillCycleItem, skillCooldownSeconds } from './skill-cycle.js';
+
 const SUPPORT_SPECS = new Set(['절실한 구원', '만개', '축복의 오라', '해방자', '빛의 수호자']);
 const DEALER_SPECS = new Set(['진실된 용맹', '회귀', '심판자', '빛의 기사']);
 const SUPPORT_CLASSES = new Set(['바드', '도화가', '홀리나이트', '발키리']);
@@ -171,6 +173,7 @@ function evolutionBonuses(selection) {
   bonuses.partyDamage += 7 * danceLevel;
   bonuses.identityGain += 10 * danceLevel;
   for (const name of ['입식 타격가', '마나 용광로', '안정된 관리자']) bonuses.brand += 10 * selectionLevel(selection, name);
+  bonuses.identityGain -= 3 * selectionLevel(selection, '안정된 관리자');
   return bonuses;
 }
 
@@ -218,9 +221,8 @@ export function supportContributionModel(snapshot, context = {}) {
 
   const rawSwift = statValue(snapshot, '신속');
   const rawSpec = statValue(snapshot, '특화');
-  const statTotal = rawSwift + rawSpec;
-  const effectiveSwift = statTotal > 0 ? statTotal * 0.75 : rawSwift;
-  const effectiveSpec = statTotal > 0 ? statTotal * 0.25 : rawSpec;
+  const effectiveSwift = rawSwift;
+  const effectiveSpec = rawSpec;
   const swiftCooldownFactor = clamp(1 - 0.0214739 * effectiveSwift / 100, 0.2, 1);
 
   let cooldownA = config.cooldownA;
@@ -231,8 +233,20 @@ export function supportContributionModel(snapshot, context = {}) {
   const cooldownGemA = cooldownGemFor(gems, config.attackA);
   const cooldownGemB = cooldownGemFor(gems, config.attackB);
   const passiveCooldownFactor = 1 - clamp(evolution.cooldown + core.cooldown, 0, 50) / 100;
-  const actualCooldownA = Math.max(1, cooldownA * swiftCooldownFactor * passiveCooldownFactor * (1 - cooldownGemA / 100));
-  const actualCooldownB = Math.max(1, cooldownB * swiftCooldownFactor * passiveCooldownFactor * (1 - cooldownGemB / 100));
+  const supportCycleShares = Object.fromEntries(
+    (context.skillEffects?.cycleItems || context.skillEffects?.items || [])
+      .filter(item => item?.currentTree !== false && number(item?.baseCooldownSeconds) > 0)
+      .map(item => [item.name, 1])
+  );
+  const skillCycle = buildSkillCycleModel({ skillEffects: context.skillEffects || {}, snapshot, shares: supportCycleShares });
+  const cycleA = findSkillCycleItem(skillCycle, config.attackA);
+  const cycleB = findSkillCycleItem(skillCycle, config.attackB);
+  const actualCooldownA = cycleA
+    ? Math.max(1, skillCooldownSeconds(cycleA, evolution.cooldown))
+    : Math.max(1, cooldownA * swiftCooldownFactor * passiveCooldownFactor * (1 - cooldownGemA / 100));
+  const actualCooldownB = cycleB
+    ? Math.max(1, skillCooldownSeconds(cycleB, evolution.cooldown))
+    : Math.max(1, cooldownB * swiftCooldownFactor * passiveCooldownFactor * (1 - cooldownGemB / 100));
   const uptimeA = clamp(config.durationA / actualCooldownA, 0, 1);
   const uptimeB = clamp(config.durationB / actualCooldownB, 0, 1);
   const overallAttackUptime = clamp((config.durationA + config.durationB) / Math.max(config.durationA + config.durationB, actualCooldownA, actualCooldownB), 0, 1);
@@ -261,7 +275,12 @@ export function supportContributionModel(snapshot, context = {}) {
   const fullBuffPower = allTimeBuffPower * identityFactor * awakeningFactor;
 
   const averageCooldown = averageSupportCooldown(gems, config.care);
-  const effectiveCooldownReduction = clamp(1 - swiftCooldownFactor * passiveCooldownFactor * (1 - averageCooldown / 100), 0, 0.8);
+  const modeledCooldownFactor = skillCycle.items.length
+    ? skillCycle.items.reduce((sum, item) => sum + (item.normalizedShare || 0) * skillCooldownSeconds(item, evolution.cooldown) / Math.max(0.1, item.tripodCooldownSeconds || item.baseCooldownSeconds), 0)
+    : 0;
+  const effectiveCooldownReduction = skillCycle.items.length && skillCycle.mappedShare > 0
+    ? clamp(1 - modeledCooldownFactor / skillCycle.mappedShare, 0, 0.8)
+    : clamp(1 - swiftCooldownFactor * passiveCooldownFactor * (1 - averageCooldown / 100), 0, 0.8);
   const identityGain = sumSupportEffect(snapshot, 'identityGain') + evolution.identityGain + core.identityGain;
   const awakeningCooldownReduction = clamp(1 - swiftCooldownFactor * passiveCooldownFactor, 0, 0.8);
   const awakeningCycleBonus = (1 / Math.max(0.2, 1 - awakeningCooldownReduction) - 1) * 0.15 + 1;
@@ -299,7 +318,10 @@ export function supportContributionModel(snapshot, context = {}) {
       allyAttackB,
       allyDamageBonus,
       brandBonus,
-      identityGain
+      identityGain,
+      skillCycleApplied: Boolean(cycleA || cycleB),
+      actualCooldownA,
+      actualCooldownB
     }
   };
 }
