@@ -1,13 +1,13 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.11';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.11';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.11';
-import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.11';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.11';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.11';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.11';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.11';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.9.11';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.9.11';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.9.12';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.9.12';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.9.12';
+import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.9.12';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.9.12';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.9.12';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.9.12';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.9.12';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.9.12';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.9.12';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -16,9 +16,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.9.11';
+} from './cache-policy.js?v=5.9.12';
 
-const VERSION = '5.9.11';
+const VERSION = '5.9.12';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -203,7 +203,7 @@ const T4_GEAR_COST_RULES = {
     label: '완갑',
     names: ['완갑'],
     materials: ['운명의 파괴석 결정', '운명의 수호석 결정'],
-    leapstone: '운명의 돌파석',
+    leapstone: '위대한 운명의 돌파석',
     fusion: '상급 아비도스 융화제',
     growthLabel: '완갑 장비 성장',
     books: { weapon: [], armor: [] }

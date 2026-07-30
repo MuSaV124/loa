@@ -1,4 +1,9 @@
-# Lost Ark Node Recommend Calculator v5.9.11
+# Lost Ark Node Recommend Calculator v5.9.12
+
+## v5.9.12
+
+- 완갑 재련에 소모되는 돌파석을 `운명의 돌파석`에서 `위대한 운명의 돌파석`으로 교정했습니다.
+- 완갑 1~25강 표시와 기대비용 계산이 모두 `위대한 운명의 돌파석` 거래소 시세를 사용합니다.
 
 ## v5.9.11
 

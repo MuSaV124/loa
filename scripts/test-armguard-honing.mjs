@@ -12,7 +12,7 @@ assert.deepEqual(first.attemptMaterials, {
   '운명의 파편': 14500,
   '운명의 파괴석 결정': 600,
   '운명의 수호석 결정': 1800,
-  '운명의 돌파석': 30,
+  '위대한 운명의 돌파석': 30,
   '상급 아비도스 융화제': 22,
   '골드': 5200,
   '실링': 80000
@@ -29,8 +29,10 @@ assert.deepEqual(last.growthMaterials, { '운명의 파편': 607000, '실링': 6
 assert.equal(last.attemptMaterials['운명의 파편'], 38470);
 assert.equal(last.attemptMaterials['운명의 파괴석 결정'], 1280);
 assert.equal(last.attemptMaterials['운명의 수호석 결정'], 4015);
+assert.equal(last.attemptMaterials['위대한 운명의 돌파석'], 94);
 assert.equal(last.attemptMaterials['골드'], 13160);
 assert.equal(last.attemptMaterials['실링'], 240000);
+assert.ok(ARMGUARD_HONING_ROWS.every(row => !Object.hasOwn(row.attemptMaterials, '운명의 돌파석')));
 assert.equal(armguardHoningRowForCurrentStage(25), null);
 
 assert.deepEqual(armguardHoningRowsBetween(0, 25).map(row => row.stage), Array.from({ length: 25 }, (_, index) => index + 1));

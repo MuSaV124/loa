@@ -69,7 +69,7 @@ export const ARMGUARD_HONING_ROWS = RAW_ARMGUARD_HONING_ROWS.map(([
     '운명의 파편': attemptShard,
     '운명의 파괴석 결정': destructionStone,
     '운명의 수호석 결정': guardianStone,
-    '운명의 돌파석': leapstone,
+    '위대한 운명의 돌파석': leapstone,
     '상급 아비도스 융화제': fusion,
     '골드': gold,
     '실링': silver
