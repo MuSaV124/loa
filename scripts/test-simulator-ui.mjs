@@ -33,7 +33,7 @@ function simulatorMarkup({ mobile }) {
                 <div class="specPlannerResultHead"><div><b>목표 달성 경로</b><small>목표 5,547 달성</small></div><div><strong>2,305,800G</strong><small>총 누적 골드</small></div><div><strong>0</strong><small>총 실링</small></div><div><strong>+128.55</strong><small>전투력 증가</small></div></div>
                 <div class="specPlannerSteps"><div class="specPlannerStep"><span>1</span><div><b>진 파공권 겁화</b><small>Lv.8 → Lv.9</small></div><div><b>768,000G</b><small>개별 비용</small></div><div><b>768,000G</b><small>누적 사용 골드</small></div><div><b>5,488.97</b><small>예상 전투력</small></div></div></div>
               </section>
-              <details class="specScenarioPanel"${mobile ? '' : ' open'}>
+              <details class="specScenarioPanel">
                 <summary class="specScenarioSummary"><span><b>A/B 비교</b><small>현재 세팅과 선택한 후보를 비교합니다.</small></span></summary>
                 <div class="specScenarioActions"><button>B 저장</button><button>불러오기</button><button>공유 링크</button><button>선택 해제</button></div>
                 <div class="specScenarioMetrics"><div><span>공식 전투력</span><b>5,446.12</b><i>→</i><strong>5,488.97</strong></div><div><span>공격/이동 속도</span><b>125.97 / 125.97</b><i>→</i><strong>130.00 / 130.00</strong></div></div>
@@ -44,16 +44,16 @@ function simulatorMarkup({ mobile }) {
                 <div class="specEfficiencyHeader"><span>스펙업 목표</span><span>효율</span><span>비용</span><span>비용/효율</span></div>
                 <div class="specEfficiencyRow confidence-estimated">
                   <div class="specEfficiencyTarget"><label class="specScenarioPick"><input type="checkbox" aria-label="파천섬광 겁화 B 비교에 적용" /><span>B</span></label><span class="specEfficiencyRank">1</span><span></span><div><div class="specEfficiencyTargetTitle"><b>보석</b><em class="confidencePill estimated">추정</em></div><span>파천섬광 겁화 8→9레벨</span></div></div>
-                  <div class="specEfficiencyStep"><b>0.790%</b><span>전투력 약 +42.85</span></div>
+                  <div class="specEfficiencyStep"><b>0.790%</b><span>환산 전투력 +42.85</span></div>
                   <div class="specEfficiencyExpected"><b>76.8만</b><span>기대 비용</span></div>
                   <div class="specEfficiencyCost"><b>97.2만</b><span>1% 상승당</span></div>
-                  <div class="specEfficiencyDetail">Lv.8 → Lv.9 · 최저가 기준 · 추정 전투력</div>
+                  <div class="specEfficiencyDetail">Lv.8 → Lv.9 · 실질 딜 추정 +0.790% · 최저가 기준</div>
                 </div>
               </div></div>
             </details>
-            <details class="powerSnapshotBlock simulatorFold" open><summary class="simulatorFoldSummary"><span><h3>장착 보석</h3></span></summary><div class="simulatorFoldBody"><div class="powerGemList"><span>보석</span></div></div></details>
-            <details class="powerSnapshotBlock powerBuildPanel simulatorFold" open><summary class="simulatorFoldSummary"><span><h3>장비 파싱</h3></span></summary><div class="simulatorFoldBody"><div class="powerBuildGrid"><div></div><div></div></div></div></details>
-            <details class="powerSnapshotBlock powerCostPrep simulatorFold" open>
+            <details class="powerSnapshotBlock simulatorFold"><summary class="simulatorFoldSummary"><span><h3>장착 보석</h3></span></summary><div class="simulatorFoldBody"><div class="powerGemList"><span>보석</span></div></div></details>
+            <details class="powerSnapshotBlock powerBuildPanel simulatorFold"><summary class="simulatorFoldSummary"><span><h3>장비 파싱</h3></span></summary><div class="simulatorFoldBody"><div class="powerBuildGrid"><div></div><div></div></div></div></details>
+            <details class="powerSnapshotBlock powerCostPrep simulatorFold">
               <summary class="powerCostHead simulatorFoldSummary"><div><h3>T4 비용 계산</h3></div></summary>
               <div class="simulatorFoldBody powerCostFoldBody">
               <section class="armguardCostPanel" aria-labelledby="armguardCostTitle">
@@ -85,12 +85,12 @@ function simulatorMarkup({ mobile }) {
               </section>
               </div>
             </details>
-            <div class="powerSnapshotBlock supportPowerPanel">
-              <div class="powerBuildHeader"><b>서포터 파티 기여 모델</b><span>공식 30 / 파티 60 / 케어 10</span></div>
-              <div class="supportPowerGrid">
+            <details class="powerSnapshotBlock supportPowerPanel simulatorFold">
+              <summary class="simulatorFoldSummary"><span><h3>서포터 파티 기여</h3><small>종합 20.00% · 상시 18.00% · 풀 19.00%</small></span></summary>
+              <div class="simulatorFoldBody"><div class="supportPowerGrid">
                 ${['상시 버프', '풀 버프', '종합 버프', '공증 가동률', '아이덴티티 가동률', '케어 보정'].map((label, index) => `<div class="supportPowerMetric"><span>${label}</span><b>${(18 + index).toFixed(2)}%</b><small>검산 항목</small></div>`).join('')}
-              </div>
-            </div>
+              </div></div>
+            </details>
           </div>
         </div>
       </section>
@@ -125,10 +125,10 @@ async function verifyViewport(viewport) {
     assert.equal(armguardSummaryColumns, 3, '데스크톱 완갑 요약은 3열이어야 합니다.');
   }
 
+  assert.equal(await page.locator('.specScenarioPanel').getAttribute('open'), null, 'A/B 비교는 기본으로 접혀야 합니다.');
   if (mobile) {
     const rowColumns = await page.locator('.specEfficiencyRow').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length);
     assert.equal(rowColumns, 1, '모바일 효율 행은 한 열로 배치되어야 합니다.');
-    assert.equal(await page.locator('.specScenarioPanel').getAttribute('open'), null, '모바일 A/B 비교는 기본으로 접혀야 합니다.');
     await page.locator('.specScenarioPanel summary').click();
     const scenarioFits = await page.locator('.specScenarioMetrics').evaluate(element => element.scrollWidth <= element.clientWidth + 1);
     assert.ok(scenarioFits, '모바일 A/B 비교값이 화면 안에 표시되어야 합니다.');
@@ -140,16 +140,22 @@ async function verifyViewport(viewport) {
 
   const scenarioName = await page.locator('.specScenarioPick input').getAttribute('aria-label');
   assert.match(scenarioName || '', /파천섬광 겁화/, 'B 체크박스가 비교 후보 이름을 포함해야 합니다.');
+  assert.match(await page.locator('.specEfficiencyStep').innerText(), /환산 전투력 \+42\.85/, '보석은 환산 전투력 증가량으로 표시되어야 합니다.');
+  assert.match(await page.locator('.specEfficiencyDetail').innerText(), /실질 딜 추정 \+0\.790%/, '기존 딜 상승률은 상세 근거에 유지되어야 합니다.');
   const foldCards = page.locator('.powerSnapshotColumns > .simulatorFold');
-  assert.equal(await foldCards.count(), 4, '시뮬레이터 주요 하위 카드 4개가 접기 UI여야 합니다.');
+  assert.equal(await foldCards.count(), 5, '시뮬레이터 주요 하위 카드 5개가 접기 UI여야 합니다.');
+  assert.equal(await page.locator('.powerCostPrep').getAttribute('open'), null, 'T4 비용 계산은 기본으로 접혀야 합니다.');
   const gemFold = page.getByText('장착 보석', { exact: true });
+  assert.equal(await page.locator('.powerSnapshotColumns > .simulatorFold').nth(1).getAttribute('open'), null, '장착 보석 카드는 기본으로 접혀야 합니다.');
   await gemFold.click();
-  assert.equal(await page.locator('.powerSnapshotColumns > .simulatorFold').nth(1).getAttribute('open'), null, '장착 보석 카드가 접혀야 합니다.');
+  assert.notEqual(await page.locator('.powerSnapshotColumns > .simulatorFold').nth(1).getAttribute('open'), null, '장착 보석 카드를 펼칠 수 있어야 합니다.');
   if (process.env.SIMULATOR_SCREENSHOT_DIR) {
     await mkdir(process.env.SIMULATOR_SCREENSHOT_DIR, { recursive: true });
     await page.screenshot({ path: join(process.env.SIMULATOR_SCREENSHOT_DIR, `simulator-${viewport.width}.png`), fullPage: true });
   }
   const supportPanel = page.locator('.supportPowerPanel');
+  assert.equal(await supportPanel.getAttribute('open'), null, '서포터 상세 지표는 기본으로 접혀야 합니다.');
+  await page.locator('.supportPowerPanel summary').click();
   const supportFits = await supportPanel.evaluate(element => element.scrollWidth <= element.clientWidth + 1);
   assert.ok(supportFits, `${viewport.width}px 서포터 기여 패널이 화면 안에 표시되어야 합니다.`);
   const supportColumns = await page.locator('.supportPowerGrid').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length);

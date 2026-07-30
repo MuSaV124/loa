@@ -1,15 +1,15 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.11.0';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.11.0';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.11.0';
-import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.11.0';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.11.0';
-import { findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.11.0';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.11.0';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.11.0';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.11.0';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.11.0';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.11.0';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.11.0';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.11.1';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.11.1';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.11.1';
+import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.11.1';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.11.1';
+import { findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.11.1';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.11.1';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.11.1';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.11.1';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.11.1';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.11.1';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.11.1';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -18,9 +18,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.11.0';
+} from './cache-policy.js?v=5.11.1';
 
-const VERSION = '5.11.0';
+const VERSION = '5.11.1';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -2258,7 +2258,7 @@ function renderSpecPlannerOutput() {
   const plan = currentSpecPlannerPlan();
   const mode = state.specPlannerMode;
   const modeled = hasModeledRecommendationMetrics(plan.steps.map(step => step.row));
-  const indexLabel = isSupportPowerSnapshot(state.powerSnapshot) ? '복합 기여 지수' : modeled ? '화력 환산 지수' : '예상 전투력';
+  const indexLabel = isSupportPowerSnapshot(state.powerSnapshot) ? '복합 기여 지수' : modeled ? '환산 전투력' : '예상 전투력';
   const summaryLabel = mode === 'target'
     ? plan.reached ? '목표 달성 경로' : '현재 후보로 도달 가능한 경로'
     : '예산 안의 추천 경로';
@@ -2286,7 +2286,7 @@ function renderSpecPlannerOutput() {
     </div>
     <div class="specPlannerSteps">${steps || '<p class="powerCostHint">현재 검증값과 시세가 모두 있는 추천 후보가 없습니다.</p>'}</div>
     ${plannerUnavailableSummary()}
-    <p class="powerCostHint">현재 장비에서 바로 가능한 다음 단계 후보를 귀속 재료 부족분과 실시간 시세로 다시 계산합니다. ${modeled ? '보석 딜 효율과 서포터 복합 기여는 공식 전투력이 아니라 현재 전투력 크기에 맞춘 비교용 환산 지수입니다. ' : ''}여러 강화 단계를 건너뛴 장기 경로는 포함하지 않습니다.</p>`;
+    <p class="powerCostHint">현재 장비에서 바로 가능한 다음 단계 후보를 귀속 재료 부족분과 실시간 시세로 다시 계산합니다. ${modeled ? '보석의 환산 전투력은 딜 상승률을 현재 공식 전투력 크기에 맞춘 비교값이며 게임 내 공식 전투력 증가는 아닙니다. ' : ''}여러 강화 단계를 건너뛴 장기 경로는 포함하지 않습니다.</p>`;
 }
 function bindSpecPlannerControls() {
   document.querySelectorAll('[data-planner-mode]').forEach(button => {
@@ -2306,7 +2306,7 @@ function bindSpecPlannerControls() {
   const currentPower = snapshotOfficialCombatPower(state.powerSnapshot);
   if (targetInput) {
     const targetLabel = $('specPlannerTargetWrap')?.querySelector('span');
-    if (targetLabel) targetLabel.textContent = isSupportPowerSnapshot(state.powerSnapshot) ? '목표 복합 기여 지수' : hasModeledRecommendationMetrics() ? '목표 화력 환산 지수' : '목표 전투력';
+    if (targetLabel) targetLabel.textContent = isSupportPowerSnapshot(state.powerSnapshot) ? '목표 복합 기여 지수' : hasModeledRecommendationMetrics() ? '목표 환산 전투력' : '목표 전투력';
     if (!(state.specPlannerTarget > 0)) state.specPlannerTarget = Math.ceil(currentPower + 100);
     targetInput.value = String(Math.round(state.specPlannerTarget));
     targetInput.onchange = () => {
@@ -2444,7 +2444,6 @@ function renderSpecScenarioComparison() {
   };
 }
 function renderSpecEfficiencyShell() {
-  const scenarioOpen = window.matchMedia('(min-width: 761px)').matches ? ' open' : '';
   const support = isSupportPowerSnapshot(state.powerSnapshot);
   return `<details class="powerSnapshotBlock powerEfficiencyPanel simulatorFold" open>
     <summary class="powerCostHead simulatorFoldSummary">
@@ -2462,7 +2461,7 @@ function renderSpecEfficiencyShell() {
       </div>
       <div id="specPlannerOutput" class="specPlannerOutput"><p class="powerCostHint">후보 비용을 계산하는 중입니다.</p></div>
     </section>
-    <details class="specScenarioPanel"${scenarioOpen}>
+    <details class="specScenarioPanel">
       <summary class="specScenarioSummary"><span><b>A/B 비교</b><small>A는 검색한 현재 세팅, B는 노드 변경과 선택한 스펙업 후보입니다.</small></span></summary>
       <div class="specScenarioActions"><button id="specScenarioSaveButton" type="button">B 저장</button><button id="specScenarioRestoreButton" type="button">불러오기</button><button id="specScenarioShareButton" type="button">공유 링크</button><button id="specScenarioClearButton" type="button">선택 해제</button></div>
       <div id="specScenarioOutput" class="specScenarioOutput"></div>
@@ -2552,7 +2551,7 @@ function specPowerDeltaText(row, powerDelta) {
   const confidence = row?.powerEstimate?.confidence;
   if (row?.powerEstimate?.metric === 'support-combined') return `복합 기여 +${Number(row.powerEstimate.percent || 0).toFixed(3)}%`;
   if (!(powerDelta > 0)) return '전투력 -';
-  if (row?.powerEstimate?.metric === 'damage') return `${confidence === 'build-analyzed' ? '딜' : '딜 추정'} +${Number(row.powerEstimate.percent || 0).toFixed(3)}%`;
+  if (row?.powerEstimate?.metric === 'damage') return `환산 전투력 +${powerDelta.toFixed(2)}`;
   if (confidence === 'verified' || confidence === 'reference-verified') return `전투력 +${powerDelta.toFixed(2)}`;
   if (confidence === 'build-sampled') return `빌드 표본 +${powerDelta.toFixed(2)}`;
   if (confidence === 'spec-sampled') return `각인 표본 +${powerDelta.toFixed(2)}`;
@@ -2603,15 +2602,27 @@ function supportEstimateDetail(row) {
   if (estimate?.metric !== 'support-combined') return '';
   return `공식 +${Number(estimate.officialPercent || 0).toFixed(3)}% · 파티 +${Number(estimate.partyPercent || 0).toFixed(3)}% · 케어 +${Number(estimate.carePercent || 0).toFixed(3)}%`;
 }
+function damageEstimateDetail(row) {
+  const estimate = row?.powerEstimate;
+  if (estimate?.metric !== 'damage') return '';
+  const prefix = estimate.confidence === 'build-analyzed' ? '실질 딜' : '실질 딜 추정';
+  return `${prefix} +${Number(estimate.percent || 0).toFixed(3)}%`;
+}
 function renderSpecEfficiencyTable() {
   const el = $('specEfficiencyTable');
   if (!el) return;
   const allEstimates = Array.isArray(state.powerCostEstimates) ? state.powerCostEstimates.slice() : [];
   updateCombatPowerCoverage(allEstimates);
   bindSpecEfficiencyFilters();
-  const estimates = allEstimates.filter(row => specEfficiencyFilterMatches(row, state.specEfficiencyFilter));
+  const filteredEstimates = allEstimates.filter(row => specEfficiencyFilterMatches(row, state.specEfficiencyFilter));
+  const estimates = filteredEstimates.filter(row => row?.available);
   if (!estimates.length) {
-    el.innerHTML = `<p class="powerCostHint">${allEstimates.length ? '선택한 종류의 스펙업 후보가 없습니다.' : '재료 시세를 불러오는 중입니다.'}</p>`;
+    const message = !allEstimates.length
+      ? '재료 시세를 불러오는 중입니다.'
+      : !filteredEstimates.length
+      ? '선택한 종류의 스펙업 후보가 없습니다.'
+      : '현재 계산 가능한 후보가 없습니다. 제외 사유는 위의 ‘제외된 후보’에서 확인할 수 있습니다.';
+    el.innerHTML = `<p class="powerCostHint compactEmptyState">${message}</p>`;
     bindSpecPlannerControls();
     renderSpecPlannerOutput();
     renderSpecScenarioComparison();
@@ -2627,7 +2638,7 @@ function renderSpecEfficiencyTable() {
   const bestScore = finiteScores.length ? Math.min(...finiteScores) : 0;
   let rankedIndex = 0;
   const rows = sortedEstimates
-    .map(row => {
+    .map((row, index) => {
       const item = row.item || {};
       const cost = row.cost || {};
       const totalGold = row.available ? Number(cost.totalGold || 0) : 0;
@@ -2659,6 +2670,8 @@ function renderSpecEfficiencyTable() {
       const stepMainText = row.stepLabel || `+${Number(row.from || item.honingLevel || 0)} → +${Number(row.to || 0)}`;
       const upgradeDetailText = row.stepDetail || stepMainText;
       const supportDetailText = supportEstimateDetail(row);
+      const damageDetailText = damageEstimateDetail(row);
+      const modeledDetailText = [supportDetailText, damageDetailText].filter(Boolean).join(' · ');
       const powerDeltaText = powerText;
       const score = specEfficiencyScore(row);
       const rankText = Number.isFinite(score) ? String(++rankedIndex) : '-';
@@ -2670,7 +2683,8 @@ function renderSpecEfficiencyTable() {
       const scenarioControl = row.available
         ? `<label class="specScenarioPick" title="${escapeHtml(scenarioLabel)}"><input type="checkbox" aria-label="${escapeHtml(scenarioLabel)}" data-spec-scenario-key="${escapeHtml(estimateKey)}"${scenarioChecked}><span>B</span></label>`
         : '<span class="specScenarioPick disabled" aria-hidden="true">-</span>';
-      return `<div class="specEfficiencyRow ${row.available ? '' : 'disabled'} confidence-${confidenceMeta.className}" data-category="${escapeHtml(row.category || '')}">
+      const secondaryClass = state.specEfficiencyFilter === 'all' && index >= 5 ? ' specSecondaryCandidate hidden' : '';
+      return `<div class="specEfficiencyRow confidence-${confidenceMeta.className}${secondaryClass}" data-category="${escapeHtml(row.category || '')}">
         <div class="specEfficiencyTarget">
           ${scenarioControl}
           <span class="specEfficiencyRank">${rankText}</span>
@@ -2690,12 +2704,16 @@ function renderSpecEfficiencyTable() {
           <b>${escapeHtml(scoreText)}</b>
           <span>1% 상승당</span>
         </div>
-        <div class="specEfficiencyDetail">${escapeHtml(upgradeDetailText)}${supportDetailText ? ` · ${escapeHtml(supportDetailText)}` : ''} · ${escapeHtml(expectedDetailText)} · ${escapeHtml(specEfficiencyReason(row))}</div>
+        <div class="specEfficiencyDetail">${escapeHtml(upgradeDetailText)}${modeledDetailText ? ` · ${escapeHtml(modeledDetailText)}` : ''} · ${escapeHtml(expectedDetailText)} · ${escapeHtml(specEfficiencyReason(row))}</div>
       </div>`;
     }).join('');
+  const moreCount = state.specEfficiencyFilter === 'all' ? Math.max(0, sortedEstimates.length - 5) : 0;
+  const moreButton = moreCount
+    ? `<button id="specCandidateMoreButton" class="specCandidateMoreButton" type="button" aria-expanded="false">다른 추천 후보 ${moreCount}개 보기</button>`
+    : '';
   el.innerHTML = `<div class="specEfficiencyHeader">
     <span>스펙업 목표</span><span>효율</span><span>비용</span><span>비용/효율</span>
-  </div>${rows}
+  </div>${rows}${moreButton}
   <p class="powerCostHint">1% 상승당 기대 골드가 낮은 순서로 정렬하고, 효율이 같으면 검증 범위가 높은 후보를 먼저 표시합니다. ${isSupportPowerSnapshot(state.powerSnapshot) ? '서포터의 1%는 복합 기여 1%입니다.' : ''} 상급 재련은 현재 단계에서 다음 10단위 완료 지점까지의 총 기대비용을 사용합니다. ${escapeHtml(combatPowerAccuracyHint())}</p>`;
   el.querySelectorAll('[data-spec-scenario-key]').forEach(input => {
     input.onchange = () => {
@@ -2705,6 +2723,13 @@ function renderSpecEfficiencyTable() {
       renderSpecScenarioComparison();
     };
   });
+  const candidateMoreButton = $('specCandidateMoreButton');
+  if (candidateMoreButton) candidateMoreButton.onclick = () => {
+    const expanded = candidateMoreButton.getAttribute('aria-expanded') === 'true';
+    el.querySelectorAll('.specSecondaryCandidate').forEach(row => row.classList.toggle('hidden', expanded));
+    candidateMoreButton.setAttribute('aria-expanded', String(!expanded));
+    candidateMoreButton.textContent = expanded ? `다른 추천 후보 ${moreCount}개 보기` : '추천 후보 접기';
+  };
   bindSpecPlannerControls();
   renderSpecPlannerOutput();
   renderSpecScenarioComparison();
@@ -2843,7 +2868,7 @@ function renderPowerCostPrep(snapshot) {
     { value: 'optimal', label: '최적' },
     { value: 'full', label: '풀숨' }
   ].map(mode => `<label><input type="radio" name="armguardBreathMode" value="${mode.value}"${state.armguardBreathMode === mode.value ? ' checked' : ''} /><span>${mode.label}</span></label>`).join('');
-  return `<details class="powerSnapshotBlock powerCostPrep simulatorFold" open>
+  return `<details class="powerSnapshotBlock powerCostPrep simulatorFold">
     <summary class="powerCostHead simulatorFoldSummary">
       <div><h3>T4 비용 계산</h3><p>일반 재련과 상급 재련의 거래 재료·귀속 재료·고정 골드를 나눠 기대 비용을 계산합니다.</p></div>
       <strong>시세 계산 연결</strong>
@@ -3131,8 +3156,9 @@ function renderSupportContributionPanel(snapshot) {
   const model = supportContributionModel(snapshot, supportModelContext());
   if (!model) return '';
   const metric = (label, value, detail) => `<div class="supportPowerMetric"><span>${escapeHtml(label)}</span><b>${Number(value || 0).toFixed(2)}%</b><small>${escapeHtml(detail)}</small></div>`;
-  return `<div class="powerSnapshotBlock supportPowerPanel">
-    <div class="powerBuildHeader"><b>서포터 파티 기여 모델</b><span>실전 가동률 반영 · 추천 가중치 공식 30 / 파티 60 / 케어 10</span></div>
+  return `<details class="powerSnapshotBlock supportPowerPanel simulatorFold">
+    <summary class="simulatorFoldSummary"><span><h3>서포터 파티 기여</h3><small>종합 ${model.totalPercent.toFixed(2)}% · 상시 ${model.allTimePercent.toFixed(2)}% · 풀 ${model.fullPercent.toFixed(2)}%</small></span><strong>복합 추천</strong></summary>
+    <div class="simulatorFoldBody"><div class="powerBuildHeader"><b>상세 기여 지표</b><span>실전 가동률 반영 · 공식 30 / 파티 60 / 케어 10</span></div>
     <div class="supportPowerGrid">
       ${metric('상시 버프', model.allTimePercent, '공증·낙인·진화')}
       ${metric('풀 버프', model.fullPercent, '상시+아이덴티티+각성')}
@@ -3141,8 +3167,8 @@ function renderSupportContributionPanel(snapshot) {
       ${metric('아이덴티티 가동률', model.detail.identityUptime * 100, '특화·쿨감·획득량')}
       ${metric('케어 보정', model.carePercent, '회복·보호막 옵션')}
     </div>
-    <p>공격력 ${Math.round(model.detail.attackPower).toLocaleString('ko-KR')} · 낙인 보너스 ${model.detail.brandBonus.toFixed(2)}% · 아군 공격 강화 ${model.detail.allyAttackA.toFixed(2)}% · 아군 피해 강화 ${model.detail.allyDamageBonus.toFixed(2)}%</p>
-  </div>`;
+    <p>공격력 ${Math.round(model.detail.attackPower).toLocaleString('ko-KR')} · 낙인 보너스 ${model.detail.brandBonus.toFixed(2)}% · 아군 공격 강화 ${model.detail.allyAttackA.toFixed(2)}% · 아군 피해 강화 ${model.detail.allyDamageBonus.toFixed(2)}%</p></div>
+  </details>`;
 }
 function renderPowerSnapshot(snapshot) {
   const panel = $('powerSnapshotPanel');
@@ -3190,12 +3216,12 @@ function renderPowerSnapshot(snapshot) {
         <div><h3>현재 장비 분석</h3><p>효율 계산에 사용한 API 원자료를 확인합니다.</p></div>
         <span>보석 · 장비 · 악세 · 아크그리드</span>
       </div>
-      <details class="powerSnapshotBlock simulatorFold" open>
+      <details class="powerSnapshotBlock simulatorFold">
         <summary class="simulatorFoldSummary"><span><h3>장착 보석</h3><small>장착 중인 보석 11개와 귀속 여부</small></span></summary>
         <div class="simulatorFoldBody"><div id="gemAnalyzerSummary" class="powerBuildHeader">${gemAnalyzerSummaryHtml(snapshot)}</div><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
       </details>
       ${renderSupportContributionPanel(snapshot)}
-      <details class="powerSnapshotBlock powerBuildPanel simulatorFold" open>
+      <details class="powerSnapshotBlock powerBuildPanel simulatorFold">
         <summary class="simulatorFoldSummary"><span><h3>장비 파싱</h3><small>장비 · 악세사리 · 아크그리드 원자료</small></span></summary>
         <div class="simulatorFoldBody">
         <div class="powerBuildGrid">
@@ -3212,7 +3238,7 @@ function renderPowerSnapshot(snapshot) {
       </details>
       ${renderPowerCostPrep(snapshot)}
     </div>
-    <p class="powerSnapshotNote">일반/상급 재련 단계는 공식 API Tooltip에서 읽습니다. 딜러 보석은 현재 아크그리드 전투분석의 스킬별 지분과 겁화/작열 공식을 적용합니다. 서포터는 공식 전투력과 실전 파티 기여 모델을 30/60/10으로 결합하며, 파티 조합·보스 패턴에 따라 실제 효율은 달라질 수 있습니다.</p>
+    <details class="powerSnapshotNote simulatorMethodNote"><summary>계산 기준 및 주의사항</summary><p>일반/상급 재련 단계는 공식 API Tooltip에서 읽습니다. 딜러 보석은 현재 아크그리드 전투분석의 스킬별 지분과 겁화/작열 공식을 적용하며, 환산 전투력은 게임 내 공식 수치가 아닌 비교값입니다. 서포터는 공식 전투력과 실전 파티 기여 모델을 30/60/10으로 결합하며, 파티 조합·보스 패턴에 따라 실제 효율은 달라질 수 있습니다.</p></details>
   `;
   hydratePowerCostMaterialPrices();
   hydrateCrystalPrice();

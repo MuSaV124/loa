@@ -5046,6 +5046,11 @@ body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .tabNav {
   border-color: rgba(95, 211, 186, .28);
   background: linear-gradient(145deg, rgba(20, 53, 59, .84), rgba(18, 27, 42, .94));
 }
+.supportPowerPanel > .simulatorFoldSummary > strong {
+  flex: 0 0 auto;
+  color: #8ce8d2;
+  font-size: .8rem;
+}
 .supportPowerGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5070,10 +5075,46 @@ body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .tabNav {
   color: #8ce8d2;
   font-size: 1.23rem;
 }
-.supportPowerPanel > p {
+.supportPowerPanel .simulatorFoldBody > p {
   margin: 11px 2px 0;
   color: var(--muted, #9aa8bc);
   font-size: .83rem;
+}
+.specCandidateMoreButton {
+  width: 100%;
+  min-height: 42px;
+  border: 1px dashed rgba(143, 196, 255, .35);
+  border-radius: 9px;
+  background: rgba(24, 49, 77, .32);
+  color: #bfdbfe;
+  font-weight: 850;
+  cursor: pointer;
+}
+.specCandidateMoreButton:hover {
+  border-color: rgba(143, 196, 255, .72);
+  background: rgba(36, 73, 112, .48);
+}
+.compactEmptyState {
+  margin: 2px 0;
+  padding: 18px;
+  border: 1px dashed rgba(148, 163, 184, .24);
+  border-radius: 9px;
+  text-align: center;
+}
+.simulatorMethodNote {
+  border: 1px solid rgba(148, 163, 184, .12);
+  border-radius: 10px;
+  background: rgba(8, 15, 25, .42);
+  padding: 10px 12px;
+}
+.simulatorMethodNote > summary {
+  color: #a9bad0;
+  font-size: .78rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+.simulatorMethodNote > p {
+  margin: 10px 0 0;
 }
 @media (max-width: 760px) {
   .supportPowerGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -60,7 +60,10 @@ assert.equal(aliasUpgrade.skillShare, 1);
 
 const characterSource = await readFile(new URL('../api/character.js', import.meta.url), 'utf8');
 const marketSource = await readFile(new URL('../api/market-prices.js', import.meta.url), 'utf8');
+const appSource = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
 assert.match(characterSource, /additionalDamage:\s*\{\s*high:\s*2\.60,\s*mid:\s*1\.60,\s*low:\s*0\.70\s*\}/);
 assert.match(marketSource, /additionalDamage[^\n]+values:\s*\{\s*high:\s*2\.60,\s*mid:\s*1\.60,\s*low:\s*0\.70\s*\}/);
+assert.match(appSource, /metric === 'damage'\) return `환산 전투력 \+\$\{powerDelta\.toFixed\(2\)\}`/);
+assert.match(appSource, /return `\$\{prefix\} \+\$\{Number\(estimate\.percent \|\| 0\)\.toFixed\(3\)\}%`/);
 
 console.log('dealer simulator audit tests passed (200 generated builds + edge cases)');
