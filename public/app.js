@@ -1,16 +1,16 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.12.0';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.12.0';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.12.0';
-import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.12.0';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.12.0';
-import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.12.0';
-import { buildSkillCycleModel, evaluateEvolutionCooldown } from './skill-cycle.js?v=5.12.0';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.12.0';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.12.0';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.12.0';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.12.0';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.12.0';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.12.0';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.13.0';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.13.0';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.13.0';
+import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.13.0';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.13.0';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.13.0';
+import { buildSkillCycleModel, evaluateEvolutionCooldown } from './skill-cycle.js?v=5.13.0';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.13.0';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.13.0';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.13.0';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.13.0';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.13.0';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.13.0';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -19,9 +19,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.12.0';
+} from './cache-policy.js?v=5.13.0';
 
-const VERSION = '5.12.0';
+const VERSION = '5.13.0';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -98,6 +98,7 @@ function renderSkillEffectControl() {
   const cooldownTripodCount = Number(state.skillEffects?.cooldownTripodCount || 0);
   const stochasticCooldownCount = Number(state.skillEffects?.stochasticCooldownCount || 0);
   const cycle = state.skillCycle;
+  const modeledSharePercent = Number(cycle?.modeledSharePercent ?? cycle?.mappedSharePercent ?? 0);
   if (!loadedCount) {
     preview.innerHTML = '<b>사용 스킬 자동 반영</b><span>캐릭터 검색 후 표시</span>';
     preview.classList.add('muted');
@@ -105,7 +106,7 @@ function renderSkillEffectControl() {
   }
   const status = [
     cycle?.usedSkillCount ? `현재 트리 ${cycle.usedSkillCount}개` : '',
-    cycle?.mappedSharePercent > 0 ? `분석 지분 ${cycle.mappedSharePercent.toFixed(1)}%` : '',
+    modeledSharePercent > 0 ? `계산 지분 ${modeledSharePercent.toFixed(1)}%` : '',
     cycle?.weightedCooldownSeconds > 0 ? `평균 ${cycle.weightedCooldownSeconds.toFixed(2)}초` : '',
     `효과값 ${minimumProfile.itemCount}개`,
     conditionalCount ? `조건 충족 ${conditionalCount}개` : '',
@@ -124,7 +125,7 @@ function renderSkillEffectControl() {
   const minimumRow = minimumProfile.itemCount
     ? `<div class="skillEffectRow"><b>추천 적용 기준값</b><span>${escapeHtml(minimumSummary)}</span></div>`
     : '';
-  const cycleNote = cycle ? `<div class="skillCycleNote">신속 ${Number(cycle.swiftCooldownReduction || 0).toFixed(2)}% · 보석 가중 ${Number(cycle.weightedGemCooldown || 0).toFixed(2)}% · ${escapeHtml(cycle.analyzerTag || '장착 스킬 추정')}${cycle.conditionalGridRules?.length ? ` · 조건부 아크그리드 ${cycle.conditionalGridRules.length}건은 일치 전투분석 지분 반영` : ''}${cycle.stochasticRuneCount ? ` · 속행 ${cycle.stochasticRuneCount}개는 확률 미공개로 직접 환산 제외` : ''}</div>` : '';
+  const cycleNote = cycle ? `<div class="skillCycleNote">신속 ${Number(cycle.swiftCooldownReduction || 0).toFixed(2)}% · 보석 가중 ${Number(cycle.weightedGemCooldown || 0).toFixed(2)}% · ${escapeHtml(cycle.analyzerTag || '장착 스킬 추정')}${cycle.appliedCycleLinkCount ? ` · 아크그리드 연쇄 ${cycle.appliedCycleLinkCount}건` : ''}${cycle.identityDriverSharePercent ? ` · 게이지 연동 ${Number(cycle.identityDriverSharePercent).toFixed(1)}%` : ''}${cycle.stochasticRuneCount || cycle.stochasticCycleLinkCount ? ` · 확률 미공개 ${Number(cycle.stochasticRuneCount || 0) + Number(cycle.stochasticCycleLinkCount || 0)}건 제외` : ''}</div>` : '';
   preview.innerHTML = `<div class="skillEffectHeading"><b>현재 스킬트리 자동 반영</b><span>${escapeHtml(status)}</span></div>${cycleNote}<div class="skillEffectRows">${minimumRow}${rows || '<div class="skillEffectRow muted"><span>계산할 사용 스킬이 없습니다.</span></div>'}</div>`;
   preview.classList.remove('muted');
 }
@@ -3226,11 +3227,15 @@ function renderSkillCyclePanel() {
       return `<div class="skillCycleRow"><b>${escapeHtml(item.name)} <small>Lv.${Number(item.level || 0)}</small></b><span>${item.normalizedShare > 0 ? `${(item.normalizedShare * 100).toFixed(1)}%` : '-'}</span><span>${Number(item.baseCooldownSeconds).toFixed(1)}초</span><strong>${Number(item.effectiveCooldownSeconds).toFixed(2)}초</strong><small>${escapeHtml(factors)}</small></div>`;
     }).join('');
   const warnings = [
-    cycle.conditionalGridRules?.length ? `조건부 아크그리드 ${cycle.conditionalGridRules.length}건은 ${cycle.analyzerTag || '일치 프로필'} 딜 지분에 반영` : '',
+    cycle.appliedCycleLinkCount ? `아크그리드 쿨 연쇄 ${cycle.appliedCycleLinkCount}건을 스택·초기화 순서대로 반영` : '',
+    cycle.identityDriverSharePercent ? `변신·아이덴티티 ${Number(cycle.identityDriverSharePercent).toFixed(1)}%는 현재 스킬의 게이지 수급 주기에 연동` : '',
+    cycle.unmodeledSharePercent ? `초각성·미장착 ${Number(cycle.unmodeledSharePercent).toFixed(1)}%는 일반 쿨감에서 제외` : '',
+    cycle.unresolvedCycleLinkCount ? `현재 트리와 연결되지 않은 아크그리드 연쇄 ${cycle.unresolvedCycleLinkCount}건은 제외` : '',
+    cycle.stochasticCycleLinkCount ? `발동률 미공개 아크그리드 ${cycle.stochasticCycleLinkCount}건은 기대값 환산 제외` : '',
     cycle.stochasticRuneCount ? `속행 ${cycle.stochasticRuneCount}개는 발동 확률 미공개로 직접 초 환산 제외` : ''
   ].filter(Boolean).join(' · ');
   return `<details class="powerSnapshotBlock skillCyclePanel simulatorFold">
-    <summary class="simulatorFoldSummary"><span><h3>현재 스킬 사이클</h3><small>${cycle.usedSkillCount}개 · 분석 지분 ${cycle.mappedSharePercent.toFixed(1)}% · 가중 평균 ${cycle.weightedCooldownSeconds.toFixed(2)}초</small></span><strong>초단위</strong></summary>
+    <summary class="simulatorFoldSummary"><span><h3>현재 스킬 사이클</h3><small>${cycle.usedSkillCount}개 · 계산 지분 ${Number(cycle.modeledSharePercent ?? cycle.mappedSharePercent).toFixed(1)}% · 가중 평균 ${cycle.weightedCooldownSeconds.toFixed(2)}초</small></span><strong>초단위</strong></summary>
     <div class="simulatorFoldBody"><div class="skillCycleTable"><div class="skillCycleRow skillCycleHeader"><b>스킬</b><span>딜 지분</span><span>기본</span><strong>장착효과</strong><small>적용 요소</small></div>${rows}</div>${warnings ? `<p>${escapeHtml(warnings)}</p>` : ''}</div>
   </details>`;
 }
@@ -4249,20 +4254,21 @@ function calculateAndRender() {
   const currentDiff = ((currentPracticalValue / baseValue) - 1) * 100;
   const candidates = [];
   const excludeCooldown = isCooldownExcluded();
+  const modeledCycleShare = Number(state.skillCycle?.modeledSharePercent ?? state.skillCycle?.mappedSharePercent ?? 0);
   const shareInput = $('mainSkillDamageShare');
   const shareControl = document.querySelector('.shareControl');
   if (shareInput) {
-    shareInput.disabled = excludeCooldown || Boolean(state.skillCycle?.mappedShare > 0);
+    shareInput.disabled = excludeCooldown || modeledCycleShare > 0;
     shareInput.dataset.effectiveValue = excludeCooldown ? '0' : String(Math.max(0, Math.min(Number(shareInput.value || 60), 100)));
   }
   if (shareControl) {
     shareControl.classList.toggle('disabled', excludeCooldown);
-    shareControl.classList.toggle('hidden', Boolean(state.skillCycle?.mappedShare > 0));
+    shareControl.classList.toggle('hidden', modeledCycleShare > 0);
   }
   const cycleHint = $('skillCycleRecommendationHint');
   if (cycleHint) {
-    cycleHint.textContent = state.skillCycle?.mappedShare > 0
-      ? `현재 스킬트리 ${state.skillCycle.mappedSkillCount}개 · 분석 딜 지분 ${state.skillCycle.mappedSharePercent.toFixed(1)}% · ${state.skillCycle.analyzerTag || '장착 스킬 추정'} 기준으로 쿨감 노드를 자동 계산합니다.`
+    cycleHint.textContent = modeledCycleShare > 0
+      ? `현재 스킬트리 ${state.skillCycle.usedSkillCount}개 · 계산 지분 ${modeledCycleShare.toFixed(1)}% · ${state.skillCycle.analyzerTag || '장착 스킬 추정'} 기준으로 쿨감 노드를 자동 계산합니다.`
       : '스킬 주기나 전투분석 지분이 없을 때만 아래 수동 지분을 사용합니다.';
   }
   // 효과 데이터가 없는 서포터 노드는 딜러 추천에서 제외합니다.

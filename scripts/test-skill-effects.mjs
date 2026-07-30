@@ -80,6 +80,31 @@ assert.equal(parsed.cooldownTripodCount, 2);
 assert.equal(parsed.ignoredCooldownCount, 0, '확정 쿨감 트라이포드는 더 이상 계산에서 제외하지 않는다.');
 assert.equal(parsed.items[0].cooldown.flatSeconds, 2);
 assert.equal(parsed.items[2].cooldown.flatSeconds, 8);
+
+const minuteCooldowns = extractCombatSkillEffects([
+  {
+    Name: '공간 절단', Level: 14, Type: '일반', SkillType: 0,
+    Tooltip: JSON.stringify({ title: { leftText: '재사용 대기시간 1분', level: '[분침 스킬]' } }),
+    Tripods: [{ Tier: 2, Slot: 0, Name: '공간의 틈', IsSelected: true, Tooltip: '재사용 대기시간이 15.0초 감소하고 적에게 주는 피해가 90.0% 증가한다.' }]
+  },
+  {
+    Name: '일념', Level: 1, Type: '일반', SkillType: 1,
+    Tooltip: JSON.stringify({ title: { leftText: '재사용 대기시간 2분', level: '[분침 스킬]' } }),
+    Tripods: []
+  },
+  {
+    Name: '바위 곰', Level: 14, Type: '지점', SkillType: 0,
+    Tooltip: JSON.stringify({ title: { leftText: '재사용 대기시간 1초 / 충전 시간 30초', level: '[둔갑 스킬]' } }),
+    Tripods: []
+  }
+]);
+assert.equal(minuteCooldowns.items[0].baseCooldownSeconds, 60, '분 단위 일반 스킬 쿨타임을 초로 변환해야 한다.');
+assert.equal(minuteCooldowns.items[1].baseCooldownSeconds, 120, '2분 초각성 스킬도 원자료 쿨타임을 보존해야 한다.');
+assert.equal(minuteCooldowns.items[2].baseCooldownSeconds, 30, '충전형 스킬은 1초 입력 지연이 아니라 실제 충전 시간을 주기로 사용해야 한다.');
+assert.equal(minuteCooldowns.items[0].cooldown.flatSeconds, 15);
+assert.equal(minuteCooldowns.items[0].cooldown.percentReduction, 0, '같은 문장의 피해량 90%를 쿨타임 증가로 오인하면 안 된다.');
+assert.equal(minuteCooldowns.items[0].cooldownEligible, true);
+assert.equal(minuteCooldowns.items[1].cooldownEligible, false);
 assert.deepEqual(parsed.calculableItems[0].effects, {
   critRate: 33.2,
   critDamage: 0,

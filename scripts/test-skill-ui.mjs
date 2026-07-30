@@ -111,7 +111,7 @@ async function verifyViewport(viewport) {
 
   await page.locator('#skillEffectPreview').getByText('현재 스킬트리 자동 반영').waitFor();
   const preview = await page.locator('#skillEffectPreview').innerText();
-  assert.match(preview, /현재 트리 3개 · 효과값 2개/);
+  assert.match(preview, /현재 트리 3개 · 계산 지분 100\.0% · 효과값 2개/);
   assert.match(preview, /추천 적용 기준값/);
   assert.match(preview, /확정 치명/);
   assert.match(preview, /조건 충족/);

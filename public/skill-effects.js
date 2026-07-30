@@ -216,15 +216,16 @@ export function parseCooldownRuleText(value) {
   };
   if (!text || !/재사용\s*대기시간|쿨타임|쿨다운/i.test(text)) return out;
 
-  const setMatch = text.match(/재사용\s*대기시간(?:이|을|은|는)?\s*(\d+(?:\.\d+)?)\s*초로\s*(?:변경|증가|감소|고정)/i);
+  const cooldownIndex = text.search(/재사용\s*대기시간|쿨타임|쿨다운/i);
+  const cooldownClause = text.slice(cooldownIndex, cooldownIndex + 120).split(/[!?]|\.(?=\s|$)/)[0];
+
+  const setMatch = cooldownClause.match(/재사용\s*대기시간(?:이|을|은|는)?\s*(\d+(?:\.\d+)?)\s*초로\s*(?:변경|증가|감소|고정)/i);
   if (setMatch) out.setSeconds = round3(setMatch[1]);
 
-  const percentMatch = text.match(/재사용\s*대기시간(?:이|을|은|는)?[^%]{0,30}?(\d+(?:\.\d+)?)\s*%\s*(감소|증가|줄어|늘어)/i);
-  if (percentMatch) out.percentReduction = round3(Number(percentMatch[1]) * cooldownDirection(percentMatch[2]));
-
   if (!setMatch) {
-    const flatMatch = text.match(/재사용\s*대기시간(?:이|을|은|는)?[^초%]{0,30}?(\d+(?:\.\d+)?)\s*초\s*(감소|증가|줄어|늘어)/i);
-    if (flatMatch) out.flatSeconds = round3(Number(flatMatch[1]) * cooldownDirection(flatMatch[2]));
+    const firstEffect = cooldownClause.match(/(\d+(?:\.\d+)?)\s*(%|초)\s*(감소|증가|줄어|늘어)/i);
+    if (firstEffect?.[2] === '%') out.percentReduction = round3(Number(firstEffect[1]) * cooldownDirection(firstEffect[3]));
+    else if (firstEffect?.[2] === '초') out.flatSeconds = round3(Number(firstEffect[1]) * cooldownDirection(firstEffect[3]));
   }
 
   const resetMatch = text.match(/(\d+(?:\.\d+)?)\s*%\s*확률로[^.!?]{0,40}?재사용\s*대기시간(?:이|을)?\s*(?:초기화|100\s*%\s*감소)/i);
@@ -249,8 +250,10 @@ function mergeCooldownRules(rules) {
 
 function baseCooldownSeconds(skill) {
   for (const text of collectSkillTooltipTexts(skill?.Tooltip)) {
-    const match = text.match(/(?:^|\s)재사용\s*대기시간\s*(\d+(?:\.\d+)?)\s*초(?:\s*$|\s*[|·])/i);
-    if (match) return round3(match[1]);
+    const charge = text.match(/(?:스택\s*)?충전\s*시간\s*(?:(\d+(?:\.\d+)?)\s*분(?:\s*(\d+(?:\.\d+)?)\s*초)?|(\d+(?:\.\d+)?)\s*초)/i);
+    if (charge) return round3(Number(charge[1] || 0) * 60 + Number(charge[2] || charge[3] || 0));
+    const match = text.match(/(?:^|\s)재사용\s*대기시간\s*(?:(\d+(?:\.\d+)?)\s*분(?:\s*(\d+(?:\.\d+)?)\s*초)?|(\d+(?:\.\d+)?)\s*초)(?:\s*$|\s*[|·/])/i);
+    if (match) return round3(Number(match[1] || 0) * 60 + Number(match[2] || match[3] || 0));
   }
   return 0;
 }
@@ -259,6 +262,8 @@ function skillCategory(skill) {
   for (const text of collectSkillTooltipTexts(skill?.Tooltip)) {
     const match = text.match(/\[([^\]]+\s*스킬)\]/);
     if (match) return match[1].replace(/\s+/g, ' ').trim();
+    const stance = text.match(/\[([^\]]+)\s*스탠스\]/);
+    if (stance) return `${stance[1].replace(/\s+/g, ' ').trim()} 스킬`;
   }
   return '';
 }
@@ -343,6 +348,7 @@ export function extractCombatSkillEffects(skills) {
       level: Number(skill?.Level || 0),
       type: String(skill?.Type || '').trim(),
       skillType: Number(skill?.SkillType || 0),
+      cooldownEligible: Number(skill?.SkillType || 0) === 0,
       category: skillCategory(skill),
       baseCooldownSeconds: baseCooldownSeconds(skill),
       cooldown,
