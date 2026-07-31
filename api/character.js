@@ -2,6 +2,8 @@ import { isBoundGem } from '../public/gem-math.js';
 import { relicEngravingEffect } from '../public/engraving-math.js';
 import { CHARACTER_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
 import { extractCombatSkillEffects } from '../public/skill-effects.js';
+import { extractCardEffects } from '../public/card-effects.js';
+import { extractAvatarEffects } from '../public/avatar-effects.js';
 
 const API_VERSION = '5.13.0';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -53,7 +55,7 @@ function setCharacterCache(key, data) {
 }
 
 async function loadCharacterData(name, apiKey) {
-  const url = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}?filters=profiles+equipment+arkpassive+engravings+gems`;
+  const url = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}?filters=profiles+equipment+arkpassive+engravings+gems+cards+avatars`;
   const arkGridUrl = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}/arkgrid`;
   const combatSkillsUrl = `https://developer-lostark.game.onstove.com/armories/characters/${encodeURIComponent(name)}/combat-skills`;
 
@@ -73,16 +75,21 @@ async function loadCharacterData(name, apiKey) {
   const arkPassive = data.ArkPassive || data.ArmoryArkPassive || null;
   const equipment = data.ArmoryEquipment || data.Equipment || [];
   const gems = data.ArmoryGem || data.ArmoryGems || data.Gems || null;
+  const cards = data.ArmoryCard || data.Cards || null;
+  const avatars = data.ArmoryAvatars || data.ArmoryAvatar || data.Avatars || null;
   const accessoryEffects = extractAccessoryEffects(equipment);
   const braceletEffects = extractBraceletEffects(equipment);
   const abilityStoneEffects = extractAbilityStoneEffects(equipment);
   const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
   const arkGridEffects = extractArkGridEffects(arkGrid.data);
+  const cardEffects = extractCardEffects(cards);
+  const avatarEffects = extractAvatarEffects(avatars);
   const skills = Array.isArray(combatSkills.data) ? combatSkills.data : [];
   const skillEffects = extractCombatSkillEffects(skills);
-  const powerSnapshot = buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, skillEffects, arkGrid: arkGrid.data });
+  const powerSnapshot = buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, cardEffects, avatarEffects, skillEffects, arkGrid: arkGrid.data });
 
-  return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, gems, skills, skillEffects, skillEffectsError: combatSkills.error, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, powerSnapshot, raw: data };
+  // cards/avatars 원본은 raw에 그대로 들어있고 파싱 결과에 아이콘까지 포함하므로 최상위로 중복해서 싣지 않는다.
+  return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, gems, skills, skillEffects, skillEffectsError: combatSkills.error, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, cardEffects, avatarEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, powerSnapshot, raw: data };
 }
 
 async function fetchJson(url, apiKey, timeoutMs = 9000) {
@@ -190,7 +197,7 @@ export function extractProfileCooldownReduction(profile) {
 const COMBAT_EQUIPMENT_TYPES = new Set(['무기', '투구', '상의', '하의', '장갑', '어깨', '완갑']);
 const ACCESSORY_EQUIPMENT_TYPES = new Set(['목걸이', '귀걸이', '반지']);
 
-function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, skillEffects, arkGrid }) {
+function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, cardEffects, avatarEffects, skillEffects, arkGrid }) {
   const equipmentSnapshot = extractEquipmentSnapshot(equipment);
   const gemSnapshot = extractGemSnapshot(gems);
   const arkGridSnapshot = extractArkGridSnapshot(arkGrid);
@@ -226,6 +233,8 @@ function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEff
       abilityStone: abilityStoneEffects,
       engraving: engravingEffects,
       arkGrid: arkGridEffects,
+      card: cardEffects,
+      avatar: avatarEffects,
       skills: {
         count: skillEffects?.items?.length || 0,
         calculableCount: skillEffects?.calculableItems?.length || 0,
@@ -244,6 +253,11 @@ function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEff
       bracelet: Boolean(equipmentSnapshot.bracelet),
       abilityStone: Boolean(equipmentSnapshot.abilityStone),
       gems: gemSnapshot.items.length,
+      cards: cardEffects?.cards?.length || 0,
+      cardAwakeTotal: (cardEffects?.sets || []).reduce((sum, set) => sum + (set.awakeTotal || 0), 0),
+      cardDamageBonusPercent: cardEffects?.damageBonusPercent || 0,
+      avatars: avatarEffects?.count || 0,
+      avatarsWithStat: avatarEffects?.withStatCount || 0,
       combatSkills: skillEffects?.items?.length || 0,
       calculableSkills: skillEffects?.calculableItems?.length || 0,
       needsVerification: [
@@ -251,7 +265,9 @@ function buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEff
         '보석은 캐릭터 ArmoryGem 응답 기준으로 레벨/종류/스킬 연결을 구조화했습니다.',
         '스킬 주기는 combat-skills의 현재 스킬 레벨·선택 트라이포드·룬과 프로필 신속, 장착 보석을 결합합니다.',
         '확률이 공개되지 않은 속행 룬과 조건부 아크그리드 쿨감은 감지하되 임의 확률로 직접 환산하지 않고 일치 전투분석 지분으로 보정합니다.',
-        '공식 전투력 산식은 공개값이 아니므로 profile.CombatPower와 샘플 오차 검증으로 보정해야 합니다.'
+        '공식 전투력 산식은 공개값이 아니므로 profile.CombatPower와 샘플 오차 검증으로 보정해야 합니다.',
+        '카드 세트 효과는 공격 속성이 변환된 경우에만 해당 속성 피해 증가를 전체 공격에 적용합니다. 피해 감소 계열은 딜 증가에서 제외합니다.',
+        '카드와 아바타는 현재 파싱해서 노출만 하며 딜/전투력 계산에는 아직 연결하지 않았습니다. 기존 보정 계수가 이미 이 둘을 포함한 표본으로 맞춰져 있어 이중 계산 위험이 있습니다.'
       ]
     }
   };
