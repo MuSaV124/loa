@@ -126,21 +126,10 @@ function cardsBySlot(cards) {
   return bySlot;
 }
 
-export function extractCardEffects(armoryCard) {
-  const cards = Array.isArray(armoryCard?.Cards) ? armoryCard.Cards : [];
-  const bySlot = cardsBySlot(cards);
-
-  const cardList = cards.map(card => ({
-    slot: Number(card.Slot),
-    name: String(card.Name || ''),
-    grade: String(card.Grade || ''),
-    icon: String(card.Icon || ''),
-    awakeCount: Number(card.AwakeCount) || 0,
-    awakeTotal: Number(card.AwakeTotal) || 0
-  }));
-
-  const result = {
-    cards: cardList,
+/** 캐릭터 검색 전이나 카드 정보가 없을 때 쓰는 기본값. 호출부와 모양이 어긋나지 않도록 여기서 만든다. */
+export function emptyCardEffects() {
+  return {
+    cards: [],
     sets: [],
     totals: {},
     attributeConversion: '',
@@ -154,6 +143,22 @@ export function extractCardEffects(armoryCard) {
     ignored: [],
     unparsed: []
   };
+}
+
+export function extractCardEffects(armoryCard) {
+  const cards = Array.isArray(armoryCard?.Cards) ? armoryCard.Cards : [];
+  const bySlot = cardsBySlot(cards);
+
+  const cardList = cards.map(card => ({
+    slot: Number(card.Slot),
+    name: String(card.Name || ''),
+    grade: String(card.Grade || ''),
+    icon: String(card.Icon || ''),
+    awakeCount: Number(card.AwakeCount) || 0,
+    awakeTotal: Number(card.AwakeTotal) || 0
+  }));
+
+  const result = { ...emptyCardEffects(), cards: cardList };
 
   for (const effect of Array.isArray(armoryCard?.Effects) ? armoryCard.Effects : []) {
     const slots = Array.isArray(effect?.CardSlots) ? effect.CardSlots.map(Number) : [];
