@@ -5,8 +5,9 @@
  * 요구 조건이 Items[].Name에 `"세상을 구하는 빛 6세트 (18각성합계)"` 형태로 들어있으므로
  * 여기서 세트 수와 각성합계를 뽑아, 실제 장착 카드로 계산한 값과 대조해 통과 여부를 정한다.
  *
- * API가 달성한 효과만 주는지 전체 단계를 주는지는 확인되지 않았다.
- * 어느 쪽이든 결과가 같도록 항상 자체 계산값으로 다시 판정한다.
+ * API는 달성한 효과만 내려준다. 24각 캐릭터에는 30각성합계 항목이 아예 오지 않고,
+ * 0각 캐릭터에는 각성 항목 자체가 없는 것을 실제 응답으로 확인했다.
+ * 그래도 자체 계산값으로 다시 판정하는 이유는 API 동작이 바뀌어도 결과가 같게 하기 위해서다.
  */
 
 const SET_NAME_PATTERN = /^(.*?)\s*(\d+)세트(?:\s*\((\d+)각성합계\))?\s*$/;
@@ -26,8 +27,19 @@ export function parseSetRequirement(name) {
   };
 }
 
+/**
+ * 하나의 Description에 `물리 방어력 +4.00%<BR><BR>마법 방어력 +4.00%` 처럼
+ * 효과가 여러 개 들어오므로 <BR>로 나눠 각각 파싱한다.
+ */
+export function parseEffectDescriptions(description) {
+  return String(description || '')
+    .split(/<\s*br\s*\/?\s*>/gi)
+    .map(part => parseEffectDescription(part))
+    .filter(Boolean);
+}
+
 export function parseEffectDescription(description) {
-  const text = String(description || '').replace(/\s+/g, ' ').trim();
+  const text = String(description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
   if (!text) return null;
 
   const conversion = ATTRIBUTE_CONVERSION_PATTERN.exec(text);
@@ -77,12 +89,17 @@ export function classifyEffect(parsed, attributeConversion) {
   const { label, value } = parsed;
 
   if (/피해\s*감소$/.test(label)) return { target: 'ignored', reason: 'defensive' };
+  if (/(방어력|생명력|보호막|회복량)$/.test(label)) return { target: 'ignored', reason: 'defensive' };
   if (/^가디언 토벌 시/.test(label)) return { target: 'ignored', reason: 'guardian-only' };
   // 대상이 받는 피해를 늘리는 파티 디버프. 본인 딜 반영 방식이 확인되지 않아 합산하지 않는다.
   // `...받는 성속성 피해량이` 처럼 조사가 붙어 오므로 끝의 조사를 허용한다.
   if (/받는\s.*피해(량)?[이가은는]?$/.test(label)) return { target: 'ignored', reason: 'party-debuff' };
 
   if (/^치명타 적중률$/.test(label)) return { target: 'critRate', value };
+  if (/^치명타 피해$/.test(label)) return { target: 'critDamage', value };
+  // 공격 속도는 딜 버킷을 직접 곱하지는 않지만 음속 돌파 계산에 쓰이므로 버리지 않는다.
+  if (/^공격 속도$/.test(label)) return { target: 'attackSpeed', value };
+  if (/^이동 속도$/.test(label)) return { target: 'moveSpeed', value };
   if (/^백어택 성공 시 적에게 주는 피해$/.test(label)) {
     return { target: 'conditional', key: 'backAttackEnemyDamage', value };
   }
@@ -129,7 +146,7 @@ export function extractCardEffects(armoryCard) {
     attributeConversion: '',
     damageBonusPercent: 0,
     // scoreCore의 딜 버킷에 그대로 더할 수 있는 값들.
-    buckets: { critRate: 0, attributeDamage: 0, enemyDamage: 0, additionalDamage: 0 },
+    buckets: { critRate: 0, critDamage: 0, attributeDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0 },
     // 조건 충족 여부를 호출부가 판단해야 하는 값들.
     conditional: { backAttackEnemyDamage: 0 },
     applied: [],
@@ -157,14 +174,14 @@ export function extractCardEffects(armoryCard) {
       const meetsRequirement =
         requirement.requiredSetCount <= equippedCount && requirement.requiredAwakeTotal <= awakeTotal;
 
-      const parsed = parseEffectDescription(item?.Description);
+      const parsedList = parseEffectDescriptions(item?.Description);
       const entry = {
         name: String(item?.Name || ''),
         setName: requirement.setName,
         requiredSetCount: requirement.requiredSetCount,
         requiredAwakeTotal: requirement.requiredAwakeTotal,
         description: String(item?.Description || ''),
-        effect: parsed
+        effects: parsedList
       };
 
       if (!meetsRequirement) {
@@ -174,13 +191,14 @@ export function extractCardEffects(armoryCard) {
 
       result.applied.push(entry);
 
-      if (!parsed) continue;
-      if (parsed.kind === 'attributeConversion') {
-        result.attributeConversion = parsed.attribute;
-      } else if (parsed.kind === 'numeric') {
-        result.totals[parsed.label] = round2((result.totals[parsed.label] || 0) + parsed.value);
-      } else {
-        result.unparsed.push({ name: entry.name, description: entry.description, reason: 'description' });
+      for (const parsed of parsedList) {
+        if (parsed.kind === 'attributeConversion') {
+          result.attributeConversion = parsed.attribute;
+        } else if (parsed.kind === 'numeric') {
+          result.totals[parsed.label] = round2((result.totals[parsed.label] || 0) + parsed.value);
+        } else {
+          result.unparsed.push({ name: entry.name, description: entry.description, reason: 'description' });
+        }
       }
     }
 
@@ -191,14 +209,16 @@ export function extractCardEffects(armoryCard) {
 
   // 속성 변환은 루프 도중에 확정되므로, 버킷 분류는 전체를 다 읽은 뒤 한 번 더 돈다.
   for (const entry of result.applied) {
-    const classified = classifyEffect(entry.effect, result.attributeConversion);
-    if (!classified) continue;
-    if (classified.target === 'ignored') {
-      result.ignored.push({ name: entry.name, description: entry.description, reason: classified.reason });
-    } else if (classified.target === 'conditional') {
-      result.conditional[classified.key] = round2((result.conditional[classified.key] || 0) + classified.value);
-    } else {
-      result.buckets[classified.target] = round2((result.buckets[classified.target] || 0) + classified.value);
+    for (const parsed of entry.effects) {
+      const classified = classifyEffect(parsed, result.attributeConversion);
+      if (!classified) continue;
+      if (classified.target === 'ignored') {
+        result.ignored.push({ name: entry.name, description: parsed.text, reason: classified.reason });
+      } else if (classified.target === 'conditional') {
+        result.conditional[classified.key] = round2((result.conditional[classified.key] || 0) + classified.value);
+      } else {
+        result.buckets[classified.target] = round2((result.buckets[classified.target] || 0) + classified.value);
+      }
     }
   }
 

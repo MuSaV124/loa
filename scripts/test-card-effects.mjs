@@ -3,6 +3,7 @@ import {
   calculateDamageBonusPercent,
   extractCardEffects,
   parseEffectDescription,
+  parseEffectDescriptions,
   parseSetRequirement
 } from '../public/card-effects.js';
 
@@ -131,7 +132,7 @@ assert.deepEqual(parseEffectDescription('백어택 성공 시 적에게 주는 �
 assert.equal(parseEffectDescription('가디언 토벌 시 가디언에게 받는 피해 7.5% 감소').value, -7.5);
 
 // 세구빛 30각: 변환된 성속성 피해만 전역 배수로 잡고, 암속성 피해 감소는 버린다.
-assert.deepEqual(full.buckets, { critRate: 0, attributeDamage: 15, enemyDamage: 0, additionalDamage: 0 });
+assert.deepEqual(full.buckets, { critRate: 0, critDamage: 0, attributeDamage: 15, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0 });
 assert.equal(full.conditional.backAttackEnemyDamage, 0);
 assert.equal(full.ignored.filter(row => row.reason === 'defensive').length, 3);
 
@@ -200,7 +201,7 @@ const guardian = extractCardEffects({
     Items: [{ Name: '부르는 소리 있도다 3세트 (15각성합계)', Description: '가디언 토벌 시 가디언에게 주는 피해 7.0% 증가' }]
   }]
 });
-assert.deepEqual(guardian.buckets, { critRate: 0, attributeDamage: 0, enemyDamage: 0, additionalDamage: 0 });
+assert.deepEqual(guardian.buckets, { critRate: 0, critDamage: 0, attributeDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0 });
 assert.equal(guardian.ignored.filter(row => row.reason === 'guardian-only').length, 1);
 
 // 변환되지 않은 속성의 피해 증가는 로테이션 지분을 알 수 없어 합산하지 않는다.
@@ -214,5 +215,36 @@ const mismatched = extractCardEffects({
 });
 assert.equal(mismatched.buckets.attributeDamage, 0);
 assert.equal(mismatched.ignored.filter(row => row.reason === 'attribute-share-unknown').length, 1);
+
+// 신념의 길: 하나의 Description에 <BR>로 효과가 두 개 들어온다. 둘 다 방어 계열이라 버린다.
+const faithPath = extractCardEffects({
+  Cards: cardsWithAwake([5, 5, 5, 5, 5, 5]),
+  Effects: [{
+    Index: 0,
+    CardSlots: [0, 1, 2, 3, 4, 5],
+    Items: [{ Name: '신념의 길 6세트 (12각성합계)', Description: '물리 방어력 +4.00%<BR><BR>마법 방어력 +4.00%' }]
+  }]
+});
+assert.equal(faithPath.unparsed.length, 0);
+assert.equal(faithPath.ignored.filter(row => row.reason === 'defensive').length, 2);
+assert.equal(faithPath.totals['물리 방어력'], 4);
+assert.equal(faithPath.totals['마법 방어력'], 4);
+
+assert.equal(parseEffectDescriptions('물리 방어력 +4.00%<BR><BR>마법 방어력 +4.00%').length, 2);
+assert.equal(parseEffectDescriptions('공격 속도 +4.00%').length, 1);
+assert.equal(parseEffectDescriptions('').length, 0);
+
+// 피어나는 화염의 가호: 공격 속도는 음속 돌파 계산에 쓰이므로 버리지 않는다.
+const flameBless = extractCardEffects({
+  Cards: cardsWithAwake([5, 5, 5, 5, 5, 5]),
+  Effects: [{
+    Index: 0,
+    CardSlots: [0, 1, 2, 3, 4, 5],
+    Items: [{ Name: '피어나는 화염의 가호 6세트 (12각성합계)', Description: '공격 속도 +4.00%' }]
+  }]
+});
+assert.equal(flameBless.buckets.attackSpeed, 4);
+assert.equal(flameBless.ignored.length, 0);
+assert.equal(flameBless.unparsed.length, 0);
 
 console.log('card effect tests passed');
