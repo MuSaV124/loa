@@ -10,7 +10,10 @@
  */
 
 const SET_NAME_PATTERN = /^(.*?)\s*(\d+)세트(?:\s*\((\d+)각성합계\))?\s*$/;
-const NUMERIC_EFFECT_PATTERN = /^(.*?)\s*([+-])\s*([\d,.]+)\s*(%?)\s*$/;
+// `성속성 피해 +7.00%` 형태
+const SIGNED_EFFECT_PATTERN = /^(.*?)\s*([+-])\s*([\d,.]+)\s*(%?)\s*$/;
+// `백어택 성공 시 적에게 주는 피해 2.0% 증가` 형태
+const TRAILING_EFFECT_PATTERN = /^(.*?)\s*([\d,.]+)\s*%\s*(증가|감소)\s*$/;
 const ATTRIBUTE_CONVERSION_PATTERN = /공격\s*속성을\s*(\S+?)으?로\s*변환/;
 
 export function parseSetRequirement(name) {
@@ -32,19 +35,70 @@ export function parseEffectDescription(description) {
     return { kind: 'attributeConversion', attribute: conversion[1], text };
   }
 
-  const numeric = NUMERIC_EFFECT_PATTERN.exec(text);
-  if (!numeric) return { kind: 'unparsed', text };
+  const signed = SIGNED_EFFECT_PATTERN.exec(text);
+  if (signed) {
+    const value = Number(signed[3].replace(/,/g, ''));
+    if (!Number.isFinite(value)) return { kind: 'unparsed', text };
+    return {
+      kind: 'numeric',
+      label: signed[1].trim(),
+      value: signed[2] === '-' ? -value : value,
+      unit: signed[4] === '%' ? 'percent' : 'flat',
+      text
+    };
+  }
 
-  const value = Number(numeric[3].replace(/,/g, ''));
-  if (!Number.isFinite(value)) return { kind: 'unparsed', text };
+  const trailing = TRAILING_EFFECT_PATTERN.exec(text);
+  if (trailing) {
+    const value = Number(trailing[2].replace(/,/g, ''));
+    if (!Number.isFinite(value)) return { kind: 'unparsed', text };
+    return {
+      kind: 'numeric',
+      label: trailing[1].trim(),
+      value: trailing[3] === '감소' ? -value : value,
+      unit: 'percent',
+      text
+    };
+  }
 
-  return {
-    kind: 'numeric',
-    label: numeric[1].trim(),
-    value: numeric[2] === '-' ? -value : value,
-    unit: numeric[4] === '%' ? 'percent' : 'flat',
-    text
-  };
+  return { kind: 'unparsed', text };
+}
+
+/**
+ * 파싱된 효과를 딜 공식의 버킷으로 분류한다.
+ * scoreCore는 치명/진화형피해/추가피해/적주피/공격력/스킬피해/각인/쿨감 버킷을 곱하므로
+ * 변환된 속성 피해는 그 어디에도 속하지 않는 별도 버킷으로 둔다.
+ *
+ * 조건이 붙은 효과는 무조건 적용하지 않고 conditional로 분리해 호출부가 결정하게 한다.
+ * 판단 근거가 부족한 항목은 합산하지 않고 ignored에 남긴다.
+ */
+export function classifyEffect(parsed, attributeConversion) {
+  if (!parsed || parsed.kind !== 'numeric') return null;
+  const { label, value } = parsed;
+
+  if (/피해\s*감소$/.test(label)) return { target: 'ignored', reason: 'defensive' };
+  if (/^가디언 토벌 시/.test(label)) return { target: 'ignored', reason: 'guardian-only' };
+  // 대상이 받는 피해를 늘리는 파티 디버프. 본인 딜 반영 방식이 확인되지 않아 합산하지 않는다.
+  // `...받는 성속성 피해량이` 처럼 조사가 붙어 오므로 끝의 조사를 허용한다.
+  if (/받는\s.*피해(량)?[이가은는]?$/.test(label)) return { target: 'ignored', reason: 'party-debuff' };
+
+  if (/^치명타 적중률$/.test(label)) return { target: 'critRate', value };
+  if (/^백어택 성공 시 적에게 주는 피해$/.test(label)) {
+    return { target: 'conditional', key: 'backAttackEnemyDamage', value };
+  }
+  if (/^적에게 주는 피해$/.test(label)) return { target: 'enemyDamage', value };
+  if (/^추가 피해$/.test(label)) return { target: 'additionalDamage', value };
+
+  const attributeMatch = /^(\S+속성) 피해$/.exec(label);
+  if (attributeMatch) {
+    // 공격 속성이 그 속성으로 변환된 경우에만 전체 공격에 적용된다.
+    if (attributeConversion && attributeMatch[1] === attributeConversion) {
+      return { target: 'attributeDamage', value };
+    }
+    return { target: 'ignored', reason: 'attribute-share-unknown' };
+  }
+
+  return { target: 'ignored', reason: 'unclassified' };
 }
 
 function cardsBySlot(cards) {
@@ -74,8 +128,13 @@ export function extractCardEffects(armoryCard) {
     totals: {},
     attributeConversion: '',
     damageBonusPercent: 0,
+    // scoreCore의 딜 버킷에 그대로 더할 수 있는 값들.
+    buckets: { critRate: 0, attributeDamage: 0, enemyDamage: 0, additionalDamage: 0 },
+    // 조건 충족 여부를 호출부가 판단해야 하는 값들.
+    conditional: { backAttackEnemyDamage: 0 },
     applied: [],
     skipped: [],
+    ignored: [],
     unparsed: []
   };
 
@@ -129,6 +188,20 @@ export function extractCardEffects(armoryCard) {
   }
 
   result.damageBonusPercent = calculateDamageBonusPercent(result);
+
+  // 속성 변환은 루프 도중에 확정되므로, 버킷 분류는 전체를 다 읽은 뒤 한 번 더 돈다.
+  for (const entry of result.applied) {
+    const classified = classifyEffect(entry.effect, result.attributeConversion);
+    if (!classified) continue;
+    if (classified.target === 'ignored') {
+      result.ignored.push({ name: entry.name, description: entry.description, reason: classified.reason });
+    } else if (classified.target === 'conditional') {
+      result.conditional[classified.key] = round2((result.conditional[classified.key] || 0) + classified.value);
+    } else {
+      result.buckets[classified.target] = round2((result.buckets[classified.target] || 0) + classified.value);
+    }
+  }
+
   return result;
 }
 

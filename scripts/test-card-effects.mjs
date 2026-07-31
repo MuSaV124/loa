@@ -120,4 +120,99 @@ for (const empty of [null, undefined, {}, { Cards: null, Effects: null }]) {
   assert.equal(result.attributeConversion, '');
 }
 
+// `...피해 2.0% 증가` 형태도 읽는다.
+assert.deepEqual(parseEffectDescription('백어택 성공 시 적에게 주는 피해 2.0% 증가'), {
+  kind: 'numeric',
+  label: '백어택 성공 시 적에게 주는 피해',
+  value: 2,
+  unit: 'percent',
+  text: '백어택 성공 시 적에게 주는 피해 2.0% 증가'
+});
+assert.equal(parseEffectDescription('가디언 토벌 시 가디언에게 받는 피해 7.5% 감소').value, -7.5);
+
+// 세구빛 30각: 변환된 성속성 피해만 전역 배수로 잡고, 암속성 피해 감소는 버린다.
+assert.deepEqual(full.buckets, { critRate: 0, attributeDamage: 15, enemyDamage: 0, additionalDamage: 0 });
+assert.equal(full.conditional.backAttackEnemyDamage, 0);
+assert.equal(full.ignored.filter(row => row.reason === 'defensive').length, 3);
+
+// 남겨진 바람의 절벽 30각: 치적 +7%가 잡혀야 한다. 파티 디버프는 보수적으로 제외.
+const windCliff = extractCardEffects({
+  Cards: cardsWithAwake([5, 5, 5, 5, 5, 5]),
+  Effects: [{
+    Index: 0,
+    CardSlots: [0, 1, 2, 3, 4, 5],
+    Items: [
+      { Name: '남겨진 바람의 절벽 2세트', Description: '암속성 피해 감소 +8.00%' },
+      { Name: '남겨진 바람의 절벽 6세트 (12각성합계)', Description: '치명타 적중률 +7.00%' },
+      { Name: '남겨진 바람의 절벽 6세트 (18각성합계)', Description: '공격 적중 시 대상이 자신 및 파티원에게 받는 성속성 피해량이 1.0% 증가' },
+      { Name: '남겨진 바람의 절벽 6세트 (30각성합계)', Description: '공격 적중 시 대상이 자신 및 파티원에게 받는 성속성 피해량이 1.5% 증가' }
+    ]
+  }]
+});
+assert.equal(windCliff.buckets.critRate, 7);
+assert.equal(windCliff.buckets.attributeDamage, 0);
+assert.equal(windCliff.attributeConversion, '');
+assert.equal(windCliff.ignored.filter(row => row.reason === 'party-debuff').length, 2);
+
+// 카제로스의 군단장: 암속성으로 변환되므로 암속성 피해가 전역 배수가 된다.
+const kazeros = extractCardEffects({
+  Cards: cardsWithAwake([5, 5, 5, 5, 5, 5]),
+  Effects: [{
+    Index: 0,
+    CardSlots: [0, 1, 2, 3, 4, 5],
+    Items: [
+      { Name: '카제로스의 군단장 2세트', Description: '성속성 피해 감소 +10.00%' },
+      { Name: '카제로스의 군단장 6세트 (12각성합계)', Description: '공격 속성을 암속성으로 변환' },
+      { Name: '카제로스의 군단장 6세트 (18각성합계)', Description: '암속성 피해 +7.00%' },
+      { Name: '카제로스의 군단장 6세트 (30각성합계)', Description: '암속성 피해 +4.00%' }
+    ]
+  }]
+});
+assert.equal(kazeros.attributeConversion, '암속성');
+assert.equal(kazeros.buckets.attributeDamage, 11);
+assert.equal(kazeros.damageBonusPercent, 11);
+// 성속성 피해 감소는 방어 계열이라 버려야 한다.
+assert.equal(kazeros.ignored.some(row => row.reason === 'defensive'), true);
+
+// 세 우마르가 오리라: 백어택 조건부라 버킷이 아니라 conditional로 간다.
+const umar = extractCardEffects({
+  Cards: [0, 1, 2].map(slot => ({ Slot: slot, Name: `카드${slot}`, Grade: '전설', AwakeCount: 5, AwakeTotal: 5 })),
+  Effects: [{
+    Index: 0,
+    CardSlots: [0, 1, 2],
+    Items: [
+      { Name: '세 우마르가 오리라 3세트', Description: '가디언 토벌 시 가디언에게 받는 피해 7.5% 감소' },
+      { Name: '세 우마르가 오리라 3세트 (6각성합계)', Description: '백어택 성공 시 적에게 주는 피해 2.0% 증가' },
+      { Name: '세 우마르가 오리라 3세트 (15각성합계)', Description: '백어택 성공 시 적에게 주는 피해 7.0% 증가' }
+    ]
+  }]
+});
+assert.equal(umar.sets[0].awakeTotal, 15);
+assert.equal(umar.conditional.backAttackEnemyDamage, 9);
+assert.equal(umar.buckets.enemyDamage, 0);
+
+// 가디언 전용 효과는 레이드 딜과 무관하므로 버린다.
+const guardian = extractCardEffects({
+  Cards: [0, 1, 2].map(slot => ({ Slot: slot, Name: `카드${slot}`, Grade: '전설', AwakeCount: 5, AwakeTotal: 5 })),
+  Effects: [{
+    Index: 0,
+    CardSlots: [0, 1, 2],
+    Items: [{ Name: '부르는 소리 있도다 3세트 (15각성합계)', Description: '가디언 토벌 시 가디언에게 주는 피해 7.0% 증가' }]
+  }]
+});
+assert.deepEqual(guardian.buckets, { critRate: 0, attributeDamage: 0, enemyDamage: 0, additionalDamage: 0 });
+assert.equal(guardian.ignored.filter(row => row.reason === 'guardian-only').length, 1);
+
+// 변환되지 않은 속성의 피해 증가는 로테이션 지분을 알 수 없어 합산하지 않는다.
+const mismatched = extractCardEffects({
+  Cards: cardsWithAwake([5, 5, 5, 5, 5, 5]),
+  Effects: [{
+    Index: 0,
+    CardSlots: [0, 1, 2, 3, 4, 5],
+    Items: [{ Name: '가상 세트 6세트', Description: '화속성 피해 +10.00%' }]
+  }]
+});
+assert.equal(mismatched.buckets.attributeDamage, 0);
+assert.equal(mismatched.ignored.filter(row => row.reason === 'attribute-share-unknown').length, 1);
+
 console.log('card effect tests passed');
