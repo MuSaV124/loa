@@ -1,16 +1,17 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.13.0';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.13.0';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.13.0';
-import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.13.0';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.13.0';
-import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.13.0';
-import { buildSkillCycleModel, evaluateEvolutionCooldown } from './skill-cycle.js?v=5.13.0';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.13.0';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.13.0';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.13.0';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.13.0';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.13.0';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.13.0';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.14.0';
+import { emptyCardEffects } from './card-effects.js?v=5.14.0';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.14.0';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.14.0';
+import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.14.0';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.14.0';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.14.0';
+import { buildSkillCycleModel, evaluateEvolutionCooldown } from './skill-cycle.js?v=5.14.0';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.14.0';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.14.0';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.14.0';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.14.0';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.14.0';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.14.0';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -19,9 +20,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.13.0';
+} from './cache-policy.js?v=5.14.0';
 
-const VERSION = '5.13.0';
+const VERSION = '5.14.0';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -61,6 +62,7 @@ const state = {
   engraving: emptyEngravingState(),
   arkGrid: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
   enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] },
+  card: emptyCardEffects(),
   skillEffects: emptySkillEffectState(),
   skillCycle: null,
   powerSnapshot: null,
@@ -3585,6 +3587,11 @@ function getBaseStats(selection = state.selected) {
   pushDamageSource(enemyDamageSources, '어빌리티 스톤 각인 보너스', state.abilityStone?.effects?.enemyDamage);
   pushDamageSource(enemyDamageSources, '추가 입력', extraEnemyDamage);
   pushDamageSource(enemyDamageSources, '백어택', backAttackEnemyDamage);
+  pushDamageSource(enemyDamageSources, '카드 세트', num(state.card?.buckets?.enemyDamage));
+  // 세 우마르가 오리라처럼 백어택 조건이 붙은 카드 효과는 백어택을 켰을 때만 넣는다.
+  if ($('backAttackEnabled').checked) {
+    pushDamageSource(enemyDamageSources, '카드 세트 · 백어택', num(state.card?.conditional?.backAttackEnemyDamage));
+  }
   const critHitDamageSources = [
     ...collectItemDamageSources(state.accessory, 'critHitDamage', '악세'),
     ...collectItemDamageSources(state.bracelet, 'critHitDamage', '팔찌')
@@ -3596,14 +3603,16 @@ function getBaseStats(selection = state.selected) {
     critStat,
     swiftStat,
     statCritRate,
-    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.arkGrid.critRate) + num(engravingEffects.critRate) + num(state.abilityStone?.effects?.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate,
-    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.arkGrid.critDamage) + num(engravingEffects.critDamage) + num(state.abilityStone?.effects?.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage,
+    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.arkGrid.critRate) + num(engravingEffects.critRate) + num(state.abilityStone?.effects?.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate + num(state.card?.buckets?.critRate),
+    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.arkGrid.critDamage) + num(engravingEffects.critDamage) + num(state.abilityStone?.effects?.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage + num(state.card?.buckets?.critDamage),
     critHitDamage: num(state.accessory.critHitDamage) + num(state.bracelet.critHitDamage) + num(state.enlightenment.critHitDamage) + num(engravingEffects.critHitDamage) + num(state.abilityStone?.effects?.critHitDamage),
     critHitDamageSources,
     evolutionDamage: num(state.enlightenment.evolutionDamage) + extraEvolutionDamage,
-    additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + num(state.arkGrid.additionalDamage) + num(engravingEffects.additionalDamage) + num(state.abilityStone?.effects?.additionalDamage) + extraAdditionalDamage,
+    additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + num(state.arkGrid.additionalDamage) + num(engravingEffects.additionalDamage) + num(state.abilityStone?.effects?.additionalDamage) + extraAdditionalDamage + num(state.card?.buckets?.additionalDamage),
     enemyDamage: effectivePercentFromSources(enemyDamageSources),
     enemyDamageSources,
+    // 공격 속성이 변환된 카드 세트의 속성 피해. 다른 버킷과 독립이라 따로 곱한다.
+    attributeDamage: num(state.card?.buckets?.attributeDamage),
     skillCritBonus: 0,
     skillDamage: 0,
     critSynergy,
@@ -3689,7 +3698,8 @@ function selectionWithoutTiers(selection = state.selected, tiers = [4, 5]) {
 }
 function scoreCore(stats) {
   // Lost Ark damage buckets: same bucket effects are additive first, then each bucket is multiplied.
-  // Expected value = crit EV × 진화형피해 × 추가피해 × 적에게주는피해 × 공격력증가.
+  // Expected value = crit EV × 진화형피해 × 추가피해 × 적에게주는피해 × 속성피해 × 공격력증가.
+  // 속성 피해는 카드 세트가 공격 속성을 변환했을 때만 붙으며 다른 버킷과 독립이다.
   const rawCritRate = stats.critRate + stats.skillCritBonus + (stats.adrenalineCritRate || 0);
   let effectiveCritRate = rawCritRate;
   let evo = stats.evolutionDamage;
@@ -3713,6 +3723,7 @@ function scoreCore(stats) {
   const effectiveCritHitDamage = (critHitMultiplier - 1) * 100;
   const displayEnemyDamage = additivePercentFromSources(stats.enemyDamageSources);
   const displayCritHitDamage = additivePercentFromSources(critHitSources);
+  const attributeMultiplier = 1 + (stats.attributeDamage || 0) / 100;
   const attackMultiplier = 1 + (stats.attackPower || 0) / 100;
   const skillDamageMultiplier = 1 + (stats.skillDamage || 0) / 100;
   const engravingDamageMultiplier = Number(stats.engravingDamageMultiplier || 1);
@@ -3726,8 +3737,8 @@ function scoreCore(stats) {
     : evaluateEvolutionCooldown(state.skillCycle, cooldownReduction, { fallbackSharePercent: mainSkillDamageSharePct });
   const cooldownRatio = cooldownEvaluation.affectedSharePercent / 100;
   const cooldownMultiplier = cooldownEvaluation.multiplier;
-  const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attackMultiplier * skillDamageMultiplier * engravingDamageMultiplier * cooldownMultiplier;
-  return { value, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, cooldownModeled: cooldownEvaluation.modeled, skillDamageMultiplier, engravingDamageMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, skillDamage: stats.skillDamage || 0, sonicBreakEvolutionDamage: stats.sonicBreakEvolutionDamage || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
+  const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attributeMultiplier * attackMultiplier * skillDamageMultiplier * engravingDamageMultiplier * cooldownMultiplier;
+  return { value, attributeDamage: stats.attributeDamage || 0, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, cooldownModeled: cooldownEvaluation.modeled, skillDamageMultiplier, engravingDamageMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, skillDamage: stats.skillDamage || 0, sonicBreakEvolutionDamage: stats.sonicBreakEvolutionDamage || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
 }
 
 function applyExperimentalSkillEffects(stats, item) {
@@ -4503,6 +4514,7 @@ function resetCharacterResultState() {
   state.engraving = emptyEngravingState();
   state.arkGrid = { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   state.enlightenment = { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
+  state.card = emptyCardEffects();
   state.skillEffects = emptySkillEffectState();
   state.skillCycle = null;
   renderSkillEffectControl();
@@ -4516,6 +4528,7 @@ function applyCharacterData(data) {
   state.abilityStone = data.abilityStoneEffects || { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
   state.engraving = data.engravingEffects || emptyEngravingState();
   state.arkGrid = data.arkGridEffects || { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+  state.card = data.cardEffects || emptyCardEffects();
   state.skillEffects = data.skillEffects || emptySkillEffectState();
   state.powerSnapshot = data.powerSnapshot || null;
   if (state.powerSnapshot?.profile && !state.powerSnapshot.profile.secondClass) {

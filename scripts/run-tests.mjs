@@ -25,7 +25,9 @@ const SUITES = [
   'test-market-cache.mjs',
   'test-spec-planner.mjs',
   'test-skill-effects.mjs',
-  'test-skill-cycle.mjs'
+  'test-skill-cycle.mjs',
+  'test-card-effects.mjs',
+  'test-avatar-effects.mjs'
 ];
 
 const failed = [];
