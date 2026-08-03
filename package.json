@@ -1,6 +1,6 @@
 {
   "name": "lostark-node-recommend-calculator",
-  "version": "5.15.2",
+  "version": "5.15.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -24,6 +24,7 @@
     "test:spec-planner": "node scripts/test-spec-planner.mjs",
     "test:skill-effects": "node scripts/test-skill-effects.mjs",
     "test:passive-skill-effects": "node scripts/test-passive-skill-effects.mjs",
+    "test:arcana-cards": "node scripts/test-arcana-card-expectation.mjs",
     "test:card-effects": "node scripts/test-card-effects.mjs",
     "test:avatar-effects": "node scripts/test-avatar-effects.mjs",
     "test:skill-cycle": "node scripts/test-skill-cycle.mjs",

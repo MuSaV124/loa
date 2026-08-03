@@ -4046,6 +4046,40 @@ select {
   color: var(--muted);
 }
 
+.arcanaIdentityNote {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 12px;
+  margin: 10px 0 16px;
+  padding: 11px 12px;
+  border: 1px solid rgba(192, 132, 252, .32);
+  border-left: 3px solid #c084fc;
+  border-radius: 6px;
+  background: rgba(33, 18, 48, .54);
+  color: #e9d5ff;
+}
+.arcanaIdentityNote b {
+  color: #f5d0fe;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.arcanaIdentityNote span,
+.arcanaIdentityNote small {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.arcanaIdentityNote small {
+  grid-column: 2;
+  color: #b8a9c8;
+}
+@media (max-width: 720px) {
+  .arcanaIdentityNote { grid-template-columns: 1fr; }
+  .arcanaIdentityNote small { grid-column: 1; }
+}
+
 .skillCritScope {
   margin: 10px 0;
   border: 1px solid rgba(56, 189, 248, 0.28);

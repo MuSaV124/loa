@@ -26,6 +26,7 @@ const SUITES = [
   'test-spec-planner.mjs',
   'test-skill-effects.mjs',
   'test-passive-skill-effects.mjs',
+  'test-arcana-card-expectation.mjs',
   'test-skill-cycle.mjs',
   'test-card-effects.mjs',
   'test-avatar-effects.mjs'

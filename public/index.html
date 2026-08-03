@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LOSTARK 진화 노드 추천 계산기</title>
-  <link rel="stylesheet" href="/style.css?v=5.15.2" />
+  <link rel="stylesheet" href="/style.css?v=5.15.3" />
 </head>
 <body>
   <main class="wrap">
@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v5.15.2 · 도약 스킬별 치적 범위 보정</span>
+        <span class="badge">v5.15.3 · 아르카나 카드 평균 기대값</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -129,6 +129,7 @@
         </div>
       </div>
       <p id="skillCycleRecommendationHint" class="skillCycleRecommendationHint">캐릭터 검색 후 현재 스킬트리의 초단위 주기와 전투분석 딜 지분을 자동 반영합니다.</p>
+      <p id="arcanaIdentityNote" class="arcanaIdentityNote hidden"></p>
       <div class="resultLayout recommendLayout468">
         <div class="recommendMain468">
           <h3>추천 TOP5</h3>
@@ -263,7 +264,7 @@
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <div class="version">Version 5.15.2</div>
-  <script type="module" src="/app.js?v=5.15.2"></script>
+  <div class="version">Version 5.15.3</div>
+  <script type="module" src="/app.js?v=5.15.3"></script>
 </body>
 </html>

@@ -247,10 +247,42 @@ async function verifyScopedBreakerCrit() {
   await page.close();
 }
 
+async function verifyArcanaCardExpectation() {
+  const response = {
+    ...characterResponse,
+    profile: { ...characterResponse.profile, CharacterName: '아르카나표본', CharacterClassName: '아르카나' },
+    arkPassive: { ...characterResponse.arkPassive, Title: '황제의 칙령' },
+    powerSnapshot: {
+      ...characterResponse.powerSnapshot,
+      profile: { ...characterResponse.powerSnapshot.profile, className: '아르카나', secondClass: '황제의 칙령' }
+    }
+  };
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) }));
+  await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
+  await page.getByPlaceholder('캐릭터명 입력').fill('아르카나표본');
+  await page.getByRole('button', { name: '검색', exact: true }).click();
+  await page.getByRole('heading', { name: /아르카나표본/ }).waitFor();
+
+  const note = page.locator('#arcanaIdentityNote');
+  await note.getByText('아르카나 카드 평균 기대값 적용').waitFor();
+  const noteText = await note.innerText();
+  assert.match(noteText, /황제의 칙령 · 도태 6\.91% 확률 가중/);
+  assert.match(noteText, /급소 노출 자체 시너지는 제외/);
+  assert.match(noteText, /카드 1회 드로우 기준 추정치/);
+  const source = await page.locator('#sourceSummary').textContent();
+  assert.match(source, /아르카나 카드 기대값/);
+  assert.match(source, /황제 5,831회 실측/);
+  const dimensions = await note.evaluate(element => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }));
+  assert.ok(dimensions.scrollWidth <= dimensions.clientWidth, `아르카나 안내가 가로로 잘리면 안 됩니다: ${JSON.stringify(dimensions)}`);
+  await page.close();
+}
+
 try {
   await verifyViewport({ width: 1440, height: 1000 });
   await verifyViewport({ width: 390, height: 844 });
   await verifyScopedBreakerCrit();
+  await verifyArcanaCardExpectation();
   await verifySupportRecommendation();
   console.log('skill effect UI tests passed');
 } finally {

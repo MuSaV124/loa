@@ -1,18 +1,19 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.2';
-import { emptyCardEffects } from './card-effects.js?v=5.15.2';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.2';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.2';
-import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.2';
-import { emptyPassiveSkillEffectState, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.2';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.2';
-import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.2';
-import { buildSkillCycleModel, evaluateEvolutionCooldown } from './skill-cycle.js?v=5.15.2';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.2';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.2';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.2';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.2';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.2';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.2';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.3';
+import { emptyCardEffects } from './card-effects.js?v=5.15.3';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.3';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.3';
+import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.3';
+import { emptyPassiveSkillEffectState, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.3';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.3';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.3';
+import { buildSkillCycleModel, evaluateEvolutionCooldown } from './skill-cycle.js?v=5.15.3';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.3';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.3';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.3';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.3';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.3';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.3';
+import { ARCANA_CULL_EFFECT, findArcanaCardExpectation, formatArcanaCardExpectation, weightedArcanaCardValue } from './arcana-card-expectation.js?v=5.15.3';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -21,9 +22,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.15.2';
+} from './cache-policy.js?v=5.15.3';
 
-const VERSION = '5.15.2';
+const VERSION = '5.15.3';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -92,9 +93,26 @@ function isConditionalSkill(item) {
   return Boolean(item?.conditional) || (item?.selectedTripods || []).some(tripod => tripod?.conditional);
 }
 
+function currentArcanaCardExpectation() {
+  return findArcanaCardExpectation(state.powerSnapshot?.profile);
+}
+
+function renderArcanaIdentityNote() {
+  const note = $('arcanaIdentityNote');
+  if (!note) return;
+  const model = currentArcanaCardExpectation();
+  note.classList.toggle('hidden', !model);
+  if (!model) {
+    note.innerHTML = '';
+    return;
+  }
+  note.innerHTML = `<b>아르카나 카드 평균 기대값 적용</b><span>${escapeHtml(formatArcanaCardExpectation(model))}. 도태의 치적 +100%·치피 +50% 상태만 확률 가중합니다. 카드 직접 피해와 사이클 변화는 전투분석 딜 지분에 반영하며, 급소 노출 자체 시너지는 제외합니다.</span><small>카드 1회 드로우 기준 추정치이며 보유·사용 타이밍에 따라 실제 DPS는 달라질 수 있습니다.</small>`;
+}
+
 function renderSkillEffectControl() {
   const preview = $('skillEffectPreview');
   if (!preview) return;
+  renderArcanaIdentityNote();
   const items = skillExperimentItems(state.skillEffects);
   const passiveRules = state.passiveSkillEffects?.rules || [];
   const loadedCount = Number(state.skillEffects?.items?.length || 0);
@@ -3765,6 +3783,32 @@ function scoreCore(stats) {
   return { value, attributeDamage: stats.attributeDamage || 0, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, cooldownModeled: cooldownEvaluation.modeled, skillDamageMultiplier, engravingDamageMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, skillDamage: stats.skillDamage || 0, sonicBreakEvolutionDamage: stats.sonicBreakEvolutionDamage || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
 }
 
+function scoreCoreWithArcanaExpectation(stats) {
+  const normal = scoreCore(stats);
+  const model = currentArcanaCardExpectation();
+  if (!model || !normal.value) return normal;
+
+  const cullStats = cloneBaseStats(stats);
+  cullStats.skillCritBonus = num(cullStats.skillCritBonus) + ARCANA_CULL_EFFECT.critRate;
+  cullStats.critDamage = num(cullStats.critDamage) + ARCANA_CULL_EFFECT.critDamage;
+  const cull = scoreCore(cullStats);
+  const value = weightedArcanaCardValue(normal.value, cull.value, model);
+  return {
+    ...normal,
+    value,
+    arcanaCardExpectation: {
+      key: model.key,
+      engraving: model.engraving,
+      probability: model.cullProbability,
+      normalValue: normal.value,
+      cullValue: cull.value,
+      multiplier: normal.value ? value / normal.value : 1,
+      evidenceLabel: model.evidenceLabel,
+      sourceUrl: model.sourceUrl
+    }
+  };
+}
+
 function applyExperimentalSkillEffects(stats, item) {
   const out = cloneBaseStats(stats);
   const effects = item?.effects || {};
@@ -3856,7 +3900,7 @@ function weightedSkillUnits() {
 }
 
 function score(stats) {
-  const baseResult = scoreCore(stats);
+  const baseResult = scoreCoreWithArcanaExpectation(stats);
   const units = weightedSkillUnits();
   if (!units.length || !baseResult.value) {
     return {
@@ -3870,7 +3914,7 @@ function score(stats) {
   const rows = units.map(unit => {
     const passive = passiveEffectsForSkill(state.passiveSkillEffects, unit, { identitySkills });
     const effects = mergeSkillEffects(unit.item?.effects || {}, passive.effects);
-    const result = scoreCore(applyExperimentalSkillEffects(stats, { name: unit.name, effects }));
+    const result = scoreCoreWithArcanaExpectation(applyExperimentalSkillEffects(stats, { name: unit.name, effects }));
     return {
       name: unit.name,
       shareName: unit.shareName,
@@ -4203,6 +4247,14 @@ function buildSourceSummary(current) {
   if (base.engravingDamageMultiplier !== 1) {
     engravingExpectedLines.push(sourceLine('예리한 둔기 평균 페널티', (base.engravingDamageMultiplier - 1) * 100, `피해 배율 ×${fmt(base.engravingDamageMultiplier)}`));
   }
+  const arcanaExpectation = current.result.arcanaCardExpectation;
+  const arcanaExpectationLines = arcanaExpectation ? [
+    sourceLine(
+      `${arcanaExpectation.engraving} · 도태 확률 가중`,
+      (Number(arcanaExpectation.multiplier || 1) - 1) * 100,
+      `${(Number(arcanaExpectation.probability || 0) * 100).toFixed(2)}% · ${arcanaExpectation.evidenceLabel} · 급소 노출 제외`
+    )
+  ] : [];
 
   $('sourceSummary').innerHTML = `
     <div class="sourceTitle"><div><h3>계산 요약</h3><p>표시는 출처별 합산값, 기대값은 로아식 합연산/곱연산으로 계산합니다.</p></div><button id="resetViewButton" type="button">초기화</button></div>
@@ -4214,6 +4266,7 @@ function buildSourceSummary(current) {
     ${sourceGroup('추피', 'green', addLines, current.result.additionalDamage)}
     ${sourceGroup('적주피', 'pink', enemyLines, current.result.enemyDamage)}
     ${skillExperimentLines.length ? sourceGroup('스킬 효과 실험값', 'orange', skillExperimentLines, skillExperiment.averageGain) : ''}
+    ${arcanaExpectationLines.length ? sourceGroup('아르카나 카드 기대값', 'purple', arcanaExpectationLines, (Number(arcanaExpectation.multiplier || 1) - 1) * 100) : ''}
     ${sourceGroup('공격력 증가', 'green', attackPowerLines, current.result.attackPower)}
     ${engravingExpectedLines.length ? sourceGroup('각인 기대값 보정', 'orange', engravingExpectedLines, (current.result.engravingDamageMultiplier - 1) * 100) : ''}
     ${sourceGroup('공격 속도', 'cyan', attackSpeedLines, current.result.attackSpeed)}

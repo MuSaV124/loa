@@ -1,4 +1,4 @@
-import { SKILL_EFFECT_KEYS, hasSkillEffects, parseSkillEffectText } from './skill-effects.js?v=5.15.2';
+import { SKILL_EFFECT_KEYS, hasSkillEffects, parseSkillEffectText } from './skill-effects.js?v=5.15.3';
 
 const EFFECT_KEYS = [...SKILL_EFFECT_KEYS];
 
