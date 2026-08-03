@@ -662,11 +662,11 @@
       "icon": "💠",
       "levels": {
         "1": {
-          "cooldownReduction": 7,
+          "manaSkillCooldownReduction": 7,
           "manaReduction": 10
         },
         "2": {
-          "cooldownReduction": 14,
+          "manaSkillCooldownReduction": 14,
           "manaReduction": 20
         }
       },
@@ -685,11 +685,13 @@
       "icon": "🟣",
       "levels": {
         "1": {
-          "evolutionDamage": 10,
+          "evolutionDamage": 5,
+          "manaSkillEvolutionDamage": 5,
           "manaReduction": 6
         },
         "2": {
-          "evolutionDamage": 20,
+          "evolutionDamage": 10,
+          "manaSkillEvolutionDamage": 10,
           "manaReduction": 12
         }
       },
@@ -805,12 +807,12 @@
       "levels": {
         "1": {
           "evolutionDamage": 8,
-          "cooldownReduction": 7,
+          "manaSkillCooldownReduction": 7,
           "manaReduction": 8
         },
         "2": {
           "evolutionDamage": 16,
-          "cooldownReduction": 14,
+          "manaSkillCooldownReduction": 14,
           "manaReduction": 16
         }
       },

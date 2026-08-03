@@ -32,10 +32,12 @@ export const ARCANA_CARD_EXPECTATION_MODELS = Object.freeze({
     sovereignProbability: 0.064,
     cardsPerMinute: 41.6,
     cardsPerMinuteRange: Object.freeze([35, 64]),
+    referenceCooldownReduction: 32,
     defaultCombatSeconds: 180,
-    evidenceLabel: '황제 실전 41.6장/분 · 현행 카드 확률 보정',
+    evidenceLabel: '황제 실전 41.6장/분 · 끝마2·최훈1·무마 기준 쿨감 보정',
     sourceUrl: 'https://www.inven.co.kr/board/lostark/5346/168434',
-    drawRateSourceUrl: 'https://www.inven.co.kr/board/lostark/5346/167701?vtype=pc'
+    drawRateSourceUrl: 'https://www.inven.co.kr/board/lostark/5346/167701?vtype=pc',
+    evolutionReferenceUrl: 'https://www.inven.co.kr/board/lostark/5346/166897?category=%EC%A0%95%EB%B3%B4'
   }),
   empress: Object.freeze({
     key: 'empress',
@@ -62,6 +64,17 @@ export function findArcanaCardExpectation(profile) {
   if (secondClass.includes('황후')) return ARCANA_CARD_EXPECTATION_MODELS.empress;
   if (secondClass.includes('황제')) return ARCANA_CARD_EXPECTATION_MODELS.emperor;
   return null;
+}
+
+export function scaleArcanaCardDraw(model, multiplier = 1) {
+  if (!model || !(Number(model.cardsPerMinute) > 0)) return model;
+  const safeMultiplier = Math.max(0, Number(multiplier) || 0);
+  return {
+    ...model,
+    baseCardsPerMinute: Number(model.baseCardsPerMinute || model.cardsPerMinute),
+    cardsPerMinute: Number(model.cardsPerMinute) * safeMultiplier,
+    cardDrawMultiplier: safeMultiplier
+  };
 }
 
 export function weightedArcanaCardValue(normalValue, cullValue, model) {

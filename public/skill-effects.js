@@ -123,6 +123,30 @@ export function collectSkillTooltipTexts(tooltip) {
   return [...new Set(texts)];
 }
 
+export function parseSkillManaUsage(tooltip) {
+  const texts = collectSkillTooltipTexts(tooltip);
+  const costs = [];
+  const patterns = [
+    /마나\s*([\d,]+(?:\.\d+)?)\s*(?:을|를)?\s*소모/gi,
+    /([\d,]+(?:\.\d+)?)\s*(?:의\s*)?마나(?:를|을)?\s*소모/gi
+  ];
+  for (const text of texts) {
+    for (const pattern of patterns) {
+      pattern.lastIndex = 0;
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        const cost = Number(String(match[1] || '').replace(/,/g, ''));
+        if (Number.isFinite(cost) && cost > 0) costs.push(cost);
+      }
+    }
+  }
+  return {
+    usesMana: costs.length > 0,
+    manaCost: costs.length ? Math.max(...costs) : 0,
+    manaUsageKnown: texts.length > 0
+  };
+}
+
 function signedValue(rawValue, direction) {
   const value = Number(rawValue);
   if (!Number.isFinite(value)) return 0;
@@ -342,6 +366,7 @@ export function extractCombatSkillEffects(skills) {
     const rune = runeSummary(skill?.Rune);
     const cooldown = mergeCooldownRules(selectedTripods.flatMap(tripod => tripod.cooldown?.rules || []));
     const currentTree = Number(skill?.Level || 0) > 1 || selectedTripods.length > 0 || Boolean(rune?.name);
+    const manaUsage = parseSkillManaUsage(skill?.Tooltip);
     const item = {
       name: String(skill?.Name || '').trim(),
       icon: String(skill?.Icon || '').trim(),
@@ -349,6 +374,7 @@ export function extractCombatSkillEffects(skills) {
       type: String(skill?.Type || '').trim(),
       skillType: Number(skill?.SkillType || 0),
       cooldownEligible: Number(skill?.SkillType || 0) === 0,
+      ...manaUsage,
       category: skillCategory(skill),
       baseCooldownSeconds: baseCooldownSeconds(skill),
       cooldown,

@@ -1,19 +1,19 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.5';
-import { emptyCardEffects } from './card-effects.js?v=5.15.5';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.5';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.5';
-import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.5';
-import { emptyPassiveSkillEffectState, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.5';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.5';
-import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.5';
-import { buildSkillCycleModel, evaluateEvolutionCooldown } from './skill-cycle.js?v=5.15.5';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.5';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.5';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.5';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.5';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.5';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.5';
-import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.5';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.6';
+import { emptyCardEffects } from './card-effects.js?v=5.15.6';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.6';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.6';
+import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.6';
+import { emptyPassiveSkillEffectState, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.6';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.6';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.6';
+import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.6';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.6';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.6';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.6';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.6';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.6';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.6';
+import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.6';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -22,9 +22,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.15.5';
+} from './cache-policy.js?v=5.15.6';
 
-const VERSION = '5.15.5';
+const VERSION = '5.15.6';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -93,8 +93,13 @@ function isConditionalSkill(item) {
   return Boolean(item?.conditional) || (item?.selectedTripods || []).some(tripod => tripod?.conditional);
 }
 
-function currentArcanaCardExpectation() {
-  return findArcanaCardExpectation(state.powerSnapshot?.profile);
+function currentArcanaCardExpectation(cooldownReduction = null) {
+  const model = findArcanaCardExpectation(state.powerSnapshot?.profile);
+  if (!model || model.key !== 'emperor' || cooldownReduction == null || !Number.isFinite(Number(cooldownReduction))) return model;
+  const castFrequency = evaluateSkillCastFrequency(state.skillCycle, Number(cooldownReduction), {
+    referenceReduction: Number(model.referenceCooldownReduction || 0)
+  });
+  return scaleArcanaCardDraw(model, castFrequency.multiplier);
 }
 
 function currentArcanaStreamEffect() {
@@ -561,11 +566,11 @@ function getContextualLevelEffect(name, level) {
   const effect = { ...getLevelEffect(name, level) };
   if (!isNoManaMainSkillEnabled()) return effect;
   if (name === '끝없는 마나' || name === '무한한 마력') {
-    delete effect.cooldownReduction;
+    delete effect.manaSkillCooldownReduction;
     effect.manaConditionNote = '주력기 마나 사용 안함: 마나 스킬 쿨감 제외';
   }
   if (name === '금단의 주문') {
-    effect.evolutionDamage = Number(level || 0) * 5;
+    delete effect.manaSkillEvolutionDamage;
     effect.manaConditionNote = '주력기 마나 사용 안함: 마나 스킬 추가 진피 제외';
   }
   if (name === '마나 용광로') {
@@ -3667,6 +3672,8 @@ function getBaseStats(selection = state.selected) {
     critHitDamage: num(state.accessory.critHitDamage) + num(state.bracelet.critHitDamage) + num(state.enlightenment.critHitDamage) + num(engravingEffects.critHitDamage) + num(state.abilityStone?.effects?.critHitDamage),
     critHitDamageSources,
     evolutionDamage: num(state.enlightenment.evolutionDamage) + extraEvolutionDamage,
+    manaSkillEvolutionDamage: 0,
+    manaSkillCooldownReduction: 0,
     additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + num(state.arkGrid.additionalDamage) + num(engravingEffects.additionalDamage) + num(state.abilityStone?.effects?.additionalDamage) + extraAdditionalDamage + num(state.card?.buckets?.additionalDamage),
     enemyDamage: effectivePercentFromSources(enemyDamageSources),
     enemyDamageSources,
@@ -3717,6 +3724,8 @@ function applyEffect(stats, effect, sourceLabel = '진화') {
     out.critHitDamageSources = [...(out.critHitDamageSources || []), { label: sourceLabel, value: effect.critHitDamage }];
   }
   if (effect.evolutionDamage) out.evolutionDamage += effect.evolutionDamage;
+  if (effect.manaSkillEvolutionDamage) out.manaSkillEvolutionDamage = num(out.manaSkillEvolutionDamage) + effect.manaSkillEvolutionDamage;
+  if (effect.manaSkillCooldownReduction && !isCooldownExcluded()) out.manaSkillCooldownReduction = num(out.manaSkillCooldownReduction) + effect.manaSkillCooldownReduction;
   if (effect.cooldownReduction && !isCooldownExcluded()) out.cooldownReduction = (out.cooldownReduction || 0) + effect.cooldownReduction;
   if (effect.sonicBreak) {
     const sonicDamage = calculateSonicBreakEvolutionDamage(
@@ -3789,11 +3798,16 @@ function scoreCore(stats) {
   // v4.8.8: 쿨감의 이론 DPS 증가분을 사용자가 입력한 '주력기 딜 지분'만큼 반영.
   // 쿨감 효과 제외 체크 시 끝마/무마/최적화 훈련 등 모든 cooldownReduction은 점수에서 0으로 처리.
   const cooldownExcluded = isCooldownExcluded();
-  const cooldownReduction = cooldownExcluded ? 0 : Math.max(0, Math.min(Number(stats.cooldownReduction || 0), 95));
+  const generalCooldownReduction = cooldownExcluded ? 0 : Math.max(0, Math.min(Number(stats.cooldownReduction || 0), 95));
+  const manaSkillCooldownReduction = cooldownExcluded ? 0 : Math.max(0, Math.min(Number(stats.manaSkillCooldownReduction || 0), 95));
+  const cooldownReduction = Math.max(0, Math.min(generalCooldownReduction + manaSkillCooldownReduction, 95));
   const mainSkillDamageSharePct = cooldownExcluded ? 0 : Math.max(0, Math.min(Number($('mainSkillDamageShare')?.value ?? 60), 100));
   const cooldownEvaluation = cooldownExcluded
     ? { multiplier: 1, affectedSharePercent: 0, modeled: Boolean(state.skillCycle?.items?.length) }
-    : evaluateEvolutionCooldown(state.skillCycle, cooldownReduction, { fallbackSharePercent: mainSkillDamageSharePct });
+    : evaluateEvolutionCooldown(state.skillCycle, generalCooldownReduction, {
+      fallbackSharePercent: mainSkillDamageSharePct,
+      manaSkillReduction: manaSkillCooldownReduction
+    });
   const cooldownRatio = cooldownEvaluation.affectedSharePercent / 100;
   const cooldownMultiplier = cooldownEvaluation.multiplier;
   const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attributeMultiplier * attackMultiplier * skillDamageMultiplier * engravingDamageMultiplier * cooldownMultiplier;
@@ -3802,7 +3816,7 @@ function scoreCore(stats) {
 
 function scoreCoreWithArcanaExpectation(stats, { emperorNormalSkill = false } = {}) {
   const normal = scoreCore(stats);
-  const model = currentArcanaCardExpectation();
+  const model = currentArcanaCardExpectation(normal.cooldownReduction);
   if (!model || !normal.value) return normal;
 
   const cullStats = cloneBaseStats(stats);
@@ -3838,6 +3852,9 @@ function scoreCoreWithArcanaExpectation(stats, { emperorNormalSkill = false } = 
       emperorCombinedTriggerProbability: Number(model.emperorCombinedTriggerProbability || 0),
       emperorNormalSkill,
       cardsPerMinute: Number(model.cardsPerMinute || 0),
+      baseCardsPerMinute: Number(model.baseCardsPerMinute || model.cardsPerMinute || 0),
+      cardDrawMultiplier: Number(model.cardDrawMultiplier || 1),
+      referenceCooldownReduction: Number(model.referenceCooldownReduction || 0),
       combatSeconds: Number(combat?.combatSeconds || 0),
       expectedCards: Number(combat?.cards || 0),
       expectedCullCards: Number(combat?.cullCards || 0),
@@ -3857,6 +3874,9 @@ function scoreCoreWithArcanaExpectation(stats, { emperorNormalSkill = false } = 
 function applyExperimentalSkillEffects(stats, item) {
   const out = cloneBaseStats(stats);
   const effects = item?.effects || {};
+  if (item?.usesMana && num(out.manaSkillEvolutionDamage) > 0) {
+    out.evolutionDamage += num(out.manaSkillEvolutionDamage);
+  }
   // 확정 치명 트라이포드의 +100%도 원시 치적에 포함해 뭉툭한 가시 초과 치적 전환에 사용한다.
   out.skillCritBonus = num(out.skillCritBonus) + num(effects.critRate);
   out.critDamage += num(effects.critDamage);
@@ -3945,8 +3965,11 @@ function weightedSkillUnits() {
 }
 
 function score(stats) {
-  const baseResult = scoreCoreWithArcanaExpectation(stats);
   const units = weightedSkillUnits();
+  const fallbackStats = !units.length && !isNoManaMainSkillEnabled() && num(stats.manaSkillEvolutionDamage) > 0
+    ? applyExperimentalSkillEffects(stats, { usesMana: true, effects: {} })
+    : stats;
+  const baseResult = scoreCoreWithArcanaExpectation(fallbackStats);
   if (!units.length || !baseResult.value) {
     return {
       ...baseResult,
@@ -3964,7 +3987,8 @@ function score(stats) {
     const arcanaEffects = streamApplies ? { critRate: arcanaStream.critRate } : {};
     const effects = mergeSkillEffects(unit.item?.effects || {}, passive.effects, arcanaEffects);
     const emperorNormalSkill = arcanaModel?.key === 'emperor' && normalizedSkillName(unit.category) === normalizedSkillName('일반 스킬');
-    const skillStats = applyExperimentalSkillEffects(stats, { name: unit.name, effects });
+    const usesMana = !isNoManaMainSkillEnabled() && unit.item?.usesMana === true;
+    const skillStats = applyExperimentalSkillEffects(stats, { name: unit.name, effects, usesMana });
     const resultWithoutArcana = scoreCore(skillStats);
     const result = scoreCoreWithArcanaExpectation(skillStats, { emperorNormalSkill });
     return {
@@ -4315,7 +4339,7 @@ function buildSourceSummary(current) {
     sourceLine(
       `${arcanaExpectation.engraving} · 카드 기대값`,
       (Number(arcanaExpectation.multiplier || 1) - 1) * 100,
-      `${arcanaExpectation.emperorCombinedTriggerProbability > 0 ? `황제+또황 ${(Number(arcanaExpectation.emperorCombinedTriggerProbability) * 100).toFixed(1)}% · ` : ''}도태 ${(Number(arcanaExpectation.probability || 0) * 100).toFixed(2)}%/${(Number(arcanaExpectation.expectationWeight || 0) * 100).toFixed(2)}%${arcanaExpectation.chancellorProbability > 0 ? ` · 재상 ${(Number(arcanaExpectation.chancellorProbability) * 100).toFixed(2)}%/${(Number(arcanaExpectation.chancellorExpectationWeight) * 100).toFixed(2)}%` : ''}${arcanaExpectation.sovereignProbability > 0 ? ` · 제후 ${(Number(arcanaExpectation.sovereignProbability) * 100).toFixed(2)}%/${(Number(arcanaExpectation.sovereignExpectationWeight) * 100).toFixed(2)}%` : ''}${arcanaExpectation.expectedCards > 0 ? ` · ${Math.round(Number(arcanaExpectation.combatSeconds || 0) / 60)}분 약 ${Number(arcanaExpectation.expectedCards).toFixed(1)}장/도태 ${Number(arcanaExpectation.expectedCullCards).toFixed(1)}장${arcanaExpectation.expectedChancellorCards > 0 ? `/재상 ${Number(arcanaExpectation.expectedChancellorCards).toFixed(1)}장` : ''}${arcanaExpectation.expectedSovereignCards > 0 ? `/제후 ${Number(arcanaExpectation.expectedSovereignCards).toFixed(1)}장` : ''}` : ''} · ${arcanaExpectation.evidenceLabel}`
+      `${arcanaExpectation.emperorCombinedTriggerProbability > 0 ? `황제+또황 ${(Number(arcanaExpectation.emperorCombinedTriggerProbability) * 100).toFixed(1)}% · ` : ''}도태 ${(Number(arcanaExpectation.probability || 0) * 100).toFixed(2)}%/${(Number(arcanaExpectation.expectationWeight || 0) * 100).toFixed(2)}%${arcanaExpectation.chancellorProbability > 0 ? ` · 재상 ${(Number(arcanaExpectation.chancellorProbability) * 100).toFixed(2)}%/${(Number(arcanaExpectation.chancellorExpectationWeight) * 100).toFixed(2)}%` : ''}${arcanaExpectation.sovereignProbability > 0 ? ` · 제후 ${(Number(arcanaExpectation.sovereignProbability) * 100).toFixed(2)}%/${(Number(arcanaExpectation.sovereignExpectationWeight) * 100).toFixed(2)}%` : ''}${arcanaExpectation.cardsPerMinute > 0 ? ` · 드로우 ${Number(arcanaExpectation.cardsPerMinute).toFixed(1)}장/분${Math.abs(Number(arcanaExpectation.cardDrawMultiplier || 1) - 1) > 0.001 ? ` (기준 ×${Number(arcanaExpectation.cardDrawMultiplier).toFixed(3)})` : ''}` : ''}${arcanaExpectation.expectedCards > 0 ? ` · ${Math.round(Number(arcanaExpectation.combatSeconds || 0) / 60)}분 약 ${Number(arcanaExpectation.expectedCards).toFixed(1)}장/도태 ${Number(arcanaExpectation.expectedCullCards).toFixed(1)}장${arcanaExpectation.expectedChancellorCards > 0 ? `/재상 ${Number(arcanaExpectation.expectedChancellorCards).toFixed(1)}장` : ''}${arcanaExpectation.expectedSovereignCards > 0 ? `/제후 ${Number(arcanaExpectation.expectedSovereignCards).toFixed(1)}장` : ''}` : ''} · ${arcanaExpectation.evidenceLabel}`
     )
   ] : [];
 

@@ -250,13 +250,13 @@ async function verifyScopedBreakerCrit() {
 async function verifyArcanaCardExpectation() {
   const arcanaSkills = [
     {
-      name: '스트림 오브 엣지', level: 14, type: '스택트', skillType: 0, currentTree: true, baseCooldownSeconds: 24,
+      name: '스트림 오브 엣지', level: 14, type: '스택트', skillType: 0, currentTree: true, usesMana: true, manaCost: 569, manaUsageKnown: true, baseCooldownSeconds: 24,
       cooldown: { flatSeconds: 0, percentReduction: 0 },
       effects: { critRate: 27.6, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, attackSpeed: 0, moveSpeed: 0, skillDamage: 0 },
       selectedTripods: [{ name: '다크니스 엣지', conditional: true, effects: { critRate: 27.6 } }]
     },
     {
-      name: '다크 리저렉션', level: 14, type: '일반', skillType: 0, currentTree: true, baseCooldownSeconds: 24,
+      name: '다크 리저렉션', level: 14, type: '일반', skillType: 0, currentTree: true, usesMana: true, manaCost: 603, manaUsageKnown: true, baseCooldownSeconds: 24,
       cooldown: { flatSeconds: 0, percentReduction: 0 },
       effects: { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, attackSpeed: 0, moveSpeed: 0, skillDamage: 0 },
       selectedTripods: [{ name: '분노의 일격', conditional: false, effects: {} }]
@@ -265,7 +265,12 @@ async function verifyArcanaCardExpectation() {
   const response = {
     ...characterResponse,
     profile: { ...characterResponse.profile, CharacterName: '아르카나표본', CharacterClassName: '아르카나' },
-    arkPassive: { ...characterResponse.arkPassive, Title: '황제의 칙령' },
+    arkPassive: { ...characterResponse.arkPassive, Title: '황제의 칙령', Effects: [
+      ...characterResponse.arkPassive.Effects,
+      { Name: '끝없는 마나', Level: 2 },
+      { Name: '최적화 훈련', Level: 1 },
+      { Name: '무한한 마력', Level: 2 }
+    ] },
     skillEffects: { items: arcanaSkills, cycleItems: arcanaSkills, calculableItems: arcanaSkills.slice(0, 1), selectedTripodCount: 2, conditionalTripodCount: 1, cooldownTripodCount: 0, stochasticCooldownCount: 0, usedSkillCount: 2 },
     powerSnapshot: {
       ...characterResponse.powerSnapshot,
@@ -296,8 +301,11 @@ async function verifyArcanaCardExpectation() {
   assert.match(source, /도태 7\.00%\/17\.65%/);
   assert.match(source, /재상 5\.65%\/32\.41%/);
   assert.match(source, /제후 6\.40%\/16\.26%/);
+  assert.match(source, /드로우 41\.6장\/분/);
   assert.match(source, /3분 약 124\.8장\/도태 8\.7장\/재상 7\.1장\/제후 8\.0장/);
   assert.doesNotMatch(source, /급소 노출/);
+  const bestRecommendation = await page.locator('#recommendList .comboRow.best').innerText();
+  assert.match(bestRecommendation, /끝마/, `황제 카드 수급을 반영한 1순위에 끝마가 포함되어야 합니다: ${bestRecommendation}`);
   const skillScope = await page.locator('.skillCritScope').innerText();
   assert.match(skillScope, /다크 리저렉션/);
   assert.match(skillScope, /스트림 오브 엣지 · 다크니스 엣지/);

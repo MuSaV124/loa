@@ -4,9 +4,20 @@ import {
   formatSkillEffectSummary,
   hasSkillEffects,
   minimumSkillEffectProfile,
+  parseSkillManaUsage,
   parseSkillEffectText,
   skillExperimentItems
 } from '../public/skill-effects.js';
+
+assert.deepEqual(parseSkillManaUsage(JSON.stringify({
+  Element_004: { value: '마나 349 소모|' },
+  Element_005: { value: '마나 412 소모' },
+  tripod: { value: '마나 소모량이 50% 감소한다.' }
+})), { usesMana: true, manaCost: 412, manaUsageKnown: true });
+assert.deepEqual(parseSkillManaUsage(JSON.stringify({
+  Element_004: { value: '충격 에너지 20 생성' }
+})), { usesMana: false, manaCost: 0, manaUsageKnown: true });
+assert.deepEqual(parseSkillManaUsage(null), { usesMana: false, manaCost: 0, manaUsageKnown: false });
 
 const direct = parseSkillEffectText(`
   치명타 적중률이 24.5% 증가하고 치명타 피해가 80% 증가한다.
@@ -84,7 +95,7 @@ assert.equal(parsed.items[2].cooldown.flatSeconds, 8);
 const minuteCooldowns = extractCombatSkillEffects([
   {
     Name: '공간 절단', Level: 14, Type: '일반', SkillType: 0,
-    Tooltip: JSON.stringify({ title: { leftText: '재사용 대기시간 1분', level: '[분침 스킬]' } }),
+    Tooltip: JSON.stringify({ title: { leftText: '재사용 대기시간 1분 | 마나 450 소모', level: '[분침 스킬]' } }),
     Tripods: [{ Tier: 2, Slot: 0, Name: '공간의 틈', IsSelected: true, Tooltip: '재사용 대기시간이 15.0초 감소하고 적에게 주는 피해가 90.0% 증가한다.' }]
   },
   {
@@ -105,6 +116,9 @@ assert.equal(minuteCooldowns.items[0].cooldown.flatSeconds, 15);
 assert.equal(minuteCooldowns.items[0].cooldown.percentReduction, 0, '같은 문장의 피해량 90%를 쿨타임 증가로 오인하면 안 된다.');
 assert.equal(minuteCooldowns.items[0].cooldownEligible, true);
 assert.equal(minuteCooldowns.items[1].cooldownEligible, false);
+assert.equal(minuteCooldowns.items[0].usesMana, true, '툴팁에 명시된 마나 소모 스킬을 식별해야 한다.');
+assert.equal(minuteCooldowns.items[0].manaCost, 450);
+assert.equal(minuteCooldowns.items[1].usesMana, false, '마나 소모 문구가 없는 스킬은 금단의 주문 추가 효과를 받지 않아야 한다.');
 assert.deepEqual(parsed.calculableItems[0].effects, {
   critRate: 33.2,
   critDamage: 0,

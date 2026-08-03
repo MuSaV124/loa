@@ -37,8 +37,8 @@ assert.equal(shiftClickTargetLevel(0, node('입식 타격가')), 2);
 assert.equal(shiftClickTargetLevel(2, node('입식 타격가'), -1), 0);
 
 for (const name of evolution.tiers['2']) assert.equal(node(name).costPerLevel, 10);
-assert.deepEqual(level('끝없는 마나', 2), { cooldownReduction: 14, manaReduction: 20 });
-assert.deepEqual(level('금단의 주문', 2), { evolutionDamage: 20, manaReduction: 12 });
+assert.deepEqual(level('끝없는 마나', 2), { manaSkillCooldownReduction: 14, manaReduction: 20 });
+assert.deepEqual(level('금단의 주문', 2), { evolutionDamage: 10, manaSkillEvolutionDamage: 10, manaReduction: 12 });
 assert.deepEqual(level('예리한 감각', 2), { critRate: 8, evolutionDamage: 10 });
 assert.deepEqual(level('한계 돌파', 3), { evolutionDamage: 30 });
 assert.deepEqual(level('최적화 훈련', 2), { evolutionDamage: 10, cooldownReduction: 8 });

@@ -12,6 +12,7 @@ import {
   findArcanaCardExpectation,
   findArcanaStreamEffect,
   formatArcanaCardExpectation,
+  scaleArcanaCardDraw,
   weightedArcanaCardValue,
   weightedEmperorNormalSkillCardValue
 } from '../public/arcana-card-expectation.js';
@@ -33,6 +34,7 @@ assert.equal(emperor.emperorCombinedTriggerProbability, 0.33);
 assert.equal(emperor.cullProbability, 0.07);
 assert.equal(emperor.chancellorProbability, 0.0565);
 assert.equal(emperor.sovereignProbability, 0.064);
+assert.equal(emperor.referenceCooldownReduction, 32);
 const emperorCullWeight = 1 - Math.exp(-(41.6 / 60) * 0.07 * 4);
 const emperorChancellorWeight = 1 - Math.exp(-(41.6 / 60) * 0.0565 * 10);
 const emperorSovereignWeight = 1 - Math.exp(-(41.6 / 60) * 0.064 * 4);
@@ -58,6 +60,14 @@ assert.ok(Math.abs(emperorCombat.cullUptime - emperorCullWeight) < 1e-12);
 assert.ok(Math.abs(emperorCombat.chancellorUptime - emperorChancellorWeight) < 1e-12);
 assert.ok(Math.abs(emperorCombat.sovereignUptime - emperorSovereignWeight) < 1e-12);
 assert.equal(formatArcanaCardExpectation(emperor), `황제의 칙령 · 황제+또황 33.0% · 실전 41.6장/분 · 도태 7.00%/${(emperorCullWeight * 100).toFixed(2)}% · 재상 5.65%/${(emperorChancellorWeight * 100).toFixed(2)}% · 제후 6.40%/${(emperorSovereignWeight * 100).toFixed(2)}%`);
+
+const slowerEmperor = scaleArcanaCardDraw(emperor, 0.8);
+assert.equal(slowerEmperor.baseCardsPerMinute, 41.6);
+assert.equal(slowerEmperor.cardsPerMinute, 33.28);
+assert.equal(slowerEmperor.cardDrawMultiplier, 0.8);
+assert.ok(arcanaCullExpectationWeight(slowerEmperor) < emperorCullWeight);
+assert.ok(arcanaChancellorExpectationWeight(slowerEmperor) < emperorChancellorWeight);
+assert.ok(arcanaSovereignExpectationWeight(slowerEmperor) < emperorSovereignWeight);
 
 const streamSkillEffects = {
   items: [{

@@ -4,6 +4,7 @@ import { extractProfileCooldownReduction } from '../api/character.js';
 import {
   buildSkillCycleModel,
   evaluateEvolutionCooldown,
+  evaluateSkillCastFrequency,
   parseArkGridCycleLinks,
   parseArkGridCooldownRules,
   skillCooldownSeconds
@@ -86,6 +87,13 @@ assert.ok(Math.abs(node.multiplier - expectedMultiplier) < 1e-12);
 assert.equal(node.affectedSharePercent, 60);
 assert.equal(node.modeled, true);
 assert.equal(skillCooldownSeconds(model.items[0], 10), 9.331);
+const fasterCardDraw = evaluateSkillCastFrequency(model, 20, { referenceReduction: 10 });
+const slowerCardDraw = evaluateSkillCastFrequency(model, 0, { referenceReduction: 10 });
+assert.ok(fasterCardDraw.multiplier > 1, '기준보다 높은 쿨감은 카드 드로우 횟수를 늘려야 한다.');
+assert.ok(slowerCardDraw.multiplier < 1, '기준보다 낮은 쿨감은 카드 드로우 횟수를 줄여야 한다.');
+assert.equal(fasterCardDraw.modeled, true);
+const fallbackCardDraw = evaluateSkillCastFrequency(null, 14, { referenceReduction: 32 });
+assert.ok(Math.abs(fallbackCardDraw.multiplier - 0.68 / 0.86) < 1e-12);
 
 const specificEffects = extractCombatSkillEffects([
   { Name: '일반 공격', Level: 10, Type: '일반', SkillType: 0, Tooltip: tooltip('일반 공격', 20), Tripods: [] },
@@ -210,6 +218,28 @@ assert.ok(evaluateEvolutionCooldown(skillBModel, 10).multiplier < evaluateEvolut
 const fallback = evaluateEvolutionCooldown(null, 10, { fallbackSharePercent: 55 });
 assert.equal(fallback.modeled, false);
 assert.ok(Math.abs(fallback.multiplier - (1 + (1 / 0.9 - 1) * 0.55)) < 1e-12);
+
+const mixedManaEffects = extractCombatSkillEffects([
+  {
+    Name: '마나 스킬', Level: 10, Type: '일반', SkillType: 0,
+    Tooltip: JSON.stringify({ title: { leftText: '재사용 대기시간 20초 | 마나 300 소모', level: '[마법 스킬]' } }),
+    Tripods: []
+  },
+  {
+    Name: '비마나 스킬', Level: 10, Type: '일반', SkillType: 0,
+    Tooltip: JSON.stringify({ title: { leftText: '재사용 대기시간 20초', level: '[마법 스킬]' } }),
+    Tripods: []
+  }
+]);
+const mixedManaModel = buildSkillCycleModel({
+  skillEffects: mixedManaEffects,
+  snapshot: { profile: { swiftCooldownReduction: 0 }, gems: { items: [] } },
+  shares: { '마나 스킬': 0.5, '비마나 스킬': 0.5 }
+});
+const manaOnlyCooldown = evaluateEvolutionCooldown(mixedManaModel, 0, { manaSkillReduction: 10 });
+const allSkillCooldown = evaluateEvolutionCooldown(mixedManaModel, 10);
+assert.equal(manaOnlyCooldown.affectedSharePercent, 50, '끝없는 마나와 무한한 마력 쿨감은 마나 사용 스킬에만 적용해야 한다.');
+assert.ok(manaOnlyCooldown.multiplier > 1 && manaOnlyCooldown.multiplier < allSkillCooldown.multiplier, '비마나 스킬은 마나 전용 쿨감 기대값에서 제외해야 한다.');
 
 const allClasses = [
   '디스트로이어', '발키리', '버서커', '슬레이어', '워로드', '홀리나이트', '기공사', '배틀마스터', '브레이커', '스트라이커',

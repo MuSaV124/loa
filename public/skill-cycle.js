@@ -311,7 +311,8 @@ function opportunityCount(seconds, windowSeconds = DEFAULT_WINDOW_SECONDS, reali
 }
 
 function secondsWith(item, { gemReduction, passiveReduction = 0 } = {}) {
-  const passive = item?.cooldownEligible === false ? 0 : clamp(passiveReduction, 0, 95);
+  const resolvedPassive = typeof passiveReduction === 'function' ? passiveReduction(item) : passiveReduction;
+  const passive = item?.cooldownEligible === false ? 0 : clamp(resolvedPassive, 0, 95);
   const afterMultipliers = tripodBaseSeconds(item)
     * (1 - clamp(item.swiftCooldownReduction, 0, 80) / 100)
     * (1 - clamp(gemReduction, 0, 95) / 100)
@@ -636,8 +637,10 @@ function evaluateGemCooldown(model) {
   );
 }
 
-export function evaluateEvolutionCooldown(model, passiveReduction, { fallbackSharePercent = 60 } = {}) {
-  const reduction = clamp(passiveReduction, 0, 95);
+export function evaluateEvolutionCooldown(model, passiveReduction, { fallbackSharePercent = 60, manaSkillReduction = 0 } = {}) {
+  const generalReduction = clamp(passiveReduction, 0, 95);
+  const manaReduction = clamp(manaSkillReduction, 0, 95);
+  const reduction = clamp(generalReduction + manaReduction, 0, 95);
   if (!reduction) return { multiplier: 1, affectedSharePercent: model?.mappedSharePercent || 0, modeled: Boolean(model?.items?.length) };
   if (!model?.items?.length || !(model?.mappedShare > 0)) {
     const share = clamp(fallbackSharePercent, 0, 100) / 100;
@@ -648,13 +651,44 @@ export function evaluateEvolutionCooldown(model, passiveReduction, { fallbackSha
     };
   }
   const before = conditionalOpportunityMap(model, 0);
-  const after = conditionalOpportunityMap(model, reduction);
+  const after = conditionalOpportunityMap(model, item => clamp(
+    generalReduction + (item?.usesMana === true ? manaReduction : 0),
+    0,
+    95
+  ));
   const comparison = compareOpportunityMaps(model, before, after);
   return {
     multiplier: comparison.multiplier,
     affectedSharePercent: comparison.affectedSharePercent,
     modeled: true,
     cycleLinkCount: number(model.appliedCycleLinkCount)
+  };
+}
+
+export function evaluateSkillCastFrequency(model, passiveReduction, { referenceReduction = 0 } = {}) {
+  const currentReduction = clamp(passiveReduction, 0, 95);
+  const baselineReduction = clamp(referenceReduction, 0, 95);
+  if (!model?.items?.length) {
+    return {
+      multiplier: (1 - baselineReduction / 100) / (1 - currentReduction / 100),
+      modeled: false,
+      currentReduction,
+      referenceReduction: baselineReduction
+    };
+  }
+
+  const totalCasts = reduction => [...conditionalOpportunityMap(model, reduction).direct.values()]
+    .filter(row => row.item?.cooldownEligible !== false)
+    .reduce((sum, row) => sum + number(row.count), 0);
+  const baselineCasts = totalCasts(baselineReduction);
+  const currentCasts = totalCasts(currentReduction);
+  return {
+    multiplier: baselineCasts > 0 ? currentCasts / baselineCasts : 1,
+    modeled: baselineCasts > 0,
+    currentReduction,
+    referenceReduction: baselineReduction,
+    baselineCasts: round3(baselineCasts),
+    currentCasts: round3(currentCasts)
   };
 }
 
