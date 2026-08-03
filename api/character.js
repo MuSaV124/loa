@@ -5,7 +5,7 @@ import { extractCombatSkillEffects } from '../public/skill-effects.js';
 import { extractCardEffects } from '../public/card-effects.js';
 import { extractAvatarEffects } from '../public/avatar-effects.js';
 
-const API_VERSION = '5.15.1';
+const API_VERSION = '5.15.2';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const CHARACTER_CACHE_MAX_SIZE = 80;

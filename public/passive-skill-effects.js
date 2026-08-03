@@ -1,4 +1,4 @@
-import { SKILL_EFFECT_KEYS, hasSkillEffects, parseSkillEffectText } from './skill-effects.js?v=5.15.1';
+import { SKILL_EFFECT_KEYS, hasSkillEffects, parseSkillEffectText } from './skill-effects.js?v=5.15.2';
 
 const EFFECT_KEYS = [...SKILL_EFFECT_KEYS];
 
@@ -66,6 +66,10 @@ function clauses(value) {
 
 function removePerUnitDamage(value) {
   return String(value || '').replace(/(?:보유한|소모한|획득한|남은|보유|소모)[^.!?]{0,60}?1\s*(?:개|회|중첩)?\s*당[^%]{0,90}?\d+(?:\.\d+)?\s*%\s*(?:증가|상승)(?:한다|합니다)?/gi, ' ');
+}
+
+function removeNonCombatDamage(value) {
+  return String(value || '').replace(/무력화\s*피해량(?:이|가)?\s*\d+(?:\.\d+)?\s*%\s*(?:증가|상승)(?:한다|합니다)?/gi, ' ');
 }
 
 function mergeEffects(target, source) {
@@ -147,7 +151,23 @@ function inferredDamageTargets(clause) {
   const damageTargets = [...source.matchAll(/(?:^|[,])\s*(?:또한\s*)?[\'"“”‘’]?([가-힣A-Za-z0-9 :·]{2,32}?)[\'"“”‘’]?(?:의)?\s*피해량(?:이|가|을|를)?\s*(?:추가로\s*)?\d/gi)]
     .map(match => match[1].trim());
   return unique([...namedSkills, ...damageTargets]
-    .filter(target => !/상태에서\s*주는|스킬\s*사용\s*시|스킬$|받는$|주는$/i.test(target)));
+    .filter(target => !/상태에서\s*주는|스킬\s*사용\s*시|스킬$|받는$|주는$|치명타$|무력화$/i.test(target)));
+}
+
+function inferredSkillContextTargets(clause) {
+  const source = String(clause || '').trim();
+  const possessive = source.match(/^[\'"“”‘’]?([가-힣A-Za-z0-9 :·]{2,32})[\'"“”‘’]?\s*의\s+/i);
+  const skill = source.match(/(?:^|이후\s+|후\s+|[,]\s*)[\'"“”‘’]?([가-힣A-Za-z0-9 :·]{2,32}?)[\'"“”‘’]?\s*스킬(?:의|\s+시전\s*시|\s+사용\s*시)/i);
+  const skillTarget = String(skill?.[1] || '').replace(/^.*(?:이후|후)\s+/i, '').trim();
+  return unique([possessive?.[1]?.includes('스킬') ? '' : possessive?.[1], skillTarget].filter(target => {
+    const value = String(target || '').trim();
+    const category = value.replace(/\s*스킬\s*$/i, '').trim();
+    return value && !/^(?:초각성|초각성기|각성기|일반|충격|기력|포격|실버호크|고대의?\s*정령|루인|헤드어택|백어택)$/i.test(category);
+  }));
+}
+
+function isSubjectlessEffectClause(clause) {
+  return /^(?:치명타|적에게\s*주는|추가\s*피해|피해량|공격\s*속도|이동\s*속도|공격력)/i.test(String(clause || '').trim());
 }
 
 function signedPercent(value, direction) {
@@ -192,6 +212,9 @@ function classifyClause(clause, { knownSkills, knownCategories }) {
   const selector = categorySelector(clause, knownCategories);
   if (selector) return { scope: 'category', targets: [], selector };
 
+  const contextTargets = /치명타/i.test(clause) ? inferredSkillContextTargets(clause) : [];
+  if (contextTargets.length) return { scope: 'skill', targets: contextTargets, selector: '' };
+
   if (/(?:상태|태세|변신|폭주|페르소나|아덴|아이덴티티)[^.!?]{0,35}(?:중|에서|진입\s*시|동안|일\s*때)/i.test(clause)) {
     return { scope: 'state', targets: [], selector: '상태 조건' };
   }
@@ -216,16 +239,22 @@ export function extractArkPassiveSkillEffects(effects, { skillItems = [], shareN
     const category = String(effect?.name || '').trim();
     if (category !== '깨달음' && category !== '도약') continue;
     const payload = parseTooltipPayload(effect);
+    let pendingTargets = [];
     for (const clause of clauses(payload.text)) {
-      const classification = classifyClause(clause, { knownSkills, knownCategories });
-      const calculableClause = removePerUnitDamage(clause);
+      let classification = classifyClause(clause, { knownSkills, knownCategories });
+      if (classification.scope === 'global' && pendingTargets.length && isSubjectlessEffectClause(clause)) {
+        classification = { scope: 'skill', targets: pendingTargets, selector: '' };
+      }
+      const calculableClause = removeNonCombatDamage(removePerUnitDamage(clause));
       const parsed = augmentPassiveEffects(parseSkillEffectText(calculableClause), calculableClause, classification);
       if (!hasSkillEffects(parsed)) {
+        pendingTargets = classification.scope === 'skill' ? classification.targets : inferredSkillContextTargets(clause);
         if (payload.nodeName !== '기민함' && !/무력화\s*피해|자신\s*및\s*파티원|파티원에게/i.test(clause) && /%/.test(clause) && /치명타|적에게\s*주는\s*피해|추가\s*피해|공격력|피해량?이?\s*\d/i.test(clause)) {
           result.unresolved.push({ effectIndex: Number(effect?.index ?? effectIndex), category, nodeName: payload.nodeName || category, text: clause });
         }
         continue;
       }
+      pendingTargets = [];
       const effectsForRule = classification.scope === 'global' ? parsed : normalizeScopedDamage(parsed);
       const signature = [category, payload.nodeName, classification.scope, classification.targets.map(normalize).join(','), normalize(classification.selector), normalize(clause), JSON.stringify(effectsForRule)].join('|');
       if (seen.has(signature)) continue;

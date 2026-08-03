@@ -53,6 +53,15 @@ assert.equal(groupedWave.critRate, 15, '권왕십이식 묶음명이 낙화와 �
 assert.equal(groupedFall.skillDamage, 80, '낙화에는 낙화 강화만 적용해야 한다.');
 assert.equal(groupedWave.skillDamage, 60, '풍랑에는 풍랑 강화만 적용해야 한다.');
 
+const leapCritTargets = extractArkPassiveSkillEffects([
+  passive('도약', '관통 필살', '적룡필살의 돌진 공격 거리가 4.0m 증가하고, 치명타 적중률이 100.0% 증가한다. 적에게 주는 피해가 20.0% 증가한다.'),
+  passive('도약', '그림자 맹수', '피니쉬 스텝의 치명타 적중률이 30.0% 증가한다. 페르소나 상태에서 공격 적중 시 치명타 피해가 15.0% 증가한다.')
+]);
+assert.equal(leapCritTargets.globalEffects.critRate, 0, '도약의 개별 스킬 치적을 전역 치적으로 합산하면 안 된다.');
+assert.equal(passiveEffectsForSkill(leapCritTargets, { name: '적룡필살' }).effects.critRate, 100);
+assert.equal(passiveEffectsForSkill(leapCritTargets, { name: '피니쉬 스텝' }).effects.critRate, 30);
+assert.equal(passiveEffectsForSkill(leapCritTargets, { name: '다른 스킬' }).effects.critRate, 0);
+
 const categoryScopes = extractArkPassiveSkillEffects([
   passive('깨달음', '포격 강화', '포격 스킬의 치명타 적중률이 40.0% 증가한다.'),
   passive('깨달음', '두 번째 동료', '실버호크 스킬의 치명타 적중률이 40.0% 증가한다.'),

@@ -16,6 +16,7 @@ let parsedRuleCount = 0;
 let unresolvedCount = 0;
 let ambiguousTargetCount = 0;
 let duplicateCritCount = 0;
+let globalLeapCritCount = 0;
 
 function normalized(value) {
   return String(value || '').replace(/\s+/g, '').replace(/[·:'"“”‘’]/g, '').trim().toLowerCase();
@@ -24,7 +25,7 @@ function normalized(value) {
 for (const name of names) {
   try {
     const response = await fetch(`${baseUrl}/api/character?name=${encodeURIComponent(name)}`, {
-      headers: { 'user-agent': 'LostArkCalculatorPassiveScopeAudit/5.15.1' }
+      headers: { 'user-agent': 'LostArkCalculatorPassiveScopeAudit/5.15.2' }
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
@@ -54,6 +55,10 @@ for (const name of names) {
         console.log(`  대상 중첩: [${rule.category}] ${rule.nodeName} - ${rule.targets.join(', ')}`);
       }
     }
+    for (const row of parsed.items.filter(row => row.category === '도약' && row.scope === 'global' && Number(row.effects?.critRate || 0) > 0)) {
+      globalLeapCritCount += 1;
+      console.log(`  도약 치적 전역 오분류: ${row.nodeName} - ${row.effects.critRate}%`);
+    }
     for (const target of [...new Set(parsed.rules.filter(row => row.scope === 'skill').flatMap(row => row.targets || []))]) {
       const matching = parsed.rules.filter(row => row.scope === 'skill' && row.targets.some(name => normalized(name) === normalized(target)) && Number(row.effects?.critRate || 0) > 0);
       const semantic = new Set(matching.map(row => `${normalized(row.text)}|${Number(row.effects?.critRate || 0)}`));
@@ -71,8 +76,8 @@ for (const name of names) {
   }
 }
 
-console.log(`\nparsed rules: ${parsedRuleCount}, unresolved: ${unresolvedCount}, ambiguous targets: ${ambiguousTargetCount}, duplicate crit: ${duplicateCritCount}, failures: ${failures.length}`);
-if (failures.length) {
+console.log(`\nparsed rules: ${parsedRuleCount}, unresolved: ${unresolvedCount}, ambiguous targets: ${ambiguousTargetCount}, duplicate crit: ${duplicateCritCount}, global leap crit: ${globalLeapCritCount}, failures: ${failures.length}`);
+if (failures.length || ambiguousTargetCount || duplicateCritCount || globalLeapCritCount) {
   console.error(failures.join('\n'));
   process.exitCode = 1;
 }
