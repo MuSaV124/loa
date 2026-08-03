@@ -1,4 +1,4 @@
-import { SKILL_EFFECT_KEYS, hasSkillEffects, parseSkillEffectText } from './skill-effects.js?v=5.15.0';
+import { SKILL_EFFECT_KEYS, hasSkillEffects, parseSkillEffectText } from './skill-effects.js?v=5.15.1';
 
 const EFFECT_KEYS = [...SKILL_EFFECT_KEYS];
 
@@ -142,8 +142,11 @@ function categorySelector(clause, knownCategories) {
 function inferredDamageTargets(clause) {
   const source = String(clause || '');
   if (/당\s*피해량/i.test(source)) return [];
-  return unique([...source.matchAll(/(?:^|[,])\s*(?:또한\s*)?[\'"“”‘’]?([가-힣A-Za-z0-9 :·]{2,32}?)[\'"“”‘’]?(?:의)?\s*피해량(?:이|가|을|를)?\s*(?:추가로\s*)?\d/gi)]
-    .map(match => match[1].trim())
+  const namedSkills = [...source.matchAll(/(?:^|[,]\s*)(?:또한\s*)?([가-힣A-Za-z0-9 ·]{2,24}\s*:\s*[가-힣A-Za-z0-9 ·]{1,24})\s*스킬(?:의)?\s*피해량/gi)]
+    .map(match => match[1].trim());
+  const damageTargets = [...source.matchAll(/(?:^|[,])\s*(?:또한\s*)?[\'"“”‘’]?([가-힣A-Za-z0-9 :·]{2,32}?)[\'"“”‘’]?(?:의)?\s*피해량(?:이|가|을|를)?\s*(?:추가로\s*)?\d/gi)]
+    .map(match => match[1].trim());
+  return unique([...namedSkills, ...damageTargets]
     .filter(target => !/상태에서\s*주는|스킬\s*사용\s*시|스킬$|받는$|주는$/i.test(target)));
 }
 
@@ -172,11 +175,18 @@ function augmentPassiveEffects(parsed, clause, classification) {
 }
 
 function classifyClause(clause, { knownSkills, knownCategories }) {
-  const targets = unique([
+  const explicitTargets = unique([
     ...quotedSkillTargets(clause),
-    ...knownSkillTargets(clause, knownSkills),
     ...inferredDamageTargets(clause)
   ]);
+  const knownTargets = knownSkillTargets(clause, knownSkills).filter(target => {
+    const key = normalize(target);
+    return !explicitTargets.some(explicit => {
+      const explicitKey = normalize(explicit);
+      return key && explicitKey && key !== explicitKey && explicitKey.includes(key);
+    });
+  });
+  const targets = unique([...explicitTargets, ...knownTargets]);
   if (targets.length) return { scope: 'skill', targets, selector: '' };
 
   const selector = categorySelector(clause, knownCategories);

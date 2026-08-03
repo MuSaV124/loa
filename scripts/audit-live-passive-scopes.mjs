@@ -1,4 +1,5 @@
 import { extractArkPassiveSkillEffects } from '../public/passive-skill-effects.js';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile } from '../public/combat-analyzer.js';
 import { readFile } from 'node:fs/promises';
 
 const names = [
@@ -13,11 +14,17 @@ const analyzer = JSON.parse(await readFile(new URL('../public/combat-analyzer.js
 const failures = [];
 let parsedRuleCount = 0;
 let unresolvedCount = 0;
+let ambiguousTargetCount = 0;
+let duplicateCritCount = 0;
+
+function normalized(value) {
+  return String(value || '').replace(/\s+/g, '').replace(/[·:'"“”‘’]/g, '').trim().toLowerCase();
+}
 
 for (const name of names) {
   try {
     const response = await fetch(`${baseUrl}/api/character?name=${encodeURIComponent(name)}`, {
-      headers: { 'user-agent': 'LostArkCalculatorPassiveScopeAudit/5.15.0' }
+      headers: { 'user-agent': 'LostArkCalculatorPassiveScopeAudit/5.15.1' }
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
@@ -29,13 +36,32 @@ for (const name of names) {
       tooltip: effect?.Tooltip || effect?.ToolTip || '',
       raw: effect
     }));
+    const profile = findCombatAnalyzerProfile(analyzer, data?.powerSnapshot, data?.skillEffects, { support: false });
+    const shareNames = Object.keys(combatAnalyzerSkillShares(profile?.value));
     const parsed = extractArkPassiveSkillEffects(effects, {
       skillItems: data?.skillEffects?.items || [],
+      shareNames,
       identitySkills: analyzer?.identitySkills || []
     });
     parsedRuleCount += parsed.rules.length;
     unresolvedCount += parsed.unresolved.length;
     console.log(`${data?.profile?.CharacterClassName || '-'}\t${name}\t규칙 ${parsed.rules.length}\t전역 ${parsed.items.length - parsed.rules.length}\t미분류 ${parsed.unresolved.length}`);
+    for (const rule of parsed.rules.filter(row => row.scope === 'skill')) {
+      const keys = rule.targets.map(normalized).filter(Boolean);
+      const ambiguous = keys.some((key, index) => keys.some((other, otherIndex) => index !== otherIndex && key !== other && other.includes(key)));
+      if (ambiguous) {
+        ambiguousTargetCount += 1;
+        console.log(`  대상 중첩: [${rule.category}] ${rule.nodeName} - ${rule.targets.join(', ')}`);
+      }
+    }
+    for (const target of [...new Set(parsed.rules.filter(row => row.scope === 'skill').flatMap(row => row.targets || []))]) {
+      const matching = parsed.rules.filter(row => row.scope === 'skill' && row.targets.some(name => normalized(name) === normalized(target)) && Number(row.effects?.critRate || 0) > 0);
+      const semantic = new Set(matching.map(row => `${normalized(row.text)}|${Number(row.effects?.critRate || 0)}`));
+      if (matching.length > semantic.size) {
+        duplicateCritCount += 1;
+        console.log(`  치적 중복: ${target} - ${matching.map(row => `${row.nodeName} ${row.effects.critRate}%`).join(', ')}`);
+      }
+    }
     if (name === verboseName) {
       for (const row of parsed.items) console.log(`  ${row.scope}: ${row.targets.join(', ') || row.selector || '전체'} - ${row.nodeName} - ${JSON.stringify(row.effects)}`);
     }
@@ -45,7 +71,7 @@ for (const name of names) {
   }
 }
 
-console.log(`\nparsed rules: ${parsedRuleCount}, unresolved: ${unresolvedCount}, failures: ${failures.length}`);
+console.log(`\nparsed rules: ${parsedRuleCount}, unresolved: ${unresolvedCount}, ambiguous targets: ${ambiguousTargetCount}, duplicate crit: ${duplicateCritCount}, failures: ${failures.length}`);
 if (failures.length) {
   console.error(failures.join('\n'));
   process.exitCode = 1;

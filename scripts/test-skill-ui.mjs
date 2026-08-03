@@ -238,7 +238,12 @@ async function verifyScopedBreakerCrit() {
   assert.match(scope, /캐릭터 공통 치적\s*79\.99%/);
   assert.match(scope, /성운멸쇄권[\s\S]*99\.99%/);
   assert.match(scope, /파천섬광[\s\S]*94\.99%/);
+  assert.match(scope, /권왕십이식 : 낙화[\s\S]*94\.99%/);
+  assert.match(scope, /권왕십이식 : 풍랑[\s\S]*94\.99%/);
+  assert.doesNotMatch(scope, /권왕십이식 : 낙화[\s\S]*109\.99%/, '낙화와 풍랑의 15% 치적을 합산하면 안 된다.');
   assert.doesNotMatch(scope, /성운멸쇄권[\s\S]*114\.99%/, '다른 스킬의 15% 치적이 성운멸쇄권에 중복되면 안 된다.');
+  const dimensions = await page.locator('.skillCritScope').evaluate(element => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }));
+  assert.ok(dimensions.scrollWidth <= dimensions.clientWidth, `치적 스킬 카드가 가로로 잘리면 안 됩니다: ${JSON.stringify(dimensions)}`);
   await page.close();
 }
 

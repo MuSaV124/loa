@@ -39,6 +39,20 @@ assert.equal(passiveEffectsForSkill(breaker, { name: '성운멸쇄권' }, { iden
 assert.equal(passiveEffectsForSkill(breaker, { name: '파천섬광', category: '충격 스킬' }).effects.critRate, 0);
 assert.equal(passiveEffectsForSkill(breaker, { name: '성운멸쇄권' }).effects.skillDamage, 0, '에너지 1당 피해는 보유량 없이 임의 계산하면 안 된다.');
 
+const groupedBreaker = extractArkPassiveSkillEffects([
+  passive('깨달음', '권왕파천무', "'권왕십이식 : 낙화' 스킬의 치명타 적중률이 15.0% 증가한다."),
+  passive('깨달음', '권왕십이식 : 낙화 강화', '권왕십이식 : 낙화 스킬의 피해량이 80.0% 증가한다.'),
+  passive('깨달음', '권왕십이식 : 풍랑', "'권왕십이식 : 풍랑' 스킬의 치명타 적중률이 15.0% 증가한다. '권왕십이식 : 풍랑' 스킬의 피해량이 추가로 60.0% 증가한다.")
+], {
+  shareNames: ['권왕십이식']
+});
+const groupedFall = passiveEffectsForSkill(groupedBreaker, { name: '권왕십이식 : 낙화', shareName: '권왕십이식' }).effects;
+const groupedWave = passiveEffectsForSkill(groupedBreaker, { name: '권왕십이식 : 풍랑', shareName: '권왕십이식' }).effects;
+assert.equal(groupedFall.critRate, 15, '권왕십이식 묶음명이 낙화와 풍랑 치적을 중복 적용하면 안 된다.');
+assert.equal(groupedWave.critRate, 15, '권왕십이식 묶음명이 낙화와 풍랑 치적을 중복 적용하면 안 된다.');
+assert.equal(groupedFall.skillDamage, 80, '낙화에는 낙화 강화만 적용해야 한다.');
+assert.equal(groupedWave.skillDamage, 60, '풍랑에는 풍랑 강화만 적용해야 한다.');
+
 const categoryScopes = extractArkPassiveSkillEffects([
   passive('깨달음', '포격 강화', '포격 스킬의 치명타 적중률이 40.0% 증가한다.'),
   passive('깨달음', '두 번째 동료', '실버호크 스킬의 치명타 적중률이 40.0% 증가한다.'),
