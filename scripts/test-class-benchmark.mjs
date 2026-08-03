@@ -34,6 +34,7 @@ assert.ok(Math.abs(benchmarkKillSeconds(fixture, fixture.classes[0].builds[0]) -
 
 const data = JSON.parse(fs.readFileSync(new URL('../public/class-benchmarks.json', import.meta.url), 'utf8'));
 const coreNumberCatalog = JSON.parse(fs.readFileSync(new URL('./ark-grid-core-numbers.json', import.meta.url), 'utf8'));
+const combatPowerSamples = JSON.parse(fs.readFileSync(new URL('./combat-power-class-samples.json', import.meta.url), 'utf8'));
 assert.equal(data.version, 3);
 assert.equal(data.classes.length, 30);
 assert.equal(Object.keys(coreNumberCatalog).length, 30);
@@ -43,6 +44,11 @@ assert.deepEqual(
   [...new Set(data.classes.map(row => row.group))],
   ['전사', '무도가', '헌터', '마법사', '암살자', '스페셜리스트', '오리지널']
 );
+const benchmarkClassNames = data.classes.map(row => row.className).sort((a, b) => a.localeCompare(b, 'ko'));
+const coreClassNames = Object.keys(coreNumberCatalog).sort((a, b) => a.localeCompare(b, 'ko'));
+const combatPowerClassNames = [...new Set(combatPowerSamples.rows.map(row => row.className))].sort((a, b) => a.localeCompare(b, 'ko'));
+assert.deepEqual(coreClassNames, benchmarkClassNames, '아크그리드 코어 직업 목록이 직업 지표 30개와 일치해야 한다.');
+assert.deepEqual(combatPowerClassNames, benchmarkClassNames, '전투력 표본 직업 목록이 직업 지표 30개와 일치해야 한다.');
 for (const group of [...new Set(data.classes.map(row => row.group))]) {
   const classNames = data.classes.filter(row => row.group === group).map(row => row.className);
   assert.deepEqual(classNames, [...classNames].sort((a, b) => a.localeCompare(b, 'ko')), `${group}: 가나다순`);

@@ -5,15 +5,24 @@ import { combatAnalyzerSkillShares, findCombatAnalyzerProfile } from '../public/
 import { buildSkillCycleModel, evaluateEvolutionCooldown } from '../public/skill-cycle.js';
 
 const API_BASE = process.env.LOA_SKILL_AUDIT_API_BASE || 'https://loa-beige.vercel.app';
-const APP_VERSION = process.env.LOA_SKILL_AUDIT_APP_VERSION || '5.15.9';
+const APP_VERSION = process.env.LOA_SKILL_AUDIT_APP_VERSION || '5.15.10';
 const SUPPORT_ENGRAVINGS = new Set(['축복의 오라', '절실한 구원', '만개']);
 
-const references = JSON.parse(await readFile(new URL('./combat-power-class-samples.json', import.meta.url), 'utf8'));
+const calibrationReferences = JSON.parse(await readFile(new URL('./combat-power-class-samples.json', import.meta.url), 'utf8'));
+const currentReferences = JSON.parse(await readFile(new URL('./combat-power-reference-characters.json', import.meta.url), 'utf8'));
+const currentReferenceByClass = new Map(currentReferences.rows.map(row => [row.className, row.name]));
+const references = {
+  ...calibrationReferences,
+  rows: calibrationReferences.rows.map(row => ({
+    ...row,
+    referenceCharacter: currentReferenceByClass.get(row.className) || row.referenceCharacter
+  }))
+};
 const analyzer = JSON.parse(await readFile(new URL('../public/combat-analyzer.json', import.meta.url), 'utf8'));
 
 async function fetchCharacter(row) {
   const url = `${API_BASE}/api/character?name=${encodeURIComponent(row.referenceCharacter)}&appVersion=${encodeURIComponent(APP_VERSION)}`;
-  const response = await fetch(url, { headers: { 'user-agent': 'LostArkCalculatorSkillCycleAudit/5.15.9' } });
+  const response = await fetch(url, { headers: { 'user-agent': 'LostArkCalculatorSkillCycleAudit/5.15.10' } });
   if (!response.ok) throw new Error(`${row.className} ${row.referenceCharacter}: HTTP ${response.status}`);
   const data = await response.json();
   if (!data?.ok) throw new Error(`${row.className} ${row.referenceCharacter}: ${data?.message || data?.error || '조회 실패'}`);
@@ -39,6 +48,7 @@ function buildAuditRow(reference, data) {
   const node = evaluateEvolutionCooldown(cycle, 4);
   const deterministicLinks = cycle.gridCycleLinks.filter(link => !link.stochastic);
   return {
+    expectedClassName: reference.className,
     className: snapshot.profile.className,
     secondClass: snapshot.profile.secondClass,
     referenceCharacter: reference.referenceCharacter,
@@ -88,6 +98,7 @@ for (const row of rows.filter(item => item.unresolvedLinks.length)) {
 assert.equal(rows.length, 30, '전 직업 표본은 30개여야 한다.');
 assert.equal(new Set(rows.map(row => row.className)).size, 30, '중복 없이 30개 직업을 조회해야 한다.');
 for (const row of rows) {
+  assert.equal(row.className, row.expectedClassName, `${row.expectedClassName} 표본 ${row.referenceCharacter}의 현재 직업이 ${row.className || '미확인'}이다.`);
   assert.ok(row.usedSkills > 0, `${row.className}: 현재 스킬트리 주기를 만들지 못했다.`);
   assert.deepEqual(row.invalidCooldowns, [], `${row.className}: 유효하지 않은 쿨타임이 있다.`);
   if (!row.support) assert.ok(row.modeledSharePercent > 0, `${row.className}: 전투분석 딜 지분과 현재 스킬을 연결하지 못했다.`);

@@ -1,4 +1,8 @@
-# Lost Ark Node Recommend Calculator v5.15.9
+# Lost Ark Node Recommend Calculator v5.15.10
+
+## v5.15.10
+- 계산 요약의 스킬별 행에서 딜 지분과 노드 출처를 숨기고 최종 추가 효과만 표시합니다.
+- 수치 효과가 없는 스킬 행을 제외해 계산 요약 길이를 줄입니다.
 
 ## v5.15.9
 

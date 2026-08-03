@@ -251,11 +251,13 @@ async function verifyScopedBreakerCrit() {
   assert.match(scope, /치적 기준 스킬\s*성운멸쇄권/);
   assert.match(scope, /캐릭터 공통 치적\s*79\.99%/);
   assert.match(scope, /성운멸쇄권[\s\S]*99\.99%/);
+  assert.match(scope, /성운멸쇄권[\s\S]*치적 \+20%/);
   assert.match(scope, /파천섬광[\s\S]*94\.99%/);
   assert.match(scope, /권왕십이식 : 낙화[\s\S]*94\.99%/);
   assert.match(scope, /권왕십이식 : 풍랑[\s\S]*94\.99%/);
   assert.doesNotMatch(scope, /권왕십이식 : 낙화[\s\S]*109\.99%/, '낙화와 풍랑의 15% 치적을 합산하면 안 된다.');
   assert.doesNotMatch(scope, /성운멸쇄권[\s\S]*114\.99%/, '다른 스킬의 15% 치적이 성운멸쇄권에 중복되면 안 된다.');
+  assert.doesNotMatch(scope, /딜 지분|깨달음|도약|아크그리드/, '치적 스킬 요약에는 최종 추가 효과만 표시해야 한다.');
   const dimensions = await page.locator('.skillCritScope').evaluate(element => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }));
   assert.ok(dimensions.scrollWidth <= dimensions.clientWidth, `치적 스킬 카드가 가로로 잘리면 안 됩니다: ${JSON.stringify(dimensions)}`);
   await page.close();
@@ -328,7 +330,8 @@ async function verifyArcanaCardExpectation() {
   assert.match(bestRecommendation, /끝마/, `황제 카드 수급을 반영한 1순위에 끝마가 포함되어야 합니다: ${bestRecommendation}`);
   const skillScope = await page.locator('.skillCritScope').innerText();
   assert.match(skillScope, /다크 리저렉션/);
-  assert.match(skillScope, /스트림 오브 엣지 · 다크니스 엣지/);
+  assert.match(skillScope, /치적 \+27\.6%/);
+  assert.doesNotMatch(skillScope, /스트림 오브 엣지|다크니스 엣지|딜 지분|깨달음|도약|아크그리드/);
   const dimensions = await note.evaluate(element => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }));
   assert.ok(dimensions.scrollWidth <= dimensions.clientWidth, `아르카나 안내가 가로로 잘리면 안 됩니다: ${JSON.stringify(dimensions)}`);
   await page.close();

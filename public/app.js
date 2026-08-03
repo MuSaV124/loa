@@ -1,19 +1,19 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.9';
-import { emptyCardEffects } from './card-effects.js?v=5.15.9';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.9';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.9';
-import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.9';
-import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.9';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.9';
-import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.9';
-import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.9';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.9';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.9';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.9';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.9';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.9';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.9';
-import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.9';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.10';
+import { emptyCardEffects } from './card-effects.js?v=5.15.10';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.10';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.10';
+import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.10';
+import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.10';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.10';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.10';
+import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.10';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.10';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.10';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.10';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.10';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.10';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.10';
+import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.10';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -22,9 +22,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.15.9';
+} from './cache-policy.js?v=5.15.10';
 
-const VERSION = '5.15.9';
+const VERSION = '5.15.10';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -4197,17 +4197,12 @@ function engravingAppliedDetailHtml() {
 function skillCritScopeHtml(current) {
   const experiment = current?.result?.skillExperiment;
   const rows = (experiment?.items || [])
-    .filter(row => Number(row?.share || 0) > 0 || hasNumericSkillEffects(row?.effects))
+    .filter(row => hasNumericSkillEffects(row?.effects))
     .sort((a, b) => Number(b?.rawCritRate || 0) - Number(a?.rawCritRate || 0) || Number(b?.share || 0) - Number(a?.share || 0));
   if (!experiment?.applied || !rows.length) return '';
   const anchorName = experiment.anchorSkill?.name || rows[0]?.name || '-';
   const skillRows = rows.map(row => {
-    const passiveNames = [...new Set([...(row.passiveRules || []), ...(row.arcanaRules || [])].map(rule => `${rule.category} ${rule.nodeName}`).filter(Boolean))];
-    const detail = [
-      Number(row.share || 0) > 0 ? `딜 지분 ${(Number(row.share) * 100).toFixed(1)}%` : '딜 지분 미확인',
-      passiveNames.join(', '),
-      row.summary || ''
-    ].filter(Boolean).join(' · ');
+    const detail = row.summary || '';
     const anchor = normalizedSkillName(row.name) === normalizedSkillName(anchorName);
     return `<div class="skillCritScopeRow${anchor ? ' anchor' : ''}"><div><b>${escapeHtml(row.name)}</b><span>${escapeHtml(detail)}</span></div><strong>${Number(row.rawCritRate || 0).toFixed(2)}%</strong></div>`;
   }).join('');
