@@ -1,19 +1,19 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.10';
-import { emptyCardEffects } from './card-effects.js?v=5.15.10';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.10';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.10';
-import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.10';
-import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.10';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.10';
-import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.10';
-import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.10';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.10';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.10';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.10';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.10';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.10';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.10';
-import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.10';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.11';
+import { emptyCardEffects } from './card-effects.js?v=5.15.11';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.11';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.11';
+import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.11';
+import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.11';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.11';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.11';
+import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.11';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.11';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.11';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.11';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.11';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.11';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.11';
+import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.11';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -22,9 +22,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.15.10';
+} from './cache-policy.js?v=5.15.11';
 
-const VERSION = '5.15.10';
+const VERSION = '5.15.11';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -141,6 +141,7 @@ function renderSkillEffectControl() {
   const arkGridRules = state.arkGridSkillEffects?.rules || [];
   const scopedRules = [...passiveRules, ...arkGridRules];
   const loadedCount = Number(state.skillEffects?.items?.length || 0);
+  const globalBuffItems = state.skillEffects?.globalBuffItems || [];
   const conditionalCount = Number(state.skillEffects?.conditionalTripodCount || items.filter(isConditionalSkill).length);
   const cooldownTripodCount = Number(state.skillEffects?.cooldownTripodCount || 0);
   const stochasticCooldownCount = Number(state.skillEffects?.stochasticCooldownCount || 0);
@@ -156,6 +157,7 @@ function renderSkillEffectControl() {
     modeledSharePercent > 0 ? `계산 지분 ${modeledSharePercent.toFixed(1)}%` : '',
     cycle?.weightedCooldownSeconds > 0 ? `평균 ${cycle.weightedCooldownSeconds.toFixed(2)}초` : '',
     `트라이포드 효과 ${items.length}개`,
+    globalBuffItems.length ? `기본 자버프 ${globalBuffItems.length}개` : '',
     passiveRules.length ? `깨달음·도약 ${passiveRules.length}개` : '',
     arkGridRules.length ? `아크그리드 ${arkGridRules.length}개` : '',
     conditionalCount ? `조건 충족 ${conditionalCount}개` : '',
@@ -170,6 +172,7 @@ function renderSkillEffectControl() {
     const detail = [flags, seconds, effectSummary].filter(Boolean).join(' · ');
     return `<div class="skillEffectRow"><b>${escapeHtml(item.name || '이름 없는 스킬')}${Number(item.level || 0) ? ` Lv.${Number(item.level)}` : ''}</b><span>${escapeHtml(detail)}</span></div>`;
   }).join('');
+  const globalBuffRows = globalBuffItems.map(item => `<div class="skillEffectRow"><b>${escapeHtml(item.name || '스킬 자버프')}</b><span>전역 자버프 · ${escapeHtml(formatSkillEffectSummary(item.effects))}</span></div>`).join('');
   const passiveRows = scopedRules.map(rule => {
     const target = rule.scope === 'skill'
       ? rule.targets.join(', ')
@@ -178,7 +181,7 @@ function renderSkillEffectControl() {
     return `<div class="skillEffectRow"><b>${escapeHtml(rule.nodeName || rule.category)}</b><span>${escapeHtml(detail)}</span></div>`;
   }).join('');
   const cycleNote = cycle ? `<div class="skillCycleNote">신속 ${Number(cycle.swiftCooldownReduction || 0).toFixed(2)}% · 보석 가중 ${Number(cycle.weightedGemCooldown || 0).toFixed(2)}% · ${escapeHtml(cycle.analyzerTag || '장착 스킬 추정')}${cycle.appliedCycleLinkCount ? ` · 아크그리드 연쇄 ${cycle.appliedCycleLinkCount}건` : ''}${cycle.identityDriverSharePercent ? ` · 게이지 연동 ${Number(cycle.identityDriverSharePercent).toFixed(1)}%` : ''}${cycle.stochasticRuneCount || cycle.stochasticCycleLinkCount ? ` · 확률 미공개 ${Number(cycle.stochasticRuneCount || 0) + Number(cycle.stochasticCycleLinkCount || 0)}건 제외` : ''}</div>` : '';
-  preview.innerHTML = `<div class="skillEffectHeading"><b>현재 스킬트리 자동 반영</b><span>${escapeHtml(status)}</span></div>${cycleNote}<div class="skillEffectRows">${passiveRows}${rows || (!passiveRows ? '<div class="skillEffectRow muted"><span>계산할 사용 스킬이 없습니다.</span></div>' : '')}</div>`;
+  preview.innerHTML = `<div class="skillEffectHeading"><b>현재 스킬트리 자동 반영</b><span>${escapeHtml(status)}</span></div>${cycleNote}<div class="skillEffectRows">${globalBuffRows}${passiveRows}${rows || (!passiveRows && !globalBuffRows ? '<div class="skillEffectRow muted"><span>계산할 사용 스킬이 없습니다.</span></div>' : '')}</div>`;
   preview.classList.remove('muted');
 }
 
@@ -3601,6 +3604,7 @@ function safePercentSources(sources, aggregateValue, aggregateLabel = '합산값
 function getBaseStats(selection = state.selected) {
   const engravingSimulation = getEngravingSimulation();
   const engravingEffects = engravingSimulation.effects;
+  const skillBuffEffects = state.skillEffects?.globalBuffEffects || {};
   const adrenalineEffect = engravingSimulation.adrenalineEffect;
   const selectedCritStat = tier1StatBonus('치명', selection);
   const selectedSwiftStat = tier1StatBonus('신속', selection);
@@ -3625,8 +3629,8 @@ function getBaseStats(selection = state.selected) {
   const arkGridAttackSpeed = num(state.arkGrid.attackSpeed);
   const arkGridMoveSpeed = num(state.arkGrid.moveSpeed);
   const engravingAttackSpeed = num(engravingEffects.attackSpeed);
-  const attackSpeed = baseSpeed + swiftSpeedBonus + enlightenmentAttackSpeed + braceletAttackMoveSpeed + arkGridAttackSpeed + engravingAttackSpeed + extraAttackSpeed;
-  const moveSpeed = baseSpeed + swiftSpeedBonus + enlightenmentMoveSpeed + braceletAttackMoveSpeed + arkGridMoveSpeed + extraMoveSpeed;
+  const attackSpeed = baseSpeed + swiftSpeedBonus + enlightenmentAttackSpeed + braceletAttackMoveSpeed + arkGridAttackSpeed + engravingAttackSpeed + num(skillBuffEffects.attackSpeed) + extraAttackSpeed;
+  const moveSpeed = baseSpeed + swiftSpeedBonus + enlightenmentMoveSpeed + braceletAttackMoveSpeed + arkGridMoveSpeed + num(skillBuffEffects.moveSpeed) + extraMoveSpeed;
   const replacementEffects = { ...(engravingSimulation.replacementEffect || {}) };
   if (!engravingSimulation.adrenalineEnabled && engravingSimulation.replacementName === '돌격대장') {
     const moveSpeedRatio = Math.max(0, Math.min((moveSpeed - 100) / 40, 1));
@@ -3661,6 +3665,7 @@ function getBaseStats(selection = state.selected) {
   pushDamageSource(enemyDamageSources, '추가 입력', extraEnemyDamage);
   pushDamageSource(enemyDamageSources, '백어택', backAttackEnemyDamage);
   pushDamageSource(enemyDamageSources, '카드 세트', num(state.card?.buckets?.enemyDamage));
+  pushDamageSource(enemyDamageSources, '스킬 기본 자버프', num(skillBuffEffects.enemyDamage));
   // 세 우마르가 오리라처럼 백어택 조건이 붙은 카드 효과는 백어택을 켰을 때만 넣는다.
   if ($('backAttackEnabled').checked) {
     pushDamageSource(enemyDamageSources, '카드 세트 · 백어택', num(state.card?.conditional?.backAttackEnemyDamage));
@@ -3672,30 +3677,31 @@ function getBaseStats(selection = state.selected) {
   pushDamageSource(critHitDamageSources, '깨달음 · 회심', state.enlightenment.critHitDamage);
   pushDamageSource(critHitDamageSources, '각인서/API', engravingEffects.critHitDamage);
   pushDamageSource(critHitDamageSources, '어빌리티 스톤 각인 보너스', state.abilityStone?.effects?.critHitDamage);
+  pushDamageSource(critHitDamageSources, '스킬 기본 자버프', skillBuffEffects.critHitDamage);
   return {
     critStat,
     swiftStat,
     statCritRate,
-    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.arkGrid.critRate) + num(engravingEffects.critRate) + num(state.abilityStone?.effects?.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate + num(state.card?.buckets?.critRate),
-    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.arkGrid.critDamage) + num(engravingEffects.critDamage) + num(state.abilityStone?.effects?.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage + num(state.card?.buckets?.critDamage),
-    critHitDamage: num(state.accessory.critHitDamage) + num(state.bracelet.critHitDamage) + num(state.enlightenment.critHitDamage) + num(engravingEffects.critHitDamage) + num(state.abilityStone?.effects?.critHitDamage),
+    critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.arkGrid.critRate) + num(engravingEffects.critRate) + num(state.abilityStone?.effects?.critRate) + num(skillBuffEffects.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate + num(state.card?.buckets?.critRate),
+    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.arkGrid.critDamage) + num(engravingEffects.critDamage) + num(state.abilityStone?.effects?.critDamage) + num(skillBuffEffects.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage + num(state.card?.buckets?.critDamage),
+    critHitDamage: num(state.accessory.critHitDamage) + num(state.bracelet.critHitDamage) + num(state.enlightenment.critHitDamage) + num(engravingEffects.critHitDamage) + num(state.abilityStone?.effects?.critHitDamage) + num(skillBuffEffects.critHitDamage),
     critHitDamageSources,
     evolutionDamage: num(state.enlightenment.evolutionDamage) + extraEvolutionDamage,
     manaSkillEvolutionDamage: 0,
     manaSkillCooldownReduction: 0,
-    additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + num(state.arkGrid.additionalDamage) + num(engravingEffects.additionalDamage) + num(state.abilityStone?.effects?.additionalDamage) + extraAdditionalDamage + num(state.card?.buckets?.additionalDamage),
+    additionalDamage: num(state.accessory.additionalDamage) + num(state.bracelet.additionalDamage) + num(state.enlightenment.additionalDamage) + num(state.arkGrid.additionalDamage) + num(engravingEffects.additionalDamage) + num(state.abilityStone?.effects?.additionalDamage) + num(skillBuffEffects.additionalDamage) + extraAdditionalDamage + num(state.card?.buckets?.additionalDamage),
     enemyDamage: effectivePercentFromSources(enemyDamageSources),
     enemyDamageSources,
     // 공격 속성이 변환된 카드 세트의 속성 피해. 다른 버킷과 독립이라 따로 곱한다.
     attributeDamage: num(state.card?.buckets?.attributeDamage),
     skillCritBonus: 0,
-    skillDamage: 0,
+    skillDamage: num(skillBuffEffects.skillDamage),
     critSynergy,
     backAttackCritRate,
     backAttackEnemyDamage,
     adrenalineCritRate: num(adrenalineEffect.critRate),
     adrenalineAttackPower: num(adrenalineEffect.attackPower),
-    attackPower: num(adrenalineEffect.attackPower) + num(state.abilityStone?.attackPower) + num(state.abilityStone?.effects?.attackPower) + num(engravingEffects.attackPower),
+    attackPower: num(adrenalineEffect.attackPower) + num(state.abilityStone?.attackPower) + num(state.abilityStone?.effects?.attackPower) + num(engravingEffects.attackPower) + num(skillBuffEffects.attackPower),
     engravingDamageMultiplier,
     engravingEffects,
     replacementEngraving: engravingSimulation.adrenalineEnabled ? null : { name: engravingSimulation.replacementName, level: engravingSimulation.replacementBookLevel, effects: replacementEffects },
@@ -3706,6 +3712,7 @@ function getBaseStats(selection = state.selected) {
     arkGridAttackSpeed,
     arkGridMoveSpeed,
     engravingAttackSpeed,
+    skillBuffEffects,
     dynamicEnlightenmentCritRate,
     dynamicEnlightenmentCritDamage,
     baseMoveAttackSpeed: baseSpeed,
@@ -3725,7 +3732,7 @@ function applyEffect(stats, effect, sourceLabel = '진화') {
   const out = { ...stats };
   if (effect.manaConditionNote) out.manaConditionNotes = [...(out.manaConditionNotes || []), { label: sourceLabel, note: effect.manaConditionNote }];
   if (effect.critStat) { out.critStat = (out.critStat || 0) + effect.critStat; out.statCritRate = critRateFromStat(out.critStat); out.critRate += critRateFromStat(effect.critStat); }
-  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.attackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentAttackSpeed || 0) + (out.braceletAttackMoveSpeed || 0) + (out.arkGridAttackSpeed || 0) + (out.engravingAttackSpeed || 0) + (out.extraAttackSpeed || 0); out.moveSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentMoveSpeed || 0) + (out.braceletAttackMoveSpeed || 0) + (out.arkGridMoveSpeed || 0) + (out.extraMoveSpeed || 0); out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
+  if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.attackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentAttackSpeed || 0) + (out.braceletAttackMoveSpeed || 0) + (out.arkGridAttackSpeed || 0) + (out.engravingAttackSpeed || 0) + num(out.skillBuffEffects?.attackSpeed) + (out.extraAttackSpeed || 0); out.moveSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentMoveSpeed || 0) + (out.braceletAttackMoveSpeed || 0) + (out.arkGridMoveSpeed || 0) + num(out.skillBuffEffects?.moveSpeed) + (out.extraMoveSpeed || 0); out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
   if (effect.critRate) out.critRate += effect.critRate;
   if (effect.critDamage) out.critDamage += effect.critDamage;
   if (effect.critHitDamage) {
@@ -4251,6 +4258,7 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.effects?.critRate) critLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critRate));
   if (base.dynamicEnlightenmentCritRate) critLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritRate));
   if (base.extraCritRate) critLines.push(sourceLine('추가 입력', base.extraCritRate));
+  if (base.skillBuffEffects?.critRate) critLines.push(sourceLine('스킬 기본 자버프', base.skillBuffEffects.critRate));
   if (appliedSkillEffects.critRate) critLines.push(sourceLine(`기준 스킬 · ${current.result?.skillExperiment?.anchorSkill?.name || '스킬별'}`, appliedSkillEffects.critRate));
   critLines.push(...critEvolution);
 
@@ -4263,6 +4271,7 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.effects?.critDamage) critDamageLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critDamage));
   if (base.dynamicEnlightenmentCritDamage) critDamageLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritDamage));
   if (base.extraCritDamage) critDamageLines.push(sourceLine('추가 입력', base.extraCritDamage));
+  if (base.skillBuffEffects?.critDamage) critDamageLines.push(sourceLine('스킬 기본 자버프', base.skillBuffEffects.critDamage));
   const critDamageAnchor = current.result?.skillExperiment?.critDamageAnchorSkill;
   const maxSkillCritDamage = Number(critDamageAnchor?.effect || 0);
   if (Math.abs(maxSkillCritDamage) > 0.0001) {
@@ -4303,6 +4312,7 @@ function buildSourceSummary(current) {
   if (base.engravingEffects?.additionalDamage) addLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.additionalDamage));
   if (state.abilityStone?.effects?.additionalDamage) addLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.additionalDamage));
   if (base.extraAdditionalDamage) addLines.push(sourceLine('추가 입력', base.extraAdditionalDamage));
+  if (base.skillBuffEffects?.additionalDamage) addLines.push(sourceLine('스킬 기본 자버프', base.skillBuffEffects.additionalDamage));
   if (appliedSkillEffects.additionalDamage) addLines.push(sourceLine('기준 스킬 효과', appliedSkillEffects.additionalDamage));
   addLines.push(...addEvolution);
 
@@ -4320,6 +4330,8 @@ function buildSourceSummary(current) {
   if (base.arkGridAttackSpeed) attackSpeedLines.push(sourceLine('아크그리드', base.arkGridAttackSpeed));
   if (base.arkGridMoveSpeed) moveSpeedLines.push(sourceLine('아크그리드', base.arkGridMoveSpeed));
   if (base.engravingAttackSpeed) attackSpeedLines.push(sourceLine('각인서/API', base.engravingAttackSpeed));
+  if (base.skillBuffEffects?.attackSpeed) attackSpeedLines.push(sourceLine('스킬 기본 자버프', base.skillBuffEffects.attackSpeed));
+  if (base.skillBuffEffects?.moveSpeed) moveSpeedLines.push(sourceLine('스킬 기본 자버프', base.skillBuffEffects.moveSpeed));
   if (base.extraAttackSpeed) attackSpeedLines.push(sourceLine('추가 입력', base.extraAttackSpeed));
   if (base.extraMoveSpeed) moveSpeedLines.push(sourceLine('추가 입력', base.extraMoveSpeed));
   if (appliedSkillEffects.attackSpeed) attackSpeedLines.push(sourceLine('기준 스킬 효과', appliedSkillEffects.attackSpeed));
@@ -4335,6 +4347,7 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.effects?.enemyDamage) enemyLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.enemyDamage));
   if (base.extraEnemyDamage) enemyLines.push(sourceLine('추가 입력', base.extraEnemyDamage));
   if (base.backAttackEnemyDamage) enemyLines.push(sourceLine('백어택', base.backAttackEnemyDamage));
+  if (base.skillBuffEffects?.enemyDamage) enemyLines.push(sourceLine('스킬 기본 자버프', base.skillBuffEffects.enemyDamage));
   if (appliedSkillEffects.enemyDamage) enemyLines.push(sourceLine('기준 스킬 효과', appliedSkillEffects.enemyDamage));
   enemyLines.push(...enemyEvolution);
 
@@ -4343,6 +4356,7 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.attackPower) attackPowerLines.push(sourceLine('어빌리티 스톤', state.abilityStone.attackPower, '기본 공격력 보너스'));
   if (state.abilityStone?.effects?.attackPower) attackPowerLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.attackPower));
   if (base.engravingEffects?.attackPower) attackPowerLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.attackPower));
+  if (base.skillBuffEffects?.attackPower) attackPowerLines.push(sourceLine('스킬 기본 자버프', base.skillBuffEffects.attackPower));
   if (appliedSkillEffects.attackPower) attackPowerLines.push(sourceLine('기준 스킬 효과', appliedSkillEffects.attackPower));
   const skillExperiment = current.result.skillExperiment || { items: [] };
   const skillExperimentLines = [];

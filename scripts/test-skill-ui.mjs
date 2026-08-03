@@ -263,6 +263,48 @@ async function verifyScopedBreakerCrit() {
   await page.close();
 }
 
+async function verifyBaseSkillSelfBuff() {
+  const damageSkill = {
+    name: '맹룡열파', icon: '', level: 14, type: '일반', skillType: 0, currentTree: true, baseCooldownSeconds: 24,
+    cooldown: { flatSeconds: 0, percentReduction: 0 },
+    effects: { critRate: 0, critDamage: 10, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, attackSpeed: 0, moveSpeed: 0, skillDamage: 0 },
+    selectedTripods: [{ name: '치명타 피해 표본' }]
+  };
+  const response = {
+    ...characterResponse,
+    profile: { ...characterResponse.profile, CharacterName: '창술표본', CharacterClassName: '창술사', Stats: [{ Type: '치명', Value: '0' }, { Type: '신속', Value: '0' }] },
+    arkPassive: { Title: '절정', Effects: [] },
+    arkGridEffects: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
+    skillEffects: {
+      items: [damageSkill], cycleItems: [damageSkill], calculableItems: [damageSkill],
+      globalBuffEffects: { critRate: 20, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, attackSpeed: 0, moveSpeed: 0, skillDamage: 0 },
+      globalBuffItems: [{ name: '청룡진', effects: { critRate: 20 } }],
+      selectedTripodCount: 1, conditionalTripodCount: 0, cooldownTripodCount: 0, stochasticCooldownCount: 0, usedSkillCount: 1
+    },
+    powerSnapshot: {
+      ...characterResponse.powerSnapshot,
+      profile: { className: '창술사', secondClass: '절정', combatPower: 5000, stats: [{ type: '신속', value: 0 }] },
+      arkGrid: { slots: [] }
+    }
+  };
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) }));
+  await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
+  await page.getByPlaceholder('캐릭터명 입력').fill('창술표본');
+  await page.getByRole('button', { name: '검색', exact: true }).click();
+  await page.getByRole('heading', { name: /창술표본/ }).waitFor();
+  await page.locator('.advancedInputDetails').evaluate(element => { element.open = true; });
+  const preview = await page.locator('#skillEffectPreview').innerText();
+  assert.match(preview, /기본 자버프 1개/);
+  assert.match(preview, /청룡진[\s\S]*전역 자버프 · 치적 \+20%/);
+  const critGroup = page.locator('.sourceGroup').filter({ hasText: '치명타 확률' });
+  const critText = await critGroup.locator('.sourceGroupBody').textContent();
+  assert.match(critText, /스킬 기본 자버프[\s\S]*\+20\.00%/);
+  const scope = await page.locator('.skillCritScope').innerText();
+  assert.match(scope, /캐릭터 공통 치적\s*20\.00%/);
+  await page.close();
+}
+
 async function verifyArcanaCardExpectation() {
   const arcanaSkills = [
     {
@@ -341,6 +383,7 @@ try {
   await verifyViewport({ width: 1440, height: 1000 });
   await verifyViewport({ width: 390, height: 844 });
   await verifyScopedBreakerCrit();
+  await verifyBaseSkillSelfBuff();
   await verifyArcanaCardExpectation();
   await verifySupportRecommendation();
   console.log('skill effect UI tests passed');

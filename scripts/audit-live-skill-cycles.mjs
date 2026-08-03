@@ -5,7 +5,7 @@ import { combatAnalyzerSkillShares, findCombatAnalyzerProfile } from '../public/
 import { buildSkillCycleModel, evaluateEvolutionCooldown } from '../public/skill-cycle.js';
 
 const API_BASE = process.env.LOA_SKILL_AUDIT_API_BASE || 'https://loa-beige.vercel.app';
-const APP_VERSION = process.env.LOA_SKILL_AUDIT_APP_VERSION || '5.15.10';
+const APP_VERSION = process.env.LOA_SKILL_AUDIT_APP_VERSION || '5.15.11';
 const SUPPORT_ENGRAVINGS = new Set(['축복의 오라', '절실한 구원', '만개']);
 
 const calibrationReferences = JSON.parse(await readFile(new URL('./combat-power-class-samples.json', import.meta.url), 'utf8'));
@@ -22,7 +22,7 @@ const analyzer = JSON.parse(await readFile(new URL('../public/combat-analyzer.js
 
 async function fetchCharacter(row) {
   const url = `${API_BASE}/api/character?name=${encodeURIComponent(row.referenceCharacter)}&appVersion=${encodeURIComponent(APP_VERSION)}`;
-  const response = await fetch(url, { headers: { 'user-agent': 'LostArkCalculatorSkillCycleAudit/5.15.10' } });
+  const response = await fetch(url, { headers: { 'user-agent': 'LostArkCalculatorSkillCycleAudit/5.15.11' } });
   if (!response.ok) throw new Error(`${row.className} ${row.referenceCharacter}: HTTP ${response.status}`);
   const data = await response.json();
   if (!data?.ok) throw new Error(`${row.className} ${row.referenceCharacter}: ${data?.message || data?.error || '조회 실패'}`);
@@ -64,6 +64,8 @@ function buildAuditRow(reference, data) {
     deterministicLinks: deterministicLinks.length,
     appliedLinks: Number(cycle.appliedCycleLinkCount || 0),
     unresolvedLinks: (cycle.unresolvedCycleLinks || []).map(link => `${link.sourceNames.join('/') || link.sourceSelector || '?'} → ${link.target}`),
+    baseBuffs: skillEffects.globalBuffItems.map(item => `${item.name}(${Object.entries(item.effects).filter(([, value]) => Math.abs(Number(value || 0)) > 0.0001).map(([key, value]) => `${key}:${value}`).join(',')})`),
+    baseBuffEffects: skillEffects.globalBuffEffects,
     unknownChanceLinks: cycle.gridCycleLinks.filter(link => link.stochastic).length,
     gemCooldownMultiplier: cycle.gemCooldownMultiplier,
     optimizationMultiplier: node.multiplier,
@@ -86,6 +88,7 @@ console.table(rows.map(row => ({
   게이지: `${row.identityDriverSharePercent.toFixed(1)}%`,
   연쇄: `${row.appliedLinks}/${row.deterministicLinks}`,
   미공개확률: row.unknownChanceLinks,
+  기본자버프: row.baseBuffs.join(' / ') || '-',
   보석배율: row.gemCooldownMultiplier.toFixed(5),
   최훈4배율: row.optimizationMultiplier.toFixed(5)
 })));
@@ -101,6 +104,7 @@ for (const row of rows) {
   assert.equal(row.className, row.expectedClassName, `${row.expectedClassName} 표본 ${row.referenceCharacter}의 현재 직업이 ${row.className || '미확인'}이다.`);
   assert.ok(row.usedSkills > 0, `${row.className}: 현재 스킬트리 주기를 만들지 못했다.`);
   assert.deepEqual(row.invalidCooldowns, [], `${row.className}: 유효하지 않은 쿨타임이 있다.`);
+  assert.ok(Object.values(row.baseBuffEffects).every(Number.isFinite), `${row.className}: 기본 스킬 자버프 수치가 유효하지 않다.`);
   if (!row.support) assert.ok(row.modeledSharePercent > 0, `${row.className}: 전투분석 딜 지분과 현재 스킬을 연결하지 못했다.`);
   assert.ok(Math.abs(row.modeledSharePercent + row.unmodeledSharePercent - 100) < 0.11, `${row.className}: 전투분석 지분 분류 합계가 100%가 아니다.`);
   assert.ok(Number.isFinite(row.gemCooldownMultiplier) && row.gemCooldownMultiplier >= 1, `${row.className}: 보석 효율이 유효하지 않다.`);

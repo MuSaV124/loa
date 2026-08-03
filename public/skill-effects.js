@@ -72,6 +72,8 @@ export function emptySkillEffectState() {
     items: [],
     calculableItems: [],
     cycleItems: [],
+    globalBuffEffects: emptyEffects(),
+    globalBuffItems: [],
     selectedTripodCount: 0,
     conditionalTripodCount: 0,
     cooldownTripodCount: 0,
@@ -120,6 +122,20 @@ export function collectSkillTooltipTexts(tooltip) {
     Object.values(value).forEach(visit);
   };
   visit(tooltip);
+  return [...new Set(texts)];
+}
+
+function collectBaseSkillDescriptionTexts(tooltip) {
+  const parsed = typeof tooltip === 'string' ? parseJsonString(tooltip) : tooltip;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return collectSkillTooltipTexts(tooltip);
+  const texts = [];
+  for (const element of Object.values(parsed)) {
+    if (!element || typeof element !== 'object') continue;
+    if (!['SingleTextBox', 'MultiTextBox'].includes(String(element.type || ''))) continue;
+    if (typeof element.value !== 'string') continue;
+    const text = decodeEntities(element.value);
+    if (text) texts.push(text);
+  }
   return [...new Set(texts)];
 }
 
@@ -175,6 +191,50 @@ function removeSpecificDamageClauses(text) {
     .replace(/치명타\s*(?:피해|피해량)[^.!?]{0,30}?[+-]?\d+(?:\.\d+)?\s*%\s*(?:증가|감소|높아지|낮아지)[^.!?]*/gi, ' ')
     .replace(/추가\s*피해(?:량)?[^.!?]{0,30}?[+-]?\d+(?:\.\d+)?\s*%\s*(?:증가|감소|높아지|낮아지)[^.!?]*/gi, ' ')
     .replace(/적에게\s*주는\s*피해(?:량)?[^.!?]{0,30}?[+-]?\d+(?:\.\d+)?\s*%\s*(?:증가|감소|높아지|낮아지)[^.!?]*/gi, ' ');
+}
+
+function isExternalPartyEffectClause(text) {
+  return /자신\s*및\s*파티원|파티원|받는\s*피해|치명타\s*저항(?:률)?|적중된\s*적은/i.test(text);
+}
+
+function effectClauses(text) {
+  return String(text || '').split(/(?<=[.!?])\s+|\|+/).map(row => row.trim()).filter(Boolean);
+}
+
+function isTimedSelfBuffClause(text) {
+  return /\d+(?:\.\d+)?\s*초\s*(?:동안|간)/i.test(text)
+    && /(?:스킬\s*)?(?:시전|사용|적중)\s*시|자신(?:의|은|이|에게)?/i.test(text);
+}
+
+function mergeStrongestEffects(target, source) {
+  for (const key of SKILL_EFFECT_KEYS) {
+    const value = Number(source?.[key] || 0);
+    if (Math.abs(value) > Math.abs(Number(target[key] || 0))) target[key] = round2(value);
+  }
+}
+
+function parseOwnSkillEffectText(text) {
+  const effects = emptyEffects();
+  for (const clause of effectClauses(text)) {
+    if (isExternalPartyEffectClause(clause)) continue;
+    mergeStrongestEffects(effects, parseSkillEffectText(clause));
+  }
+  return effects;
+}
+
+function parseBaseSkillEffects(skill) {
+  const effects = emptyEffects();
+  const selfBuffEffects = emptyEffects();
+  const descriptions = collectBaseSkillDescriptionTexts(skill?.Tooltip);
+  for (const description of descriptions) {
+    for (const clause of effectClauses(description)) {
+      if (isExternalPartyEffectClause(clause)) continue;
+      const parsed = parseSkillEffectText(clause);
+      if (!hasSkillEffects(parsed)) continue;
+      mergeStrongestEffects(isTimedSelfBuffClause(clause) ? selfBuffEffects : effects, parsed);
+    }
+  }
+  return { effects, selfBuffEffects, descriptions };
 }
 
 export function parseSkillEffectText(value) {
@@ -311,7 +371,7 @@ function parseSelectedTripod(tripod) {
   const joinedText = texts.join(' ');
   const effects = emptyEffects();
   for (const text of texts) {
-    const parsed = parseSkillEffectText(text);
+    const parsed = parseOwnSkillEffectText(text);
     for (const key of SKILL_EFFECT_KEYS) {
       if (Math.abs(Number(parsed[key] || 0)) > Math.abs(Number(effects[key] || 0))) effects[key] = parsed[key];
     }
@@ -343,6 +403,7 @@ function parseSelectedTripod(tripod) {
 export function extractCombatSkillEffects(skills) {
   const result = emptySkillEffectState();
   for (const skill of Array.isArray(skills) ? skills : []) {
+    const base = parseBaseSkillEffects(skill);
     const selectedTripods = (Array.isArray(skill?.Tripods) ? skill.Tripods : [])
       .filter(tripod => tripod?.IsSelected === true)
       .map(parseSelectedTripod);
@@ -353,6 +414,7 @@ export function extractCombatSkillEffects(skills) {
     result.ignoredCooldownCount = result.stochasticCooldownCount;
 
     const merged = { effects: emptyEffects(), skillDamageMultiplier: 1 };
+    mergeTripodEffects(merged, base.effects);
     for (const tripod of selectedTripods) mergeTripodEffects(merged, tripod.effects);
     merged.effects.skillDamage = round2((merged.skillDamageMultiplier - 1) * 100);
     for (const key of SKILL_EFFECT_KEYS) merged.effects[key] = round2(merged.effects[key]);
@@ -366,6 +428,16 @@ export function extractCombatSkillEffects(skills) {
     const rune = runeSummary(skill?.Rune);
     const cooldown = mergeCooldownRules(selectedTripods.flatMap(tripod => tripod.cooldown?.rules || []));
     const currentTree = Number(skill?.Level || 0) > 1 || selectedTripods.length > 0 || Boolean(rune?.name);
+    if (currentTree && hasSkillEffects(base.selfBuffEffects)) {
+      const buffItem = {
+        name: String(skill?.Name || '').trim(),
+        effects: base.selfBuffEffects
+      };
+      result.globalBuffItems.push(buffItem);
+      for (const key of SKILL_EFFECT_KEYS) {
+        result.globalBuffEffects[key] = round2(Number(result.globalBuffEffects[key] || 0) + Number(base.selfBuffEffects[key] || 0));
+      }
+    }
     const manaUsage = parseSkillManaUsage(skill?.Tooltip);
     const item = {
       name: String(skill?.Name || '').trim(),
@@ -380,6 +452,8 @@ export function extractCombatSkillEffects(skills) {
       cooldown,
       rune,
       currentTree,
+      baseEffects: base.effects,
+      selfBuffEffects: base.selfBuffEffects,
       effects: merged.effects,
       timedSpeedEffects,
       conditional: selectedTripods.some(tripod => tripod.conditional),

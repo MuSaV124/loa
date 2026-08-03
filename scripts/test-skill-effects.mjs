@@ -33,6 +33,38 @@ assert.equal(direct.attackSpeed, 8);
 assert.equal(direct.moveSpeed, 5);
 assert.equal('cooldownReduction' in direct, false);
 
+const baseSkillBuffs = extractCombatSkillEffects([
+  {
+    Name: '청룡진', Level: 10,
+    Tooltip: JSON.stringify({
+      Element_005: { type: 'SingleTextBox', value: '스킬 시전 시 연가공법을 발동시켜 6초 동안 치명타 적중률이 20.0% 증가한다.' },
+      Element_006: { type: 'TripodSkillCustom', value: { desc: '공격에 적중된 적은 16초 동안 자신 및 파티원의 치명타 공격에 받는 피해가 8.0% 증가한다.' } },
+      Element_014: { type: 'SingleTextBox', value: '스킬 시전 시 연가공법을 발동시켜 6초 동안 치명타 적중률이 20.0% 증가한다.' }
+    }),
+    Tripods: [{ Tier: 1, Slot: 0, Name: '약점 공략', IsSelected: true, Tooltip: '공격에 적중된 적은 16초 동안 자신 및 파티원의 치명타 공격에 받는 피해가 8.0% 증가한다.' }]
+  },
+  {
+    Name: '전 직업 자버프 표본', Level: 10,
+    Tooltip: JSON.stringify({
+      Element_005: { type: 'SingleTextBox', value: '스킬 사용 시 8초 동안 자신의 공격 및 이동 속도가 12.0% 증가한다.' }
+    }),
+    Tripods: []
+  },
+  {
+    Name: '스킬 전용 치적 표본', Level: 10,
+    Tooltip: JSON.stringify({
+      Element_005: { type: 'SingleTextBox', value: '공격 적중 시 치명타 적중률이 40.0% 증가한다.' }
+    }),
+    Tripods: []
+  }
+]);
+assert.equal(baseSkillBuffs.globalBuffEffects.critRate, 20, '청룡진 기본 설명의 지속 자버프 치적을 전역 반영해야 한다.');
+assert.equal(baseSkillBuffs.globalBuffEffects.attackSpeed, 12, '직업명 예외 없이 기본 설명의 지속 공속 자버프를 읽어야 한다.');
+assert.equal(baseSkillBuffs.globalBuffEffects.moveSpeed, 12, '직업명 예외 없이 기본 설명의 지속 이속 자버프를 읽어야 한다.');
+assert.equal(baseSkillBuffs.items[0].effects.skillDamage, 0, '파티원이 받는 치명타 피해 시너지를 스킬 피해로 오인하면 안 된다.');
+assert.equal(baseSkillBuffs.items[2].effects.critRate, 40, '지속시간 없는 기본 설명 효과는 해당 스킬 전용으로 유지해야 한다.');
+assert.equal(baseSkillBuffs.globalBuffItems.length, 2);
+
 const jointSpeed = parseSkillEffectText('공격 및 이동 속도가 7%만큼 증가한다. 피해가 25% 증가한다.');
 assert.equal(jointSpeed.attackSpeed, 7);
 assert.equal(jointSpeed.moveSpeed, 7);
