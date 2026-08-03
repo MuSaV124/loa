@@ -1,17 +1,18 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.14.0';
-import { emptyCardEffects } from './card-effects.js?v=5.14.0';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.14.0';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.14.0';
-import { emptySkillEffectState, formatSkillEffectSummary, minimumSkillEffectProfile, skillExperimentItems } from './skill-effects.js?v=5.14.0';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.14.0';
-import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.14.0';
-import { buildSkillCycleModel, evaluateEvolutionCooldown } from './skill-cycle.js?v=5.14.0';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.14.0';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.14.0';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.14.0';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.14.0';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.14.0';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.14.0';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.0';
+import { emptyCardEffects } from './card-effects.js?v=5.15.0';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.0';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.0';
+import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.0';
+import { emptyPassiveSkillEffectState, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.0';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.0';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.0';
+import { buildSkillCycleModel, evaluateEvolutionCooldown } from './skill-cycle.js?v=5.15.0';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.0';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.0';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.0';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.0';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.0';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.0';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -20,9 +21,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.14.0';
+} from './cache-policy.js?v=5.15.0';
 
-const VERSION = '5.14.0';
+const VERSION = '5.15.0';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -64,6 +65,7 @@ const state = {
   enlightenment: { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] },
   card: emptyCardEffects(),
   skillEffects: emptySkillEffectState(),
+  passiveSkillEffects: emptyPassiveSkillEffectState(),
   skillCycle: null,
   powerSnapshot: null,
   powerCostEstimates: [],
@@ -94,7 +96,7 @@ function renderSkillEffectControl() {
   const preview = $('skillEffectPreview');
   if (!preview) return;
   const items = skillExperimentItems(state.skillEffects);
-  const minimumProfile = minimumSkillEffectProfile(state.skillEffects);
+  const passiveRules = state.passiveSkillEffects?.rules || [];
   const loadedCount = Number(state.skillEffects?.items?.length || 0);
   const conditionalCount = Number(state.skillEffects?.conditionalTripodCount || items.filter(isConditionalSkill).length);
   const cooldownTripodCount = Number(state.skillEffects?.cooldownTripodCount || 0);
@@ -110,7 +112,8 @@ function renderSkillEffectControl() {
     cycle?.usedSkillCount ? `현재 트리 ${cycle.usedSkillCount}개` : '',
     modeledSharePercent > 0 ? `계산 지분 ${modeledSharePercent.toFixed(1)}%` : '',
     cycle?.weightedCooldownSeconds > 0 ? `평균 ${cycle.weightedCooldownSeconds.toFixed(2)}초` : '',
-    `효과값 ${minimumProfile.itemCount}개`,
+    `트라이포드 효과 ${items.length}개`,
+    passiveRules.length ? `깨달음·도약 ${passiveRules.length}개` : '',
     conditionalCount ? `조건 충족 ${conditionalCount}개` : '',
     cooldownTripodCount ? `쿨 트포 ${cooldownTripodCount}개` : '',
     stochasticCooldownCount ? `확률 쿨감 ${stochasticCooldownCount}개 별도` : ''
@@ -123,12 +126,15 @@ function renderSkillEffectControl() {
     const detail = [flags, seconds, effectSummary].filter(Boolean).join(' · ');
     return `<div class="skillEffectRow"><b>${escapeHtml(item.name || '이름 없는 스킬')}${Number(item.level || 0) ? ` Lv.${Number(item.level)}` : ''}</b><span>${escapeHtml(detail)}</span></div>`;
   }).join('');
-  const minimumSummary = formatSkillEffectSummary(minimumProfile.effects) || '수치 효과 없음';
-  const minimumRow = minimumProfile.itemCount
-    ? `<div class="skillEffectRow"><b>추천 적용 기준값</b><span>${escapeHtml(minimumSummary)}</span></div>`
-    : '';
+  const passiveRows = passiveRules.map(rule => {
+    const target = rule.scope === 'skill'
+      ? rule.targets.join(', ')
+      : rule.scope === 'category' ? `${rule.selector} 스킬` : '상태 조건 주력기';
+    const detail = `${rule.category} · ${target} · ${formatSkillEffectSummary(rule.effects) || '수치 효과 없음'}`;
+    return `<div class="skillEffectRow"><b>${escapeHtml(rule.nodeName || rule.category)}</b><span>${escapeHtml(detail)}</span></div>`;
+  }).join('');
   const cycleNote = cycle ? `<div class="skillCycleNote">신속 ${Number(cycle.swiftCooldownReduction || 0).toFixed(2)}% · 보석 가중 ${Number(cycle.weightedGemCooldown || 0).toFixed(2)}% · ${escapeHtml(cycle.analyzerTag || '장착 스킬 추정')}${cycle.appliedCycleLinkCount ? ` · 아크그리드 연쇄 ${cycle.appliedCycleLinkCount}건` : ''}${cycle.identityDriverSharePercent ? ` · 게이지 연동 ${Number(cycle.identityDriverSharePercent).toFixed(1)}%` : ''}${cycle.stochasticRuneCount || cycle.stochasticCycleLinkCount ? ` · 확률 미공개 ${Number(cycle.stochasticRuneCount || 0) + Number(cycle.stochasticCycleLinkCount || 0)}건 제외` : ''}</div>` : '';
-  preview.innerHTML = `<div class="skillEffectHeading"><b>현재 스킬트리 자동 반영</b><span>${escapeHtml(status)}</span></div>${cycleNote}<div class="skillEffectRows">${minimumRow}${rows || '<div class="skillEffectRow muted"><span>계산할 사용 스킬이 없습니다.</span></div>'}</div>`;
+  preview.innerHTML = `<div class="skillEffectHeading"><b>현재 스킬트리 자동 반영</b><span>${escapeHtml(status)}</span></div>${cycleNote}<div class="skillEffectRows">${passiveRows}${rows || (!passiveRows ? '<div class="skillEffectRow muted"><span>계산할 사용 스킬이 없습니다.</span></div>' : '')}</div>`;
   preview.classList.remove('muted');
 }
 
@@ -654,7 +660,7 @@ function isLeapEffect(effect, joinedText = '') {
   // 깨달음 파싱에서 도약 텍스트가 포함된 항목은 전부 제외합니다.
   return normalized.includes('도약') || normalized.includes('leap');
 }
-function extractEnlightenmentEffects(effects) {
+function extractEnlightenmentEffects(effects, passiveState = state.passiveSkillEffects) {
   const result = { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
   const applied = new Set();
   for (const effect of effects || []) {
@@ -667,6 +673,14 @@ function extractEnlightenmentEffects(effects) {
     const joined = effectFullText(effect);
     const normalized = normalizeNodeName(`${effect?.name || ''} ${joined}`);
     const parsed = parsePercentEffectText(joined);
+    const passiveRows = (passiveState?.items || []).filter(row => Number(row?.effectIndex) === Number(effect?.index));
+    const scopedRows = passiveRows.filter(row => row.scope !== 'global');
+    const globalRows = passiveRows.filter(row => row.scope === 'global');
+    for (const key of ['critRate','critDamage','critHitDamage','enemyDamage','additionalDamage']) {
+      const globalValue = round2(globalRows.reduce((sum, row) => sum + Number(row?.effects?.[key] || 0), 0));
+      if (scopedRows.some(row => Math.abs(Number(row?.rawEffects?.[key] || 0)) > 0.0001)) parsed[key] = globalValue;
+      else if (Math.abs(globalValue) > Math.abs(Number(parsed[key] || 0))) parsed[key] = globalValue;
+    }
 
     // 기상술사 질풍노도/기민함처럼 문장 안에 고정 수치가 아니라
     // 공속/이속 증가량을 참조하는 깨달음 효과는 별도 계산합니다.
@@ -1508,6 +1522,14 @@ function refreshSkillCycleModel() {
   });
   return state.skillCycle;
 }
+function refreshPassiveSkillEffects() {
+  state.passiveSkillEffects = extractArkPassiveSkillEffects(state.foundEffects, {
+    skillItems: state.skillEffects?.items || [],
+    shareNames: (state.skillCycle?.shareRows || []).map(row => row?.name).filter(Boolean),
+    identitySkills: state.combatAnalyzer?.identitySkills || []
+  });
+  return state.passiveSkillEffects;
+}
 async function loadCombatAnalyzer() {
   if (state.combatAnalyzer) return state.combatAnalyzer;
   if (!combatAnalyzerPromise) {
@@ -1516,6 +1538,8 @@ async function loadCombatAnalyzer() {
       .then(data => {
         state.combatAnalyzer = data || null;
         refreshSkillCycleModel();
+        refreshPassiveSkillEffects();
+        if (state.foundEffects?.length) state.enlightenment = extractEnlightenmentEffects(state.foundEffects, state.passiveSkillEffects);
         renderSkillEffectControl();
         const summary = $('gemAnalyzerSummary');
         if (state.powerSnapshot && simulatorRendered) renderPowerSnapshot(state.powerSnapshot);
@@ -3770,47 +3794,134 @@ function applyExperimentalSkillEffects(stats, item) {
   return out;
 }
 
+function normalizedSkillName(value) {
+  return String(value || '').replace(/\s+/g, '').replace(/[·:]/g, '').trim().toLowerCase();
+}
+
+function matchedSkillItem(name, targetNames = []) {
+  const candidates = [name, ...targetNames].map(normalizedSkillName).filter(Boolean);
+  const items = state.skillEffects?.items || [];
+  return items.find(item => candidates.some(candidate => {
+    const itemName = normalizedSkillName(item?.name);
+    return itemName && (itemName === candidate || itemName.includes(candidate) || candidate.includes(itemName));
+  })) || null;
+}
+
+function weightedSkillUnits() {
+  const shareRows = state.skillCycle?.shareRows || [];
+  if (shareRows.length) {
+    const explicitPassiveTargets = [...new Set((state.passiveSkillEffects?.rules || [])
+      .filter(rule => rule.scope === 'skill')
+      .flatMap(rule => rule.targets || [])
+      .filter(Boolean))];
+    const units = shareRows.flatMap(row => {
+      let targetNames = Array.isArray(row?.targetNames) && row.targetNames.length ? row.targetNames : [row?.name];
+      const groupName = normalizedSkillName(row?.name);
+      const groupedPassiveTargets = explicitPassiveTargets.filter(target => {
+        const key = normalizedSkillName(target);
+        return groupName && key && key !== groupName && key.includes(groupName);
+      });
+      if (groupedPassiveTargets.length && !matchedSkillItem(row?.name)) targetNames = groupedPassiveTargets;
+      const weight = Number(row?.normalizedShare || 0) / Math.max(1, targetNames.length);
+      return targetNames.map(name => {
+        const item = matchedSkillItem(name, [row?.name]);
+        return {
+          name: item?.name || name || row?.name || '이름 없는 스킬',
+          shareName: row?.name || name,
+          targetNames: [name],
+          category: item?.category || '',
+          item,
+          weight
+        };
+      });
+    }).filter(row => row.weight > 0);
+    for (const target of explicitPassiveTargets) {
+      if (units.some(unit => normalizedSkillName(unit.name) === normalizedSkillName(target))) continue;
+      const item = matchedSkillItem(target);
+      units.push({ name: item?.name || target, shareName: target, targetNames: [target], category: item?.category || '', item, weight: 0 });
+    }
+    return units;
+  }
+
+  const items = skillExperimentItems(state.skillEffects);
+  const weight = items.length ? 1 / items.length : 0;
+  return items.map(item => ({
+    name: item.name || '이름 없는 스킬',
+    shareName: item.name || '',
+    targetNames: [item.name].filter(Boolean),
+    category: item.category || '',
+    item,
+    weight
+  }));
+}
+
 function score(stats) {
   const baseResult = scoreCore(stats);
-  const minimumProfile = minimumSkillEffectProfile(state.skillEffects);
-  const items = minimumProfile.items;
-  if (!items.length || !hasNumericSkillEffects(minimumProfile.effects) || !baseResult.value) {
+  const units = weightedSkillUnits();
+  if (!units.length || !baseResult.value) {
     return {
       ...baseResult,
       skillExperimentMultiplier: 1,
-      skillExperiment: { applied: false, count: 0, conditionalAssumed: true, items: [] }
+      skillExperiment: { applied: false, count: 0, conditionalAssumed: true, items: [], commonCritRate: baseResult.rawCritRate }
     };
   }
-  const rows = items.map(item => {
-    const result = scoreCore(applyExperimentalSkillEffects(stats, item));
+
+  const identitySkills = state.combatAnalyzer?.identitySkills || [];
+  const rows = units.map(unit => {
+    const passive = passiveEffectsForSkill(state.passiveSkillEffects, unit, { identitySkills });
+    const effects = mergeSkillEffects(unit.item?.effects || {}, passive.effects);
+    const result = scoreCore(applyExperimentalSkillEffects(stats, { name: unit.name, effects }));
     return {
-      name: item.name || '이름 없는 스킬',
-      level: Number(item.level || 0),
-      conditional: isConditionalSkill(item),
-      guaranteedCrit: isGuaranteedCritSkill(item),
-      summary: formatSkillEffectSummary(item.effects) || '수치 효과 없음',
+      name: unit.name,
+      shareName: unit.shareName,
+      level: Number(unit.item?.level || 0),
+      share: unit.weight,
+      conditional: isConditionalSkill(unit.item) || passive.rules.some(rule => rule.scope === 'state'),
+      guaranteedCrit: isGuaranteedCritSkill(unit.item) || Number(effects.critRate || 0) >= 99.99,
+      summary: formatSkillEffectSummary(effects) || '수치 효과 없음',
+      effects,
+      passiveRules: passive.rules,
       value: result.value,
       gain: ((result.value / baseResult.value) - 1) * 100,
+      rawCritRate: result.rawCritRate,
       effectiveCritRate: result.effectiveCritRate,
       critDamage: result.critDamage,
-      convertedEvolutionDamage: result.convertedEvolutionDamage
+      convertedEvolutionDamage: result.convertedEvolutionDamage,
+      result
     };
   });
-  const minimumResult = scoreCore(applyExperimentalSkillEffects(stats, {
-    name: '추천 적용 기준값',
-    effects: minimumProfile.effects
-  }));
-  const minimumMultiplier = minimumResult.value / baseResult.value;
+  const modeledWeight = Math.min(1, rows.reduce((sum, row) => sum + Number(row.share || 0), 0));
+  const weightedMultiplier = (1 - modeledWeight) + rows.reduce((sum, row) => sum + Number(row.share || 0) * (row.value / baseResult.value), 0);
+  const appliedRows = rows.filter(row => hasNumericSkillEffects(row.effects));
+  if (!appliedRows.length) {
+    return {
+      ...baseResult,
+      skillExperimentMultiplier: 1,
+      skillExperiment: { applied: false, count: rows.length, conditionalAssumed: true, items: rows, commonCritRate: baseResult.rawCritRate }
+    };
+  }
+  const anchor = [...rows].sort((a, b) => Number(b.rawCritRate || 0) - Number(a.rawCritRate || 0) || Number(b.share || 0) - Number(a.share || 0))[0];
+  const weightedConvertedEvolutionDamage = rows.reduce((sum, row) => sum + Number(row.share || 0) * Number(row.convertedEvolutionDamage || 0), 0)
+    + (1 - modeledWeight) * Number(baseResult.convertedEvolutionDamage || 0);
   return {
-    ...minimumResult,
-    skillExperimentMultiplier: minimumMultiplier,
+    ...baseResult,
+    value: baseResult.value * weightedMultiplier,
+    rawCritRate: Number(anchor?.rawCritRate ?? baseResult.rawCritRate),
+    critRate: Number(anchor?.rawCritRate ?? baseResult.critRate),
+    effectiveCritRate: Number(anchor?.effectiveCritRate ?? baseResult.effectiveCritRate),
+    critDamage: Number(anchor?.critDamage ?? baseResult.critDamage),
+    convertedEvolutionDamage: weightedConvertedEvolutionDamage,
+    skillExperimentMultiplier: weightedMultiplier,
     skillExperiment: {
       applied: true,
-      count: rows.length,
+      count: appliedRows.length,
       conditionalAssumed: true,
-      averageGain: (minimumMultiplier - 1) * 100,
-      appliedEffects: minimumProfile.effects,
-      items: rows
+      averageGain: (weightedMultiplier - 1) * 100,
+      appliedEffects: anchor?.effects || {},
+      commonCritRate: baseResult.rawCritRate,
+      anchorSkill: anchor ? { name: anchor.name, critRate: anchor.rawCritRate, share: anchor.share } : null,
+      modeledSharePercent: modeledWeight * 100,
+      items: rows.map(({ result, ...row }) => row)
     }
   };
 }
@@ -3895,7 +4006,7 @@ function enlightenmentAppliedDetailHtml(base) {
   pushTotal('추피', state.enlightenment.additionalDamage);
   pushTotal('적주피', state.enlightenment.enemyDamage);
   const totalLine = totals.length ? `<div class="enlightenmentDetailTotal"><strong>깨달음 합계</strong><em>${escapeHtml(totals.join(' / '))}</em></div>` : '';
-  return `<details class="enlightenmentDetails"><summary>깨달음 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 깨달음 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. v4.8.1부터 API Name이 '깨달음'인 항목만 깨달음으로 반영합니다. 도약/진화 항목은 깨달음 계산에서 제외합니다.</p></div></details>`;
+  return `<details class="enlightenmentDetails"><summary>깨달음 전역 적용 내역 / 중복 확인</summary><div class="enlightenmentDetailBody">${rows.join('')}${totalLine}<p>같은 효과 안에서 RAW·Tooltip·Description 반복 문장은 가장 큰 유효값 1개만 반영합니다. 개별 스킬·스킬 계열·상태 조건 효과는 이 전역 합계에서 분리하고, 깨달음과 도약 모두 해당 스킬의 딜 지분 계산에만 적용합니다.</p></div></details>`;
 }
 
 
@@ -3935,6 +4046,26 @@ function engravingAppliedDetailHtml() {
   if (stoneEffParts.length) rows.push(`<div class="enlightenmentDetailLine"><b>스톤 각인 보너스</b><span>${escapeHtml(stoneEffParts.join(' / '))}</span></div>`);
   if (!rows.length) return `<details class="enlightenmentDetails"><summary>어빌리티 스톤 / 각인서 적용 내역</summary><div class="enlightenmentDetailBody"><div class="enlightenmentDetailLine muted"><span>API에서 파싱된 어빌리티 스톤/각인서 효과가 없습니다.</span></div></div></details>`;
   return `<details class="enlightenmentDetails"><summary>어빌리티 스톤 / 각인서 적용 내역</summary><div class="enlightenmentDetailBody">${rows.join('')}</div></details>`;
+}
+
+function skillCritScopeHtml(current) {
+  const experiment = current?.result?.skillExperiment;
+  const rows = (experiment?.items || [])
+    .filter(row => Number(row?.share || 0) > 0 || hasNumericSkillEffects(row?.effects))
+    .sort((a, b) => Number(b?.rawCritRate || 0) - Number(a?.rawCritRate || 0) || Number(b?.share || 0) - Number(a?.share || 0));
+  if (!experiment?.applied || !rows.length) return '';
+  const anchorName = experiment.anchorSkill?.name || rows[0]?.name || '-';
+  const skillRows = rows.map(row => {
+    const passiveNames = [...new Set((row.passiveRules || []).map(rule => `${rule.category} ${rule.nodeName}`).filter(Boolean))];
+    const detail = [
+      Number(row.share || 0) > 0 ? `딜 지분 ${(Number(row.share) * 100).toFixed(1)}%` : '딜 지분 미확인',
+      passiveNames.join(', '),
+      row.summary || ''
+    ].filter(Boolean).join(' · ');
+    const anchor = normalizedSkillName(row.name) === normalizedSkillName(anchorName);
+    return `<div class="skillCritScopeRow${anchor ? ' anchor' : ''}"><div><b>${escapeHtml(row.name)}</b><span>${escapeHtml(detail)}</span></div><strong>${Number(row.rawCritRate || 0).toFixed(2)}%</strong></div>`;
+  }).join('');
+  return `<section class="skillCritScope"><div class="skillCritScopeHead"><div><span>치적 기준 스킬</span><b>${escapeHtml(anchorName)}</b></div><div><span>캐릭터 공통 치적</span><b>${Number(experiment.commonCritRate || 0).toFixed(2)}%</b></div><div><span>기준 스킬 최종 치적</span><b>${Number(experiment.anchorSkill?.critRate || rows[0]?.rawCritRate || 0).toFixed(2)}%</b></div></div><div class="skillCritScopeRows">${skillRows}</div></section>`;
 }
 
 function buildSourceSummary(current) {
@@ -3978,7 +4109,7 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.effects?.critRate) critLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critRate));
   if (base.dynamicEnlightenmentCritRate) critLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritRate));
   if (base.extraCritRate) critLines.push(sourceLine('추가 입력', base.extraCritRate));
-  if (appliedSkillEffects.critRate) critLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.critRate));
+  if (appliedSkillEffects.critRate) critLines.push(sourceLine(`기준 스킬 · ${current.result?.skillExperiment?.anchorSkill?.name || '스킬별'}`, appliedSkillEffects.critRate));
   critLines.push(...critEvolution);
 
   const critDamageLines = [sourceLine('기본 치명타 피해', 200)];
@@ -3990,12 +4121,12 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.effects?.critDamage) critDamageLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critDamage));
   if (base.dynamicEnlightenmentCritDamage) critDamageLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritDamage));
   if (base.extraCritDamage) critDamageLines.push(sourceLine('추가 입력', base.extraCritDamage));
-  if (appliedSkillEffects.critDamage) critDamageLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.critDamage));
+  if (appliedSkillEffects.critDamage) critDamageLines.push(sourceLine(`기준 스킬 · ${current.result?.skillExperiment?.anchorSkill?.name || '스킬별'}`, appliedSkillEffects.critDamage));
   critDamageLines.push(...critDamageEvolution);
 
   const critHitLines = [];
   for (const src of current.stats.critHitDamageSources || []) critHitLines.push(sourceLine(src.label || '치명타 적중 주피', Number(src.value || 0)));
-  if (appliedSkillEffects.critHitDamage) critHitLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.critHitDamage));
+  if (appliedSkillEffects.critHitDamage) critHitLines.push(sourceLine('기준 스킬 효과', appliedSkillEffects.critHitDamage));
   critHitLines.push(...critHitEvolution);
   if (!critHitLines.length && current.stats.critHitDamage) critHitLines.push(sourceLine('치명타 적중 주피', current.stats.critHitDamage));
 
@@ -4012,7 +4143,7 @@ function buildSourceSummary(current) {
   if (base.engravingEffects?.additionalDamage) addLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.additionalDamage));
   if (state.abilityStone?.effects?.additionalDamage) addLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.additionalDamage));
   if (base.extraAdditionalDamage) addLines.push(sourceLine('추가 입력', base.extraAdditionalDamage));
-  if (appliedSkillEffects.additionalDamage) addLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.additionalDamage));
+  if (appliedSkillEffects.additionalDamage) addLines.push(sourceLine('기준 스킬 효과', appliedSkillEffects.additionalDamage));
   addLines.push(...addEvolution);
 
   const attackSpeedLines = [sourceLine('기본 + 만찬 + 서폿 진화', 114, '100% + 5% + 9%')];
@@ -4031,8 +4162,8 @@ function buildSourceSummary(current) {
   if (base.engravingAttackSpeed) attackSpeedLines.push(sourceLine('각인서/API', base.engravingAttackSpeed));
   if (base.extraAttackSpeed) attackSpeedLines.push(sourceLine('추가 입력', base.extraAttackSpeed));
   if (base.extraMoveSpeed) moveSpeedLines.push(sourceLine('추가 입력', base.extraMoveSpeed));
-  if (appliedSkillEffects.attackSpeed) attackSpeedLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.attackSpeed));
-  if (appliedSkillEffects.moveSpeed) moveSpeedLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.moveSpeed));
+  if (appliedSkillEffects.attackSpeed) attackSpeedLines.push(sourceLine('기준 스킬 효과', appliedSkillEffects.attackSpeed));
+  if (appliedSkillEffects.moveSpeed) moveSpeedLines.push(sourceLine('기준 스킬 효과', appliedSkillEffects.moveSpeed));
 
   const enemyLines = [];
   if (state.accessory.enemyDamage) enemyLines.push(sourceLine('악세', state.accessory.enemyDamage));
@@ -4044,7 +4175,7 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.effects?.enemyDamage) enemyLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.enemyDamage));
   if (base.extraEnemyDamage) enemyLines.push(sourceLine('추가 입력', base.extraEnemyDamage));
   if (base.backAttackEnemyDamage) enemyLines.push(sourceLine('백어택', base.backAttackEnemyDamage));
-  if (appliedSkillEffects.enemyDamage) enemyLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.enemyDamage));
+  if (appliedSkillEffects.enemyDamage) enemyLines.push(sourceLine('기준 스킬 효과', appliedSkillEffects.enemyDamage));
   enemyLines.push(...enemyEvolution);
 
   const attackPowerLines = [];
@@ -4052,11 +4183,11 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.attackPower) attackPowerLines.push(sourceLine('어빌리티 스톤', state.abilityStone.attackPower, '기본 공격력 보너스'));
   if (state.abilityStone?.effects?.attackPower) attackPowerLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.attackPower));
   if (base.engravingEffects?.attackPower) attackPowerLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.attackPower));
-  if (appliedSkillEffects.attackPower) attackPowerLines.push(sourceLine('스킬 효과 최소치', appliedSkillEffects.attackPower));
+  if (appliedSkillEffects.attackPower) attackPowerLines.push(sourceLine('기준 스킬 효과', appliedSkillEffects.attackPower));
   const skillExperiment = current.result.skillExperiment || { items: [] };
   const skillExperimentLines = [];
   if (skillExperiment.applied) {
-    skillExperimentLines.push(sourceLine('추천 적용 기준값', skillExperiment.averageGain, formatSkillEffectSummary(skillExperiment.appliedEffects) || '수치 효과 없음'));
+    skillExperimentLines.push(sourceLine('스킬별 지분 합산', skillExperiment.averageGain, `계산 지분 ${Number(skillExperiment.modeledSharePercent || 0).toFixed(1)}% · 기준 ${skillExperiment.anchorSkill?.name || '-'}`));
   }
   skillExperimentLines.push(...(skillExperiment.items || []).map(row => {
     const flags = [
@@ -4065,7 +4196,7 @@ function buildSourceSummary(current) {
       row.convertedEvolutionDamage > 0 ? `뭉가 전환 +${fmt(row.convertedEvolutionDamage)}%` : ''
     ].filter(Boolean);
     const detail = [...flags, row.summary || '수치 효과 없음'].join(' · ');
-    return sourceLine(`${row.name}${row.level ? ` Lv.${row.level}` : ''}`, row.gain, detail);
+    return sourceLine(`${row.name}${row.level ? ` Lv.${row.level}` : ''}`, row.gain, `${Number(row.share || 0) > 0 ? `딜 지분 ${(Number(row.share) * 100).toFixed(1)}% · ` : ''}${detail}`);
   }));
 
   const engravingExpectedLines = [];
@@ -4075,6 +4206,7 @@ function buildSourceSummary(current) {
 
   $('sourceSummary').innerHTML = `
     <div class="sourceTitle"><div><h3>계산 요약</h3><p>표시는 출처별 합산값, 기대값은 로아식 합연산/곱연산으로 계산합니다.</p></div><button id="resetViewButton" type="button">초기화</button></div>
+    ${skillCritScopeHtml(current)}
     ${sourceGroup('치명타 확률', 'blue', critLines, current.result.critRate)}
     ${sourceGroup('치명타 피해', 'purple', critDamageLines, current.result.critDamage)}
     ${sourceGroup('치명타 적중 주피', 'pink', critHitLines, current.result.critHitDamage)}
@@ -4088,7 +4220,7 @@ function buildSourceSummary(current) {
     ${sourceGroup('이동 속도', 'cyan', moveSpeedLines, current.result.moveSpeed)}
     ${enlightenmentAppliedDetailHtml(base)}
     ${engravingAppliedDetailHtml()}
-    <div class="sourceFoot">UI의 치피·진피·추피는 합산 표시이며, 적주피·치명타 적중 주피는 내부 기대값에서 출처별 곱연산으로 적용됩니다. 스킬 효과 실험값은 치적은 <b>확인된 증가 수치 중 최대치</b>, 나머지 효과는 <b>0보다 큰 증가 수치 중 최솟값</b>을 조건 충족 기준으로 추천 계산 전체에 적용하며 쿨감은 제외합니다. 공이속은 N초 동안/간 지속 문구가 있는 효과만 적용하고, 스킬 자체 속도와 감소 효과는 전역 적용하지 않습니다. 확정 치명의 치적 +100%도 뭉가 초과 치적 전환에 사용합니다. 뭉가 Lv.2는 <b>기본 진피 15% + 초과 치적 전환 최대 60% = 총 75%</b> 기준입니다.</div>
+    <div class="sourceFoot">UI의 치피·진피·추피는 합산 표시이며, 적주피·치명타 적중 주피는 내부 기대값에서 출처별 곱연산으로 적용됩니다. 트라이포드·깨달음·도약 효과는 <b>개별 스킬마다 계산한 뒤 전투 분석 딜 지분으로 합산</b>합니다. 상태 조건은 충족 기준이며, 보유 자원 1당처럼 현재 수량을 알 수 없는 가변 효과는 임의 합산하지 않습니다. 공이속은 N초 동안/간 지속 문구가 있는 효과만 적용하고, 확정 치명의 치적 +100%는 해당 스킬의 뭉가 초과 치적 전환에만 사용합니다. 뭉가 Lv.2는 <b>기본 진피 15% + 초과 치적 전환 최대 60% = 총 75%</b> 기준입니다.</div>
   `;
   const reset = $('resetViewButton');
   if (reset) reset.addEventListener('click', () => { state.selected = JSON.parse(JSON.stringify(state.apiSelected || {})); renderEvolutionTiers(); calculateAndRender(); });
@@ -4516,6 +4648,7 @@ function resetCharacterResultState() {
   state.enlightenment = { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
   state.card = emptyCardEffects();
   state.skillEffects = emptySkillEffectState();
+  state.passiveSkillEffects = emptyPassiveSkillEffectState();
   state.skillCycle = null;
   renderSkillEffectControl();
   simulatorRendered = false;
@@ -4537,10 +4670,11 @@ function applyCharacterData(data) {
   syncAdrenalineControlsFromEngraving();
   renderCharacter(data.profile, data.arkPassive);
   state.foundEffects = readEffects(data.arkPassive);
-  state.enlightenment = extractEnlightenmentEffects(state.foundEffects);
   state.selected = classifyEvolution(state.foundEffects);
   state.apiSelected = JSON.parse(JSON.stringify(state.selected));
   refreshSkillCycleModel();
+  refreshPassiveSkillEffects();
+  state.enlightenment = extractEnlightenmentEffects(state.foundEffects, state.passiveSkillEffects);
   renderSkillEffectControl();
   const sharedScenario = state.pendingSharedScenario;
   if (sharedScenario && (!sharedScenario.characterName || sharedScenario.characterName === data.profile.CharacterName)) {

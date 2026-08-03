@@ -87,7 +87,16 @@ const characterResponse = {
     ItemAvgLevel: '1,700.00', CombatPower: '5,000.00', CharacterImage: '',
     Stats: [{ Type: '치명', Value: '1500' }, { Type: '신속', Value: '900' }]
   },
-  arkPassive: { Title: '수라의 길', Effects: [{ Name: '뭉툭한 가시', Level: 2, Description: '', Tooltip: '' }] },
+  arkPassive: { Title: '테스트 전직', Effects: [
+    { Name: '뭉툭한 가시', Level: 2, Description: '', Tooltip: '' },
+    {
+      Name: '도약', Level: 1, Description: '도약 2티어 표본 강화 Lv.1',
+      ToolTip: JSON.stringify({
+        Element_000: { type: 'NameTagBox', value: '표본 강화' },
+        Element_002: { type: 'MultiTextBox', value: '표본 기술 스킬의 치명타 피해가 20.0% 증가한다.' }
+      })
+    }
+  ] },
   accessoryEffects: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
   braceletEffects: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
   abilityStoneEffects: { attackPower: 0, effects: {}, engravings: [], items: [] },
@@ -95,7 +104,7 @@ const characterResponse = {
   arkGridEffects: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
   skillEffects: { items: [skillItem, higherCritDamageSkillItem, baselineSkillItem], cycleItems: [skillItem, higherCritDamageSkillItem, baselineSkillItem], calculableItems: [skillItem, higherCritDamageSkillItem], selectedTripodCount: 3, conditionalTripodCount: 1, cooldownTripodCount: 1, stochasticCooldownCount: 0, usedSkillCount: 3 },
   powerSnapshot: {
-    profile: { className: '브레이커', secondClass: '수라의 길', combatPower: 5000, stats: [{ type: '신속', value: 900 }] },
+    profile: { className: '브레이커', secondClass: '테스트 전직', combatPower: 5000, stats: [{ type: '신속', value: 900 }] },
     equipment: { combat: [], accessories: [] }, gems: { items: [], summary: {} }, arkGrid: { slots: [] }, effects: { arkGrid: { items: [] } }, coverage: {}
   }
 };
@@ -111,8 +120,9 @@ async function verifyViewport(viewport) {
 
   await page.locator('#skillEffectPreview').getByText('현재 스킬트리 자동 반영').waitFor();
   const preview = await page.locator('#skillEffectPreview').innerText();
-  assert.match(preview, /현재 트리 3개 · 계산 지분 100\.0% · 효과값 2개/);
-  assert.match(preview, /추천 적용 기준값/);
+  assert.match(preview, /현재 트리 3개 · 계산 지분 100\.0%/);
+  assert.match(preview, /트라이포드 효과 3개 · 깨달음·도약 1개/);
+  assert.match(preview, /표본 강화/);
   assert.match(preview, /확정 치명/);
   assert.match(preview, /조건 충족/);
   assert.match(preview, /치적 \+100%/);
@@ -125,12 +135,13 @@ async function verifyViewport(viewport) {
   const source = await page.locator('#sourceSummary').textContent();
   assert.match(source, /스킬 효과 실험값/);
   assert.match(source, /표본 기술/);
-  assert.match(source, /0보다 큰 증가 수치 중 최솟값/);
-  assert.match(source, /확인된 증가 수치 중 최대치/);
-  assert.match(source, /추천 적용 기준값/);
+  assert.match(source, /개별 스킬마다 계산한 뒤 전투 분석 딜 지분으로 합산/);
+  assert.match(source, /치적 기준 스킬/);
+  assert.match(source, /캐릭터 공통 치적/);
+  assert.match(source, /스킬별 지분 합산/);
   assert.match(source, /뭉가 전환/, '확정 치명 +100%가 뭉가 초과 치적 전환에 사용되어야 한다.');
   const critDamageTotal = await page.locator('.sourceGroup').filter({ hasText: '치명타 피해' }).locator('summary em').innerText();
-  assert.equal(critDamageTotal, '+360.00%', `기본 치피 200%에 스킬 최소치 160%가 적용되어야 합니다: ${critDamageTotal}`);
+  assert.equal(critDamageTotal, '+380.00%', `기준 스킬 치피 160%와 도약 20%가 해당 스킬에 적용되어야 합니다: ${critDamageTotal}`);
   const skillGainText = await page.locator('.sourceGroup').filter({ hasText: '스킬 효과 실험값' }).locator('summary em').innerText();
   const skillGain = Number(skillGainText.replace(/[^\d.-]/g, ''));
   assert.ok(Number.isFinite(skillGain) && skillGain > 0, `스킬 효과가 최종 기대값에 반영되지 않았습니다: ${skillGainText}`);
@@ -184,9 +195,57 @@ async function verifySupportRecommendation() {
   await page.close();
 }
 
+async function verifyScopedBreakerCrit() {
+  const skill = (name, critRate = 0) => ({
+    name, icon: '', level: 14, type: '일반', skillType: 0, currentTree: true, baseCooldownSeconds: 20,
+    cooldown: { flatSeconds: 0, percentReduction: 0 },
+    effects: { critRate, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, attackSpeed: 0, moveSpeed: 0, skillDamage: 0 },
+    selectedTripods: critRate ? [{ name: '한계 돌파', conditional: false, guaranteedCrit: false }] : []
+  });
+  const passive = (category, nodeName, text) => ({
+    Name: category,
+    Description: `${category} 2티어 ${nodeName} Lv.1`,
+    ToolTip: JSON.stringify({
+      Element_000: { type: 'NameTagBox', value: nodeName },
+      Element_002: { type: 'MultiTextBox', value: text }
+    })
+  });
+  const skills = [skill('파천섬광', 15), skill('천기심권', 15), skill('성운멸쇄권')];
+  const response = {
+    ...characterResponse,
+    profile: { ...characterResponse.profile, CharacterName: '권왕표본', Stats: [{ Type: '치명', Value: '2235' }, { Type: '신속', Value: '0' }] },
+    arkPassive: { Title: '권왕파천무', Effects: [
+      passive('깨달음', '권왕파천무', "'권왕십이식 : 낙화' 스킬의 치명타 적중률이 15.0% 증가한다."),
+      passive('깨달음', '권왕십이식 : 풍랑', "'권왕십이식 : 풍랑' 스킬의 치명타 적중률이 15.0% 증가한다."),
+      passive('도약', '충격 폭발', '성운멸쇄권 스킬 시전 시 치명타 적중률이 20.0% 증가한다.')
+    ] },
+    skillEffects: { items: skills, cycleItems: skills, calculableItems: skills.filter(row => row.effects.critRate), selectedTripodCount: 2, conditionalTripodCount: 0, cooldownTripodCount: 0, stochasticCooldownCount: 0, usedSkillCount: 3 },
+    powerSnapshot: {
+      ...characterResponse.powerSnapshot,
+      profile: { className: '브레이커', secondClass: '권왕파천무', combatPower: 5000, stats: [{ type: '신속', value: 0 }] },
+      arkGrid: { slots: [{ name: '파천경', point: 14 }, { name: '충격 충전', point: 14 }, { name: '파천 돌파', point: 14 }] }
+    }
+  };
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) }));
+  await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
+  await page.getByPlaceholder('캐릭터명 입력').fill('권왕표본');
+  await page.getByRole('button', { name: '검색', exact: true }).click();
+  await page.getByRole('heading', { name: /권왕표본/ }).waitFor();
+  await page.locator('.advancedInputDetails').evaluate(element => { element.open = true; });
+  const scope = await page.locator('.skillCritScope').innerText();
+  assert.match(scope, /치적 기준 스킬\s*성운멸쇄권/);
+  assert.match(scope, /캐릭터 공통 치적\s*79\.99%/);
+  assert.match(scope, /성운멸쇄권[\s\S]*99\.99%/);
+  assert.match(scope, /파천섬광[\s\S]*94\.99%/);
+  assert.doesNotMatch(scope, /성운멸쇄권[\s\S]*114\.99%/, '다른 스킬의 15% 치적이 성운멸쇄권에 중복되면 안 된다.');
+  await page.close();
+}
+
 try {
   await verifyViewport({ width: 1440, height: 1000 });
   await verifyViewport({ width: 390, height: 844 });
+  await verifyScopedBreakerCrit();
   await verifySupportRecommendation();
   console.log('skill effect UI tests passed');
 } finally {
