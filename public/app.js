@@ -1,19 +1,19 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.8';
-import { emptyCardEffects } from './card-effects.js?v=5.15.8';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.8';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.8';
-import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.8';
-import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.8';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.8';
-import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.8';
-import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.8';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.8';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.8';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.8';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.8';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.8';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.8';
-import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.8';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.9';
+import { emptyCardEffects } from './card-effects.js?v=5.15.9';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.9';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.9';
+import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.9';
+import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.9';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.9';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.9';
+import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.9';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.9';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.9';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.9';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.9';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.9';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.9';
+import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.9';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -22,9 +22,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.15.8';
+} from './cache-policy.js?v=5.15.9';
 
-const VERSION = '5.15.8';
+const VERSION = '5.15.9';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -4032,7 +4032,11 @@ function score(stats) {
       skillExperiment: { applied: false, count: rows.length, conditionalAssumed: true, items: rows, commonCritRate: baseResult.rawCritRate }
     };
   }
-  const anchor = [...rows].sort((a, b) => Number(b.rawCritRate || 0) - Number(a.rawCritRate || 0) || Number(b.share || 0) - Number(a.share || 0))[0];
+  const referenceRows = rows.some(row => Number(row.share || 0) > 0)
+    ? rows.filter(row => Number(row.share || 0) > 0)
+    : rows;
+  const critRateAnchor = [...referenceRows].sort((a, b) => Number(b.rawCritRate || 0) - Number(a.rawCritRate || 0) || Number(b.share || 0) - Number(a.share || 0))[0];
+  const critDamageAnchor = [...referenceRows].sort((a, b) => Number(b.critDamage || 0) - Number(a.critDamage || 0) || Number(b.share || 0) - Number(a.share || 0))[0];
   const weightedConvertedEvolutionDamage = rows.reduce((sum, row) => sum + Number(row.share || 0) * Number(row.convertedEvolutionDamage || 0), 0)
     + (1 - modeledWeight) * Number(baseResult.convertedEvolutionDamage || 0);
   const baseWithoutArcana = scoreCore(stats);
@@ -4046,10 +4050,10 @@ function score(stats) {
   return {
     ...baseResult,
     value: weightedValue,
-    rawCritRate: Number(anchor?.rawCritRate ?? baseResult.rawCritRate),
-    critRate: Number(anchor?.rawCritRate ?? baseResult.critRate),
-    effectiveCritRate: Number(anchor?.effectiveCritRate ?? baseResult.effectiveCritRate),
-    critDamage: Number(anchor?.critDamage ?? baseResult.critDamage),
+    rawCritRate: Number(critRateAnchor?.rawCritRate ?? baseResult.rawCritRate),
+    critRate: Number(critRateAnchor?.rawCritRate ?? baseResult.critRate),
+    effectiveCritRate: Number(critRateAnchor?.effectiveCritRate ?? baseResult.effectiveCritRate),
+    critDamage: Number(critDamageAnchor?.critDamage ?? baseResult.critDamage),
     convertedEvolutionDamage: weightedConvertedEvolutionDamage,
     skillExperimentMultiplier: weightedMultiplier,
     arcanaCardExpectation,
@@ -4058,9 +4062,10 @@ function score(stats) {
       count: appliedRows.length,
       conditionalAssumed: true,
       averageGain: (weightedMultiplier - 1) * 100,
-      appliedEffects: anchor?.effects || {},
+      appliedEffects: critRateAnchor?.effects || {},
       commonCritRate: baseResult.rawCritRate,
-      anchorSkill: anchor ? { name: anchor.name, critRate: anchor.rawCritRate, share: anchor.share } : null,
+      anchorSkill: critRateAnchor ? { name: critRateAnchor.name, critRate: critRateAnchor.rawCritRate, share: critRateAnchor.share } : null,
+      critDamageAnchorSkill: critDamageAnchor ? { name: critDamageAnchor.name, critDamage: critDamageAnchor.critDamage, share: critDamageAnchor.share, effect: Number(critDamageAnchor.effects?.critDamage || 0) } : null,
       modeledSharePercent: modeledWeight * 100,
       items: rows.map(({ result, valueWithoutArcana, ...row }) => row)
     }
@@ -4263,17 +4268,13 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.effects?.critDamage) critDamageLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critDamage));
   if (base.dynamicEnlightenmentCritDamage) critDamageLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritDamage));
   if (base.extraCritDamage) critDamageLines.push(sourceLine('추가 입력', base.extraCritDamage));
-  let weightedSkillCritDamage = 0;
-  for (const row of skillExperimentRows) {
-    const value = Number(row?.effects?.critDamage || 0);
-    const share = Math.max(0, Number(row?.share || 0));
-    if (!(Math.abs(value) > 0.0001) || !(share > 0)) continue;
-    const contribution = value * share;
-    weightedSkillCritDamage += contribution;
+  const critDamageAnchor = current.result?.skillExperiment?.critDamageAnchorSkill;
+  const maxSkillCritDamage = Number(critDamageAnchor?.effect || 0);
+  if (Math.abs(maxSkillCritDamage) > 0.0001) {
     critDamageLines.push(sourceLine(
-      `스킬 · ${row.name || '이름 미확인'}`,
-      contribution,
-      `원효과 ${pct(value)} · 딜 지분 ${(share * 100).toFixed(1)}%`
+      `기준 스킬 · ${critDamageAnchor.name || '이름 미확인'}`,
+      maxSkillCritDamage,
+      `주력기에서 확인된 최대 치피 ${pct(maxSkillCritDamage)} · 딜 지분 가중 없음`
     ));
   }
   const arcanaCullUptime = Number(current.result?.arcanaCardExpectation?.expectationWeight || 0);
@@ -4286,7 +4287,7 @@ function buildSourceSummary(current) {
     ));
   }
   critDamageLines.push(...critDamageEvolution);
-  const displayedCritDamage = Number(current.stats?.critDamage || 200) + weightedSkillCritDamage + arcanaCullCritDamage;
+  const displayedCritDamage = Number(current.stats?.critDamage || 200) + maxSkillCritDamage + arcanaCullCritDamage;
 
   const critHitLines = [];
   for (const src of current.stats.critHitDamageSources || []) critHitLines.push(sourceLine(src.label || '치명타 적중 주피', Number(src.value || 0)));
@@ -4393,7 +4394,7 @@ function buildSourceSummary(current) {
     ${sourceGroup('이동 속도', 'cyan', moveSpeedLines, current.result.moveSpeed)}
     ${enlightenmentAppliedDetailHtml(base)}
     ${engravingAppliedDetailHtml()}
-    <div class="sourceFoot">UI의 치피·진피·추피는 합산 표시이며, 적주피·치명타 적중 주피는 내부 기대값에서 출처별 곱연산으로 적용됩니다. 트라이포드·깨달음·도약 효과는 <b>개별 스킬마다 계산한 뒤 전투 분석 딜 지분으로 합산</b>합니다. 상태 조건은 충족 기준이며, 보유 자원 1당처럼 현재 수량을 알 수 없는 가변 효과는 임의 합산하지 않습니다. 공이속은 N초 동안/간 지속 문구가 있는 효과만 적용하고, 확정 치명의 치적 +100%는 해당 스킬의 뭉가 초과 치적 전환에만 사용합니다. 뭉가 Lv.2는 <b>기본 진피 15% + 초과 치적 전환 최대 60% = 총 75%</b> 기준입니다.</div>
+    <div class="sourceFoot">UI와 노드 판단의 치적·치피는 실제 주력기에서 확인된 <b>각각의 최댓값</b>을 표시합니다. 적주피·치명타 적중 주피는 내부 기대값에서 출처별 곱연산으로 적용하며, 개별 스킬 전용 피해 효과와 전체 DPS는 전투 분석 딜 지분으로 합산합니다. 상태 조건은 충족 기준이며, 보유 자원 1당처럼 현재 수량을 알 수 없는 가변 효과는 임의 합산하지 않습니다. 공이속은 N초 동안/간 지속 문구가 있는 효과만 적용하고, 확정 치명의 치적 +100%는 해당 스킬의 뭉가 초과 치적 전환에만 사용합니다. 뭉가 Lv.2는 <b>기본 진피 15% + 초과 치적 전환 최대 60% = 총 75%</b> 기준입니다.</div>
   `;
   const reset = $('resetViewButton');
   if (reset) reset.addEventListener('click', () => { state.selected = JSON.parse(JSON.stringify(state.apiSelected || {})); renderEvolutionTiers(); calculateAndRender(); });
