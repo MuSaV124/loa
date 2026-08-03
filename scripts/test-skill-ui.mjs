@@ -101,7 +101,13 @@ const characterResponse = {
   braceletEffects: { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
   abilityStoneEffects: { attackPower: 0, effects: {}, engravings: [], items: [] },
   engravingEffects: { effects: {}, items: [], adrenaline: { adopted: false, level: 0, critRate: 0, attackPower: 0 } },
-  arkGridEffects: { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] },
+  arkGridEffects: {
+    critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 1, additionalDamage: 0,
+    items: [{
+      name: '질서의 별 코어 : 표본', point: 20,
+      activeTexts: ['적에게 주는 피해량이 1.0% 증가한다.', '표본 기술의 피해량이 10.0% 증가한다.']
+    }]
+  },
   skillEffects: { items: [skillItem, higherCritDamageSkillItem, baselineSkillItem], cycleItems: [skillItem, higherCritDamageSkillItem, baselineSkillItem], calculableItems: [skillItem, higherCritDamageSkillItem], selectedTripodCount: 3, conditionalTripodCount: 1, cooldownTripodCount: 1, stochasticCooldownCount: 0, usedSkillCount: 3 },
   powerSnapshot: {
     profile: { className: '브레이커', secondClass: '테스트 전직', combatPower: 5000, stats: [{ type: '신속', value: 900 }] },
@@ -121,7 +127,8 @@ async function verifyViewport(viewport) {
   await page.locator('#skillEffectPreview').getByText('현재 스킬트리 자동 반영').waitFor();
   const preview = await page.locator('#skillEffectPreview').innerText();
   assert.match(preview, /현재 트리 3개 · 계산 지분 100\.0%/);
-  assert.match(preview, /트라이포드 효과 3개 · 깨달음·도약 1개/);
+  assert.match(preview, /트라이포드 효과 3개 · 깨달음·도약 1개 · 아크그리드 1개/);
+  assert.match(preview, /아크그리드 · 표본 기술 · 스킬 피해 \+10%/);
   assert.match(preview, /표본 강화/);
   assert.match(preview, /확정 치명/);
   assert.match(preview, /조건 충족/);

@@ -41,6 +41,7 @@ assert.equal(jointSpeed.skillDamage, 25);
 const critHit = parseSkillEffectText('치명타 적중 시 적에게 주는 피해가 15% 증가한다.');
 assert.equal(critHit.critHitDamage, 15);
 assert.equal(critHit.enemyDamage, 0, '치명타 적중 조건 피해를 일반 적주피로 중복 계산하면 안 된다.');
+assert.equal(parseSkillEffectText('보스 이상 적에게 주는 피해가 1.5% 추가로 증가한다.').enemyDamage, 1.5);
 
 const guaranteed = extractCombatSkillEffects([{
   Name: '적룡포', Level: 14,

@@ -1,19 +1,19 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.7';
-import { emptyCardEffects } from './card-effects.js?v=5.15.7';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.7';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.7';
-import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.7';
-import { emptyPassiveSkillEffectState, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.7';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.7';
-import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.7';
-import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.7';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.7';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.7';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.7';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.7';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.7';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.7';
-import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.7';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.8';
+import { emptyCardEffects } from './card-effects.js?v=5.15.8';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.8';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.8';
+import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.8';
+import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.8';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.8';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.8';
+import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.8';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.8';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.8';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.8';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.8';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.8';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.8';
+import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.8';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -22,9 +22,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.15.7';
+} from './cache-policy.js?v=5.15.8';
 
-const VERSION = '5.15.7';
+const VERSION = '5.15.8';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -67,6 +67,7 @@ const state = {
   card: emptyCardEffects(),
   skillEffects: emptySkillEffectState(),
   passiveSkillEffects: emptyPassiveSkillEffectState(),
+  arkGridSkillEffects: emptyPassiveSkillEffectState(),
   skillCycle: null,
   powerSnapshot: null,
   powerCostEstimates: [],
@@ -137,6 +138,8 @@ function renderSkillEffectControl() {
   renderArcanaIdentityNote();
   const items = skillExperimentItems(state.skillEffects);
   const passiveRules = state.passiveSkillEffects?.rules || [];
+  const arkGridRules = state.arkGridSkillEffects?.rules || [];
+  const scopedRules = [...passiveRules, ...arkGridRules];
   const loadedCount = Number(state.skillEffects?.items?.length || 0);
   const conditionalCount = Number(state.skillEffects?.conditionalTripodCount || items.filter(isConditionalSkill).length);
   const cooldownTripodCount = Number(state.skillEffects?.cooldownTripodCount || 0);
@@ -154,6 +157,7 @@ function renderSkillEffectControl() {
     cycle?.weightedCooldownSeconds > 0 ? `평균 ${cycle.weightedCooldownSeconds.toFixed(2)}초` : '',
     `트라이포드 효과 ${items.length}개`,
     passiveRules.length ? `깨달음·도약 ${passiveRules.length}개` : '',
+    arkGridRules.length ? `아크그리드 ${arkGridRules.length}개` : '',
     conditionalCount ? `조건 충족 ${conditionalCount}개` : '',
     cooldownTripodCount ? `쿨 트포 ${cooldownTripodCount}개` : '',
     stochasticCooldownCount ? `확률 쿨감 ${stochasticCooldownCount}개 별도` : ''
@@ -166,7 +170,7 @@ function renderSkillEffectControl() {
     const detail = [flags, seconds, effectSummary].filter(Boolean).join(' · ');
     return `<div class="skillEffectRow"><b>${escapeHtml(item.name || '이름 없는 스킬')}${Number(item.level || 0) ? ` Lv.${Number(item.level)}` : ''}</b><span>${escapeHtml(detail)}</span></div>`;
   }).join('');
-  const passiveRows = passiveRules.map(rule => {
+  const passiveRows = scopedRules.map(rule => {
     const target = rule.scope === 'skill'
       ? rule.targets.join(', ')
       : rule.scope === 'category' ? `${rule.selector} 스킬` : '상태 조건 주력기';
@@ -716,7 +720,7 @@ function extractEnlightenmentEffects(effects, passiveState = state.passiveSkillE
     const passiveRows = (passiveState?.items || []).filter(row => Number(row?.effectIndex) === Number(effect?.index));
     const scopedRows = passiveRows.filter(row => row.scope !== 'global');
     const globalRows = passiveRows.filter(row => row.scope === 'global');
-    for (const key of ['critRate','critDamage','critHitDamage','enemyDamage','additionalDamage']) {
+    for (const key of ['critRate','critDamage','critHitDamage','enemyDamage','additionalDamage','attackSpeed','moveSpeed']) {
       const globalValue = round2(globalRows.reduce((sum, row) => sum + Number(row?.effects?.[key] || 0), 0));
       if (scopedRows.some(row => Math.abs(Number(row?.rawEffects?.[key] || 0)) > 0.0001)) parsed[key] = globalValue;
       else if (Math.abs(globalValue) > Math.abs(Number(parsed[key] || 0))) parsed[key] = globalValue;
@@ -1563,11 +1567,16 @@ function refreshSkillCycleModel() {
   return state.skillCycle;
 }
 function refreshPassiveSkillEffects() {
-  state.passiveSkillEffects = extractArkPassiveSkillEffects(state.foundEffects, {
+  const options = {
     skillItems: state.skillEffects?.items || [],
     shareNames: (state.skillCycle?.shareRows || []).map(row => row?.name).filter(Boolean),
     identitySkills: state.combatAnalyzer?.identitySkills || []
-  });
+  };
+  state.passiveSkillEffects = extractArkPassiveSkillEffects(state.foundEffects, options);
+  state.arkGridSkillEffects = extractArkGridSkillEffects(state.arkGrid?.items || [], options);
+  for (const key of ['critRate', 'critDamage', 'attackSpeed', 'moveSpeed', 'enemyDamage', 'additionalDamage']) {
+    state.arkGrid[key] = Number(state.arkGridSkillEffects.globalEffects?.[key] || 0);
+  }
   return state.passiveSkillEffects;
 }
 async function loadCombatAnalyzer() {
@@ -3919,7 +3928,7 @@ function matchedSkillItem(name, targetNames = []) {
 function weightedSkillUnits() {
   const shareRows = state.skillCycle?.shareRows || [];
   if (shareRows.length) {
-    const explicitPassiveTargets = [...new Set((state.passiveSkillEffects?.rules || [])
+    const explicitPassiveTargets = [...new Set([...(state.passiveSkillEffects?.rules || []), ...(state.arkGridSkillEffects?.rules || [])]
       .filter(rule => rule.scope === 'skill')
       .flatMap(rule => rule.targets || [])
       .filter(Boolean))];
@@ -3983,9 +3992,10 @@ function score(stats) {
   const arcanaModel = currentArcanaCardExpectation();
   const rows = units.map(unit => {
     const passive = passiveEffectsForSkill(state.passiveSkillEffects, unit, { identitySkills });
+    const arkGrid = passiveEffectsForSkill(state.arkGridSkillEffects, unit, { identitySkills });
     const streamApplies = Boolean(arcanaStream) && normalizedSkillName(unit.name) !== normalizedSkillName(arcanaStream.skillName);
     const arcanaEffects = streamApplies ? { critRate: arcanaStream.critRate } : {};
-    const effects = mergeSkillEffects(unit.item?.effects || {}, passive.effects, arcanaEffects);
+    const effects = mergeSkillEffects(unit.item?.effects || {}, passive.effects, arkGrid.effects, arcanaEffects);
     const emperorNormalSkill = arcanaModel?.key === 'emperor' && normalizedSkillName(unit.category) === normalizedSkillName('일반 스킬');
     const usesMana = !isNoManaMainSkillEnabled() && unit.item?.usesMana === true;
     const skillStats = applyExperimentalSkillEffects(stats, { name: unit.name, effects, usesMana });
@@ -3996,11 +4006,11 @@ function score(stats) {
       shareName: unit.shareName,
       level: Number(unit.item?.level || 0),
       share: unit.weight,
-      conditional: isConditionalSkill(unit.item) || passive.rules.some(rule => rule.scope === 'state') || streamApplies || emperorNormalSkill,
+      conditional: isConditionalSkill(unit.item) || [...passive.rules, ...arkGrid.rules].some(rule => rule.scope === 'state') || streamApplies || emperorNormalSkill,
       guaranteedCrit: isGuaranteedCritSkill(unit.item) || Number(effects.critRate || 0) >= 99.99,
       summary: formatSkillEffectSummary(effects) || '수치 효과 없음',
       effects,
-      passiveRules: passive.rules,
+      passiveRules: [...passive.rules, ...arkGrid.rules],
       arcanaRules: streamApplies ? [{ category: '스킬 자버프', nodeName: `${arcanaStream.sourceSkill} · ${arcanaStream.sourceTripod}`, effects: arcanaEffects }] : [],
       valueWithoutArcana: resultWithoutArcana.value,
       value: result.value,
@@ -4817,6 +4827,7 @@ function resetCharacterResultState() {
   state.card = emptyCardEffects();
   state.skillEffects = emptySkillEffectState();
   state.passiveSkillEffects = emptyPassiveSkillEffectState();
+  state.arkGridSkillEffects = emptyPassiveSkillEffectState();
   state.skillCycle = null;
   renderSkillEffectControl();
   simulatorRendered = false;
@@ -4829,6 +4840,7 @@ function applyCharacterData(data) {
   state.abilityStone = data.abilityStoneEffects || { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
   state.engraving = data.engravingEffects || emptyEngravingState();
   state.arkGrid = data.arkGridEffects || { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
+  state.arkGridSkillEffects = data.arkGridSkillEffects || emptyPassiveSkillEffectState();
   state.card = data.cardEffects || emptyCardEffects();
   state.skillEffects = data.skillEffects || emptySkillEffectState();
   state.powerSnapshot = data.powerSnapshot || null;

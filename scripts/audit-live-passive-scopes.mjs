@@ -1,4 +1,4 @@
-import { extractArkPassiveSkillEffects } from '../public/passive-skill-effects.js';
+import { extractArkGridSkillEffects, extractArkPassiveSkillEffects } from '../public/passive-skill-effects.js';
 import { combatAnalyzerSkillShares, findCombatAnalyzerProfile } from '../public/combat-analyzer.js';
 import { readFile } from 'node:fs/promises';
 
@@ -17,6 +17,8 @@ let unresolvedCount = 0;
 let ambiguousTargetCount = 0;
 let duplicateCritCount = 0;
 let globalLeapCritCount = 0;
+let arkGridRuleCount = 0;
+let suspiciousArkGridGlobalCount = 0;
 
 function normalized(value) {
   return String(value || '').replace(/\s+/g, '').replace(/[·:'"“”‘’]/g, '').trim().toLowerCase();
@@ -25,7 +27,7 @@ function normalized(value) {
 for (const name of names) {
   try {
     const response = await fetch(`${baseUrl}/api/character?name=${encodeURIComponent(name)}`, {
-      headers: { 'user-agent': 'LostArkCalculatorPassiveScopeAudit/5.15.7' }
+      headers: { 'user-agent': 'LostArkCalculatorPassiveScopeAudit/5.15.8' }
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
@@ -44,9 +46,15 @@ for (const name of names) {
       shareNames,
       identitySkills: analyzer?.identitySkills || []
     });
+    const arkGridParsed = extractArkGridSkillEffects(data?.arkGridEffects?.items || [], {
+      skillItems: data?.skillEffects?.items || [],
+      shareNames,
+      identitySkills: analyzer?.identitySkills || []
+    });
     parsedRuleCount += parsed.rules.length;
-    unresolvedCount += parsed.unresolved.length;
-    console.log(`${data?.profile?.CharacterClassName || '-'}\t${name}\t규칙 ${parsed.rules.length}\t전역 ${parsed.items.length - parsed.rules.length}\t미분류 ${parsed.unresolved.length}`);
+    arkGridRuleCount += arkGridParsed.rules.length;
+    unresolvedCount += parsed.unresolved.length + arkGridParsed.unresolved.length;
+    console.log(`${data?.profile?.CharacterClassName || '-'}\t${name}\t패시브 규칙 ${parsed.rules.length}\t그리드 규칙 ${arkGridParsed.rules.length}\t미분류 ${parsed.unresolved.length + arkGridParsed.unresolved.length}`);
     for (const rule of parsed.rules.filter(row => row.scope === 'skill')) {
       const keys = rule.targets.map(normalized).filter(Boolean);
       const ambiguous = keys.some((key, index) => keys.some((other, otherIndex) => index !== otherIndex && key !== other && other.includes(key)));
@@ -59,6 +67,10 @@ for (const name of names) {
       globalLeapCritCount += 1;
       console.log(`  도약 치적 전역 오분류: ${row.nodeName} - ${row.effects.critRate}%`);
     }
+    for (const row of arkGridParsed.items.filter(row => row.scope === 'global' && /스킬|상태|태세|변신|효과[^.!?]{0,30}동안/i.test(row.text))) {
+      suspiciousArkGridGlobalCount += 1;
+      console.log(`  아크그리드 전역 의심: ${row.nodeName} - ${row.text}`);
+    }
     for (const target of [...new Set(parsed.rules.filter(row => row.scope === 'skill').flatMap(row => row.targets || []))]) {
       const matching = parsed.rules.filter(row => row.scope === 'skill' && row.targets.some(name => normalized(name) === normalized(target)) && Number(row.effects?.critRate || 0) > 0);
       const semantic = new Set(matching.map(row => `${normalized(row.text)}|${Number(row.effects?.critRate || 0)}`));
@@ -69,15 +81,17 @@ for (const name of names) {
     }
     if (name === verboseName) {
       for (const row of parsed.items) console.log(`  ${row.scope}: ${row.targets.join(', ') || row.selector || '전체'} - ${row.nodeName} - ${JSON.stringify(row.effects)}`);
+      for (const row of arkGridParsed.items) console.log(`  grid ${row.scope}: ${row.targets.join(', ') || row.selector || '전체'} - ${row.nodeName} - ${JSON.stringify(row.effects)}`);
     }
     for (const row of parsed.unresolved) console.log(`  미분류: [${row.category}] ${row.nodeName} - ${row.text}`);
+    for (const row of arkGridParsed.unresolved) console.log(`  그리드 미분류: ${row.nodeName} - ${row.text}`);
   } catch (error) {
     failures.push(`${name}: ${error.message}`);
   }
 }
 
-console.log(`\nparsed rules: ${parsedRuleCount}, unresolved: ${unresolvedCount}, ambiguous targets: ${ambiguousTargetCount}, duplicate crit: ${duplicateCritCount}, global leap crit: ${globalLeapCritCount}, failures: ${failures.length}`);
-if (failures.length || ambiguousTargetCount || duplicateCritCount || globalLeapCritCount) {
+console.log(`\npassive rules: ${parsedRuleCount}, ark grid rules: ${arkGridRuleCount}, unresolved: ${unresolvedCount}, suspicious ark grid globals: ${suspiciousArkGridGlobalCount}, ambiguous targets: ${ambiguousTargetCount}, duplicate crit: ${duplicateCritCount}, global leap crit: ${globalLeapCritCount}, failures: ${failures.length}`);
+if (failures.length || suspiciousArkGridGlobalCount || ambiguousTargetCount || duplicateCritCount || globalLeapCritCount) {
   console.error(failures.join('\n'));
   process.exitCode = 1;
 }

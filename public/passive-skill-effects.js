@@ -1,4 +1,4 @@
-import { SKILL_EFFECT_KEYS, hasSkillEffects, parseSkillEffectText } from './skill-effects.js?v=5.15.7';
+import { SKILL_EFFECT_KEYS, hasSkillEffects, parseSkillEffectText } from './skill-effects.js?v=5.15.8';
 
 const EFFECT_KEYS = [...SKILL_EFFECT_KEYS];
 
@@ -58,7 +58,8 @@ function nodeNameFromDescription(value) {
 
 function clauses(value) {
   return cleanText(value)
-    .replace(/(증가|감소|상승|강화)하고,\s*/gi, '$1.\n')
+    .replace(/((?:증가|감소|상승|강화)하고|변경되고),\s*/gi, '$1.\n')
+    .replace(/((?:증가|감소|상승|강화)하고)\s+(?=[가-힣A-Za-z0-9 ·]{1,24}\s*스킬)/gi, '$1.\n')
     .split(/\n|(?<=[.!?])\s+/)
     .map(row => row.trim())
     .filter(Boolean);
@@ -113,7 +114,8 @@ function quotedSkillTargets(clause) {
   const damageIndex = source.search(/피해량|피해가/i);
   const damagePrefix = damageIndex >= 0 ? source.slice(Math.max(0, damageIndex - 100), damageIndex) : '';
   const withDamage = [...damagePrefix.matchAll(/[\'"“”‘’]([^\'"“”‘’]{1,45})[\'"“”‘’]/gi)].map(match => match[1].trim());
-  return unique([...withSkill, ...withDamage]);
+  return unique([...withSkill, ...withDamage])
+    .filter(target => !/^(?:운명|효과|버프)\s*:/i.test(String(target || '').trim()));
 }
 
 function knownSkillTargets(clause, knownSkills) {
@@ -122,7 +124,8 @@ function knownSkillTargets(clause, knownSkills) {
     const key = normalize(name);
     return key && (source.includes(`${key}스킬`) || source.includes(`${key}피해량`) || source.includes(`${key}의피해량`));
   });
-  if (direct.length || !/피해량|피해가/.test(source)) return direct;
+  if (direct.length) return direct;
+  if (!/피해량|피해가|치명타|공격속도|이동속도|공격력|추가피해/.test(source)) return [];
   const mentioned = knownSkills.filter(name => {
     const key = normalize(name);
     return key && source.includes(key);
@@ -137,7 +140,17 @@ function categorySelector(clause, knownCategories) {
     .find(category => normalize(source).includes(`${normalize(category).replace(/스킬$/, '')}스킬`));
   if (known) return known.replace(/\s*스킬\s*$/, '').trim();
 
-  const explicit = source.match(/(?:^|[,.]\s*|\s)(초각성|각성기|일반|충격|기력|포격|실버호크|고대의?\s*정령|루인|헤드어택|백어택)\s*스킬(?:의|이|가|은|는|을|로|에서|에)/i);
+  const stance = source.match(/(?:^|[,.]\s*|\s)([가-힣A-Za-z0-9 ·]{1,20}?)\s*스탠스(?:\s*전환)?\s*시/i);
+  if (stance) {
+    const stanceKey = normalize(stance[1]);
+    const stanceCategory = knownCategories.find(category => {
+      const categoryKey = normalize(category).replace(/스킬$/, '');
+      return categoryKey && (categoryKey === stanceKey || categoryKey.includes(stanceKey) || stanceKey.includes(categoryKey));
+    });
+    if (stanceCategory) return stanceCategory.replace(/\s*스킬\s*$/, '').trim();
+  }
+
+  const explicit = source.match(/(?:^|[,.]\s*|\s)(초각성|각성기|일반|충격|기력|포격|실버호크|고대의?\s*정령|루인|헤드어택|백어택|캐스팅|곰|망자)\s*스킬(?:의|이|가|은|는|을|로|에서|에)/i);
   if (explicit) return explicit[1].trim();
   const damageCategory = source.match(/(?:^|\s)(초각성기|각성기)(?:의)?\s*피해량/i);
   return damageCategory?.[1]?.replace(/기$/, '')?.trim() || '';
@@ -180,7 +193,7 @@ function augmentPassiveEffects(parsed, clause, classification) {
   const text = String(clause || '');
   if (classification.scope !== 'global') {
     let strongestDamage = Number(effects.skillDamage || 0);
-    for (const match of text.matchAll(/(?:총\s*)?피해량(?:이|가|을|를)?\s*(?:추가로\s*)?(\d+(?:\.\d+)?)\s*%\s*(증가|강화|감소|낮아지)/gi)) {
+    for (const match of text.matchAll(/(?:총\s*)?피해량(?:이|가|을|를)?\s*(?:\d+\s*회\s*동안\s*)?(?:추가로\s*)?(\d+(?:\.\d+)?)\s*%\s*(증가|강화|감소|낮아지)/gi)) {
       const value = signedPercent(match[1], match[2]);
       if (Math.abs(value) > Math.abs(strongestDamage)) strongestDamage = value;
     }
@@ -212,10 +225,14 @@ function classifyClause(clause, { knownSkills, knownCategories }) {
   const selector = categorySelector(clause, knownCategories);
   if (selector) return { scope: 'category', targets: [], selector };
 
+  if (/[\'"“”‘’]운명[^\'"“”‘’]+[\'"“”‘’]\s*:/i.test(clause)) {
+    return { scope: 'state', targets: [], selector: '운명 효과' };
+  }
+
   const contextTargets = /치명타/i.test(clause) ? inferredSkillContextTargets(clause) : [];
   if (contextTargets.length) return { scope: 'skill', targets: contextTargets, selector: '' };
 
-  if (/(?:상태|태세|변신|폭주|페르소나|아덴|아이덴티티)[^.!?]{0,35}(?:중|에서|진입\s*시|동안|일\s*때)/i.test(clause)) {
+  if (/(?:상태|태세|변신|폭주|페르소나|아덴|아이덴티티|효과)[^.!?]{0,35}(?:중|에서|진입\s*시|동안|일\s*때|유지되는\s*동안)/i.test(clause)) {
     return { scope: 'state', targets: [], selector: '상태 조건' };
   }
   return { scope: 'global', targets: [], selector: '' };
@@ -225,7 +242,7 @@ export function emptyPassiveSkillEffectState() {
   return { rules: [], globalEffects: emptyEffects(), items: [], unresolved: [] };
 }
 
-export function extractArkPassiveSkillEffects(effects, { skillItems = [], shareNames = [], identitySkills = [] } = {}) {
+function extractScopedSkillEffects(effects, { skillItems = [], shareNames = [], identitySkills = [], categories = [] } = {}) {
   const result = emptyPassiveSkillEffectState();
   const knownSkills = unique([
     ...skillItems.map(item => item?.name),
@@ -233,11 +250,12 @@ export function extractArkPassiveSkillEffects(effects, { skillItems = [], shareN
     ...identitySkills
   ].filter(Boolean));
   const knownCategories = unique(skillItems.map(item => item?.category).filter(Boolean));
+  const acceptedCategories = new Set(categories.map(category => normalize(category)));
   const seen = new Set();
 
   for (const [effectIndex, effect] of (Array.isArray(effects) ? effects : []).entries()) {
     const category = String(effect?.name || '').trim();
-    if (category !== '깨달음' && category !== '도약') continue;
+    if (!acceptedCategories.has(normalize(category))) continue;
     const payload = parseTooltipPayload(effect);
     let pendingTargets = [];
     for (const clause of clauses(payload.text)) {
@@ -278,6 +296,34 @@ export function extractArkPassiveSkillEffects(effects, { skillItems = [], shareN
     }
   }
   return result;
+}
+
+export function extractArkPassiveSkillEffects(effects, options = {}) {
+  return extractScopedSkillEffects(effects, { ...options, categories: ['깨달음', '도약'] });
+}
+
+export function extractArkGridSkillEffects(items, options = {}) {
+  const effects = [];
+  for (const [itemIndex, item] of (Array.isArray(items) ? items : []).entries()) {
+    for (const [textIndex, activeText] of (Array.isArray(item?.activeTexts) ? item.activeTexts : []).entries()) {
+      const text = cleanText(activeText);
+      if (!text) continue;
+      effects.push({
+        index: effects.length,
+        name: '아크그리드',
+        level: Number(item?.point || 0),
+        raw: {
+          ToolTip: {
+            Element_000: { type: 'NameTagBox', value: item?.name || `아크그리드 ${itemIndex + 1}` },
+            Element_002: { type: 'MultiTextBox', value: text }
+          }
+        },
+        arkGridItemIndex: itemIndex,
+        arkGridTextIndex: textIndex
+      });
+    }
+  }
+  return extractScopedSkillEffects(effects, { ...options, categories: ['아크그리드'] });
 }
 
 function matchesText(left, right) {

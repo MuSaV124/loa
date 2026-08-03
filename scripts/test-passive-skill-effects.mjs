@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  extractArkGridSkillEffects,
   extractArkPassiveSkillEffects,
   mergeSkillEffects,
   passiveEffectsForSkill
@@ -82,6 +83,58 @@ assert.equal(passiveEffectsForSkill(categoryScopes, { name: '실버호크 스킬
 assert.equal(passiveEffectsForSkill(categoryScopes, { name: '고대의 정령 스킬' }).effects.critRate, 26);
 assert.equal(passiveEffectsForSkill(categoryScopes, { name: '적룡필살' }).effects.critRate, 110);
 assert.equal(passiveEffectsForSkill(categoryScopes, { name: '스나이프', category: '일반 스킬' }).effects.critRate, 10);
+
+const glaivier = extractArkPassiveSkillEffects([
+  passive('깨달음', '절정 I', '난무 스탠스 전환 시 이동속도가 15.0% 증가하고, 집중 스탠스 전환 시 공격속도가 15.0% 증가한다.'),
+  passive('깨달음', '절정 II', '난무 스탠스 전환 시 치명타 피해가 70.0% 증가한다.'),
+  passive('깨달음', '절정 III', '집중 스탠스 전환 시 적에게 주는 피해가 25.0% 증가한다.')
+], {
+  skillItems: [
+    { name: '맹룡열파', category: '난무 스킬' },
+    { name: '적룡포', category: '집중 스킬' }
+  ]
+});
+assert.equal(glaivier.globalEffects.attackSpeed, 0);
+assert.equal(glaivier.globalEffects.moveSpeed, 0);
+assert.equal(glaivier.globalEffects.critDamage, 0);
+assert.equal(glaivier.globalEffects.enemyDamage, 0);
+const flurryEffects = passiveEffectsForSkill(glaivier, { name: '맹룡열파', category: '난무 스킬' }).effects;
+const focusEffects = passiveEffectsForSkill(glaivier, { name: '적룡포', category: '집중 스킬' }).effects;
+assert.equal(flurryEffects.moveSpeed, 15);
+assert.equal(flurryEffects.attackSpeed, 0);
+assert.equal(flurryEffects.critDamage, 70);
+assert.equal(focusEffects.attackSpeed, 15);
+assert.equal(focusEffects.moveSpeed, 0);
+assert.equal(focusEffects.skillDamage, 25);
+
+const glaivierGrid = extractArkGridSkillEffects([
+  {
+    name: '질서의 해 코어 : 연가 창식',
+    point: 19,
+    activeTexts: [
+      '적에게 주는 피해량이 1.5% 증가한다.',
+      "'운명: 연가 창식' : 30.0초 동안 집중 스킬의 치명타 적중률이 20.0% 감소하지만, 집중 스킬이 치명타로 적중 시 적에게 주는 피해가 20.0% 증가한다.",
+      "'운명: 연가 난무' : 30.0초 동안 난무 스킬의 피해량이 34.0% 증가한다."
+    ]
+  },
+  {
+    name: '질서의 달 코어 : 청룡기',
+    point: 18,
+    activeTexts: ['난무 스킬의 시전 속도가 10.0% 증가하고 집중 스킬의 피해량이 10.0% 증가한다.']
+  }
+], {
+  skillItems: [
+    { name: '맹룡열파', category: '난무 스킬' },
+    { name: '적룡포', category: '집중 스킬' }
+  ]
+});
+assert.equal(glaivierGrid.globalEffects.enemyDamage, 1.5);
+assert.equal(glaivierGrid.globalEffects.critRate, 0);
+const flurryGridEffects = passiveEffectsForSkill(glaivierGrid, { name: '맹룡열파', category: '난무 스킬' }).effects;
+const focusGridEffects = passiveEffectsForSkill(glaivierGrid, { name: '적룡포', category: '집중 스킬' }).effects;
+assert.equal(flurryGridEffects.skillDamage, 34);
+assert.equal(focusGridEffects.critRate, -20);
+assert.equal(focusGridEffects.skillDamage, 32, '조건부 적주피 20%와 집중 피해 10%는 해당 계열에서 곱연산해야 한다.');
 
 const leap = extractArkPassiveSkillEffects([
   passive('도약', '풀려난 힘', '초각성 스킬이 적에게 주는 피해가 15.0% 증가한다.'),

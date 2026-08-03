@@ -23,7 +23,7 @@ export const SKILL_EFFECT_LABELS = {
 };
 
 const PERCENT = '([+-]?\\d+(?:\\.\\d+)?)\\s*%';
-const CHANGE = '(?:만큼\\s*)?(증가|감소|높아지|낮아지)';
+const CHANGE = '(?:(?:만큼|추가로)\\s*)?(증가|감소|높아지|낮아지)';
 const EFFECT_PATTERNS = {
   critRate: [
     new RegExp(`치명타\\s*(?:적중\\s*)?(?:확률|률)(?:이|가|을|를)?\\s*${PERCENT}\\s*${CHANGE}`, 'gi')

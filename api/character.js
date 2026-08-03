@@ -2,10 +2,11 @@ import { isBoundGem } from '../public/gem-math.js';
 import { relicEngravingEffect } from '../public/engraving-math.js';
 import { CHARACTER_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
 import { extractCombatSkillEffects } from '../public/skill-effects.js';
+import { extractArkGridSkillEffects } from '../public/passive-skill-effects.js';
 import { extractCardEffects } from '../public/card-effects.js';
 import { extractAvatarEffects } from '../public/avatar-effects.js';
 
-const API_VERSION = '5.15.7';
+const API_VERSION = '5.15.8';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const CHARACTER_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const CHARACTER_CACHE_MAX_SIZE = 80;
@@ -81,15 +82,17 @@ async function loadCharacterData(name, apiKey) {
   const braceletEffects = extractBraceletEffects(equipment);
   const abilityStoneEffects = extractAbilityStoneEffects(equipment);
   const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
-  const arkGridEffects = extractArkGridEffects(arkGrid.data);
   const cardEffects = extractCardEffects(cards);
   const avatarEffects = extractAvatarEffects(avatars);
   const skills = Array.isArray(combatSkills.data) ? combatSkills.data : [];
   const skillEffects = extractCombatSkillEffects(skills);
+  const arkGridEffects = extractArkGridEffects(arkGrid.data, skillEffects);
+  const arkGridSkillEffects = arkGridEffects.skillEffects;
+  delete arkGridEffects.skillEffects;
   const powerSnapshot = buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, cardEffects, avatarEffects, skillEffects, arkGrid: arkGrid.data });
 
   // cards/avatars 원본은 raw에 그대로 들어있고 파싱 결과에 아이콘까지 포함하므로 최상위로 중복해서 싣지 않는다.
-  return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, gems, skills, skillEffects, skillEffectsError: combatSkills.error, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, cardEffects, avatarEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridError: arkGrid.error, powerSnapshot, raw: data };
+  return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, gems, skills, skillEffects, skillEffectsError: combatSkills.error, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, cardEffects, avatarEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridSkillEffects, arkGridError: arkGrid.error, powerSnapshot, raw: data };
 }
 
 async function fetchJson(url, apiKey, timeoutMs = 9000) {
@@ -1360,7 +1363,7 @@ function optionGradeNearMatch(text, index) {
   return match?.[1] || '';
 }
 
-function extractArkGridEffects(arkGrid) {
+function extractArkGridEffects(arkGrid, skillEffects) {
   const result = { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   const slots = Array.isArray(arkGrid?.Slots) ? arkGrid.Slots : [];
   for (const slot of slots) {
@@ -1376,10 +1379,15 @@ function extractArkGridEffects(arkGrid) {
     for (const key of Object.keys(effects)) effects[key] = round2(effects[key]);
     if (Object.values(effects).some(v => Math.abs(Number(v || 0)) > 0.0001)) {
       for (const key of Object.keys(effects)) result[key] += effects[key];
-      result.items.push({ index: slot.Index, name: slot.Name, grade: slot.Grade, point, effects, activeTexts });
     }
+    if (activeTexts.length) result.items.push({ index: slot.Index, name: slot.Name, grade: slot.Grade, point, effects, activeTexts });
   }
   for (const key of ['critRate', 'critDamage', 'attackSpeed', 'moveSpeed', 'enemyDamage', 'additionalDamage']) result[key] = round2(result[key]);
+  const scoped = extractArkGridSkillEffects(result.items, { skillItems: skillEffects?.items || [] });
+  for (const key of ['critRate', 'critDamage', 'attackSpeed', 'moveSpeed', 'enemyDamage', 'additionalDamage']) {
+    result[key] = round2(scoped.globalEffects?.[key]);
+  }
+  result.skillEffects = scoped;
   return result;
 }
 
