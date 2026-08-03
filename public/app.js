@@ -1,19 +1,19 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.3';
-import { emptyCardEffects } from './card-effects.js?v=5.15.3';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.3';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.3';
-import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.3';
-import { emptyPassiveSkillEffectState, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.3';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.3';
-import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.3';
-import { buildSkillCycleModel, evaluateEvolutionCooldown } from './skill-cycle.js?v=5.15.3';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.3';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.3';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.3';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.3';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.3';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.3';
-import { ARCANA_CULL_EFFECT, findArcanaCardExpectation, formatArcanaCardExpectation, weightedArcanaCardValue } from './arcana-card-expectation.js?v=5.15.3';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.5';
+import { emptyCardEffects } from './card-effects.js?v=5.15.5';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.5';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.5';
+import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.5';
+import { emptyPassiveSkillEffectState, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.5';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.5';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.5';
+import { buildSkillCycleModel, evaluateEvolutionCooldown } from './skill-cycle.js?v=5.15.5';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.5';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.5';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.5';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.5';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.5';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.5';
+import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.5';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -22,9 +22,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.15.3';
+} from './cache-policy.js?v=5.15.5';
 
-const VERSION = '5.15.3';
+const VERSION = '5.15.5';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -97,6 +97,10 @@ function currentArcanaCardExpectation() {
   return findArcanaCardExpectation(state.powerSnapshot?.profile);
 }
 
+function currentArcanaStreamEffect() {
+  return findArcanaStreamEffect(state.powerSnapshot?.profile, state.skillEffects);
+}
+
 function renderArcanaIdentityNote() {
   const note = $('arcanaIdentityNote');
   if (!note) return;
@@ -106,7 +110,20 @@ function renderArcanaIdentityNote() {
     note.innerHTML = '';
     return;
   }
-  note.innerHTML = `<b>아르카나 카드 평균 기대값 적용</b><span>${escapeHtml(formatArcanaCardExpectation(model))}. 도태의 치적 +100%·치피 +50% 상태만 확률 가중합니다. 카드 직접 피해와 사이클 변화는 전투분석 딜 지분에 반영하며, 급소 노출 자체 시너지는 제외합니다.</span><small>카드 1회 드로우 기준 추정치이며 보유·사용 타이밍에 따라 실제 DPS는 달라질 수 있습니다.</small>`;
+  const combat = arcanaCombatExpectation(model);
+  const stream = currentArcanaStreamEffect();
+  const combatText = combat?.cardsPerMinute > 0
+    ? model.key === 'emperor'
+      ? `표준 ${Math.round(combat.combatSeconds / 60)}분 딜타임 약 ${combat.cards.toFixed(1)}장·도태 ${combat.cullCards.toFixed(1)}장·재상 ${combat.chancellorCards.toFixed(1)}장·제후 ${combat.sovereignCards.toFixed(1)}장으로 환산합니다.`
+      : `표준 ${Math.round(combat.combatSeconds / 60)}분 딜타임 약 ${combat.cards.toFixed(1)}장·도태 ${combat.cullCards.toFixed(1)}장으로 환산합니다.`
+    : '분당 드로우 실측값이 없는 세팅은 카드 1회 확률만 반영합니다.';
+  const streamText = stream
+    ? ` 장착한 ${stream.sourceSkill}의 ${stream.sourceTripod} 최대 중첩 치적 +${stream.critRate.toFixed(1)}%를 황제 주력기에 적용합니다.`
+    : '';
+  const emperorText = model.key === 'emperor'
+    ? ' 재상 치적 +20%·제후 일반 스킬 피해 +50%는 일반 스킬에만 적용하며, 도태와 겹치는 상태까지 기대값으로 계산합니다.'
+    : '';
+  note.innerHTML = `<b>아르카나 카드·스킬 기대값 적용</b><span>${escapeHtml(formatArcanaCardExpectation(model))}. ${escapeHtml(combatText)}${escapeHtml(streamText)} 도태의 치적 +100%·치피 +50%를 기대 가동률로 계산합니다.${escapeHtml(emperorText)} 카드 직접 피해는 전투분석 딜 지분을 유지합니다.</span><small>확률/가동률은 슬래시 앞뒤 순서입니다. 카드 보유·사용 타이밍과 보스 기믹에 따라 실제 DPS는 달라질 수 있습니다.</small>`;
 }
 
 function renderSkillEffectControl() {
@@ -3783,7 +3800,7 @@ function scoreCore(stats) {
   return { value, attributeDamage: stats.attributeDamage || 0, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, cooldownModeled: cooldownEvaluation.modeled, skillDamageMultiplier, engravingDamageMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, skillDamage: stats.skillDamage || 0, sonicBreakEvolutionDamage: stats.sonicBreakEvolutionDamage || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
 }
 
-function scoreCoreWithArcanaExpectation(stats) {
+function scoreCoreWithArcanaExpectation(stats, { emperorNormalSkill = false } = {}) {
   const normal = scoreCore(stats);
   const model = currentArcanaCardExpectation();
   if (!model || !normal.value) return normal;
@@ -3792,7 +3809,20 @@ function scoreCoreWithArcanaExpectation(stats) {
   cullStats.skillCritBonus = num(cullStats.skillCritBonus) + ARCANA_CULL_EFFECT.critRate;
   cullStats.critDamage = num(cullStats.critDamage) + ARCANA_CULL_EFFECT.critDamage;
   const cull = scoreCore(cullStats);
-  const value = weightedArcanaCardValue(normal.value, cull.value, model);
+  let chancellor = null;
+  let cullChancellor = null;
+  let value = weightedArcanaCardValue(normal.value, cull.value, model);
+  if (model.key === 'emperor' && emperorNormalSkill) {
+    const chancellorStats = cloneBaseStats(stats);
+    chancellorStats.skillCritBonus = num(chancellorStats.skillCritBonus) + ARCANA_CHANCELLOR_EFFECT.critRate;
+    chancellor = scoreCore(chancellorStats);
+    const cullChancellorStats = cloneBaseStats(cullStats);
+    cullChancellorStats.skillCritBonus = num(cullChancellorStats.skillCritBonus) + ARCANA_CHANCELLOR_EFFECT.critRate;
+    cullChancellor = scoreCore(cullChancellorStats);
+    value = weightedEmperorNormalSkillCardValue(normal.value, cull.value, chancellor.value, cullChancellor.value, model);
+  }
+  const combat = arcanaCombatExpectation(model);
+  const expectationWeight = arcanaCullExpectationWeight(model);
   return {
     ...normal,
     value,
@@ -3800,8 +3830,23 @@ function scoreCoreWithArcanaExpectation(stats) {
       key: model.key,
       engraving: model.engraving,
       probability: model.cullProbability,
+      expectationWeight,
+      chancellorProbability: Number(model.chancellorProbability || 0),
+      chancellorExpectationWeight: arcanaChancellorExpectationWeight(model),
+      sovereignProbability: Number(model.sovereignProbability || 0),
+      sovereignExpectationWeight: arcanaSovereignExpectationWeight(model),
+      emperorCombinedTriggerProbability: Number(model.emperorCombinedTriggerProbability || 0),
+      emperorNormalSkill,
+      cardsPerMinute: Number(model.cardsPerMinute || 0),
+      combatSeconds: Number(combat?.combatSeconds || 0),
+      expectedCards: Number(combat?.cards || 0),
+      expectedCullCards: Number(combat?.cullCards || 0),
+      expectedChancellorCards: Number(combat?.chancellorCards || 0),
+      expectedSovereignCards: Number(combat?.sovereignCards || 0),
       normalValue: normal.value,
       cullValue: cull.value,
+      chancellorValue: Number(chancellor?.value || 0),
+      cullChancellorValue: Number(cullChancellor?.value || 0),
       multiplier: normal.value ? value / normal.value : 1,
       evidenceLabel: model.evidenceLabel,
       sourceUrl: model.sourceUrl
@@ -3911,20 +3956,29 @@ function score(stats) {
   }
 
   const identitySkills = state.combatAnalyzer?.identitySkills || [];
+  const arcanaStream = currentArcanaStreamEffect();
+  const arcanaModel = currentArcanaCardExpectation();
   const rows = units.map(unit => {
     const passive = passiveEffectsForSkill(state.passiveSkillEffects, unit, { identitySkills });
-    const effects = mergeSkillEffects(unit.item?.effects || {}, passive.effects);
-    const result = scoreCoreWithArcanaExpectation(applyExperimentalSkillEffects(stats, { name: unit.name, effects }));
+    const streamApplies = Boolean(arcanaStream) && normalizedSkillName(unit.name) !== normalizedSkillName(arcanaStream.skillName);
+    const arcanaEffects = streamApplies ? { critRate: arcanaStream.critRate } : {};
+    const effects = mergeSkillEffects(unit.item?.effects || {}, passive.effects, arcanaEffects);
+    const emperorNormalSkill = arcanaModel?.key === 'emperor' && normalizedSkillName(unit.category) === normalizedSkillName('일반 스킬');
+    const skillStats = applyExperimentalSkillEffects(stats, { name: unit.name, effects });
+    const resultWithoutArcana = scoreCore(skillStats);
+    const result = scoreCoreWithArcanaExpectation(skillStats, { emperorNormalSkill });
     return {
       name: unit.name,
       shareName: unit.shareName,
       level: Number(unit.item?.level || 0),
       share: unit.weight,
-      conditional: isConditionalSkill(unit.item) || passive.rules.some(rule => rule.scope === 'state'),
+      conditional: isConditionalSkill(unit.item) || passive.rules.some(rule => rule.scope === 'state') || streamApplies || emperorNormalSkill,
       guaranteedCrit: isGuaranteedCritSkill(unit.item) || Number(effects.critRate || 0) >= 99.99,
       summary: formatSkillEffectSummary(effects) || '수치 효과 없음',
       effects,
       passiveRules: passive.rules,
+      arcanaRules: streamApplies ? [{ category: '스킬 자버프', nodeName: `${arcanaStream.sourceSkill} · ${arcanaStream.sourceTripod}`, effects: arcanaEffects }] : [],
+      valueWithoutArcana: resultWithoutArcana.value,
       value: result.value,
       gain: ((result.value / baseResult.value) - 1) * 100,
       rawCritRate: result.rawCritRate,
@@ -3936,7 +3990,7 @@ function score(stats) {
   });
   const modeledWeight = Math.min(1, rows.reduce((sum, row) => sum + Number(row.share || 0), 0));
   const weightedMultiplier = (1 - modeledWeight) + rows.reduce((sum, row) => sum + Number(row.share || 0) * (row.value / baseResult.value), 0);
-  const appliedRows = rows.filter(row => hasNumericSkillEffects(row.effects));
+  const appliedRows = rows.filter(row => hasNumericSkillEffects(row.effects) || row.result?.arcanaCardExpectation?.emperorNormalSkill);
   if (!appliedRows.length) {
     return {
       ...baseResult,
@@ -3947,15 +4001,24 @@ function score(stats) {
   const anchor = [...rows].sort((a, b) => Number(b.rawCritRate || 0) - Number(a.rawCritRate || 0) || Number(b.share || 0) - Number(a.share || 0))[0];
   const weightedConvertedEvolutionDamage = rows.reduce((sum, row) => sum + Number(row.share || 0) * Number(row.convertedEvolutionDamage || 0), 0)
     + (1 - modeledWeight) * Number(baseResult.convertedEvolutionDamage || 0);
+  const baseWithoutArcana = scoreCore(stats);
+  const weightedValue = baseResult.value * weightedMultiplier;
+  const weightedValueWithoutArcana = (1 - modeledWeight) * baseWithoutArcana.value
+    + rows.reduce((sum, row) => sum + Number(row.share || 0) * Number(row.valueWithoutArcana || 0), 0);
+  const arcanaCardExpectation = baseResult.arcanaCardExpectation ? {
+    ...baseResult.arcanaCardExpectation,
+    multiplier: weightedValueWithoutArcana > 0 ? weightedValue / weightedValueWithoutArcana : baseResult.arcanaCardExpectation.multiplier
+  } : null;
   return {
     ...baseResult,
-    value: baseResult.value * weightedMultiplier,
+    value: weightedValue,
     rawCritRate: Number(anchor?.rawCritRate ?? baseResult.rawCritRate),
     critRate: Number(anchor?.rawCritRate ?? baseResult.critRate),
     effectiveCritRate: Number(anchor?.effectiveCritRate ?? baseResult.effectiveCritRate),
     critDamage: Number(anchor?.critDamage ?? baseResult.critDamage),
     convertedEvolutionDamage: weightedConvertedEvolutionDamage,
     skillExperimentMultiplier: weightedMultiplier,
+    arcanaCardExpectation,
     skillExperiment: {
       applied: true,
       count: appliedRows.length,
@@ -3965,7 +4028,7 @@ function score(stats) {
       commonCritRate: baseResult.rawCritRate,
       anchorSkill: anchor ? { name: anchor.name, critRate: anchor.rawCritRate, share: anchor.share } : null,
       modeledSharePercent: modeledWeight * 100,
-      items: rows.map(({ result, ...row }) => row)
+      items: rows.map(({ result, valueWithoutArcana, ...row }) => row)
     }
   };
 }
@@ -4100,7 +4163,7 @@ function skillCritScopeHtml(current) {
   if (!experiment?.applied || !rows.length) return '';
   const anchorName = experiment.anchorSkill?.name || rows[0]?.name || '-';
   const skillRows = rows.map(row => {
-    const passiveNames = [...new Set((row.passiveRules || []).map(rule => `${rule.category} ${rule.nodeName}`).filter(Boolean))];
+    const passiveNames = [...new Set([...(row.passiveRules || []), ...(row.arcanaRules || [])].map(rule => `${rule.category} ${rule.nodeName}`).filter(Boolean))];
     const detail = [
       Number(row.share || 0) > 0 ? `딜 지분 ${(Number(row.share) * 100).toFixed(1)}%` : '딜 지분 미확인',
       passiveNames.join(', '),
@@ -4250,9 +4313,9 @@ function buildSourceSummary(current) {
   const arcanaExpectation = current.result.arcanaCardExpectation;
   const arcanaExpectationLines = arcanaExpectation ? [
     sourceLine(
-      `${arcanaExpectation.engraving} · 도태 확률 가중`,
+      `${arcanaExpectation.engraving} · 카드 기대값`,
       (Number(arcanaExpectation.multiplier || 1) - 1) * 100,
-      `${(Number(arcanaExpectation.probability || 0) * 100).toFixed(2)}% · ${arcanaExpectation.evidenceLabel} · 급소 노출 제외`
+      `${arcanaExpectation.emperorCombinedTriggerProbability > 0 ? `황제+또황 ${(Number(arcanaExpectation.emperorCombinedTriggerProbability) * 100).toFixed(1)}% · ` : ''}도태 ${(Number(arcanaExpectation.probability || 0) * 100).toFixed(2)}%/${(Number(arcanaExpectation.expectationWeight || 0) * 100).toFixed(2)}%${arcanaExpectation.chancellorProbability > 0 ? ` · 재상 ${(Number(arcanaExpectation.chancellorProbability) * 100).toFixed(2)}%/${(Number(arcanaExpectation.chancellorExpectationWeight) * 100).toFixed(2)}%` : ''}${arcanaExpectation.sovereignProbability > 0 ? ` · 제후 ${(Number(arcanaExpectation.sovereignProbability) * 100).toFixed(2)}%/${(Number(arcanaExpectation.sovereignExpectationWeight) * 100).toFixed(2)}%` : ''}${arcanaExpectation.expectedCards > 0 ? ` · ${Math.round(Number(arcanaExpectation.combatSeconds || 0) / 60)}분 약 ${Number(arcanaExpectation.expectedCards).toFixed(1)}장/도태 ${Number(arcanaExpectation.expectedCullCards).toFixed(1)}장${arcanaExpectation.expectedChancellorCards > 0 ? `/재상 ${Number(arcanaExpectation.expectedChancellorCards).toFixed(1)}장` : ''}${arcanaExpectation.expectedSovereignCards > 0 ? `/제후 ${Number(arcanaExpectation.expectedSovereignCards).toFixed(1)}장` : ''}` : ''} · ${arcanaExpectation.evidenceLabel}`
     )
   ] : [];
 

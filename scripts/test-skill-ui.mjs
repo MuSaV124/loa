@@ -248,10 +248,25 @@ async function verifyScopedBreakerCrit() {
 }
 
 async function verifyArcanaCardExpectation() {
+  const arcanaSkills = [
+    {
+      name: '스트림 오브 엣지', level: 14, type: '스택트', skillType: 0, currentTree: true, baseCooldownSeconds: 24,
+      cooldown: { flatSeconds: 0, percentReduction: 0 },
+      effects: { critRate: 27.6, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, attackSpeed: 0, moveSpeed: 0, skillDamage: 0 },
+      selectedTripods: [{ name: '다크니스 엣지', conditional: true, effects: { critRate: 27.6 } }]
+    },
+    {
+      name: '다크 리저렉션', level: 14, type: '일반', skillType: 0, currentTree: true, baseCooldownSeconds: 24,
+      cooldown: { flatSeconds: 0, percentReduction: 0 },
+      effects: { critRate: 0, critDamage: 0, critHitDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, attackSpeed: 0, moveSpeed: 0, skillDamage: 0 },
+      selectedTripods: [{ name: '분노의 일격', conditional: false, effects: {} }]
+    }
+  ];
   const response = {
     ...characterResponse,
     profile: { ...characterResponse.profile, CharacterName: '아르카나표본', CharacterClassName: '아르카나' },
     arkPassive: { ...characterResponse.arkPassive, Title: '황제의 칙령' },
+    skillEffects: { items: arcanaSkills, cycleItems: arcanaSkills, calculableItems: arcanaSkills.slice(0, 1), selectedTripodCount: 2, conditionalTripodCount: 1, cooldownTripodCount: 0, stochasticCooldownCount: 0, usedSkillCount: 2 },
     powerSnapshot: {
       ...characterResponse.powerSnapshot,
       profile: { ...characterResponse.powerSnapshot.profile, className: '아르카나', secondClass: '황제의 칙령' }
@@ -265,14 +280,27 @@ async function verifyArcanaCardExpectation() {
   await page.getByRole('heading', { name: /아르카나표본/ }).waitFor();
 
   const note = page.locator('#arcanaIdentityNote');
-  await note.getByText('아르카나 카드 평균 기대값 적용').waitFor();
+  await note.getByText('아르카나 카드·스킬 기대값 적용').waitFor();
   const noteText = await note.innerText();
-  assert.match(noteText, /황제의 칙령 · 도태 6\.91% 확률 가중/);
-  assert.match(noteText, /급소 노출 자체 시너지는 제외/);
-  assert.match(noteText, /카드 1회 드로우 기준 추정치/);
+  assert.match(noteText, /황제의 칙령 · 황제\+또황 33\.0% · 실전 41\.6장\/분/);
+  assert.match(noteText, /도태 7\.00%\/17\.65% · 재상 5\.65%\/32\.41% · 제후 6\.40%\/16\.26%/);
+  assert.match(noteText, /3분 딜타임 약 124\.8장·도태 8\.7장·재상 7\.1장·제후 8\.0장/);
+  assert.match(noteText, /재상 치적 \+20%·제후 일반 스킬 피해 \+50%/);
+  assert.match(noteText, /다크니스 엣지 최대 중첩 치적 \+27\.6%/);
+  assert.doesNotMatch(noteText, /급소 노출/);
+  assert.match(noteText, /카드 보유·사용 타이밍/);
   const source = await page.locator('#sourceSummary').textContent();
   assert.match(source, /아르카나 카드 기대값/);
-  assert.match(source, /황제 5,831회 실측/);
+  assert.match(source, /황제 실전 41\.6장\/분/);
+  assert.match(source, /황제\+또황 33\.0%/);
+  assert.match(source, /도태 7\.00%\/17\.65%/);
+  assert.match(source, /재상 5\.65%\/32\.41%/);
+  assert.match(source, /제후 6\.40%\/16\.26%/);
+  assert.match(source, /3분 약 124\.8장\/도태 8\.7장\/재상 7\.1장\/제후 8\.0장/);
+  assert.doesNotMatch(source, /급소 노출/);
+  const skillScope = await page.locator('.skillCritScope').innerText();
+  assert.match(skillScope, /다크 리저렉션/);
+  assert.match(skillScope, /스트림 오브 엣지 · 다크니스 엣지/);
   const dimensions = await note.evaluate(element => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }));
   assert.ok(dimensions.scrollWidth <= dimensions.clientWidth, `아르카나 안내가 가로로 잘리면 안 됩니다: ${JSON.stringify(dimensions)}`);
   await page.close();
