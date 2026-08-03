@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LOSTARK 진화 노드 추천 계산기</title>
-  <link rel="stylesheet" href="/style.css?v=5.15.6" />
+  <link rel="stylesheet" href="/style.css?v=5.15.7" />
 </head>
 <body>
   <main class="wrap">
@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값에 추가 효과를 더해 진화 노드 변경 시 실시간으로 계산합니다.</p>
         </div>
-        <span class="badge">v5.15.6 · 아르카나 노드 추천 보정</span>
+        <span class="badge">v5.15.7 · 스킬별 예둔 효율 보정</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -144,7 +144,7 @@
     </section>
 
     <section id="keenPanel" class="calcTabPanel panel">
-      <div class="sectionHead"><div><h2>예리한 둔기 효율</h2><p class="hint">현재 치적/치피 기준으로 전설·유물 예둔 효율을 계산합니다.</p></div></div>
+      <div class="sectionHead"><div><h2>예리한 둔기 효율</h2><p class="hint">스킬별 치적·치피와 조건부 효과를 반영해 전설·유물 예둔 효율을 계산합니다.</p></div></div>
       <div id="keenEfficiency" class="keenGrid"></div>
     </section>
 
@@ -264,7 +264,7 @@
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <div class="version">Version 5.15.6</div>
-  <script type="module" src="/app.js?v=5.15.6"></script>
+  <div class="version">Version 5.15.7</div>
+  <script type="module" src="/app.js?v=5.15.7"></script>
 </body>
 </html>

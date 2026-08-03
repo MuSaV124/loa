@@ -1,19 +1,19 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.6';
-import { emptyCardEffects } from './card-effects.js?v=5.15.6';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.6';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.6';
-import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.6';
-import { emptyPassiveSkillEffectState, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.6';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.6';
-import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.6';
-import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.6';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.6';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.6';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.6';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.6';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.6';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.6';
-import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.6';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.7';
+import { emptyCardEffects } from './card-effects.js?v=5.15.7';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.7';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.7';
+import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.7';
+import { emptyPassiveSkillEffectState, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.7';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.7';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.7';
+import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.7';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.7';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.7';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.7';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.7';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.7';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.7';
+import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.7';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -22,9 +22,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.15.6';
+} from './cache-policy.js?v=5.15.7';
 
-const VERSION = '5.15.6';
+const VERSION = '5.15.7';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -4202,6 +4202,7 @@ function skillCritScopeHtml(current) {
 function buildSourceSummary(current) {
   const base = getBaseStats();
   const appliedSkillEffects = current.result?.skillExperiment?.appliedEffects || {};
+  const skillExperimentRows = current.result?.skillExperiment?.items || [];
   const critEvolution = [];
   const critDamageEvolution = [];
   const critHitEvolution = [];
@@ -4252,8 +4253,30 @@ function buildSourceSummary(current) {
   if (state.abilityStone?.effects?.critDamage) critDamageLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.critDamage));
   if (base.dynamicEnlightenmentCritDamage) critDamageLines.push(sourceLine('깨달음 · 기민함', base.dynamicEnlightenmentCritDamage));
   if (base.extraCritDamage) critDamageLines.push(sourceLine('추가 입력', base.extraCritDamage));
-  if (appliedSkillEffects.critDamage) critDamageLines.push(sourceLine(`기준 스킬 · ${current.result?.skillExperiment?.anchorSkill?.name || '스킬별'}`, appliedSkillEffects.critDamage));
+  let weightedSkillCritDamage = 0;
+  for (const row of skillExperimentRows) {
+    const value = Number(row?.effects?.critDamage || 0);
+    const share = Math.max(0, Number(row?.share || 0));
+    if (!(Math.abs(value) > 0.0001) || !(share > 0)) continue;
+    const contribution = value * share;
+    weightedSkillCritDamage += contribution;
+    critDamageLines.push(sourceLine(
+      `스킬 · ${row.name || '이름 미확인'}`,
+      contribution,
+      `원효과 ${pct(value)} · 딜 지분 ${(share * 100).toFixed(1)}%`
+    ));
+  }
+  const arcanaCullUptime = Number(current.result?.arcanaCardExpectation?.expectationWeight || 0);
+  const arcanaCullCritDamage = arcanaCullUptime * ARCANA_CULL_EFFECT.critDamage;
+  if (arcanaCullCritDamage > 0) {
+    critDamageLines.push(sourceLine(
+      '아르카나 · 도태 카드',
+      arcanaCullCritDamage,
+      `발동 중 치피 +${ARCANA_CULL_EFFECT.critDamage}% · 기대 가동률 ${(arcanaCullUptime * 100).toFixed(2)}% · 실제 계산은 상태별 가중`
+    ));
+  }
   critDamageLines.push(...critDamageEvolution);
+  const displayedCritDamage = Number(current.stats?.critDamage || 200) + weightedSkillCritDamage + arcanaCullCritDamage;
 
   const critHitLines = [];
   for (const src of current.stats.critHitDamageSources || []) critHitLines.push(sourceLine(src.label || '치명타 적중 주피', Number(src.value || 0)));
@@ -4347,7 +4370,7 @@ function buildSourceSummary(current) {
     <div class="sourceTitle"><div><h3>계산 요약</h3><p>표시는 출처별 합산값, 기대값은 로아식 합연산/곱연산으로 계산합니다.</p></div><button id="resetViewButton" type="button">초기화</button></div>
     ${skillCritScopeHtml(current)}
     ${sourceGroup('치명타 확률', 'blue', critLines, current.result.critRate)}
-    ${sourceGroup('치명타 피해', 'purple', critDamageLines, current.result.critDamage)}
+    ${sourceGroup('치명타 피해', 'purple', critDamageLines, displayedCritDamage)}
     ${sourceGroup('치명타 적중 주피', 'pink', critHitLines, current.result.critHitDamage)}
     ${sourceGroup('진피', 'orange', evoLines, current.result.evo)}
     ${sourceGroup('추피', 'green', addLines, current.result.additionalDamage)}
@@ -4371,10 +4394,10 @@ function renderCombatStats(current = statsWithSelection(state.selected)) {
 }
 
 function keenEfficiency(current, bonusCritDamage) {
-  const critRate = Math.max(0, Math.min(100, Number(current?.result?.effectiveCritRate ?? current?.result?.critRate ?? 0))) / 100;
-  const critDamage = Number(current?.result?.critDamage || 200);
-  const before = (1 - critRate) + critRate * (critDamage / 100);
-  const after = ((1 - critRate) + critRate * ((critDamage + bonusCritDamage) / 100)) * 0.98;
+  const before = Number(current?.result?.value || 0);
+  const afterStats = cloneBaseStats(current?.stats || {});
+  afterStats.critDamage = Number(afterStats.critDamage || 200) + Number(bonusCritDamage || 0);
+  const after = Number(score(afterStats)?.value || 0) * 0.98;
   if (!before || !Number.isFinite(before) || !Number.isFinite(after)) return 0;
   return ((after / before) - 1) * 100;
 }
@@ -4393,8 +4416,13 @@ function renderKeenEfficiency(current) {
       <em>${recommend ? '추천' : '비추천'}</em>
     </div>`;
   }).join('');
-  const crit = Math.max(0, Math.min(100, Number(current?.result?.effectiveCritRate ?? current?.result?.critRate ?? 0)));
-  el.innerHTML = `<div class="keenNote">계산 기준: 실제 치적 ${crit.toFixed(2)}% / 치피 ${Number(current?.result?.critDamage || 0).toFixed(2)}%</div>${rows}`;
+  const experimentItems = current?.result?.skillExperiment?.items || [];
+  const critDamageValues = experimentItems.map(row => Number(row?.critDamage || 0)).filter(value => value > 0);
+  const critDamageRange = critDamageValues.length
+    ? `${Math.min(...critDamageValues).toFixed(2)}~${Math.max(...critDamageValues).toFixed(2)}%`
+    : `${Number(current?.result?.critDamage || 0).toFixed(2)}%`;
+  const arcanaNote = current?.result?.arcanaCardExpectation ? ' · 도태/재상 기대 가동률 포함' : '';
+  el.innerHTML = `<div class="keenNote">계산 기준: 스킬별 치적·치피 재계산 · 치피 ${critDamageRange}${arcanaNote}</div>${rows}`;
 }
 function shortNodeName(name) {
   const map = {
