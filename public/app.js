@@ -1,19 +1,19 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.11';
-import { emptyCardEffects } from './card-effects.js?v=5.15.11';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.11';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.11';
-import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.11';
-import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.11';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.11';
-import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.11';
-import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.11';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.11';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.11';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.11';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.11';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.11';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.11';
-import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.11';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.12';
+import { emptyCardEffects } from './card-effects.js?v=5.15.12';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.12';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.12';
+import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.12';
+import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.12';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.12';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.12';
+import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.12';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.12';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.12';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.12';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.12';
+import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.12';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.12';
+import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.12';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -22,9 +22,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.15.11';
+} from './cache-policy.js?v=5.15.12';
 
-const VERSION = '5.15.11';
+const VERSION = '5.15.12';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -85,6 +85,29 @@ const state = {
   pendingSharedScenario: null
 };
 let simulatorRendered = false;
+let calculationDirty = false;
+
+function setCalculationDirty(dirty = true) {
+  calculationDirty = Boolean(dirty);
+  const button = $('evolutionRecalculateButton');
+  const notice = $('evolutionRecalculateNotice');
+  if (button) {
+    button.classList.toggle('pending', calculationDirty);
+    button.textContent = calculationDirty ? '재계산 필요' : '재계산';
+  }
+  notice?.classList.toggle('hidden', !calculationDirty);
+}
+
+function recalculateSelectedSettings() {
+  const button = $('evolutionRecalculateButton');
+  if (button) button.disabled = true;
+  try {
+    calculateAndRender();
+    setCalculationDirty(false);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
 
 function isGuaranteedCritSkill(item) {
   return Boolean(item?.guaranteedCrit) || Number(item?.effects?.critRate || 0) >= 99.99;
@@ -3554,7 +3577,7 @@ function setNodeLevel(name, desiredLevel) {
   if (nextLevel <= 0) delete state.selected[name];
   else state.selected[name] = { level: nextLevel, source: 'manual' };
   renderEvolutionTiers();
-  calculateAndRender();
+  setCalculationDirty(true);
 }
 
 
@@ -4406,7 +4429,7 @@ function buildSourceSummary(current) {
     <div class="sourceFoot">UI와 노드 판단의 치적·치피는 실제 주력기에서 확인된 <b>각각의 최댓값</b>을 표시합니다. 적주피·치명타 적중 주피는 내부 기대값에서 출처별 곱연산으로 적용하며, 개별 스킬 전용 피해 효과와 전체 DPS는 전투 분석 딜 지분으로 합산합니다. 상태 조건은 충족 기준이며, 보유 자원 1당처럼 현재 수량을 알 수 없는 가변 효과는 임의 합산하지 않습니다. 공이속은 N초 동안/간 지속 문구가 있는 효과만 적용하고, 확정 치명의 치적 +100%는 해당 스킬의 뭉가 초과 치적 전환에만 사용합니다. 뭉가 Lv.2는 <b>기본 진피 15% + 초과 치적 전환 최대 60% = 총 75%</b> 기준입니다.</div>
   `;
   const reset = $('resetViewButton');
-  if (reset) reset.addEventListener('click', () => { state.selected = JSON.parse(JSON.stringify(state.apiSelected || {})); renderEvolutionTiers(); calculateAndRender(); });
+  if (reset) reset.addEventListener('click', () => { state.selected = JSON.parse(JSON.stringify(state.apiSelected || {})); renderEvolutionTiers(); setCalculationDirty(true); });
 }
 
 function renderCombatStats(current = statsWithSelection(state.selected)) {
@@ -4702,6 +4725,7 @@ function calculateAndRender() {
     </article>`;
   }).join('')}</div>` : `<div class="emptyNotice">추천 가능한 2/4/5티어 조합이 없습니다. 쿨감 효과 제외 상태에서는 끝없는 마나/최적화 훈련 등 쿨감 노드가 추천 후보에서 제거됩니다.</div>`;
   renderSpecScenarioComparison();
+  setCalculationDirty(false);
 }
 
 async function loadDb() {
@@ -4842,6 +4866,7 @@ function resetCharacterResultState() {
   renderSkillEffectControl();
   simulatorRendered = false;
   document.body.classList.remove('simulatorMode');
+  setCalculationDirty(false);
 }
 
 function applyCharacterData(data) {
@@ -4876,6 +4901,7 @@ function applyCharacterData(data) {
   renderEvolutionTiers();
   renderSummary(data.profile, data.arkPassive);
   calculateAndRender();
+  setCalculationDirty(false);
 }
 
 function updateCharacterRefreshButton() {
@@ -4940,24 +4966,25 @@ $('characterRefreshButton')?.addEventListener('click', () => {
 });
 $('characterName')?.addEventListener('input', updateCharacterRefreshButton);
 $('simulatorBackButton')?.addEventListener('click', closeSimulatorPage);
-EXTRA_EFFECT_INPUT_IDS.forEach(id => $(id).addEventListener('input', calculateAndRender));
-$('adrenalineEnabled').addEventListener('change', () => { updateAdrenalineReplacementVisibility(); calculateAndRender(); });
-$('adrenalineBookLevel')?.addEventListener('change', () => { updateEngravingControlPreviews(); calculateAndRender(); });
+$('evolutionRecalculateButton')?.addEventListener('click', recalculateSelectedSettings);
+EXTRA_EFFECT_INPUT_IDS.forEach(id => $(id).addEventListener('input', () => setCalculationDirty(true)));
+$('adrenalineEnabled').addEventListener('change', () => { updateAdrenalineReplacementVisibility(); setCalculationDirty(true); });
+$('adrenalineBookLevel')?.addEventListener('change', () => { updateEngravingControlPreviews(); setCalculationDirty(true); });
 $('adrenalineReplacementName')?.addEventListener('change', () => {
   const item = engravingItemByName($('adrenalineReplacementName').value);
   $('adrenalineReplacementBookLevel').value = String(clampRelicBookLevel(item?.bookLevel ?? 0));
   updateEngravingControlPreviews();
-  calculateAndRender();
+  setCalculationDirty(true);
 });
-$('adrenalineReplacementBookLevel')?.addEventListener('change', () => { updateEngravingControlPreviews(); calculateAndRender(); });
-$('critSynergyEnabled').addEventListener('change', calculateAndRender);
-$('critSynergyValue').addEventListener('change', calculateAndRender);
-$('backAttackEnabled').addEventListener('change', calculateAndRender);
-$('excludeCooldown')?.addEventListener('change', calculateAndRender);
-$('noManaMainSkill')?.addEventListener('change', calculateAndRender);
-$('singleHitMainSkill')?.addEventListener('change', calculateAndRender);
-$('manaShortageClass')?.addEventListener('change', calculateAndRender);
-$('mainSkillDamageShare')?.addEventListener('input', calculateAndRender);
+$('adrenalineReplacementBookLevel')?.addEventListener('change', () => { updateEngravingControlPreviews(); setCalculationDirty(true); });
+$('critSynergyEnabled').addEventListener('change', () => setCalculationDirty(true));
+$('critSynergyValue').addEventListener('change', () => setCalculationDirty(true));
+$('backAttackEnabled').addEventListener('change', () => setCalculationDirty(true));
+$('excludeCooldown')?.addEventListener('change', () => setCalculationDirty(true));
+$('noManaMainSkill')?.addEventListener('change', () => setCalculationDirty(true));
+$('singleHitMainSkill')?.addEventListener('change', () => setCalculationDirty(true));
+$('manaShortageClass')?.addEventListener('change', () => setCalculationDirty(true));
+$('mainSkillDamageShare')?.addEventListener('input', () => setCalculationDirty(true));
 
 
 const LOSTARK_JOBS = [

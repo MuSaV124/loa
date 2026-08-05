@@ -2031,6 +2031,45 @@ body {
   font-size: 20px;
   letter-spacing: 0;
 }
+.evolutionRecalculateArea {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.evolutionRecalculateNotice {
+  border: 1px solid rgba(245, 182, 66, .5);
+  border-radius: 6px;
+  background: rgba(245, 182, 66, .1);
+  color: #ffe2a3;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.evolutionRecalculateButton {
+  min-width: 92px;
+  min-height: 40px;
+  border: 1px solid rgba(245, 182, 66, .7);
+  border-radius: 7px;
+  background: linear-gradient(180deg, #ffc85b, #f0a928);
+  color: #15100a;
+  font-weight: 950;
+  cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.evolutionRecalculateButton:hover {
+  filter: brightness(1.06);
+}
+.evolutionRecalculateButton.pending {
+  border-color: #fff0bf;
+  background: #ffd15c;
+  box-shadow: 0 0 0 4px rgba(245, 182, 66, .24), 0 6px 18px rgba(245, 182, 66, .2);
+}
+.evolutionRecalculateButton:disabled {
+  opacity: .65;
+  cursor: wait;
+}
 .hint {
   margin: 4px 0 0;
 }
@@ -3973,6 +4012,26 @@ select {
 }
 .advancedInputDetails[open] > summary {
   border-bottom: 1px solid var(--softLine);
+}
+@media (max-width: 560px) {
+  .evolutionSectionHead {
+    align-items: center;
+  }
+  .evolutionRecalculateArea {
+    align-items: flex-end;
+    flex-direction: column-reverse;
+    gap: 6px;
+  }
+  .evolutionRecalculateNotice {
+    max-width: 220px;
+    white-space: normal;
+    text-align: right;
+  }
+  .evolutionRecalculateButton {
+    min-width: 84px;
+    min-height: 38px;
+    padding: 0 12px;
+  }
 }
 .advancedInputBody {
   padding: 0 16px 16px;

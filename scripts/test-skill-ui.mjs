@@ -159,6 +159,24 @@ async function verifyViewport(viewport) {
   const skillGainText = await page.locator('.sourceGroup').filter({ hasText: '스킬 효과 실험값' }).locator('summary em').innerText();
   const skillGain = Number(skillGainText.replace(/[^\d.-]/g, ''));
   assert.ok(Number.isFinite(skillGain) && skillGain > 0, `스킬 효과가 최종 기대값에 반영되지 않았습니다: ${skillGainText}`);
+
+  const initialSummary = await page.locator('#sourceSummary').textContent();
+  const selectedNode = page.locator('.nodeCard.selected').first();
+  const initialLevel = await selectedNode.locator('.nodeControls b').textContent();
+  await selectedNode.locator('[data-action="minus"]').click();
+  const changedLevel = await page.locator('.nodeCard.selected').first().locator('.nodeControls b').textContent();
+  assert.notEqual(changedLevel, initialLevel, '노드 선택은 계산 대기 중에도 즉시 변경되어야 합니다.');
+  assert.equal(await page.locator('#sourceSummary').textContent(), initialSummary, '재계산 전에는 계산 결과가 변경되면 안 됩니다.');
+  assert.equal(await page.locator('#evolutionRecalculateButton').evaluate(button => button.classList.contains('pending')), true, '노드 변경 후 재계산 필요 상태가 표시되어야 합니다.');
+  assert.equal(await page.locator('#evolutionRecalculateNotice').isVisible(), true, '설정 변경 후 재계산 안내가 보여야 합니다.');
+
+  await page.locator('#extraCritRate').fill('7');
+  assert.equal(await page.locator('#sourceSummary').textContent(), initialSummary, '추가 효과 입력도 재계산 전에는 결과에 적용되면 안 됩니다.');
+  await page.locator('#evolutionRecalculateButton').click();
+  assert.equal(await page.locator('#evolutionRecalculateButton').evaluate(button => button.classList.contains('pending')), false, '재계산 후 대기 상태가 해제되어야 합니다.');
+  assert.equal(await page.locator('#evolutionRecalculateNotice').isVisible(), false, '재계산 후 설정 변경 안내가 사라져야 합니다.');
+  assert.notEqual(await page.locator('#sourceSummary').textContent(), initialSummary, '재계산 버튼은 현재 노드와 추가 효과를 결과에 적용해야 합니다.');
+
   const layout = await page.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth }));
   assert.ok(layout.scrollWidth <= layout.width + 1, `${viewport.width}px 화면에서 가로 넘침: ${layout.scrollWidth} > ${layout.width}`);
   const screenshot = await page.screenshot({ fullPage: true });
