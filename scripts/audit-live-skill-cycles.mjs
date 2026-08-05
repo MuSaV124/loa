@@ -5,7 +5,7 @@ import { combatAnalyzerSkillShares, findCombatAnalyzerProfile } from '../public/
 import { buildSkillCycleModel, evaluateEvolutionCooldown } from '../public/skill-cycle.js';
 
 const API_BASE = process.env.LOA_SKILL_AUDIT_API_BASE || 'https://loa-beige.vercel.app';
-const APP_VERSION = process.env.LOA_SKILL_AUDIT_APP_VERSION || '5.15.12';
+const APP_VERSION = process.env.LOA_SKILL_AUDIT_APP_VERSION || '5.15.14';
 const SUPPORT_ENGRAVINGS = new Set(['축복의 오라', '절실한 구원', '만개']);
 
 const calibrationReferences = JSON.parse(await readFile(new URL('./combat-power-class-samples.json', import.meta.url), 'utf8'));
@@ -22,7 +22,7 @@ const analyzer = JSON.parse(await readFile(new URL('../public/combat-analyzer.js
 
 async function fetchCharacter(row) {
   const url = `${API_BASE}/api/character?name=${encodeURIComponent(row.referenceCharacter)}&appVersion=${encodeURIComponent(APP_VERSION)}`;
-  const response = await fetch(url, { headers: { 'user-agent': 'LostArkCalculatorSkillCycleAudit/5.15.12' } });
+  const response = await fetch(url, { headers: { 'user-agent': 'LostArkCalculatorSkillCycleAudit/5.15.14' } });
   if (!response.ok) throw new Error(`${row.className} ${row.referenceCharacter}: HTTP ${response.status}`);
   const data = await response.json();
   if (!data?.ok) throw new Error(`${row.className} ${row.referenceCharacter}: ${data?.message || data?.error || '조회 실패'}`);

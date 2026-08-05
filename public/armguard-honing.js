@@ -27,6 +27,19 @@ const RAW_ARMGUARD_HONING_ROWS = [
   [25, 1.5, 607000, 6070000, 38470, 1280, 4015, 94, 62, 13160, 240000]
 ];
 
+export const ARMGUARD_HONING_INFO = Object.freeze({
+  official: true,
+  verifiedAt: '2026-08-05',
+  source: 'https://lostark.game.onstove.com/News/Notice/Views/13508#anchor-1785742364253',
+  specialHoningMaterial: '특수 재련 : 전이 돌파석'
+});
+
+export const ARMGUARD_LIMIT_BREAKS = Object.freeze([
+  Object.freeze({ stage: 10, fromGrade: '영웅', toGrade: '전설', materials: Object.freeze({ '사령의 잔영': 200 }), substitute: Object.freeze({ '죽음의 손': 100 }) }),
+  Object.freeze({ stage: 15, fromGrade: '전설', toGrade: '유물', materials: Object.freeze({ '사령의 잔영': 240 }), substitute: Object.freeze({ '죽음의 손': 120 }) }),
+  Object.freeze({ stage: 20, fromGrade: '유물', toGrade: '고대', materials: Object.freeze({ '죽음의 손': 150 }), substitute: null })
+]);
+
 export const NORMAL_HONING_PITY_RULES = Object.freeze({
   failBonusRate: 0.1,
   maxRateMultiplier: 2,
@@ -85,6 +98,12 @@ export function armguardHoningRowsBetween(fromStage, toStage) {
   const from = Math.max(0, Math.min(24, Math.floor(Number(fromStage || 0))));
   const to = Math.max(from + 1, Math.min(25, Math.floor(Number(toStage || 25))));
   return ARMGUARD_HONING_ROWS.filter(row => row.from >= from && row.to <= to);
+}
+
+export function armguardLimitBreaksBetween(fromStage, toStage) {
+  const from = Math.max(0, Math.min(25, Math.floor(Number(fromStage || 0))));
+  const to = Math.max(from, Math.min(25, Math.floor(Number(toStage || 25))));
+  return ARMGUARD_LIMIT_BREAKS.filter(row => row.stage >= from && row.stage < to);
 }
 
 function armguardAttemptRatePercent(ratePercent, attempt) {

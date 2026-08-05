@@ -16,8 +16,18 @@ assert.deepEqual(extractProfileAttackBreakdown({ Stats: [{
 });
 
 assert.equal(ARMGUARD_POWER_ESTIMATE.official, false);
+assert.equal(ARMGUARD_POWER_ESTIMATE.officialAnchors, true);
 assert.equal(ARMGUARD_POWER_ESTIMATE.breakthroughShare, 0.4);
 assert.deepEqual(ARMGUARD_POWER_REFERENCES.map(row => row.stage), [0, 10, 15, 20, 25]);
+assert.deepEqual(armguardPowerEffectAtStage(0), {
+  stage: 0,
+  weaponPower: 3500,
+  defense: 450,
+  mainStat: 10500,
+  vitality: 900,
+  baseAttack: 0,
+  baseAttackPercent: 0
+});
 assert.deepEqual(armguardPowerEffectAtStage(10), {
   stage: 10,
   weaponPower: 10969,
@@ -30,6 +40,7 @@ assert.deepEqual(armguardPowerEffectAtStage(10), {
 assert.equal(armguardPowerEffectAtStage(15).baseAttackPercent, 1);
 assert.equal(armguardPowerEffectAtStage(20).mainStat, 60216);
 assert.equal(armguardPowerEffectAtStage(25).baseAttackPercent, 3);
+assert.equal(armguardPowerEffectAtStage(25).mainStat, 73710);
 
 const stage11 = armguardPowerEffectAtStage(11);
 assert.equal(stage11.weaponPower, 10969 + (14817 - 10969) * 0.4);
@@ -54,8 +65,8 @@ const breakerSnapshot = {
 const breakerEstimate = estimateArmguardCombatPower(breakerSnapshot, 0, 25);
 assert.equal(breakerEstimate.available, true);
 assert.equal(breakerEstimate.className, '브레이커');
-assert.ok(Math.abs(breakerEstimate.gainPercent - 15.380821471821292) < 1e-9);
-assert.ok(Math.abs(breakerEstimate.powerGain - 838.1455663818115) < 1e-9);
+assert.ok(Math.abs(breakerEstimate.gainPercent - 15.108204469101683) < 1e-9);
+assert.ok(Math.abs(breakerEstimate.powerGain - 823.2898753143111) < 1e-9);
 
 const otherClassEstimate = estimateArmguardCombatPower({
   ...breakerSnapshot,

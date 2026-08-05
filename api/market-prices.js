@@ -1,6 +1,6 @@
 import { MARKET_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
 
-const API_VERSION = '5.15.12';
+const API_VERSION = '5.15.14';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
@@ -71,7 +71,7 @@ const GEM_RULES = {
   cooldown: { label: '작열', names: ['작열'], icon: 'https://cdn-lostark.game.onstove.com/efui_iconatlas/use/use_9_71.png' }
 };
 
-const T4_MATERIAL_GROUPS = [
+export const T4_MATERIAL_GROUPS = [
   {
     group: '기본 강화 재료',
     items: ['운명의 파편 주머니(소)', '운명의 파편 주머니(중)', '운명의 파편 주머니(대)', '운명의 돌파석', '위대한 운명의 돌파석', '운명의 파괴석', '운명의 파괴석 결정', '운명의 수호석', '운명의 수호석 결정']
@@ -86,11 +86,11 @@ const T4_MATERIAL_GROUPS = [
   },
   {
     group: '재봉술',
-    items: ['재봉술 : 업화 [11-14]', '재봉술 : 업화 [15-18]', '재봉술 : 업화 [19-20]', '장인의 재봉술 : 1단계', '장인의 재봉술 : 2단계', '장인의 재봉술 : 3단계', '장인의 재봉술 : 4단계']
+    items: ['재봉술 : 업화 [11-14]', '재봉술 : 업화 [15-18]', '재봉술 : 업화 [19-20]', '재봉술 : 전율 [12-15]', '재봉술 : 전율 [16-19]', '장인의 재봉술 : 1단계', '장인의 재봉술 : 2단계', '장인의 재봉술 : 3단계', '장인의 재봉술 : 4단계']
   },
   {
     group: '야금술',
-    items: ['야금술 : 업화 [11-14]', '야금술 : 업화 [15-18]', '야금술 : 업화 [19-20]', '장인의 야금술 : 1단계', '장인의 야금술 : 2단계', '장인의 야금술 : 3단계', '장인의 야금술 : 4단계']
+    items: ['야금술 : 업화 [11-14]', '야금술 : 업화 [15-18]', '야금술 : 업화 [19-20]', '야금술 : 전율 [12-15]', '야금술 : 전율 [16-19]', '장인의 야금술 : 1단계', '장인의 야금술 : 2단계', '장인의 야금술 : 3단계', '장인의 야금술 : 4단계']
   },
   {
     group: '아크그리드 젬',

@@ -6,8 +6,9 @@ import { extractArkGridSkillEffects } from '../public/passive-skill-effects.js';
 import { extractCardEffects } from '../public/card-effects.js';
 import { extractAvatarEffects } from '../public/avatar-effects.js';
 
-const API_VERSION = '5.15.12';
+const API_VERSION = '5.15.14';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
+const OFFICIAL_ARMGUARD_ICON = `${CDN_PREFIX}efui_iconatlas/bracer/bracer_1.png`;
 const CHARACTER_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const CHARACTER_CACHE_MAX_SIZE = 80;
 const characterCache = new Map();
@@ -291,16 +292,18 @@ function parseEquipmentSnapshotItem(item) {
   const tooltip = parseTooltip(item?.Tooltip);
   const text = tooltipText(item?.Tooltip);
   const name = stripHtml(item?.Name || '');
+  const type = item?.Type || item?.ItemType || '';
+  const isArmguard = type === '완갑' || name.includes('완갑');
   const advancedHoningExcluded = name.includes('전율');
   const quality = firstFiniteNumber([
     item?.Quality,
     findQualityValue(tooltip)
   ]);
   return {
-    type: item?.Type || item?.ItemType || '',
+    type,
     name,
     grade: item?.Grade || '',
-    icon: normalizeIconUrl(item?.Icon || item?.IconPath || findIconPath(item?.Tooltip) || ''),
+    icon: normalizeIconUrl(item?.Icon || item?.IconPath || findIconPath(item?.Tooltip) || (isArmguard ? OFFICIAL_ARMGUARD_ICON : '')),
     honingLevel: firstFiniteNumber([
       item?.HoningLevel,
       matchNumber(name, [/^\s*\+([0-9]+)/]),

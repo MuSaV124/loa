@@ -6,7 +6,9 @@ import {
   decodeSpecScenario,
   encodeSpecScenario,
   mergeMaterials,
-  scaleMaterials
+  scaleMaterials,
+  upperAncientRefineBookName,
+  upperAncientRefineBookRateBonusPercent
 } from '../public/spec-planner.js';
 
 const allocation = allocateOwnedMaterials(
@@ -29,6 +31,17 @@ assert.deepEqual(
   ),
   { '운명의 파편': 24000, '실링': 432000, '골드': 3880 }
 );
+
+assert.equal(upperAncientRefineBookName('armor', 11, 12), '재봉술 : 전율 [12-15]');
+assert.equal(upperAncientRefineBookName('weapon', 14, 15), '야금술 : 전율 [12-15]');
+assert.equal(upperAncientRefineBookName('armor', 15, 16), '재봉술 : 전율 [16-19]');
+assert.equal(upperAncientRefineBookName('weapon', 18, 19), '야금술 : 전율 [16-19]');
+assert.equal(upperAncientRefineBookName('weapon', 19, 20), '');
+assert.deepEqual(
+  [12, 13, 14, 15, 16, 17, 18, 19].map(upperAncientRefineBookRateBonusPercent),
+  [5, 5, 4, 4, 4, 3, 3, 3]
+);
+assert.equal(upperAncientRefineBookRateBonusPercent(20), 0);
 
 const rows = [
   { category: 'normalHoning', item: { type: '무기', name: 'A' }, from: 20, to: 21, available: true, powerDelta: 100, expectedCost: { expectedGold: 1000 } },

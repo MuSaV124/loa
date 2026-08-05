@@ -1,19 +1,19 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.12';
-import { emptyCardEffects } from './card-effects.js?v=5.15.12';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.12';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.12';
-import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.12';
-import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.12';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.12';
-import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.12';
-import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.12';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.12';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.12';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.12';
-import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey } from './spec-planner.js?v=5.15.12';
-import { ARMGUARD_BREATH_ESTIMATE, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.12';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.12';
-import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.12';
+import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.14';
+import { emptyCardEffects } from './card-effects.js?v=5.15.14';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.14';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.14';
+import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.14';
+import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.14';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.14';
+import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.14';
+import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.14';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.14';
+import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.14';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.14';
+import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey, upperAncientRefineBookName, upperAncientRefineBookRateBonusPercent } from './spec-planner.js?v=5.15.14';
+import { ARMGUARD_BREATH_ESTIMATE, ARMGUARD_HONING_INFO, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardLimitBreaksBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.14';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.14';
+import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.14';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -22,9 +22,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=5.15.12';
+} from './cache-policy.js?v=5.15.14';
 
-const VERSION = '5.15.12';
+const VERSION = '5.15.14';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -290,7 +290,10 @@ const T4_GEAR_COST_RULES = {
     growthLabel: '장비 성장',
     limitBreakLabel: '한계돌파',
     limitBreakMaterials: ['고통의 가시'],
-    books: { weapon: [], armor: [] }
+    books: {
+      weapon: ['야금술 : 전율 [12-15]', '야금술 : 전율 [16-19]'],
+      armor: ['재봉술 : 전율 [12-15]', '재봉술 : 전율 [16-19]']
+    }
   },
   armguard: {
     label: '완갑',
@@ -303,7 +306,7 @@ const T4_GEAR_COST_RULES = {
   }
 };
 const T4_SHARED_COST_MATERIALS = ['운명의 파편 주머니(대)', '빙하의 숨결', '용암의 숨결'];
-const BOUND_ONLY_MATERIALS = new Set(['고통의 가시', '아그리스의 비늘', '낙뢰의 뿔']);
+const BOUND_ONLY_MATERIALS = new Set(['고통의 가시', '아그리스의 비늘', '낙뢰의 뿔', '사령의 잔영', '죽음의 손', '특수 재련 : 전이 돌파석']);
 const T4_ADVANCED_HONING_TEMPERING_COSTS = {
   1: { weapon: { name: '아그리스의 비늘', amount: 60 }, armor: { name: '아그리스의 비늘', amount: 24 } },
   2: { weapon: { name: '아그리스의 비늘', amount: 60 }, armor: { name: '아그리스의 비늘', amount: 24 } },
@@ -963,7 +966,23 @@ function accessoryOptionGradeClass(grade) {
   return '';
 }
 function renderPowerEquipmentRow(item) {
+  const isArmguard = item?.type === '완갑' || String(item?.name || '').includes('완갑');
   const honing = item.honingLevel != null ? `+${item.honingLevel}` : '확인 필요';
+  if (isArmguard) {
+    const grade = item.grade || '등급 확인 필요';
+    return `<div class="powerEquipmentRow powerArmguardRow">
+      ${powerItemIcon(item, { hideQuality: true })}
+      <div class="powerEquipmentFields">
+        <b>${escapeHtml(item.name || '완갑')}</b>
+        <div class="powerFieldGrid powerArmguardFields">
+          <span>${escapeHtml(grade)}</span>
+          <span>완갑</span>
+          <span>${escapeHtml(honing)}</span>
+          <span>품질·아이템 레벨 없음</span>
+        </div>
+      </div>
+    </div>`;
+  }
   const advanced = item.advancedHoningExcluded ? '' : (item.advancedHoningLevel != null ? `상재 ${item.advancedHoningLevel}` : '상재 미확인');
   const quality = item.quality != null ? `품질 ${item.quality}` : '품질 미확인';
   const qualityClass = gearQualityClass(item.quality);
@@ -1242,13 +1261,17 @@ function mergedNextNormalRefineMaterials(item) {
   const attemptRow = normalCostRowForGear(item, normalRefineCostSetForGear(item));
   if (!attemptRow) return null;
   const attemptMaterials = { ...(attemptRow.materials || {}) };
+  const rule = classifyT4GearCostRule(item);
+  if (rule.key === 'upperAncient') {
+    const bookName = upperAncientRefineBookName(isWeaponGear(item) ? 'weapon' : 'armor', attemptRow.from, attemptRow.to);
+    addMaterialAmount(attemptMaterials, bookName, bookName ? 1 : 0);
+  }
   const growthMaterials = {};
   const growthRow = normalCostRowForGear(item, normalGrowthCostSetForGear(item));
   if (growthRow) {
     addMaterialAmount(growthMaterials, '운명의 파편', growthRow.fragment);
     addMaterialAmount(growthMaterials, '실링', growthRow.silver);
   }
-  const rule = classifyT4GearCostRule(item);
   const growthDataMissing = isLimitBreakGrowth(item, rule) && !growthRow;
   return {
     from: attemptRow.from,
@@ -1396,7 +1419,12 @@ function normalHoningSupportRatePercent(ratePercent, strategy) {
   const breathCount = Number(strategy?.breathCount || 0);
   const breathRatio = maxBreath > 0 ? Math.max(0, Math.min(maxBreath, breathCount)) / maxBreath : 0;
   const breathBonus = base * T4_NORMAL_HONING_FULL_BREATH_BONUS_MULTIPLIER * breathRatio;
-  const bookBonus = strategy?.useBook ? base * T4_NORMAL_HONING_BOOK_BONUS_MULTIPLIER : 0;
+  const officialUpperAncientBookBonus = String(strategy?.bookName || '').includes('전율')
+    ? upperAncientRefineBookRateBonusPercent(strategy?.toStage)
+    : 0;
+  const bookBonus = strategy?.useBook
+    ? officialUpperAncientBookBonus || base * T4_NORMAL_HONING_BOOK_BONUS_MULTIPLIER
+    : 0;
   return breathBonus + bookBonus;
 }
 function buildNormalHoningStrategyMaterials(baseMaterials, optional, strategy) {
@@ -1437,7 +1465,7 @@ function calculateNormalHoningExpectedCost(baseMaterials, next, priceMap) {
   const breathOptions = maxBreath > 0 ? Array.from({ length: maxBreath + 1 }, (_, count) => count) : [0];
   for (const breathCount of breathOptions) {
     for (const useBook of bookOptions) {
-      const strategy = { breathCount, maxBreath, useBook, bookName: optional.bookName };
+      const strategy = { breathCount, maxBreath, useBook, bookName: optional.bookName, toStage: next.to };
       const attemptMaterials = buildNormalHoningStrategyMaterials(baseMaterials, optional, strategy);
       const attemptStats = calculateNormalHoningAttemptStats(next, strategy);
       const scenarioCost = attempts => {
@@ -1480,6 +1508,7 @@ function calculateNormalHoningExpectedCost(baseMaterials, next, priceMap) {
 
 function calculateArmguardRangeExpectedCost(fromStage, toStage, priceMap, breathMode = 'optimal') {
   const rows = armguardHoningRowsBetween(fromStage, toStage);
+  const limitBreaks = armguardLimitBreaksBetween(fromStage, toStage);
   const lavaUnitGold = unitGoldForMaterial(priceMap, '용암의 숨결');
   const glacierUnitGold = unitGoldForMaterial(priceMap, '빙하의 숨결');
   const hasBreathPrices = lavaUnitGold > 0 && glacierUnitGold > 0;
@@ -1536,6 +1565,7 @@ function calculateArmguardRangeExpectedCost(fromStage, toStage, priceMap, breath
     from: rows[0]?.from ?? Number(fromStage || 0),
     to: rows.at(-1)?.to ?? Number(toStage || 0),
     stages,
+    limitBreaks,
     expectedAttempts,
     pityAttempts,
     expectedPityCount,
@@ -2937,31 +2967,33 @@ function renderNormalRefineAttemptCostTable() {
     {
       data: T4_NORMAL_REFINE_ATTEMPT_COSTS.upperAncient,
       armorColumns: ['운명의 수호석 결정', '위대한 운명의 돌파석', '상급 아비도스 융화제', '운명의 파편', '골드', '실링', '빙하의 숨결'],
-      weaponColumns: ['운명의 파괴석 결정', '위대한 운명의 돌파석', '상급 아비도스 융화제', '운명의 파편', '골드', '실링', '용암의 숨결']
+      weaponColumns: ['운명의 파괴석 결정', '위대한 운명의 돌파석', '상급 아비도스 융화제', '운명의 파편', '골드', '실링', '용암의 숨결'],
+      armorBook: row => upperAncientRefineBookName('armor', row.from, row.to),
+      weaponBook: row => upperAncientRefineBookName('weapon', row.from, row.to)
     }
   ];
-  const renderRows = (rows = [], columns = []) => rows.map(row => {
-    const book = Object.keys(row.materials || {}).find(name => name.includes('재봉술') || name.includes('야금술'));
+  const renderRows = (rows = [], columns = [], bookResolver = null) => rows.map(row => {
+    const book = Object.keys(row.materials || {}).find(name => name.includes('재봉술') || name.includes('야금술')) || bookResolver?.(row) || '';
     return `<tr>
       <td>${row.from}→${row.to}</td>
       ${columns.map(name => `<td>${formatNumber(row.materials?.[name] || 0)}</td>`).join('')}
       <td>${book ? escapeHtml(book.replace(' : 업화 ', ' ')) : '-'}</td>
     </tr>`;
   }).join('');
-  const renderTable = (title, rows, columns) => `<section>
+  const renderTable = (title, rows, columns, bookResolver) => `<section>
     <h4>${escapeHtml(title)}</h4>
     <div class="normalGrowthScroll normalRefineScroll">
       <table class="normalGrowthTable normalRefineTable">
         <thead><tr><th>구간</th>${columns.map(name => `<th>${escapeHtml(name.replace('운명의 ', '').replace('아비도스 ', ''))}</th>`).join('')}<th>책</th></tr></thead>
-        <tbody>${renderRows(rows, columns)}</tbody>
+        <tbody>${renderRows(rows, columns, bookResolver)}</tbody>
       </table>
     </div>
   </section>`;
-  const renderRuleSet = ({ data, armorColumns, weaponColumns }) => `<div class="normalRefineRuleSet">
+  const renderRuleSet = ({ data, armorColumns, weaponColumns, armorBook, weaponBook }) => `<div class="normalRefineRuleSet">
     <div class="powerBuildHeader"><b>${escapeHtml(data.label)}</b><span>성장 재료 미포함</span></div>
     <div class="advancedHoningColumns">
-      ${renderTable('방어구', data.armor, armorColumns)}
-      ${data.weapon?.length ? renderTable('무기', data.weapon, weaponColumns) : '<section><h4>무기</h4><p class="powerCostHint">데이터 입력 대기</p></section>'}
+      ${renderTable('방어구', data.armor, armorColumns, armorBook)}
+      ${data.weapon?.length ? renderTable('무기', data.weapon, weaponColumns, weaponBook) : '<section><h4>무기</h4><p class="powerCostHint">데이터 입력 대기</p></section>'}
     </div>
   </div>`;
   return `<div class="advancedHoningCostTable normalRefineCostTable">
@@ -3035,7 +3067,7 @@ function renderPowerCostPrep(snapshot) {
       <div id="armguardCostResult" class="armguardCostResult" aria-live="polite">
         <p class="armguardCostLoading">재료 시세를 불러오는 중입니다.</p>
       </div>
-      <p class="powerCostHint armguardEstimateNote">예상 규칙: 목표 1~19강은 용암 10개+빙하 10개, 20~23강은 15개+15개, 24~25강은 25개+25개를 고정으로 함께 사용합니다. 공식 수량 공개 전 임시 배분이며 확인 즉시 교체합니다. 최적 모드는 노숨과 해당 단계 풀숨의 거래소 시세·기대 성공률만 비교하고, 보유 재료는 최종 구매 비용에서 차감합니다.</p>
+      <p class="powerCostHint armguardEstimateNote">재련 성공률·성장 재료·1회 재련 재료는 ${escapeHtml(ARMGUARD_HONING_INFO.verifiedAt)} 공식 업데이트 표 확인값입니다. 특수 재련은 귀속 재료 '${escapeHtml(ARMGUARD_HONING_INFO.specialHoningMaterial)}'을 사용합니다. 숨결 최대 수량과 성공률 증가는 공식 페이지에서 공개되지 않아 목표 1~19강 10+10, 20~23강 15+15, 24~25강 25+25의 임시 배분을 유지합니다. 최적 모드는 노숨과 임시 풀숨의 거래소 시세·기대 성공률을 비교합니다.</p>
     </section>
     <div class="powerCostGrid">
       <div>
@@ -3112,6 +3144,13 @@ function renderArmguardExpectedCost(priceMap) {
       <b>${stage.from}→${stage.to}강</b><span>${escapeHtml(recommendation)}</span><small>${escapeHtml(combined)} · 기대 ${formatExpectedAmount(stage.expectedAttempts)}회 · ${escapeHtml(saving)}</small>
     </div>`;
   }).join('');
+  const limitBreakRows = (plan.limitBreaks || []).map(row => {
+    const primary = Object.entries(row.materials || {}).map(([name, amount]) => `${name} ${formatNumber(amount)}개`).join(' + ');
+    const substitute = row.substitute
+      ? ` · 대체 ${Object.entries(row.substitute).map(([name, amount]) => `${name} ${formatNumber(amount)}개`).join(' + ')}`
+      : '';
+    return `<div class="armguardBreathRow"><b>+${row.stage} 한계 해방</b><span>${escapeHtml(`${row.fromGrade} → ${row.toGrade}`)}</span><small>${escapeHtml(primary + substitute)}</small></div>`;
+  }).join('');
   const powerSummary = powerEstimate.available
     ? `<div class="armguardPowerSummary"><span>${plan.from}→${plan.to}강 예상 전투력</span><strong>+${formatNumber(Number(powerEstimate.powerGain || 0).toFixed(2))}</strong><small>${escapeHtml(powerEstimate.className || '검색 캐릭터')} 기준 · ${formatNumber(Number(powerEstimate.fromPower || 0).toFixed(2))} → ${formatNumber(Number(powerEstimate.toPower || 0).toFixed(2))} · +${Number(powerEstimate.gainPercent || 0).toFixed(2)}%</small></div>`
     : `<div class="armguardPowerSummary unavailable"><span>${plan.from}→${plan.to}강 예상 전투력</span><strong>계산 대기</strong><small>${escapeHtml(powerEstimate.reason || '캐릭터 기준값 확인 필요')}</small></div>`;
@@ -3139,7 +3178,8 @@ function renderArmguardExpectedCost(priceMap) {
       <summary><span><b>단계별 숨결 최적 수량</b><small>${plan.hasBreathPrices ? `용암 ${formatGold(plan.lavaUnitGold)} · 빙하 ${formatGold(plan.glacierUnitGold)}` : '두 숨결 시세 확인 필요'}</small></span></summary>
       <div class="armguardBreathList">${breathRows}</div>
     </details>
-    <p class="powerCostHint armguardPowerEstimateNote">완갑 전투력은 공개된 +10/+15/+20/+25 효과와 역산한 +0 효과를 검색 캐릭터의 기본 공격력·무기 공격력·공식 전투력에 적용한 출시 전 예상치입니다. 10→11, 15→16, 20→21강은 등급 돌파 증가를 크게 반영했으며 실제 출시 데이터 확인 후 교체합니다.</p>
+    ${limitBreakRows ? `<details class="armguardBreathDetails"><summary><span><b>선택 구간 한계 해방</b><small>레이드 귀속 재료 · 골드 환산 제외</small></span></summary><div class="armguardBreathList">${limitBreakRows}</div></details>` : ''}
+    <p class="powerCostHint armguardPowerEstimateNote">완갑 0/+10/+15/+20/+25 능력치는 2026-08-05 공식 아이템 사전 확인값입니다. 중간 단계 능력치와 검색 캐릭터 전투력 환산은 공식 기준점 사이를 보정한 예상값이며, 실제 완갑 장착 캐릭터 표본이 확보되면 단계별로 교체합니다.</p>
     ${hasMissingPrice ? '<p class="armguardCostWarning">시세가 없는 재료는 기대 골드 합계에서 제외되었습니다.</p>' : ''}`;
 }
 

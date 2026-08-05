@@ -4,8 +4,17 @@ import {
   isUsableMarketSnapshot,
   isUsableMaterialSection
 } from '../server/market-cache.js';
+import { T4_MATERIAL_GROUPS } from '../api/market-prices.js';
 
 const now = new Date('2026-07-26T03:00:00.000Z');
+
+const officialAugustMaterials = T4_MATERIAL_GROUPS.flatMap(group => group.items);
+assert.ok(officialAugustMaterials.includes('재봉술 : 전율 [12-15]'));
+assert.ok(officialAugustMaterials.includes('재봉술 : 전율 [16-19]'));
+assert.ok(officialAugustMaterials.includes('야금술 : 전율 [12-15]'));
+assert.ok(officialAugustMaterials.includes('야금술 : 전율 [16-19]'));
+assert.ok(!officialAugustMaterials.includes('사령의 잔영'));
+assert.ok(!officialAugustMaterials.includes('죽음의 손'));
 
 function gemSection(price = 100) {
   return {

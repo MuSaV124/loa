@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
-import { ARMGUARD_BREATH_ESTIMATE, ARMGUARD_HONING_ROWS, armguardBreathMaxCombined, armguardBreathMixes, armguardBreathMixesForMode, armguardExpectedPityCount, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardPityProbability } from '../public/armguard-honing.js';
+import { ARMGUARD_BREATH_ESTIMATE, ARMGUARD_HONING_INFO, ARMGUARD_HONING_ROWS, ARMGUARD_LIMIT_BREAKS, armguardBreathMaxCombined, armguardBreathMixes, armguardBreathMixesForMode, armguardExpectedPityCount, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardLimitBreaksBetween, armguardPityProbability } from '../public/armguard-honing.js';
 
 assert.equal(ARMGUARD_HONING_ROWS.length, 25);
+assert.equal(ARMGUARD_HONING_INFO.official, true);
+assert.equal(ARMGUARD_LIMIT_BREAKS.length, 3);
+assert.deepEqual(armguardLimitBreaksBetween(0, 25).map(row => row.stage), [10, 15, 20]);
+assert.deepEqual(armguardLimitBreaksBetween(10, 20).map(row => row.stage), [10, 15]);
+assert.deepEqual(armguardLimitBreaksBetween(20, 25).map(row => row.stage), [20]);
 assert.deepEqual(ARMGUARD_HONING_ROWS.map(row => row.stage), Array.from({ length: 25 }, (_, index) => index + 1));
 
 const first = armguardHoningRowForCurrentStage(0);

@@ -1,16 +1,19 @@
 const RAW_ARMGUARD_POWER_REFERENCES = [
   // stage, weapon power, physical/magic defense, main stat, vitality, base attack, base attack percent
-  [0, 3273, 432, 9702, 870, 0, 0],
+  [0, 3500, 450, 10500, 900, 0, 0],
   [10, 10969, 1456, 34746, 3072, 2030, 0],
   [15, 14817, 1968, 47268, 4173, 3690, 1],
   [20, 18794, 2488, 60216, 5286, 5980, 2],
-  [25, 22940, 3019, 77310, 6414, 9050, 3]
+  [25, 22940, 3019, 73710, 6414, 9050, 3]
 ];
 
 export const ARMGUARD_POWER_ESTIMATE = Object.freeze({
   official: false,
+  officialAnchors: true,
+  verifiedAt: '2026-08-05',
+  source: 'https://lostark.game.onstove.com/ItemDictionary?key=134301106',
   breakthroughShare: 0.4,
-  note: '완갑 출시 전 공개된 10/15/20/25강 툴팁과 0강 역산값을 사용한 예상치'
+  note: '공식 아이템 사전의 0/10/15/20/25강 툴팁을 기준으로 하며, 중간 단계와 캐릭터 전투력 환산은 표본 보정 예상치'
 });
 
 export const ARMGUARD_POWER_REFERENCES = Object.freeze(RAW_ARMGUARD_POWER_REFERENCES.map(([
@@ -130,6 +133,7 @@ export function estimateArmguardCombatPower(snapshot, fromStage = 0, toStage = 2
   return {
     available: true,
     official: false,
+    officialAnchors: ARMGUARD_POWER_ESTIMATE.officialAnchors,
     className: snapshot?.profile?.className || '',
     from,
     to,

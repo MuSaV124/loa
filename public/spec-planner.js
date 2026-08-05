@@ -35,6 +35,20 @@ export function mergeMaterials(...groups) {
   return merged;
 }
 
+export function upperAncientRefineBookName(slot, fromStage, toStage = Number(fromStage || 0) + 1) {
+  const prefix = slot === 'weapon' ? '야금술' : slot === 'armor' ? '재봉술' : '';
+  const target = Math.floor(Number(toStage || 0));
+  if (!prefix || !Number.isFinite(target)) return '';
+  if (target >= 12 && target <= 15) return `${prefix} : 전율 [12-15]`;
+  if (target >= 16 && target <= 19) return `${prefix} : 전율 [16-19]`;
+  return '';
+}
+
+export function upperAncientRefineBookRateBonusPercent(toStage) {
+  const bonuses = { 12: 5, 13: 5, 14: 4, 15: 4, 16: 4, 17: 3, 18: 3, 19: 3 };
+  return bonuses[Math.floor(Number(toStage || 0))] || 0;
+}
+
 export function buildHoningScenarioMaterials(oneTimeMaterials = {}, perAttemptMaterials = {}, attempts = 1) {
   return mergeMaterials(oneTimeMaterials, scaleMaterials(perAttemptMaterials, attempts));
 }
