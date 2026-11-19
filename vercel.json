@@ -1,5 +1,10 @@
 {
   "version": 2,
+  "git": {
+    "deploymentEnabled": {
+      "codex/gold-efficiency-simulator": false
+    }
+  },
   "functions": {
     "api/**/*.js": {
       "maxDuration": 60
