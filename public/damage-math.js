@@ -1,4 +1,4 @@
-import { calculateBluntSpike } from './evolution-math.js?v=20261118';
+import { calculateBluntSpike } from './evolution-math.js?v=6.0.0';
 
 export const BASE_CRIT_DAMAGE = 200;
 export const CRIT_RATE_PER_STAT = 0.03579; // 기존 Lv.70 환산값. 공식 반올림 정밀도는 미검증.

@@ -1,5 +1,5 @@
 import { buildSkillCycleModel, findSkillCycleItem, skillCooldownSeconds } from './skill-cycle.js';
-import { collectSkillTooltipTexts } from './skill-effects.js?v=20261118';
+import { collectSkillTooltipTexts } from './skill-effects.js?v=6.0.0';
 
 const SUPPORT_SPECS = new Set(['절실한 구원', '만개', '축복의 오라', '해방자', '빛의 수호자']);
 const DEALER_SPECS = new Set(['진실된 용맹', '회귀', '심판자', '빛의 기사']);
