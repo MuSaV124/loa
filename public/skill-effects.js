@@ -145,7 +145,13 @@ function collectBaseSkillDescriptionTexts(tooltip) {
 }
 
 export function parseSkillManaUsage(tooltip) {
-  const texts = collectSkillTooltipTexts(tooltip);
+  const parsed = typeof tooltip === 'string' ? parseJsonString(tooltip) : tooltip;
+  const costHeader = parsed?.Element_004?.value;
+  // The official tooltip includes the next level's cost in a separate element.
+  const texts = typeof costHeader === 'string' ? [decodeEntities(costHeader)]
+    : typeof parsed?.title?.leftText === 'string' ? [decodeEntities(parsed.title.leftText)]
+    : !parsed && typeof tooltip === 'string' && /^\s*(?:마나\s+[\d,]+\s+소모|[\d,]+\s*(?:의\s*)?마나(?:를|을)?\s*소모)/.test(tooltip)
+      ? [decodeEntities(tooltip)] : [];
   const costs = [];
   const patterns = [
     /마나\s*([\d,]+(?:\.\d+)?)\s*(?:을|를)?\s*소모/gi,
@@ -161,11 +167,10 @@ export function parseSkillManaUsage(tooltip) {
       }
     }
   }
-  return {
-    usesMana: costs.length > 0,
-    manaCost: costs.length ? Math.max(...costs) : 0,
-    manaUsageKnown: texts.length > 0
-  };
+  const distinctCosts = [...new Set(costs)];
+  const manaUsageKnown = texts.length > 0 && distinctCosts.length < 2
+    && (distinctCosts.length === 1 || !texts[0].includes('마나'));
+  return { usesMana: distinctCosts.length === 1, manaCost: distinctCosts.length === 1 ? distinctCosts[0] : 0, manaUsageKnown };
 }
 
 function signedValue(rawValue, direction) {

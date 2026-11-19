@@ -1,12 +1,13 @@
 import { isBoundGem } from '../public/gem-math.js';
 import { relicEngravingEffect } from '../public/engraving-math.js';
 import { CHARACTER_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
-import { extractCombatSkillEffects } from '../public/skill-effects.js';
+import { extractCombatSkillEffects, skillExperimentItems } from '../public/skill-effects.js';
+import { buildCharacterManaProfile } from '../public/mana-character.js';
 import { extractArkGridSkillEffects } from '../public/passive-skill-effects.js';
 import { extractCardEffects } from '../public/card-effects.js';
 import { extractAvatarEffects } from '../public/avatar-effects.js';
 
-const API_VERSION = '6.0.0';
+const API_VERSION = '6.1.0';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const OFFICIAL_ARMGUARD_ICON = `${CDN_PREFIX}efui_iconatlas/bracer/bracer_1.png`;
 const CHARACTER_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
@@ -91,9 +92,10 @@ async function loadCharacterData(name, apiKey) {
   const arkGridSkillEffects = arkGridEffects.skillEffects;
   delete arkGridEffects.skillEffects;
   const powerSnapshot = buildPowerSnapshot({ profile, arkPassive, equipment, gems, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, arkGridEffects, cardEffects, avatarEffects, skillEffects, arkGrid: arkGrid.data });
+  const manaProfile = buildCharacterManaProfile(profile, powerSnapshot, skills, skillExperimentItems(skillEffects));
 
   // cards/avatars 원본은 raw에 그대로 들어있고 파싱 결과에 아이콘까지 포함하므로 최상위로 중복해서 싣지 않는다.
-  return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, gems, skills, skillEffects, skillEffectsError: combatSkills.error, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, cardEffects, avatarEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridSkillEffects, arkGridError: arkGrid.error, powerSnapshot, raw: data };
+  return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, gems, skills, skillEffects, manaProfile, skillEffectsError: combatSkills.error, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, cardEffects, avatarEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridSkillEffects, arkGridError: arkGrid.error, powerSnapshot, raw: data };
 }
 
 async function fetchJson(url, apiKey, timeoutMs = 9000) {

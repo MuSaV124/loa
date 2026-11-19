@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LOSTARK 진화 노드 추천 계산기</title>
-  <link rel="stylesheet" href="/style.css?v=6.0.0" />
+  <link rel="stylesheet" href="/style.css?v=6.1.0" />
 </head>
 <body>
   <main class="wrap">
@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값과 선택한 진화 노드·추가 효과를 재계산해 비교합니다.</p>
         </div>
-        <span class="badge">v6.0.0 · 다중 치명타 업데이트</span>
+        <span class="badge">v6.1.0 · 마나 환경 비교</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -124,8 +124,8 @@
           <div class="recommendCheckRow">
             <label class="miniCheck" title="기준 스킬이 치명타로 적중하지 않을 확률을 표시합니다."><span>단타 주력기</span><input id="singleHitMainSkill" type="checkbox" /></label>
             <label class="miniCheck"><span>쿨감 효과 제외</span><input id="excludeCooldown" type="checkbox" /></label>
-            <label class="miniCheck"><span>주력기 마나 사용 안함</span><input id="noManaMainSkill" type="checkbox" /></label>
-            <label class="miniCheck" title="마나 용광로를 추천 후보에서 제외합니다."><span>마나 부족 직업</span><input id="manaShortageClass" type="checkbox" /></label>
+            <label class="miniCheck" title="스킬 툴팁이 없을 때 주력기를 비마나 스킬로 취급합니다."><span>주력기 마나 사용 안함</span><input id="noManaMainSkill" type="checkbox" /></label>
+            <label class="miniCheck" title="입력한 전투 구간에서 스킬 사용 지연을 계산합니다."><span>마나 제약 비교</span><input id="manaShortageClass" type="checkbox" /></label>
           </div>
           <label class="shareControl" title="쿨감이 실제 딜 사이클을 줄이는 주력기 딜 지분입니다. 쿨감 효과 제외 체크 시 0%로 처리됩니다.">
             <span>주력기 딜 지분 <em>쿨감 환산용</em></span>
@@ -135,10 +135,55 @@
         </div>
       </div>
       <p id="skillCycleRecommendationHint" class="skillCycleRecommendationHint">캐릭터 검색 후 현재 스킬트리의 초단위 주기와 전투분석 딜 지분을 자동 반영합니다.</p>
+      <div class="manaEnvironment" id="manaEnvironment">
+        <label>레이드 서포터
+          <select id="manaSupport"><option value="none">서포터 없음</option><option value="bard">바드</option><option value="artist">도화가</option><option value="paladin">홀리나이트</option><option value="valkyrie">발키리</option></select>
+        </label>
+        <p id="manaSupportSummary" class="hint" aria-live="polite"></p>
+        <p id="manaAutoStatus" class="hint">캐릭터 조회 후 공식 스킬 데이터를 표시합니다.</p>
+      </div>
+      <details id="manaScenarioPanel" class="advancedInputDetails manaScenarioPanel hidden">
+        <summary><span><b>마나 비교 조건</b><small>측정한 스킬 사용과 회복을 입력해 조합별 마나 지연을 비교합니다.</small></span></summary>
+        <div class="advancedInputBody">
+          <div class="manaScenarioGrid">
+            <label>전투 시간(초)<input id="manaDuration" type="number" min="1" max="600" step="any" /></label>
+            <label>최대 마나<input id="manaMax" type="number" min="1" step="any" /></label>
+            <label>시작 마나<input id="manaStart" type="number" min="0" step="any" /></label>
+            <label>음식·서포터 적용 전 회복 1회량<input id="manaRecovery" type="number" min="0" step="any" /></label>
+            <label>첫 회복(초)<input id="manaFirstRecovery" type="number" min="0" step="any" /></label>
+            <label>회복 간격(초)<input id="manaRecoveryInterval" type="number" min="0.1" step="any" /></label>
+            <label>소모 감소 중첩<select id="manaCostReductions"><option value="">미확인</option><option value="sum">합산으로 실측</option><option value="product">개별 곱으로 실측</option></select></label>
+            <label>마나 회복 음식<select id="manaFood"><option value="none">미사용</option><option value="used">사용</option></select></label>
+            <label id="manaFoodTickLabel" class="hidden">음식 사용 중 회복 1회량<input id="manaFoodTick" type="number" min="0" step="any" /></label>
+          </div>
+          <div id="manaSupportSettings" class="manaScenarioGrid hidden">
+            <label>서포터 효과 가동률(%)<input id="manaSupportUptime" type="number" min="0" max="100" step="any" /></label>
+            <label>회복 효과를 받은 시각(초, 쉼표 구분)<input id="manaSupportTimes" type="text" /></label>
+            <label><span id="manaSupportRestoreLabel">실측 회복량</span><input id="manaSupportRestore" type="number" min="0" step="any" aria-labelledby="manaSupportRestoreLabel" /></label>
+          </div>
+          <p id="manaSupportTimingHint" class="hint hidden"></p>
+          <details id="manaAutoSkills" class="manaAutoSkills hidden">
+            <summary>조회한 스킬 소모량과 쿨타임</summary>
+            <ul id="manaAutoSkillList"></ul>
+          </details>
+          <label>스킬명 | 첫 사용(초) | 재사용 간격(초) | 마나 소모량
+            <textarea id="manaRotation" rows="4" aria-describedby="manaRotationHint"></textarea>
+          </label>
+          <p id="manaRotationHint" class="hint">진화 적용 전 사용 간격과 비용을 한 줄에 스킬 하나씩 입력하세요. 조회한 비용은 수정할 수 있습니다. 유틸 스킬을 포함하고 실제 회복이 0인 경우에만 0을 입력하세요.</p>
+          <label>추가 회복 시각(초) | 회복량 (선택)
+            <textarea id="manaExtraRecovery" rows="2" aria-label="추가 회복 시각과 회복량"></textarea>
+          </label>
+          <button id="applyManaScenario" type="button">마나 조건 적용</button>
+        </div>
+      </details>
       <p id="arcanaIdentityNote" class="arcanaIdentityNote hidden"></p>
       <div class="resultLayout recommendLayout468">
         <div class="recommendMain468">
           <h3>추천 TOP5</h3>
+          <label id="manaRecommendationModeLabel" class="manaRecommendationMode">추천 기준
+            <select id="manaRecommendationMode"><option value="auto">실전 지속 피해 우선</option><option value="theory">이론상 기대 피해</option><option value="estimate">가정 기반 비교</option><option value="unverified">미검증 후보</option></select>
+          </label>
+          <p id="manaRecommendationStatus" class="hint" aria-live="polite"></p>
           <div id="recommendList" class="recommendList"></div>
         </div>
         <div class="apiBaseline468">
@@ -270,7 +315,7 @@
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <div class="version">Version 6.0.0</div>
-  <script type="module" src="/app.js?v=6.0.0"></script>
+  <div class="version">Version 6.1.0</div>
+  <script type="module" src="/app.js?v=6.1.0"></script>
 </body>
 </html>

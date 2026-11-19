@@ -120,7 +120,8 @@ export function buildUpgradePlan({
       const gold = finiteNonNegative(cost?.gold);
       const score = percent > 0 ? gold / percent : Infinity;
       return { ...candidate, cost, powerDelta, percent, gold, score };
-    }).filter(candidate => mode !== 'budget' || cumulativeGold + candidate.gold <= goldBudget + 0.000001);
+    }).filter(candidate => candidate.cost?.complete !== false
+      && (mode !== 'budget' || cumulativeGold + candidate.gold <= goldBudget + 0.000001));
 
     if (!evaluated.length) break;
     evaluated.sort((a, b) => a.score - b.score || b.powerDelta - a.powerDelta || a.key.localeCompare(b.key));
@@ -140,7 +141,8 @@ export function buildUpgradePlan({
       cumulativeSilver,
       ownedUsed: normalizeOwnedMaterials(picked.cost?.ownedUsed || {})
     });
-    remaining = remaining.filter(candidate => candidate.key !== picked.key);
+    remaining = remaining.filter(candidate => candidate.key !== picked.key
+      && (!picked.row.upgradeGroup || candidate.row.upgradeGroup !== picked.row.upgradeGroup));
 
     if (mode === 'target' && target > 0 && projectedPower >= target) break;
   }

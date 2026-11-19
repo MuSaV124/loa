@@ -1,4 +1,10 @@
-# Lost Ark Node Recommend Calculator v6.0.0
+# Lost Ark Node Recommend Calculator v6.1.0
+
+## v6.1.0
+
+- 공식 스킬 툴팁으로 현재 레벨 마나 소모와 확인 가능한 소모 보정을 채웁니다.
+- 레이드 서포터와 음식의 마나 환경을 비교하며, 가동률 가정과 실측 입력을 구분합니다.
+- [데이터 출처와 운용 검증 범위](docs/mana-environment-v6.1.0.md)
 
 ## v6.0.0
 

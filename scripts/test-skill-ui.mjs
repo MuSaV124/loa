@@ -81,7 +81,7 @@ const baselineSkillItem = {
 };
 const characterResponse = {
   ok: true,
-  apiVersion: '5.9.12',
+  apiVersion: '6.1.0',
   profile: {
     CharacterName: '스킬표본', CharacterClassName: '브레이커', ServerName: '아브렐슈드',
     ItemAvgLevel: '1,700.00', CombatPower: '5,000.00', CharacterImage: '',
@@ -119,10 +119,11 @@ async function verifyViewport(viewport) {
   const page = await browser.newPage({ viewport });
   await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(characterResponse) }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
+  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.0');
   await page.getByPlaceholder('캐릭터명 입력').fill('스킬표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /스킬표본/ }).waitFor();
-  await page.locator('.advancedInputDetails').evaluate(element => { element.open = true; });
+  await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
 
   await page.locator('#skillEffectPreview').getByText('현재 스킬트리 자동 반영').waitFor();
   const preview = await page.locator('#skillEffectPreview').innerText();
@@ -224,6 +225,24 @@ async function verifySupportRecommendation() {
   assert.match(recommendation, /종합 파티 기여/);
   assert.match(recommendation, /공증 가동률/);
   assert.match(recommendation, /현재 스킬 주기·파티 기여 기준/);
+  const baseline = Number((await page.locator('#currentScore .apiBaselineRow > div').first().locator('b').innerText()).replace('%', ''));
+  const manaFurnace = page.locator('.nodeCard[data-name="마나 용광로"] [data-action="minus"]');
+  await manaFurnace.click();
+  await manaFurnace.click();
+  const stable = page.locator('.nodeCard[data-name="안정된 관리자"] [data-action="plus"]');
+  await stable.click();
+  await stable.click();
+  await page.locator('#evolutionRecalculateButton').click();
+  const changed = Number((await page.locator('#currentScore .apiBaselineRow > div').nth(1).locator('b').innerText()).replace('%', ''));
+  assert.ok(changed < baseline);
+  await page.locator('#simulatorJumpButton').click();
+  await page.locator('.specScenarioPanel summary').click();
+  assert.match(await page.locator('.supportPowerPanel summary').innerText(), new RegExp(`종합 ${changed.toFixed(2)}%`));
+  const supportMetric = page.locator('#specScenarioOutput .specScenarioMetrics > div').nth(1);
+  assert.match(await supportMetric.innerText(), /복합 파티 기여/);
+  const combined = Number((await supportMetric.locator('strong').innerText()).replace('%', ''));
+  const expected = (((1 + changed / 100) / (1 + baseline / 100)) ** 0.6 - 1) * 100;
+  assert.ok(Math.abs(combined - expected) < 0.015, `${combined} != ${expected}`);
   await page.close();
 }
 
@@ -264,7 +283,7 @@ async function verifyScopedBreakerCrit() {
   await page.getByPlaceholder('캐릭터명 입력').fill('권왕표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /권왕표본/ }).waitFor();
-  await page.locator('.advancedInputDetails').evaluate(element => { element.open = true; });
+  await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
   const scope = await page.locator('.skillCritScope').innerText();
   assert.match(scope, /치적 기준 스킬\s*성운멸쇄권/);
   assert.match(scope, /캐릭터 공통 치적\s*79\.99%/);
@@ -311,7 +330,7 @@ async function verifyBaseSkillSelfBuff() {
   await page.getByPlaceholder('캐릭터명 입력').fill('창술표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /창술표본/ }).waitFor();
-  await page.locator('.advancedInputDetails').evaluate(element => { element.open = true; });
+  await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
   const preview = await page.locator('#skillEffectPreview').innerText();
   assert.match(preview, /기본 자버프 1개/);
   assert.match(preview, /청룡진[\s\S]*전역 자버프 · 치적 \+20%/);
@@ -395,8 +414,11 @@ async function verifyArcanaCardExpectation() {
   assert.ok(numericValues.every(value => Number.isFinite(value) && value > 0));
   assert.deepEqual(numericValues, [...numericValues].sort((a, b) => b - a));
   assert.deepEqual(await topRows.locator('.nodePill').allTextContents(), [
-    '마나 용광로 Lv.2', '뭉툭한 가시 Lv.2', '마나 용광로 Lv.2', '뭉툭한 가시 Lv.2', '마나 용광로 Lv.2'
+    '뭉툭한 가시 Lv.2', '뭉툭한 가시 Lv.2', '입식 타격가 Lv.2', '뭉툭한 가시 Lv.2', '뭉툭한 가시 Lv.2'
   ]);
+  await page.locator('#manaRecommendationMode').selectOption('unverified');
+  assert.match(await page.locator('#manaRecommendationStatus').textContent(), /미검증 후보/);
+  await page.locator('#manaRecommendationMode').selectOption('auto');
   assert.doesNotMatch(await topRows.allTextContents().then(rows => rows.join(' ')), /감점|치적 95%|실전 추천값/);
   if (process.env.LOA_REPORT_TOP5 === '1') {
     console.log(JSON.stringify(await topRows.evaluateAll(rows => rows.map(row => ({
@@ -414,13 +436,395 @@ async function verifyArcanaCardExpectation() {
   await page.close();
 }
 
+async function verifyHighCritRecommendation(viewport = { width: 1440, height: 1000 }) {
+  const page = await browser.newPage({ viewport });
+  const ring = { type: '반지', name: '시뮬레이터 표본 반지', effects: {
+    critRate: 0.4, critDamage: 1.1, optionGrades: { critRate: '하', critDamage: '하' }
+  } };
+  const accessory = { critRate: 0.4, critDamage: 1.1, items: [ring] };
+  const engraving = {
+    effects: { enemyDamage: 18 },
+    items: [{ name: '원한', grade: '유물', bookLevel: 0, nextBookLevel: 1, effects: { enemyDamage: 18 }, deltaEffects: { enemyDamage: 0.75 } }],
+    adrenaline: { adopted: false }
+  };
+  const fixture = {
+    ok: true,
+    apiVersion: '6.1.0',
+    profile: { ...characterResponse.profile, CharacterName: '다중치명표본', Stats: [] },
+    arkPassive: { Effects: [{ Name: '입식 타격가', Level: 2 }] },
+    accessoryEffects: accessory,
+    engravingEffects: engraving,
+    powerSnapshot: {
+      profile: { name: '다중치명표본', className: '브레이커', secondClass: '검증용 직업각인', combatPower: 5000 },
+      effects: { accessory, engraving },
+      equipment: { combat: [], accessories: [] },
+      gems: { items: [] }
+    },
+    skillEffects: { items: [
+      { name: '기본 기술', level: 14, currentTree: true, effects: {} },
+      { name: '치적 치피 기술', level: 14, currentTree: true, effects: { critRate: 20, critDamage: 100 } }
+    ] }
+  };
+  await page.route('**/api/character**', route => route.fulfill({ json: fixture }));
+  await page.route('**/api/market-prices?**', route => route.fulfill({
+    json: { ok: true, items: [{ name: '표본 시세', price: 1000 }], lowest: { price: 1000 }, rows: [] }
+  }));
+  await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
+  await page.getByPlaceholder('캐릭터명 입력').fill('다중치명표본');
+  await page.getByRole('button', { name: '검색', exact: true }).click();
+  await page.getByRole('heading', { name: /다중치명표본/ }).waitFor();
+  await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
+  await page.locator('#extraCritRate').fill('219.6');
+  await page.locator('#extraCritDamage').fill('148.9');
+  await page.locator('#noManaMainSkill').check();
+  await page.locator('#excludeCooldown').check();
+  await page.locator('#evolutionRecalculateButton').click();
+
+  // The two skills have equal test weight. At 220% and 240% only the second
+  // and third tiers occur. Enumerate their outcomes independently of the app.
+  const expected = ({ crit = 0, evo = 0, keen = 0, mastery = 0, blunt = false, critHit = 1 } = {}) => {
+    const skills = [[220 + crit, 3.5 + keen], [240 + crit, 4.5 + keen]];
+    return skills.reduce((sum, [rate, damage]) => {
+      const second = damage * critHit + damage - 1;
+      const third = second + damage - 1;
+      const thirdChance = (rate - 200) / 100;
+      const multiplier = blunt ? 0.2 + 0.8 * damage * critHit : second * (1 - thirdChance) + third * thirdChance;
+      const evolution = 1 + (evo + (blunt ? 1.4 * (rate - 80) : 0)) / 100;
+      return sum + multiplier * evolution * (1 + mastery / 100) * 1.18 / 2;
+    }, 0);
+  };
+  const currentScore = page.locator('#currentScore .apiBaselineRow > div').nth(1).locator('b');
+  const normal = expected({ evo: 21 });
+  assert.equal(await currentScore.innerText(), normal.toFixed(4));
+  const keenValues = await page.locator('#keenEfficiency .keenCard strong').allTextContents();
+  assert.deepEqual(keenValues, [0.44, 0.52].map(keen =>
+    `${((0.98 * expected({ evo: 21, keen }) / normal - 1) * 100).toFixed(2)}%`
+  ));
+
+  // Fixed fixture with cooldown and mana nodes excluded. Compute all 36
+  // eligible combinations before comparing the first five rendered rows.
+  const tier2 = [
+    { label: '한돌 Lv.3', evo: 30, crit: 0 },
+    { label: '예감 Lv.1|한돌 Lv.2', evo: 25, crit: 4 },
+    { label: '예감 Lv.2|한돌 Lv.1', evo: 20, crit: 8 }
+  ];
+  const tier4 = [
+    { label: '회심 + 달인', evo: 0, crit: 7, mastery: 8.5, critHit: 1.12 },
+    { label: '회심 + 분쇄', evo: 20, crit: 0, mastery: 0, critHit: 1.12 },
+    { label: '달인 + 분쇄', evo: 20, crit: 7, mastery: 8.5, critHit: 1 }
+  ];
+  const tier5 = [
+    { label: '뭉툭한 가시 Lv.2', evo: 19, blunt: true },
+    { label: '음속 돌파 Lv.2', evo: 2.8 },
+    { label: '인파이팅 Lv.2', evo: 18 },
+    { label: '입식 타격가 Lv.2', evo: 21 }
+  ];
+  const candidates = tier2.flatMap(a => tier4.flatMap(b => tier5.map(c => ({
+    nodes: [a.label, b.label, c.label],
+    value: expected({ crit: a.crit + b.crit, evo: a.evo + b.evo + c.evo, mastery: b.mastery, blunt: c.blunt, critHit: b.critHit })
+  }))));
+  assert.equal(candidates.length, 36);
+  const top = candidates.sort((a, b) => b.value - a.value).slice(0, 5);
+  const rows = await page.locator('#recommendList .comboRow').evaluateAll(items => items.map(row => ({
+    nodes: [
+      [...row.querySelectorAll('.chipWrap b')].map(chip => chip.textContent).join('|'),
+      row.querySelector('.tierLine:nth-child(2) strong').textContent,
+      row.querySelector('.nodePill').textContent
+    ],
+    value: row.querySelector('.rowMetric b').textContent,
+    note: row.querySelector('.practicalNote')?.textContent || '',
+    stages: row.querySelector('.rowMetric small').textContent
+  })));
+  assert.deepEqual(rows.map(({ nodes, value }) => ({ nodes, value })), top.map(({ nodes, value }) => ({ nodes, value: value.toFixed(4) })));
+  const normalRows = rows.filter(row => !row.nodes[2].includes('뭉툭한 가시'));
+  const bluntRows = rows.filter(row => row.nodes[2].includes('뭉툭한 가시'));
+  assert.ok(normalRows.length > 0 && bluntRows.length > 0);
+  for (const row of normalRows) assert.match(row.stages, /2중 확정 · 3중/);
+  for (const row of bluntRows) assert.match(row.stages, /다중 치명 0\.00%/);
+  for (const row of rows) {
+    if (row.nodes[1].includes('회심') && !row.nodes[2].includes('뭉툭한 가시')) {
+      assert.match(row.note, /치명타 적중 주피 중첩 미검증/);
+    }
+  }
+
+  const criticalMaster = page.locator('.nodeCard[data-name="회심"]');
+  await criticalMaster.locator('[data-action="plus"]').click();
+  await page.locator('#evolutionRecalculateButton').click();
+  assert.match(await page.locator('#sourceSummary').textContent(), /치명타 적중 시 피해 증가의 중첩은 미검증/);
+  assert.match(await page.locator('#keenEfficiency').innerText(), /치명타 적중 주피 중첩 미검증/);
+  await criticalMaster.locator('[data-action="minus"]').click();
+
+  const standUp = page.locator('.nodeCard[data-name="입식 타격가"] [data-action="minus"]');
+  await standUp.click();
+  await standUp.click();
+  const blunt = page.locator('.nodeCard[data-name="뭉툭한 가시"] [data-action="plus"]');
+  await blunt.click();
+  await blunt.click();
+  await page.locator('#evolutionRecalculateButton').click();
+  assert.equal(await currentScore.innerText(), expected({ evo: 19, blunt: true }).toFixed(4));
+
+  // Reproduce the TOP5 using the actual controls and compare each in A/B.
+  // On mobile replay the highest-scoring candidate and both gear changes.
+  assert.deepEqual(top[0].nodes, ['예감 Lv.2|한돌 Lv.1', '회심 + 달인', '뭉툭한 가시 Lv.2']);
+  const metrics = page.locator('#specScenarioOutput .specScenarioMetrics > div');
+  const scenarioGain = metrics.nth(1).locator('strong');
+  const percent = value => `+${((value / normal - 1) * 100).toFixed(2)}%`;
+  const replay = viewport.width > 600 ? [...top].reverse() : [top[0]];
+  const fullName = { 예감: '예리한 감각', 한돌: '한계 돌파' };
+  for (const [index, candidate] of replay.entries()) {
+    if (index) await page.locator('#simulatorBackButton').click();
+    const labels = [...candidate.nodes[0].split('|'), ...candidate.nodes[1].split(' + '), candidate.nodes[2]];
+    const levels = new Map(labels.map(label => {
+      const [name, level] = label.split(' Lv.');
+      return [fullName[name] || name, Number(level || 1)];
+    }));
+    const active = new Map(await page.locator('.nodeCard.selected').evaluateAll(nodes =>
+      nodes.map(node => [node.dataset.name, Number(node.querySelector('.nodeControls b').textContent.replace('Lv.', ''))])
+    ));
+    const clickNode = (name, action) => page.locator(`.nodeCard[data-name="${name}"] [data-action="${action}"]`).click();
+    for (const [name, level] of active) {
+      for (let step = level; step > (levels.get(name) || 0); step -= 1) await clickNode(name, 'minus');
+    }
+    for (const [name, level] of levels) {
+      for (let step = active.get(name) || 0; step < level; step += 1) await clickNode(name, 'plus');
+    }
+    await page.locator('#evolutionRecalculateButton').click();
+    await page.locator('#simulatorJumpButton').click();
+    const comparison = page.locator('.specScenarioPanel');
+    if (await comparison.getAttribute('open') == null) await comparison.locator('summary').click();
+    assert.equal(await scenarioGain.innerText(), percent(candidate.value));
+  }
+
+  const upgrade = page.locator('.specEfficiencyRow').filter({ hasText: '하하 → 상상' });
+  await upgrade.locator('.specScenarioPick > span').click();
+  assert.equal(await upgrade.getByRole('checkbox', { name: /표본 반지.*B 비교에 적용/ }).isChecked(), true);
+  assert.equal(await metrics.nth(2).locator('strong').innerText(), '256.15%');
+  const ringScore = expected({ crit: 15 + 1.15, evo: 39, keen: 0.029, mastery: 8.5, blunt: true, critHit: 1.12 });
+  assert.equal(await scenarioGain.innerText(), percent(ringScore));
+  const changedPower = Number((await metrics.nth(0).locator('strong').innerText()).replaceAll(',', ''));
+  assert.ok(changedPower > 5000);
+  const oldHybrid = percent(top[0].value * changedPower / 5000);
+  assert.notEqual(await scenarioGain.innerText(), oldHybrid);
+  await page.locator('.specEfficiencyRow[data-category="engraving"]').filter({ hasText: '원한' })
+    .locator('.specScenarioPick > span').click();
+  assert.equal(await scenarioGain.innerText(), percent(ringScore * 1.1875 / 1.18));
+  if (process.env.LOA_REPORT_SIMULATION === '1') {
+    console.log(`ring A/B old ${oldHybrid}, new ${percent(ringScore)}, ring + engraving ${percent(ringScore * 1.1875 / 1.18)}`);
+  }
+  const size = await page.locator('#specScenarioOutput').evaluate(element => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  assert.ok(size.scroll <= size.width + 1);
+  await page.close();
+}
+
+async function verifyHoningMarketRefresh(viewport) {
+  const page = await browser.newPage({ viewport });
+  const now = new Date();
+  await page.clock.install({ time: now });
+  let refreshes = 0;
+  let directQueries = 0;
+  const updatedAt = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
+  const priceItems = [
+    ['운명의 파편 주머니(대)', 66130143, 200, 1], ['운명의 파괴석 결정', 66102007, 800, 100],
+    ['운명의 수호석 결정', 66102107, 150, 100], ['위대한 운명의 돌파석', 66110226, 30, 1],
+    ['상급 아비도스 융화제', 6861013, 240, 1], ['용암의 숨결', 66111131, 450, 1],
+    ['빙하의 숨결', 66111132, 440, 1]
+  ];
+  const response = structuredClone(characterResponse);
+  response.powerSnapshot.profile.baseAttackPower = 190000;
+  response.powerSnapshot.equipment.combat = [
+    { type: '무기', name: '표본 무기', weaponPower: 170000, honingLevel: 25, grade: '고대' },
+    { type: '완갑', name: '표본 완갑', honingLevel: 15, grade: '유물' }
+  ];
+  await page.route('**/api/character**', route => route.fulfill({ json: response }));
+  await page.route('**/api/market-prices?**', route => {
+    if (new URL(route.request().url()).searchParams.get('mode') === 't4Materials') directQueries += 1;
+    return route.fulfill({ status: 503, json: { ok: false } });
+  });
+  await page.route('**/api/market-snapshot', route => {
+    refreshes += 1;
+    const fresh = refreshes > 1;
+    const stamp = fresh ? new Date(now.getTime() + 60 * 1000).toISOString() : updatedAt;
+    const items = priceItems.map(([name, id, price, bundleCount]) => ({
+      name, id, bundleCount, price: fresh && id === 6861013 ? price * 4 : price
+    }));
+    return route.fulfill({ json: { ok: true, updatedAt: stamp, sections: {
+      material: { ok: true, updatedAt: stamp, items },
+      gem: { ok: true, updatedAt: stamp, rows: [{ level: 10 }] },
+      engraving: { ok: true, updatedAt: stamp, items: [{ name: '표본', price: 5 }] },
+      crystal: { ok: true, updatedAt: stamp, crystalGoldPer100: 3900 }
+    } } });
+  });
+  try {
+    await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
+    await page.getByPlaceholder('캐릭터명 입력').fill('스킬표본');
+    await page.getByRole('button', { name: '검색', exact: true }).click();
+    await page.locator('#simulatorJumpButton').click();
+    const costs = page.locator('.powerCostPrep');
+    await costs.evaluate(element => { element.open = true; });
+    const status = costs.locator('[data-material-quote-status]');
+    await status.getByText(/오래된 캐시.*갱신 실패/).waitFor();
+    assert.equal(directQueries, 1);
+    await page.locator('#armguardFromStage').selectOption('15');
+    await page.locator('#armguardToStage').selectOption('16');
+    await page.locator('input[name="armguardBreathMode"][value="none"]').evaluate(element => element.click());
+    const ranked = page.locator('.specEfficiencyRow[data-efficiency-metric="전투력"]').filter({ hasText: '표본 완갑' });
+    await ranked.waitFor({ state: 'attached' });
+    assert.match(await ranked.textContent(), /10만G당/);
+    const rankCost = ranked.locator('.specEfficiencyExpected b');
+    const panelCost = page.locator('.armguardCostSummary > div').nth(1).locator('strong');
+    const before = [await rankCost.textContent(), await panelCost.textContent()];
+    await page.clock.fastForward(5 * 60 * 1000 + 1000);
+    await page.waitForFunction(() => {
+      const labels = [...document.querySelectorAll('[data-material-quote-status]')];
+      return labels.length && labels.every(el => /KST/.test(el.textContent) && !/오래된|갱신 실패/.test(el.textContent));
+    });
+    assert.equal(refreshes, 2);
+    assert.equal(directQueries, 1);
+    assert.notEqual(await rankCost.textContent(), before[0]);
+    assert.notEqual(await panelCost.textContent(), before[1]);
+    const after = await panelCost.textContent();
+    await page.locator('#armguardToStage').selectOption('17');
+    await page.locator('#armguardToStage').selectOption('16');
+    assert.equal(await panelCost.textContent(), after);
+    if (viewport.width > 600) {
+      const workerCreated = page.waitForEvent('worker', { predicate: worker => worker.url().includes('honing-cost-worker.js') });
+      await page.locator('input[aria-label="운명의 파편 보유 귀속 수량"]').fill('2200000');
+      await page.locator('input[aria-label="운명의 파편 보유 귀속 수량"]').press('Tab');
+      await page.locator('#armguardToStage').selectOption('19');
+      await workerCreated;
+      await panelCost.waitFor();
+      assert.match(await panelCost.textContent(), /G$/);
+    }
+    const panel = await costs.evaluate(el => ({ width: el.clientWidth, scroll: el.scrollWidth }));
+    assert.ok(panel.scroll <= panel.width + 1);
+  } finally {
+    await page.close();
+  }
+}
+
+async function verifyManaRecommendation(viewport, critBonus) {
+  const page = await browser.newPage({ viewport });
+  const fixture = structuredClone(characterResponse);
+  fixture.profile.CharacterName = '마나표본';
+  fixture.profile.CharacterClassName = '워로드';
+  fixture.profile.Stats = [{ Type: '최대 마나', Value: '100' }];
+  fixture.powerSnapshot.profile.className = '워로드';
+  fixture.arkPassive.Effects = [
+    { Name: '마나 용광로', Level: 2 },
+    { Name: '금단의 주문', Level: 2 }
+  ];
+  const sampleSkills = [
+    { ...baselineSkillItem, name: '마나 기술 A', effects: { critRate: 15 }, usesMana: true, manaUsageKnown: true, manaCost: 999, cooldownEligible: true },
+    { ...baselineSkillItem, name: '마나 기술 B', effects: {}, usesMana: true, manaUsageKnown: true, manaCost: 999, cooldownEligible: true }
+  ];
+  fixture.skills = sampleSkills.map((skill, index) => ({ Name: skill.name, Tooltip: JSON.stringify({
+    Element_004: { type: 'MultiTextBox', value: `마나 ${index === 0 ? 200 : 80} 소모|` },
+    Element_011: { type: 'SingleTextBox', value: '마나 999 소모' }
+  }) }));
+  fixture.skillEffects = { items: sampleSkills, cycleItems: sampleSkills, calculableItems: sampleSkills, usedSkillCount: 2 };
+  await page.route('**/api/character**', route => route.fulfill({ json: fixture }));
+  try {
+    await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
+    await page.getByPlaceholder('캐릭터명 입력').fill('마나표본');
+    await page.getByRole('button', { name: '검색', exact: true }).click();
+    await page.getByRole('heading', { name: /마나표본/ }).waitFor();
+    assert.match(await page.locator('#manaAutoStatus').textContent(), /공식 스킬 비용 2\/2.*공식 API 최대 마나 100.*실전 운용 주기 미확인/);
+    assert.equal(await page.locator('#manaMax').inputValue(), '100');
+    assert.equal(await page.locator('#manaRecovery').inputValue(), '');
+    assert.match(await page.locator('#manaRotation').inputValue(), /마나 기술 A \|  \|  \| 200/);
+    await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
+    await page.locator('#extraCritRate').fill(String(critBonus));
+    await page.locator('#evolutionRecalculateButton').click();
+    assert.match(await page.locator('#sourceSummary').textContent(), /마나 용광로.*\+7(?:\.0+)?%/s);
+    const status = page.locator('#manaRecommendationStatus');
+    const rows = page.locator('#recommendList .comboRow');
+    const top = () => rows.evaluateAll(items => items.map(row => (
+      [...row.querySelectorAll('.tierLine strong')].map(label => label.textContent).join(' / ')
+    )));
+    const theory = await top();
+    assert.equal(theory.length, 5);
+    assert.match(await status.textContent(), /이론상 기대 피해 순위.*미평가/);
+    await page.locator('#manaShortageClass').check();
+    assert.deepEqual(await top(), theory, '데이터가 없는 체크 상태는 특정 노드를 배제하지 않는다.');
+    assert.match(await status.textContent(), /전투 시간/);
+    const set = (id, value) => page.locator(`#${id}`).fill(String(value));
+    for (const [id, value] of Object.entries({ manaDuration: 14, manaMax: 100, manaStart: 100, manaRecovery: 0, manaFirstRecovery: 1, manaRecoveryInterval: 1 })) {
+      await set(id, value);
+    }
+    const panel = page.locator('#manaScenarioPanel');
+    await set('manaRotation', '마나 기술 A | 0 | 2 | 40\n마나 기술 B | 1 | 3 | 20');
+    await page.locator('#manaCostReductions').selectOption('product');
+    await page.locator('#applyManaScenario').click();
+    assert.match(await status.textContent(), /입력 조건 마나 반영 순위/);
+    const scarce = await top();
+    assert.equal(scarce.length, 5);
+    assert.notDeepEqual(scarce, theory);
+    assert.match(await rows.first().textContent(), /마나 부족.*지연/);
+    const supportTop = { none: scarce };
+    for (const [support, label, override] of [
+      ['bard', '바드', 45], ['artist', '도화가', 25], ['paladin', '홀리나이트', 60], ['valkyrie', '발키리', 60]
+    ]) {
+      await page.locator('#manaSupport').selectOption(support);
+      assert.match(await page.locator('#manaSupportSummary').textContent(), /공식 툴팁/);
+      assert.match(await status.textContent(), /이론상 기대 피해 순위/);
+      await set('manaSupportUptime', 0);
+      await page.locator('#applyManaScenario').click();
+      assert.deepEqual(await top(), scarce);
+      await set('manaSupportUptime', 100);
+      await page.locator('#applyManaScenario').click();
+      assert.match(await status.textContent(), /이론상 기대 피해 순위/);
+      if (support !== 'artist') {
+        await page.locator('#manaRecommendationMode').selectOption('estimate');
+        assert.match(await status.textContent(), /가정 기반 마나 비교/);
+        await page.locator('#manaRecommendationMode').selectOption('auto');
+      } else assert.match(await status.textContent(), /실제 적용 시각/);
+      await set('manaSupportTimes', support === 'artist' ? '1, 4, 7, 10, 13' : '0, 8');
+      await set('manaSupportRestore', override);
+      await page.locator('#applyManaScenario').click();
+      assert.match(await status.textContent(), /입력 조건 마나 반영 순위/);
+      assert.match(await rows.first().textContent(), new RegExp(label));
+      supportTop[support] = await top();
+    }
+    assert.deepEqual(supportTop.paladin, supportTop.valkyrie);
+    assert.ok(Object.values(supportTop).some(result => JSON.stringify(result) !== JSON.stringify(scarce)));
+    await page.locator('#manaSupport').selectOption('bard');
+    assert.equal(await page.locator('#manaSupportRestore').inputValue(), '45');
+    assert.deepEqual(await top(), supportTop.bard);
+    await page.locator('#manaSupport').selectOption('none');
+    assert.deepEqual(await top(), scarce, '서포터 변경 시 적용 버튼 없이 순위를 다시 계산한다.');
+    await page.locator('#manaFood').selectOption('used');
+    assert.match(await status.textContent(), /음식 사용 상태의 회복 1회량 미확인/);
+    await set('manaFoodTick', 100);
+    await page.locator('#applyManaScenario').click();
+    assert.deepEqual(await top(), theory);
+    await page.locator('#manaFood').selectOption('none');
+    await set('manaRecovery', 100);
+    await page.locator('#applyManaScenario').click();
+    assert.deepEqual(await top(), theory, '회복이 충분하면 마나 반영 순위와 이론 순위가 같다.');
+    await page.locator('#manaShortageClass').uncheck();
+    assert.deepEqual(await top(), theory);
+    if (process.env.LOA_REPORT_TOP5 === '1') console.log({ critBonus, theory, supportTop });
+    await page.locator('#manaShortageClass').check();
+    const size = await panel.evaluate(element => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+    assert.ok(size.scroll <= size.width + 1, `${viewport.width}px 마나 입력 패널 ${size.scroll}/${size.width}px`);
+  } finally {
+    await page.close();
+  }
+}
+
 try {
   await verifyViewport({ width: 1440, height: 1000 });
   await verifyViewport({ width: 390, height: 844 });
   await verifyScopedBreakerCrit();
   await verifyBaseSkillSelfBuff();
   await verifyArcanaCardExpectation();
+  await verifyHighCritRecommendation();
+  await verifyHighCritRecommendation({ width: 390, height: 844 });
   await verifySupportRecommendation();
+  await verifyHoningMarketRefresh({ width: 1440, height: 1000 });
+  await verifyHoningMarketRefresh({ width: 390, height: 844 });
+  await verifyManaRecommendation({ width: 1440, height: 1000 }, 150);
+  await verifyManaRecommendation({ width: 390, height: 844 }, 35);
   console.log('skill effect UI tests passed');
 } finally {
   await browser.close();

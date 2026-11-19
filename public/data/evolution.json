@@ -1134,10 +1134,10 @@
       "description": "마나 스킬 사용 시 최대 마나의 2%가 추가로 소모됩니다. 피해를 준 스킬의 증감 전 기본 마나 소모량에 비례해 해당 스킬의 진화형 피해가 증가합니다.",
       "levels": {
         "1": {
-          "evolutionDamage": 12
+          "manaFurnace": { "maxManaCostPercent": 2, "damagePerTenMana": 0.25, "maxEvolutionDamage": 12 }
         },
         "2": {
-          "evolutionDamage": 24
+          "manaFurnace": { "maxManaCostPercent": 2, "damagePerTenMana": 0.5, "maxEvolutionDamage": 24 }
         }
       },
       "iconImage": "/images/evolution/마나 용광로.webp",

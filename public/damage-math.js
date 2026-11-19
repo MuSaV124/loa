@@ -1,4 +1,4 @@
-import { calculateBluntSpike } from './evolution-math.js?v=6.0.0';
+import { calculateBluntSpike } from './evolution-math.js?v=6.1.0';
 
 export const BASE_CRIT_DAMAGE = 200;
 export const CRIT_RATE_PER_STAT = 0.03579; // 기존 Lv.70 환산값. 공식 반올림 정밀도는 미검증.
@@ -66,6 +66,7 @@ export function expectedHitDamage(stats = {}) {
   return {
     value: Number.isFinite(value) ? value : 0,
     critical, rawCritRate, ...conversion, evo: evolutionDamage,
+    critHitStackingUnverified: critical.multiCritChance > 0 && critHitMultiplier !== 1,
     enemyDamage: (enemyMultiplier - 1) * 100,
     critHitDamage: (critHitMultiplier - 1) * 100,
     skillDamageMultiplier, engravingDamageMultiplier

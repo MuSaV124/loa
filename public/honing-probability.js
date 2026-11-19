@@ -16,22 +16,35 @@ export function normalHoningAttemptRatePercent(ratePercent, attempt, supportRate
     + (Number.isFinite(support) && support > 0 ? support : 0));
 }
 
-export function normalHoningOutcome(ratePercent, supportRatePercent = 0) {
+export function normalHoningAttemptDistribution(ratePercent, supportRatePercent = 0) {
   if (!normalHoningAttemptRatePercent(ratePercent, 1, supportRatePercent)) {
-    return { pityAttempts: 0, expectedAttempts: 0, pityProbability: 0 };
+    return [];
   }
   const { artisanFactor, artisanLimit } = NORMAL_HONING_PITY_RULES;
-  let expectedAttempts = 0;
+  const outcomes = [];
   let survival = 1;
   let artisan = 0;
   for (let attempt = 1; attempt < 10000; attempt += 1) {
     const rate = normalHoningAttemptRatePercent(ratePercent, attempt, supportRatePercent);
-    expectedAttempts += survival;
-    survival *= 1 - rate / 100;
+    const probability = survival * rate / 100;
+    outcomes.push({ attempts: attempt, probability, pity: false });
+    survival -= probability;
+    if (rate >= 100) return outcomes;
     artisan += rate * artisanFactor;
     if (artisan >= artisanLimit) {
-      return { pityAttempts: attempt + 1, expectedAttempts: expectedAttempts + survival, pityProbability: survival };
+      outcomes.push({ attempts: attempt + 1, probability: survival, pity: true });
+      return outcomes;
     }
   }
-  return { pityAttempts: 0, expectedAttempts: 0, pityProbability: 0 };
+  return [];
+}
+
+export function normalHoningOutcome(ratePercent, supportRatePercent = 0) {
+  const outcomes = normalHoningAttemptDistribution(ratePercent, supportRatePercent);
+  const pity = outcomes.at(-1);
+  return {
+    pityAttempts: pity?.attempts || 0,
+    expectedAttempts: outcomes.reduce((sum, outcome) => sum + outcome.attempts * outcome.probability, 0),
+    pityProbability: pity?.pity ? pity.probability : 0
+  };
 }

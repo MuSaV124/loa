@@ -13,11 +13,19 @@ assert.deepEqual(parseSkillManaUsage(JSON.stringify({
   Element_004: { value: '마나 349 소모|' },
   Element_005: { value: '마나 412 소모' },
   tripod: { value: '마나 소모량이 50% 감소한다.' }
-})), { usesMana: true, manaCost: 412, manaUsageKnown: true });
+})), { usesMana: true, manaCost: 349, manaUsageKnown: true });
 assert.deepEqual(parseSkillManaUsage(JSON.stringify({
   Element_004: { value: '충격 에너지 20 생성' }
 })), { usesMana: false, manaCost: 0, manaUsageKnown: true });
 assert.deepEqual(parseSkillManaUsage(null), { usesMana: false, manaCost: 0, manaUsageKnown: false });
+assert.deepEqual(parseSkillManaUsage({
+  Element_004: { type: 'MultiTextBox', value: '마나 98 소모|' },
+  Element_011: { type: 'SingleTextBox', value: '마나 125 소모' }
+}), { usesMana: true, manaCost: 98, manaUsageKnown: true });
+assert.deepEqual(parseSkillManaUsage({ Element_004: { value: '마나의 4%를 소모' } }),
+  { usesMana: false, manaCost: 0, manaUsageKnown: false });
+assert.deepEqual(parseSkillManaUsage({ Element_011: { value: '마나 125 소모' } }),
+  { usesMana: false, manaCost: 0, manaUsageKnown: false });
 
 const direct = parseSkillEffectText(`
   치명타 적중률이 24.5% 증가하고 치명타 피해가 80% 증가한다.

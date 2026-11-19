@@ -4209,6 +4209,21 @@ select {
   border-left: 3px solid #38bdf8;
   background: rgba(14, 165, 233, .08);
 }
+.manaScenarioPanel { border: 1px solid var(--softLine); border-radius: 6px; margin-bottom: 14px; }
+.manaScenarioPanel .advancedInputBody { display: grid; gap: 10px; padding-top: 12px; }
+.manaScenarioGrid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(136px, 1fr)); }
+.manaScenarioPanel label { display: grid; gap: 4px; min-width: 0; }
+.manaScenarioPanel :is(input, select, textarea) { width: 100%; min-width: 0; max-width: 100%; }
+.manaScenarioPanel textarea { width: 100%; resize: vertical; color: inherit; background: #0a111a; border: 1px solid var(--softLine); border-radius: 6px; padding: 8px; }
+.manaScenarioPanel button { justify-self: start; }
+.manaRecommendationMode { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.manaEnvironment { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px 12px; margin: 0 0 14px; }
+.manaEnvironment label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.manaEnvironment p { margin: 0; }
+#manaAutoStatus { grid-column: 1 / -1; }
+.manaAutoSkills ul { padding-inline-start: 18px; }
+#manaSupportSettings.hidden, .manaEnvironment.hidden { display: none; }
+@media (max-width: 560px) { .manaEnvironment { grid-template-columns: minmax(0, 1fr); } }
 .skillCycleTable {
   display: grid;
   min-width: 640px;
