@@ -43,6 +43,27 @@ export const ARMGUARD_LIMIT_BREAKS = Object.freeze([
   Object.freeze({ stage: 20, fromGrade: '유물', toGrade: '고대', materials: Object.freeze({ '죽음의 손': 150 }), substitute: null })
 ]);
 
+export function allocateArmguardLimitBreaks(from, to, ownedMaterials = {}, startingGrade = '') {
+  const remainingOwned = { ...ownedMaterials };
+  const shortages = [];
+  const gradeOrder = ['영웅', '전설', '유물', '고대'];
+  for (const row of armguardLimitBreaksBetween(from, to)) {
+    if (row.stage === from && gradeOrder.indexOf(startingGrade) >= gradeOrder.indexOf(row.toGrade)) continue;
+    const [name, required] = Object.entries(row.materials)[0];
+    const own = Math.min(required, Math.floor(Number(remainingOwned[name] || 0)));
+    const shortage = required - own;
+    const [substitute] = Object.keys(row.substitute || {});
+    const substituteAmount = substitute ? Math.ceil(shortage / 2) : 0;
+    if ((!substitute && shortage > 0) || (substitute && Number(remainingOwned[substitute] || 0) < substituteAmount)) {
+      shortages.push(row.stage);
+      continue;
+    }
+    remainingOwned[name] = Number(remainingOwned[name] || 0) - own;
+    if (substituteAmount) remainingOwned[substitute] -= substituteAmount;
+  }
+  return { remainingOwned, shortages };
+}
+
 // Provisional until Smilegate publishes the armguard support-material caps.
 export const ARMGUARD_BREATH_ESTIMATE = Object.freeze({
   official: false,

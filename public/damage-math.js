@@ -66,6 +66,7 @@ export function expectedHitDamage(stats = {}) {
   return {
     value: Number.isFinite(value) ? value : 0,
     critical, rawCritRate, ...conversion, evo: evolutionDamage,
+    critHitStackingUnverified: critical.multiCritChance > 0 && critHitMultiplier !== 1,
     enemyDamage: (enemyMultiplier - 1) * 100,
     critHitDamage: (critHitMultiplier - 1) * 100,
     skillDamageMultiplier, engravingDamageMultiplier

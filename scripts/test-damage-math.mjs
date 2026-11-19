@@ -17,6 +17,24 @@ for (const [rate, low, high, chance] of [
   close(result.multiplier, low * (1 - chance) + high * chance);
   close(result.nextTierChance, chance);
 }
+// Official tier rule at each requested rate, with 250% critical damage.
+for (const [critRate, expected, tiers, nextChance, multiChance] of [
+  [90, 2.35, 0, .9, 0],
+  [95, 2.425, 0, .95, 0],
+  [100, 2.5, 1, 0, 0],
+  [110, 2.65, 1, .1, .1],
+  [120, 2.8, 1, .2, .2],
+  [150, 3.25, 1, .5, .5],
+  [200, 4, 2, 0, 1],
+  [220, 4.3, 2, .2, 1],
+  [300, 5.5, 3, 0, 1]
+]) {
+  const result = expectedHitDamage({ critRate, critDamage: 250 });
+  close(result.value, expected);
+  assert.equal(result.critical.guaranteedTiers, tiers);
+  close(result.critical.nextTierChance, nextChance);
+  close(result.critical.multiCritChance, multiChance);
+}
 close(crit(120).multiCritChance, .2);
 assert.equal(crit(220).critHitChance, 1);
 assert.equal(crit(220).multiCritChance, 1);
@@ -24,6 +42,9 @@ assert.equal(crit(220).guaranteedTiers, 2);
 assert.equal(expectedCriticalDamage({ critRate: 220, canCrit: false }).multiplier, 1);
 assert.equal(expectedCriticalDamage({ critRate: 220, multiCrit: false }).multiplier, 2);
 close(expectedCriticalDamage({ critRate: 120, critDamage: 250, critHitMultiplier: 1.12 }).multiplier, 2.5 * 1.12 + .2 * 1.5);
+assert.equal(expectedHitDamage({ critRate: 100, critHitDamage: 12 }).critHitStackingUnverified, false);
+assert.equal(expectedHitDamage({ critRate: 100.01, critHitDamage: 12 }).critHitStackingUnverified, true);
+assert.equal(expectedHitDamage({ critRate: 220, critHitDamage: 12, critCap: 80 }).critHitStackingUnverified, false);
 
 const blunt = expectedHitDamage({ critRate: 180, critDamage: 250, critCap: 80, evolutionDamage: 19, overCritToEvolutionDamageRate: 1.4 });
 assert.equal(blunt.critical.multiCritChance, 0);

@@ -131,7 +131,7 @@ function gemBonus(gem, tables, kind) {
 
 export function combatAnalyzerGemFactors(data, snapshot, skillEffects, options = {}) {
   const support = Boolean(options.support);
-  const profile = findCombatAnalyzerProfile(data, snapshot, skillEffects, { support });
+  const profile = options.profile ?? findCombatAnalyzerProfile(data, snapshot, skillEffects, { support });
   const shares = combatAnalyzerSkillShares(profile.value);
   const skillNames = Object.keys(shares).filter(name => Number(shares[name] || 0) > 0);
   const gems = Array.isArray(snapshot?.gems?.items) ? snapshot.gems.items : [];
@@ -180,7 +180,7 @@ export function gemUpgradeEfficiency({ data, snapshot, skillEffects, gem, nextLe
     return sameGem ? { ...item, level: Number(nextLevel || Number(item.level || 0) + 1) } : item;
   });
   const afterSnapshot = { ...snapshot, gems: { ...(snapshot.gems || {}), items: upgradedItems } };
-  const after = combatAnalyzerGemFactors(data, afterSnapshot, skillEffects, { support });
+  const after = combatAnalyzerGemFactors(data, afterSnapshot, skillEffects, { support, profile: before.profile });
   const kind = profileGemKind(gem);
   const beforeFactor = kind === 'cooldown' ? before.cooldownFactor : before.damageFactor;
   const afterFactor = kind === 'cooldown' ? after.cooldownFactor : after.damageFactor;

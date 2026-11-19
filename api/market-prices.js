@@ -1,4 +1,5 @@
 import { MARKET_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
+import { materialQuote } from '../public/material-quotes.js';
 
 const API_VERSION = '6.0.0';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
@@ -97,12 +98,6 @@ export const T4_MATERIAL_GROUPS = [
     items: ['질서의 젬 : 안정', '질서의 젬 : 견고', '질서의 젬 : 불변', '혼돈의 젬 : 침식', '혼돈의 젬 : 왜곡', '혼돈의 젬 : 붕괴']
   }
 ];
-const DESTINY_SHARD_POUCH_COUNTS = {
-  '소': 1000,
-  '중': 2000,
-  '대': 3000
-};
-
 export default async function handler(req, res) {
   try {
     const mode = String(req.query.mode || '').trim();
@@ -111,6 +106,8 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${sharedTtlSeconds}`);
     return res.status(200).json(await loadMarketPriceSection(mode, req.query));
   } catch (error) {
+    res.setHeader('Cache-Control', 'no-store');
+    if (error?.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
     return res.status(Number(error?.statusCode || 500)).json({ ok: false, apiVersion: API_VERSION, error: '시세 조회 실패', message: error?.message || String(error) });
   }
 }
@@ -625,7 +622,7 @@ async function searchEngravingListFresh(apiKey, maxPages) {
 
 async function searchT4Materials(apiKey, query) {
   const force = String(query.force || '') === '1';
-  const cacheKey = 't4Materials:v9:hero-ark-grid-gems';
+  const cacheKey = 't4Materials:v10:validated-bundles';
   return getCachedMarketList(cacheKey, force, async () => searchT4MaterialsFresh(apiKey), isUsableT4MaterialList);
 }
 
@@ -641,10 +638,11 @@ async function searchT4MaterialsFresh(apiKey) {
       rows.push(entry.value.item);
       tried.push(...entry.value.tried);
     } else {
-      rows.push({ group: task.group, requestedName: task.name, name: task.name, price: 0, unitPrice: 0, bundleCount: 1, error: entry.reason?.message || String(entry.reason || '조회 실패') });
+      rows.push({ group: task.group, requestedName: task.name, name: task.name, price: 0, unitPrice: 0, bundleCount: 1, missing: true, error: entry.reason?.message || String(entry.reason || '조회 실패') });
       tried.push({ group: task.group, name: task.name, error: entry.reason?.message || String(entry.reason || '조회 실패') });
     }
   }
+  if (results.every(entry => entry.status === 'rejected')) throw results[0].reason;
   return { ok: true, apiVersion: API_VERSION, source: 'markets/items', mode: 't4Materials', groups: T4_MATERIAL_GROUPS.map(group => group.group), items: rows, tried, updatedAt: new Date().toISOString() };
 }
 
@@ -662,27 +660,31 @@ async function searchMarketMaterial(apiKey, name, group) {
   const matched = [];
   const aliases = materialSearchAliases(name);
   const isArkGridGem = isArkGridGemName(name);
-  for (const keyword of aliases) {
-    for (const categoryCode of [null, 50000, 50010, 50020, 50030, 50040]) {
-      const payload = { Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode ?? undefined, ItemGrade: isArkGridGem ? ARK_GRID_GEM_GRADE : undefined, ItemName: keyword, PageNo: 1 };
-      stripUndefined(payload);
-      const result = await fetchMarketPage(apiKey, payload);
-      tried.push({ group, name, keyword, categoryCode, count: result.items.length, totalCount: result.totalCount, error: result.error || null });
-      for (const raw of result.items) {
-        const item = normalizeMarketItem(raw);
-        if (!item.price) continue;
-        if (isArkGridGem && normalizeText(item.grade) !== ARK_GRID_GEM_GRADE) continue;
-        const itemText = normalizeText(`${item.name} ${item.fullText}`);
-        if (!isMaterialNameMatch(itemText, name, keyword)) continue;
-        const meta = applyMaterialUnitMeta({ ...item, group, requestedName: name, source: 'markets/items' }, name);
-        matched.push(isArkGridGem ? { ...meta, pheonCost: defaultArkGridGemPheonCost(meta.grade) } : meta);
-      }
-      if (matched.length) break;
+  const queries = [{ keyword: aliases[0], categoryCode: 0 }];
+  if (aliases.length > 1 || !isArkGridGem) {
+    queries.push({ keyword: aliases[1] || aliases[0], categoryCode: isArkGridGem ? 0 : 50000 });
+  }
+  for (const { keyword, categoryCode } of queries) {
+    const payload = { Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode, ItemGrade: isArkGridGem ? ARK_GRID_GEM_GRADE : undefined, ItemName: keyword, PageNo: 1 };
+    stripUndefined(payload);
+    const data = await requestLostArk(apiKey, MARKET_ENDPOINT, { method: 'POST', body: payload });
+    if (!data || typeof data !== 'object' || !Object.hasOwn(data, 'Items')
+      || (data.Items != null && !Array.isArray(data.Items))) {
+      throw new Error('거래소 재료 응답 형식 오류');
+    }
+    const items = data.Items || [];
+    tried.push({ group, name, keyword, categoryCode, count: items.length, totalCount: Number(data.TotalCount || 0) });
+    for (const raw of items) {
+      const item = normalizeMarketItem(raw);
+      if (isArkGridGem && normalizeText(item.grade) !== ARK_GRID_GEM_GRADE) continue;
+      const quote = materialQuote({ ...item, price: raw.CurrentMinPrice, bundleCount: raw.BundleCount, group, requestedName: name, source: 'markets/items' }, name);
+      if (!quote) continue;
+      matched.push(isArkGridGem ? { ...quote, pheonCost: defaultArkGridGemPheonCost(quote.grade) } : quote);
     }
     if (matched.length) break;
   }
   matched.sort((a, b) => a.effectiveUnitPrice - b.effectiveUnitPrice || a.unitPrice - b.unitPrice || a.price - b.price);
-  const item = matched[0] || applyMaterialUnitMeta({ group, requestedName: name, name, price: 0, unitPrice: 0, bundleCount: 1, icon: '', grade: '', missing: true }, name);
+  const item = matched[0] || { group, requestedName: name, name, price: 0, unitPrice: 0, bundleCount: 1, icon: '', grade: '', missing: true };
   return { item: { ...item, group, requestedName: name }, tried };
 }
 
@@ -726,24 +728,6 @@ function parseArkGridGemName(name) {
   return null;
 }
 
-function isMaterialNameMatch(itemText, targetName, keyword) {
-  const compactText = normalizeText(itemText).replace(/\s+/g, '');
-  const target = normalizeText(targetName).replace(/\s+/g, '');
-  const key = normalizeText(keyword).replace(/\s+/g, '');
-  const sizeMatch = targetName.match(/운명의\s*파편\s*주머니\((소|중|대)\)/);
-  if (sizeMatch) return compactText.includes('운명의파편주머니') && compactText.includes(sizeMatch[1]);
-  const artisanBook = targetName.match(/^장인의\s*(재봉술|야금술)\s*:?\s*(\d)단계$/);
-  if (artisanBook) {
-    const [, type, stage] = artisanBook;
-    return compactText.includes('장인의') && compactText.includes(type) && compactText.includes(`${stage}단계`);
-  }
-  const arkGridGem = parseArkGridGemName(targetName);
-  if (arkGridGem) {
-    return compactText.includes(arkGridGem.order) && compactText.includes(arkGridGem.type) && compactText.includes('젬');
-  }
-  return compactText.includes(target) || compactText.includes(key);
-}
-
 function defaultArkGridGemPheonCost(grade) {
   const text = normalizeText(grade);
   if (text.includes('영웅')) return 12;
@@ -752,36 +736,12 @@ function defaultArkGridGemPheonCost(grade) {
   return 0;
 }
 
-function materialUnitPrice(item) {
-  const bundle = Number(item.bundleCount || 1) || 1;
-  return Math.round((Number(item.price || 0) / bundle) * 100) / 100;
-}
-
-function destinyShardPouchCount(name) {
-  const size = String(name || '').match(/운명의\s*파편\s*주머니\((소|중|대)\)/)?.[1];
-  return size ? DESTINY_SHARD_POUCH_COUNTS[size] || 0 : 0;
-}
-
-function applyMaterialUnitMeta(item, requestedName) {
-  const unitPrice = Number(item.unitPrice || materialUnitPrice(item) || 0);
-  const shardCount = destinyShardPouchCount(requestedName);
-  if (!shardCount) return { ...item, unitPrice, effectiveUnitPrice: unitPrice };
-  const shardUnitPrice = Math.round((unitPrice / shardCount) * 10000) / 10000;
-  return {
-    ...item,
-    unitPrice,
-    shardCount,
-    shardUnitPrice,
-    effectiveUnitPrice: shardUnitPrice
-  };
-}
-
 async function getCachedMarketList(cacheKey, force, loader, isUsable = () => true) {
   const now = Date.now();
   const cached = marketListCache.get(cacheKey);
   if (!force && cached && cached.expiresAt > now && isUsable(cached.data)) return { ...cached.data, cached: true };
   if (!force && cached && cached.expiresAt > now && !isUsable(cached.data)) marketListCache.delete(cacheKey);
-  if (!force && marketListInflight.has(cacheKey)) {
+  if (marketListInflight.has(cacheKey)) {
     const data = await marketListInflight.get(cacheKey);
     return { ...data, cached: isUsable(data), joinedInflight: true };
   }
@@ -840,15 +800,41 @@ async function fetchMarketPage(apiKey, payload) {
 }
 
 async function requestLostArk(apiKey, url, options = {}) {
+  const blocked = marketApiBackoff.get(apiKey);
+  if (blocked?.until > Date.now()) throw blocked.error;
+  if (blocked) marketApiBackoff.delete(apiKey);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), LOSTARK_REQUEST_TIMEOUT_MS);
   const init = { method: options.method || 'GET', headers: { Authorization: `bearer ${apiKey}`, Accept: 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}) }, signal: controller.signal };
   if (options.body) init.body = JSON.stringify(options.body);
-  const response = await fetch(url, init).finally(() => clearTimeout(timeout));
-  const text = await response.text();
-  if (!response.ok) throw new Error(`LostArk API 오류 (${response.status}): ${text.slice(0, 300)}`);
+  let response;
+  let text;
+  try {
+    response = await fetch(url, init);
+    text = await response.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+  const rateLimited = response.status === 429 || response.headers.get('X-RateLimit-Remaining') === '0';
+  if (rateLimited || response.status === 503 || response.status === 401 || response.status === 403) {
+    const now = Date.now();
+    const retry = response.headers.get('Retry-After');
+    const retryMs = retry && /^\d+$/.test(retry) ? now + Number(retry) * 1000 : Date.parse(retry || '');
+    const resetMs = rateLimited ? Number(response.headers.get('X-RateLimit-Reset')) * 1000 : 0;
+    const requestedUntil = Math.max(retryMs || 0, resetMs || 0);
+    const until = requestedUntil > now ? requestedUntil : now + 60000;
+    const error = Object.assign(new Error(rateLimited ? '로스트아크 API 요청 한도 도달' : `로스트아크 API 오류 (${response.status})`), {
+      statusCode: rateLimited ? 429 : response.status,
+      retryAfter: Math.ceil((until - now) / 1000)
+    });
+    marketApiBackoff.set(apiKey, { until, error });
+    if (!response.ok) throw error;
+  }
+  if (!response.ok) throw Object.assign(new Error(`LostArk API 오류 (${response.status})`), { statusCode: response.status });
   try { return text ? JSON.parse(text) : null; } catch { throw new Error(`API 응답 JSON 파싱 실패: ${text.slice(0, 300)}`); }
 }
+
+const marketApiBackoff = new Map();
 
 function normalizeAuctionItem(item) {
   const auctionInfo = item.AuctionInfo || {};
