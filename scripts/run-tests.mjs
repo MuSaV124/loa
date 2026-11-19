@@ -28,6 +28,8 @@ const SUITES = [
   'test-honing-market.mjs',
   'test-spec-planner.mjs',
   'test-skill-effects.mjs',
+  'test-mana-recommendation.mjs',
+  'test-mana-environment.mjs',
   'test-passive-skill-effects.mjs',
   'test-arcana-card-expectation.mjs',
   'test-skill-cycle.mjs',

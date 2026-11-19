@@ -81,7 +81,7 @@ const baselineSkillItem = {
 };
 const characterResponse = {
   ok: true,
-  apiVersion: '5.9.12',
+  apiVersion: '6.1.0',
   profile: {
     CharacterName: '스킬표본', CharacterClassName: '브레이커', ServerName: '아브렐슈드',
     ItemAvgLevel: '1,700.00', CombatPower: '5,000.00', CharacterImage: '',
@@ -119,10 +119,11 @@ async function verifyViewport(viewport) {
   const page = await browser.newPage({ viewport });
   await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(characterResponse) }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
+  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.0');
   await page.getByPlaceholder('캐릭터명 입력').fill('스킬표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /스킬표본/ }).waitFor();
-  await page.locator('.advancedInputDetails').evaluate(element => { element.open = true; });
+  await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
 
   await page.locator('#skillEffectPreview').getByText('현재 스킬트리 자동 반영').waitFor();
   const preview = await page.locator('#skillEffectPreview').innerText();
@@ -282,7 +283,7 @@ async function verifyScopedBreakerCrit() {
   await page.getByPlaceholder('캐릭터명 입력').fill('권왕표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /권왕표본/ }).waitFor();
-  await page.locator('.advancedInputDetails').evaluate(element => { element.open = true; });
+  await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
   const scope = await page.locator('.skillCritScope').innerText();
   assert.match(scope, /치적 기준 스킬\s*성운멸쇄권/);
   assert.match(scope, /캐릭터 공통 치적\s*79\.99%/);
@@ -329,7 +330,7 @@ async function verifyBaseSkillSelfBuff() {
   await page.getByPlaceholder('캐릭터명 입력').fill('창술표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /창술표본/ }).waitFor();
-  await page.locator('.advancedInputDetails').evaluate(element => { element.open = true; });
+  await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
   const preview = await page.locator('#skillEffectPreview').innerText();
   assert.match(preview, /기본 자버프 1개/);
   assert.match(preview, /청룡진[\s\S]*전역 자버프 · 치적 \+20%/);
@@ -413,8 +414,11 @@ async function verifyArcanaCardExpectation() {
   assert.ok(numericValues.every(value => Number.isFinite(value) && value > 0));
   assert.deepEqual(numericValues, [...numericValues].sort((a, b) => b - a));
   assert.deepEqual(await topRows.locator('.nodePill').allTextContents(), [
-    '마나 용광로 Lv.2', '뭉툭한 가시 Lv.2', '마나 용광로 Lv.2', '뭉툭한 가시 Lv.2', '마나 용광로 Lv.2'
+    '뭉툭한 가시 Lv.2', '뭉툭한 가시 Lv.2', '입식 타격가 Lv.2', '뭉툭한 가시 Lv.2', '뭉툭한 가시 Lv.2'
   ]);
+  await page.locator('#manaRecommendationMode').selectOption('unverified');
+  assert.match(await page.locator('#manaRecommendationStatus').textContent(), /미검증 후보/);
+  await page.locator('#manaRecommendationMode').selectOption('auto');
   assert.doesNotMatch(await topRows.allTextContents().then(rows => rows.join(' ')), /감점|치적 95%|실전 추천값/);
   if (process.env.LOA_REPORT_TOP5 === '1') {
     console.log(JSON.stringify(await topRows.evaluateAll(rows => rows.map(row => ({
@@ -445,7 +449,7 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   };
   const fixture = {
     ok: true,
-    apiVersion: '6.0.0',
+    apiVersion: '6.1.0',
     profile: { ...characterResponse.profile, CharacterName: '다중치명표본', Stats: [] },
     arkPassive: { Effects: [{ Name: '입식 타격가', Level: 2 }] },
     accessoryEffects: accessory,
@@ -469,7 +473,7 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   await page.getByPlaceholder('캐릭터명 입력').fill('다중치명표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /다중치명표본/ }).waitFor();
-  await page.locator('.advancedInputDetails').evaluate(element => { element.open = true; });
+  await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
   await page.locator('#extraCritRate').fill('219.6');
   await page.locator('#extraCritDamage').fill('148.9');
   await page.locator('#noManaMainSkill').check();
@@ -698,6 +702,116 @@ async function verifyHoningMarketRefresh(viewport) {
   }
 }
 
+async function verifyManaRecommendation(viewport, critBonus) {
+  const page = await browser.newPage({ viewport });
+  const fixture = structuredClone(characterResponse);
+  fixture.profile.CharacterName = '마나표본';
+  fixture.profile.CharacterClassName = '워로드';
+  fixture.profile.Stats = [{ Type: '최대 마나', Value: '100' }];
+  fixture.powerSnapshot.profile.className = '워로드';
+  fixture.arkPassive.Effects = [
+    { Name: '마나 용광로', Level: 2 },
+    { Name: '금단의 주문', Level: 2 }
+  ];
+  const sampleSkills = [
+    { ...baselineSkillItem, name: '마나 기술 A', effects: { critRate: 15 }, usesMana: true, manaUsageKnown: true, manaCost: 999, cooldownEligible: true },
+    { ...baselineSkillItem, name: '마나 기술 B', effects: {}, usesMana: true, manaUsageKnown: true, manaCost: 999, cooldownEligible: true }
+  ];
+  fixture.skills = sampleSkills.map((skill, index) => ({ Name: skill.name, Tooltip: JSON.stringify({
+    Element_004: { type: 'MultiTextBox', value: `마나 ${index === 0 ? 200 : 80} 소모|` },
+    Element_011: { type: 'SingleTextBox', value: '마나 999 소모' }
+  }) }));
+  fixture.skillEffects = { items: sampleSkills, cycleItems: sampleSkills, calculableItems: sampleSkills, usedSkillCount: 2 };
+  await page.route('**/api/character**', route => route.fulfill({ json: fixture }));
+  try {
+    await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
+    await page.getByPlaceholder('캐릭터명 입력').fill('마나표본');
+    await page.getByRole('button', { name: '검색', exact: true }).click();
+    await page.getByRole('heading', { name: /마나표본/ }).waitFor();
+    assert.match(await page.locator('#manaAutoStatus').textContent(), /공식 스킬 비용 2\/2.*공식 API 최대 마나 100.*실전 운용 주기 미확인/);
+    assert.equal(await page.locator('#manaMax').inputValue(), '100');
+    assert.equal(await page.locator('#manaRecovery').inputValue(), '');
+    assert.match(await page.locator('#manaRotation').inputValue(), /마나 기술 A \|  \|  \| 200/);
+    await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
+    await page.locator('#extraCritRate').fill(String(critBonus));
+    await page.locator('#evolutionRecalculateButton').click();
+    assert.match(await page.locator('#sourceSummary').textContent(), /마나 용광로.*\+7(?:\.0+)?%/s);
+    const status = page.locator('#manaRecommendationStatus');
+    const rows = page.locator('#recommendList .comboRow');
+    const top = () => rows.evaluateAll(items => items.map(row => (
+      [...row.querySelectorAll('.tierLine strong')].map(label => label.textContent).join(' / ')
+    )));
+    const theory = await top();
+    assert.equal(theory.length, 5);
+    assert.match(await status.textContent(), /이론상 기대 피해 순위.*미평가/);
+    await page.locator('#manaShortageClass').check();
+    assert.deepEqual(await top(), theory, '데이터가 없는 체크 상태는 특정 노드를 배제하지 않는다.');
+    assert.match(await status.textContent(), /전투 시간/);
+    const set = (id, value) => page.locator(`#${id}`).fill(String(value));
+    for (const [id, value] of Object.entries({ manaDuration: 14, manaMax: 100, manaStart: 100, manaRecovery: 0, manaFirstRecovery: 1, manaRecoveryInterval: 1 })) {
+      await set(id, value);
+    }
+    const panel = page.locator('#manaScenarioPanel');
+    await set('manaRotation', '마나 기술 A | 0 | 2 | 40\n마나 기술 B | 1 | 3 | 20');
+    await page.locator('#manaCostReductions').selectOption('product');
+    await page.locator('#applyManaScenario').click();
+    assert.match(await status.textContent(), /입력 조건 마나 반영 순위/);
+    const scarce = await top();
+    assert.equal(scarce.length, 5);
+    assert.notDeepEqual(scarce, theory);
+    assert.match(await rows.first().textContent(), /마나 부족.*지연/);
+    const supportTop = { none: scarce };
+    for (const [support, label, override] of [
+      ['bard', '바드', 45], ['artist', '도화가', 25], ['paladin', '홀리나이트', 60], ['valkyrie', '발키리', 60]
+    ]) {
+      await page.locator('#manaSupport').selectOption(support);
+      assert.match(await page.locator('#manaSupportSummary').textContent(), /공식 툴팁/);
+      assert.match(await status.textContent(), /이론상 기대 피해 순위/);
+      await set('manaSupportUptime', 0);
+      await page.locator('#applyManaScenario').click();
+      assert.deepEqual(await top(), scarce);
+      await set('manaSupportUptime', 100);
+      await page.locator('#applyManaScenario').click();
+      assert.match(await status.textContent(), /이론상 기대 피해 순위/);
+      if (support !== 'artist') {
+        await page.locator('#manaRecommendationMode').selectOption('estimate');
+        assert.match(await status.textContent(), /가정 기반 마나 비교/);
+        await page.locator('#manaRecommendationMode').selectOption('auto');
+      } else assert.match(await status.textContent(), /실제 적용 시각/);
+      await set('manaSupportTimes', support === 'artist' ? '1, 4, 7, 10, 13' : '0, 8');
+      await set('manaSupportRestore', override);
+      await page.locator('#applyManaScenario').click();
+      assert.match(await status.textContent(), /입력 조건 마나 반영 순위/);
+      assert.match(await rows.first().textContent(), new RegExp(label));
+      supportTop[support] = await top();
+    }
+    assert.deepEqual(supportTop.paladin, supportTop.valkyrie);
+    assert.ok(Object.values(supportTop).some(result => JSON.stringify(result) !== JSON.stringify(scarce)));
+    await page.locator('#manaSupport').selectOption('bard');
+    assert.equal(await page.locator('#manaSupportRestore').inputValue(), '45');
+    assert.deepEqual(await top(), supportTop.bard);
+    await page.locator('#manaSupport').selectOption('none');
+    assert.deepEqual(await top(), scarce, '서포터 변경 시 적용 버튼 없이 순위를 다시 계산한다.');
+    await page.locator('#manaFood').selectOption('used');
+    assert.match(await status.textContent(), /음식 사용 상태의 회복 1회량 미확인/);
+    await set('manaFoodTick', 100);
+    await page.locator('#applyManaScenario').click();
+    assert.deepEqual(await top(), theory);
+    await page.locator('#manaFood').selectOption('none');
+    await set('manaRecovery', 100);
+    await page.locator('#applyManaScenario').click();
+    assert.deepEqual(await top(), theory, '회복이 충분하면 마나 반영 순위와 이론 순위가 같다.');
+    await page.locator('#manaShortageClass').uncheck();
+    assert.deepEqual(await top(), theory);
+    if (process.env.LOA_REPORT_TOP5 === '1') console.log({ critBonus, theory, supportTop });
+    await page.locator('#manaShortageClass').check();
+    const size = await panel.evaluate(element => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+    assert.ok(size.scroll <= size.width + 1, `${viewport.width}px 마나 입력 패널 ${size.scroll}/${size.width}px`);
+  } finally {
+    await page.close();
+  }
+}
+
 try {
   await verifyViewport({ width: 1440, height: 1000 });
   await verifyViewport({ width: 390, height: 844 });
@@ -709,6 +823,8 @@ try {
   await verifySupportRecommendation();
   await verifyHoningMarketRefresh({ width: 1440, height: 1000 });
   await verifyHoningMarketRefresh({ width: 390, height: 844 });
+  await verifyManaRecommendation({ width: 1440, height: 1000 }, 150);
+  await verifyManaRecommendation({ width: 390, height: 844 }, 35);
   console.log('skill effect UI tests passed');
 } finally {
   await browser.close();

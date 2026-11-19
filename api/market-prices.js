@@ -1,7 +1,7 @@
 import { MARKET_REFRESH_COOLDOWN_MS, SHARED_PRICE_CACHE_TTL_MS } from '../public/cache-policy.js';
 import { materialQuote } from '../public/material-quotes.js';
 
-const API_VERSION = '6.0.0';
+const API_VERSION = '6.1.0';
 const MARKET_ENDPOINT = 'https://developer-lostark.game.onstove.com/markets/items';
 const AUCTION_ENDPOINT = 'https://developer-lostark.game.onstove.com/auctions/items';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
