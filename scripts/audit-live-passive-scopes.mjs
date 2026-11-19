@@ -27,7 +27,7 @@ function normalized(value) {
 for (const name of names) {
   try {
     const response = await fetch(`${baseUrl}/api/character?name=${encodeURIComponent(name)}`, {
-      headers: { 'user-agent': 'LostArkCalculatorPassiveScopeAudit/6.1.0' }
+      headers: { 'user-agent': 'LostArkCalculatorPassiveScopeAudit/6.1.1' }
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();

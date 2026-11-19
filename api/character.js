@@ -7,7 +7,7 @@ import { extractArkGridSkillEffects } from '../public/passive-skill-effects.js';
 import { extractCardEffects } from '../public/card-effects.js';
 import { extractAvatarEffects } from '../public/avatar-effects.js';
 
-const API_VERSION = '6.1.0';
+const API_VERSION = '6.1.1';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const OFFICIAL_ARMGUARD_ICON = `${CDN_PREFIX}efui_iconatlas/bracer/bracer_1.png`;
 const CHARACTER_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;

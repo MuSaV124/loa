@@ -4216,6 +4216,9 @@ select {
 .manaScenarioPanel :is(input, select, textarea) { width: 100%; min-width: 0; max-width: 100%; }
 .manaScenarioPanel textarea { width: 100%; resize: vertical; color: inherit; background: #0a111a; border: 1px solid var(--softLine); border-radius: 6px; padding: 8px; }
 .manaScenarioPanel button { justify-self: start; }
+.manaScenarioPanel .manaManualToggle { display: flex; align-items: center; gap: 6px; justify-self: start; }
+.manaScenarioPanel .manaManualToggle input { width: auto; }
+#manaSensitivity:empty { display: none; }
 .manaRecommendationMode { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .manaEnvironment { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px 12px; margin: 0 0 14px; }
 .manaEnvironment label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

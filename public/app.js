@@ -1,27 +1,28 @@
-import { calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=6.1.0';
-import { BASE_CRIT_DAMAGE, CRIT_RATE_PER_STAT, NOVEMBER_2026_PATCH_URL, expectedHitDamage, multiplyPercentSources } from './damage-math.js?v=6.1.0';
-import { emptyCardEffects } from './card-effects.js?v=6.1.0';
-import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=6.1.0';
-import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=6.1.0';
-import { emptySkillEffectState, formatSkillEffectSummary, parseSkillManaUsage, skillExperimentItems } from './skill-effects.js?v=6.1.0';
-import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=6.1.0';
-import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=6.1.0';
-import { combatAnalyzerGemFactors, combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=6.1.0';
-import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency, normalizeSkillCycleName } from './skill-cycle.js?v=6.1.0';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=6.1.0';
-import { ADRENALINE_ENGRAVING_NAME, KEEN_BLUNT_NAME, KEEN_BLUNT_DAMAGE_FACTOR, RELIC_ENGRAVING_RULES, addEngravingEffects, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=6.1.0';
-import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=6.1.0';
-import { buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey, upperAncientRefineBookName, upperAncientRefineBookRateBonusPercent } from './spec-planner.js?v=6.1.0';
+import { calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=6.1.1';
+import { BASE_CRIT_DAMAGE, CRIT_RATE_PER_STAT, NOVEMBER_2026_PATCH_URL, expectedHitDamage, multiplyPercentSources } from './damage-math.js?v=6.1.1';
+import { emptyCardEffects } from './card-effects.js?v=6.1.1';
+import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=6.1.1';
+import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=6.1.1';
+import { emptySkillEffectState, formatSkillEffectSummary, parseSkillManaUsage, skillExperimentItems } from './skill-effects.js?v=6.1.1';
+import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=6.1.1';
+import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=6.1.1';
+import { combatAnalyzerGemFactors, combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=6.1.1';
+import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency, normalizeSkillCycleName } from './skill-cycle.js?v=6.1.1';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=6.1.1';
+import { ADRENALINE_ENGRAVING_NAME, KEEN_BLUNT_NAME, KEEN_BLUNT_DAMAGE_FACTOR, RELIC_ENGRAVING_RULES, addEngravingEffects, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=6.1.1';
+import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=6.1.1';
+import { buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey, upperAncientRefineBookName, upperAncientRefineBookRateBonusPercent } from './spec-planner.js?v=6.1.1';
 import { accessoryDamageInput, accessoryUpgradeHasDamageModel, expectedDamageChangePercent } from './spec-simulation.js';
-import { ARMGUARD_BREATH_ESTIMATE, ARMGUARD_HONING_INFO, allocateArmguardLimitBreaks, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardLimitBreaksBetween } from './armguard-honing.js?v=6.1.0';
+import { ARMGUARD_BREATH_ESTIMATE, ARMGUARD_HONING_INFO, allocateArmguardLimitBreaks, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardLimitBreaksBetween } from './armguard-honing.js?v=6.1.1';
 import { normalHoningAttemptDistribution, normalHoningAttemptRatePercent } from './honing-probability.js';
 import { calculateHoningMaterialCost, goldEfficiency } from './honing-cost.js';
 import { materialPurchaser, materialQuote } from './material-quotes.js';
-import { evaluateManaCandidate, manaFurnaceDamage, prepareManaScenario, rankManaCandidates } from './mana-recommendation.js';
+import { evaluateManaCandidate, manaFurnaceDamage, minimumSustainableMana, prepareManaScenario, rankManaCandidates } from './mana-recommendation.js?v=6.1.1';
+import { AUTO_MANA_RECOVERY_SOURCE, buildAutomaticManaAnalysis } from './mana-automatic.js?v=6.1.1';
 import { buildCharacterManaProfile, findVerifiedManaProfile, MANA_PROFILE_PATCH, withManaCooldowns } from './mana-character.js';
 import { resolveManaEnvironment, SUPPORT_MANA, SUPPORT_MANA_VERIFIED_AT, supportManaSummary } from './support-mana.js';
-import { estimateArmguardCombatPower } from './armguard-power.js?v=6.1.0';
-import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=6.1.0';
+import { estimateArmguardCombatPower } from './armguard-power.js?v=6.1.1';
+import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=6.1.1';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -30,9 +31,9 @@ import {
   formatCooldownClock,
   isCompatibleCharacterCacheData,
   remainingCooldownMs
-} from './cache-policy.js?v=6.1.0';
+} from './cache-policy.js?v=6.1.1';
 
-const VERSION = '6.1.0';
+const VERSION = '6.1.1';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -4739,7 +4740,7 @@ function candidateTag(c) {
   if (hasSameTier245(state.selected, c.tier2Entries, c.fourNames, c.fiveName)) tags.push('<em class="currentTag">현재</em>');
   return tags.join('');
 }
-function practicalNoteHtml(candidate) {
+function practicalNoteHtml(candidate, analysis) {
   if (candidate.supportModel) return '';
   const result = candidate.calc.result;
   const chance = result.critical?.critHitChance;
@@ -4756,7 +4757,7 @@ function practicalNoteHtml(candidate) {
     notes.push(`이론 ${candidate.theoryRank}위 · ${mana.quality === 'estimate' ? `가정 ${candidate.scenarioRank}위` : `마나 반영 ${candidate.manaRank}위`}`);
     if (candidate.supportName) notes.push(candidate.supportName);
     if (Number.isFinite(candidate.manaApiDiff)) notes.push(`같은 마나 조건에서 API 대비 ${pct(candidate.manaApiDiff)}`);
-    notes.push(mana.firstShortage == null ? '입력 구간 내 마나 부족 없음' : `${fmt(mana.firstShortage)}초에 마나 부족`);
+    notes.push(mana.firstShortage == null ? '계산 구간 내 마나 부족 없음' : `${fmt(mana.firstShortage)}초에 마나 부족`);
     if (mana.delayedSkills.length) {
       const delayed = mana.delayedSkills.slice(0, 3).map(skill => `${skill.name} ${fmt(skill.wait)}초${skill.lostCasts ? `·${skill.lostCasts}회 감소` : ''}`);
       notes.push(`지연 ${delayed.join(', ')}`);
@@ -4766,6 +4767,16 @@ function practicalNoteHtml(candidate) {
     }
   } else if (mana?.reason) notes.push(mana.reason);
   else if (result.manaDamageUnverified) notes.push('일부 스킬의 마나 조건부 피해 미검증');
+  if (analysis?.threshold && !result.manaDamageUnverified) {
+    const capacity = minimumSustainableMana(analysis.threshold, candidate.calc.stats);
+    const alternate = minimumSustainableMana(analysis.alternateThreshold, candidate.calc.stats);
+    const unsupported = minimumSustainableMana(analysis.withoutSupportThreshold, candidate.calc.stats);
+    if (Number.isFinite(capacity)) notes.push(`${analysis.threshold.environment.profile.label} · 가상 운용 최소 최대 MP ${formatNumber(Math.ceil(capacity))}`);
+    else if (capacity === Infinity) notes.push('가상 운용에서 최대 MP를 높여도 마나 부족');
+    if (Number.isFinite(alternate)) notes.push(`대안 가정 ${formatNumber(Math.ceil(alternate))} MP`);
+    else if (alternate === Infinity) notes.push('대안 가정에서도 용량만으로 유지 불가');
+    if (Number.isFinite(unsupported) && Math.abs(unsupported - capacity) > 0.001) notes.push(`서포터 없음 ${formatNumber(Math.ceil(unsupported))} MP`);
+  }
   return notes.length ? `<div class="practicalNote">${escapeHtml(notes.join(' · '))}</div>` : '';
 }
 
@@ -4782,6 +4793,7 @@ const MANA_INPUT_FIELDS = {
 const SUPPORT_INPUT_FIELDS = ['manaSupportUptime', 'manaSupportTimes', 'manaSupportRestore'];
 const supportManaInputs = new Map();
 let selectedManaSupport = 'none';
+let previousManaCharacter = '';
 
 function fillManaProfileInputs() {
   const character = state.manaCharacter;
@@ -4810,7 +4822,6 @@ function fillManaProfileInputs() {
     if (extraRecovery.value) extraRecovery.dataset.manaSource = 'verified-profile';
     else delete extraRecovery.dataset.manaSource;
   }
-  if (verified && $('manaShortageClass')) $('manaShortageClass').checked = true;
 }
 
 function renderManaEnvironment(supportMode) {
@@ -4841,7 +4852,7 @@ function renderManaEnvironment(supportMode) {
     const costs = skills.filter(skill => skill.baseCost != null && skill.source === 'official-api').length;
     const max = character.maxMana ? `공식 API 최대 마나 ${formatNumber(character.maxMana)}` : '최대 마나 미확인';
     autoStatus.textContent = `${character.className || '직업 미확인'} · ${character.resource} · 공식 스킬 비용 ${costs}/${skills.length} · ${max} · ${verified ? '검증된 운용 프로필 적용 가능' : '자연 회복·실전 운용 주기 미확인'}`;
-  }
+  } else if (autoStatus) autoStatus.textContent = '캐릭터 조회 후 공식 스킬 데이터를 표시합니다.';
   $('manaAutoSkills')?.classList.toggle('hidden', !skills.length);
   const list = $('manaAutoSkillList');
   if (list) list.innerHTML = skills.map(skill => {
@@ -4926,15 +4937,17 @@ function calculateAndRender() {
   const apiBaseValue = Number(apiBase.result.value || 0);
   const currentValue = Number(current.result.value || 0);
   const noManaMainSkill = isNoManaMainSkillEnabled() && !weightedSkillUnits().some(unit => unit.weight > 0 && unit.item?.usesMana === true);
-  const compareMana = !supportMode && Boolean($('manaShortageClass')?.checked);
-  $('manaScenarioPanel')?.classList.toggle('hidden', !compareMana);
+  const manualMana = Boolean($('manaShortageClass')?.checked);
+  $('manaScenarioPanel')?.classList.toggle('hidden', supportMode);
   $('manaRecommendationModeLabel')?.classList.toggle('hidden', supportMode);
   renderManaEnvironment(supportMode);
-  const manaInput = compareMana
+  const manaInput = supportMode ? null : manualMana
     ? state.skillCycle?.appliedCycleLinkCount > 0
       ? { reason: '연동 스킬의 재사용 대기시간과 마나 부족의 상호작용 미검증' }
       : manaScenarioForRecommendation()
-    : null;
+    : buildAutomaticManaAnalysis({ character: state.manaCharacter, cycle: state.skillCycle,
+      knownSkills: skillExperimentItems(state.skillEffects), damageSkills: weightedSkillUnits().filter(unit => unit.weight > 0).map(unit => unit.name),
+      support: $('manaSupport')?.value || 'none' });
   const apiSupportModel = supportMode ? supportContributionModel(state.powerSnapshot, { ...supportModelContext(), selection: apiSelection }) : null;
   const currentSupportModel = supportMode ? supportContributionModel(state.powerSnapshot, { ...supportModelContext(), selection: state.selected }) : null;
   const apiPracticalValue = supportMode ? Number(apiSupportModel?.totalBuffPower || 1) : apiBaseValue;
@@ -5012,21 +5025,46 @@ function calculateAndRender() {
     }
   }
   const mode = supportMode ? 'support' : $('manaRecommendationMode')?.value || 'auto';
-  const ranks = rankManaCandidates(candidates, compareMana || mode === 'unverified');
+  const ranks = rankManaCandidates(candidates, Boolean(manaInput?.scenario) || mode === 'unverified');
   const showMana = mode === 'auto' && ranks.practical.length > 0;
-  const showEstimate = mode === 'estimate' && ranks.evaluated.length > 0;
+  const automaticEstimate = manaInput?.origin === 'automatic';
+  const estimates = ranks.evaluated.filter(candidate => candidate.mana.quality === 'estimate');
+  const showEstimate = (mode === 'estimate' || (mode === 'auto' && automaticEstimate)) && estimates.length > 0;
   const shown = mode === 'support' ? candidates.sort((a, b) => b.recValue - a.recValue)
-    : mode === 'unverified' ? ranks.unverified : showMana ? ranks.practical : showEstimate ? ranks.evaluated : ranks.theoretical;
+    : mode === 'unverified' ? ranks.unverified : showMana ? ranks.practical : showEstimate ? estimates : ranks.theoretical;
   const top = shown.slice(0, 5);
   const status = $('manaRecommendationStatus');
   if (status) {
-    const detail = compareMana
-      ? manaInput?.reason || manaInput?.scenario?.environment?.assumption
-        || (ranks.practical.length ? `입력 구간 평가 ${ranks.practical.length}개 · 사용자 입력·지연 없는 조합 우선` : '현재 입력으로 평가 가능한 조합 없음')
-      : '마나 지속 가능성 미평가';
+    const detail = [manaInput?.reason, manaInput?.detail || manaInput?.scenario?.environment?.assumption,
+      manaInput?.scenario && !ranks.evaluated.length && '지속 피해 순위 산정에 필요한 피해·스킬 규칙 미검증',
+      mode === 'estimate' && !estimates.length && '가정 기반 피해 순위를 계산할 수 있는 후보 없음',
+      manaInput?.threshold && '카드에 가상 운용 유지에 필요한 최소 최대 MP 표시',
+      manualMana && ranks.practical.length > 0 && `수동 시나리오 평가 ${ranks.practical.length}개`].filter(Boolean).join(' · ');
+    const eligible = ranks.theoretical.length;
+    const excluded = eligible - ranks.evaluated.length;
+    const label = showMana ? (manaInput.origin === 'verified' ? '검증된 프로필 마나 반영 순위' : '입력 조건 마나 반영 순위')
+      : showEstimate ? (automaticEstimate ? '가정 기반 자동 TOP5' : '가정 기반 마나 비교') : '이론상 기대 피해 순위';
     status.textContent = supportMode ? '' : mode === 'unverified'
       ? `미검증 후보 ${ranks.unverified.length}개 · ${detail}`
-      : `${showMana ? '입력 조건 마나 반영 순위' : showEstimate ? '가정 기반 마나 비교' : '이론상 기대 피해 순위'} · ${detail}${ranks.unverified.length ? ` · 미검증 ${ranks.unverified.length}개` : ''}`;
+      : [label, detail, manaInput?.scenario && excluded > 0 && `마나 순위 산정 불가 ${excluded}개`, ranks.unverified.length > 0 && `실전 미검증 ${ranks.unverified.length}개`].filter(Boolean).join(' · ');
+  }
+  const sensitivity = $('manaSensitivity');
+  if (sensitivity) {
+    sensitivity.textContent = '';
+    if (showEstimate && manaInput?.alternate) {
+      const alternates = estimates.map(candidate => ({ ...candidate, original: candidate,
+        mana: evaluateManaCandidate(manaInput.alternate, candidate.calc.stats, candidate.calc.result) }));
+      const alternateTop = rankManaCandidates(alternates, true).evaluated.slice(0, 5);
+      const changed = alternateTop.length !== top.length || alternateTop.some((candidate, i) => candidate.original !== top[i]);
+      sensitivity.textContent = `첫 사용 분산·장착 역순 및 소모 감소 합산으로 비교하면 TOP5 ${changed ? '순위 변경' : '순위 동일'}`;
+    } else if (manaInput?.threshold) {
+      sensitivity.textContent = '대안 가정은 첫 사용 시각을 분산하고 장착 역순·소모 감소 합산으로 비교합니다.';
+    }
+  }
+  const recoverySource = $('manaRecoverySource');
+  if (recoverySource) {
+    recoverySource.href = AUTO_MANA_RECOVERY_SOURCE;
+    recoverySource.classList.toggle('hidden', !manaInput?.assumedRecovery);
   }
   const apiManaConditionNote = manaConditionNoteText(apiBase);
   const currentManaConditionNote = manaConditionNoteText(current);
@@ -5065,7 +5103,7 @@ function calculateAndRender() {
           <div class="tierLine"><span>5T</span><strong class="nodePill">${escapeHtml(c.fiveName)} Lv.${c.fiveLevel}</strong>${candidateTag(c)}</div>
         </div>
         <div class="comboMemo">${escapeHtml(memo)}</div>
-        ${practicalNoteHtml(c)}
+        ${practicalNoteHtml(c, manaInput)}
       </div>
       <div class="rowMetrics">
         <div class="rowMetric"><span>${supportMode ? '종합 파티 기여' : '이론 기대 피해 배율'}</span><b>${supportMode ? `${((c.recValue - 1) * 100).toFixed(2)}%` : c.calc.result.manaDamageUnverified ? '미검증' : c.recValue.toFixed(4)}</b><small>${supportMode ? `상시 ${Number(c.supportModel?.allTimePercent || 0).toFixed(2)}%` : criticalOutcomeLabel(c.calc.result.critical)}</small>${Number.isFinite(c.mana?.value) ? `<small>마나 반영 <strong>${c.mana.value.toFixed(4)}</strong></small>` : ''}</div>
@@ -5215,6 +5253,7 @@ function resetCharacterResultState() {
   state.passiveSkillEffects = emptyPassiveSkillEffectState();
   state.arkGridSkillEffects = emptyPassiveSkillEffectState();
   state.skillCycle = null;
+  state.manaCharacter = null;
   renderSkillEffectControl();
   simulatorRendered = false;
   document.body.classList.remove('simulatorMode');
@@ -5244,6 +5283,12 @@ function applyCharacterData(data) {
   }
   state.manaCharacter = data.manaProfile || buildCharacterManaProfile(data.profile, state.powerSnapshot,
     Array.isArray(data.skills) ? data.skills : [], skillExperimentItems(state.skillEffects));
+  const characterKey = normalizeCharacterCacheKey(data.profile?.CharacterName);
+  if (previousManaCharacter && characterKey !== previousManaCharacter) {
+    $('manaShortageClass').checked = false;
+    $('manaScenarioPanel').open = false;
+  }
+  previousManaCharacter = characterKey;
   fillManaProfileInputs();
   syncAdrenalineControlsFromEngraving();
   renderCharacter(data.profile, data.arkPassive);
@@ -5346,26 +5391,30 @@ $('backAttackEnabled').addEventListener('change', () => setCalculationDirty(true
 $('excludeCooldown')?.addEventListener('change', () => setCalculationDirty(true));
 $('noManaMainSkill')?.addEventListener('change', () => setCalculationDirty(true));
 $('singleHitMainSkill')?.addEventListener('change', () => setCalculationDirty(true));
-$('manaShortageClass')?.addEventListener('change', () => {
+$('manaShortageClass')?.addEventListener('change', () => calculateAndRender());
+$('applyManaScenario')?.addEventListener('click', () => {
+  $('manaShortageClass').checked = true;
   calculateAndRender();
-  if ($('manaShortageClass').checked) $('manaScenarioPanel').open = true;
 });
-$('applyManaScenario')?.addEventListener('click', () => calculateAndRender());
 $('manaRecommendationMode')?.addEventListener('change', () => calculateAndRender());
 $('manaSupport')?.addEventListener('change', event => {
   supportManaInputs.set(selectedManaSupport, SUPPORT_INPUT_FIELDS.map(id => $(id)?.value || ''));
   selectedManaSupport = event.target.value;
   const saved = supportManaInputs.get(selectedManaSupport) || [];
   SUPPORT_INPUT_FIELDS.forEach((id, index) => { $(id).value = saved[index] || ''; });
-  $('manaShortageClass').checked = true;
-  $('manaScenarioPanel').open = true;
   calculateAndRender();
 });
 for (const id of [...SUPPORT_INPUT_FIELDS, 'manaFood', 'manaFoodTick']) {
-  $(id)?.addEventListener('change', () => calculateAndRender());
+  $(id)?.addEventListener('change', () => {
+    if ($('manaShortageClass')?.checked) calculateAndRender();
+    else renderManaEnvironment(false);
+  });
 }
 for (const id of [...Object.keys(MANA_INPUT_FIELDS), 'manaRotation', 'manaExtraRecovery']) {
   $(id)?.addEventListener('input', event => { delete event.target.dataset.manaSource; });
+  $(id)?.addEventListener('change', () => {
+    if ($('manaShortageClass')?.checked) calculateAndRender();
+  });
 }
 $('mainSkillDamageShare')?.addEventListener('input', () => setCalculationDirty(true));
 

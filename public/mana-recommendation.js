@@ -1,4 +1,4 @@
-import { normalizeSkillCycleName } from './skill-cycle.js';
+import { normalizeSkillCycleName, skillCooldownSeconds } from './skill-cycle.js';
 
 export function manaFurnaceDamage(effect, skill) {
   if (!effect) return { damage: 0, known: true };
@@ -63,6 +63,14 @@ function castCount(skill, duration) {
   return Math.max(0, Math.ceil((duration - skill.first - EPSILON) / skill.interval));
 }
 
+function manaCastSchedule(skills, duration) {
+  return skills.filter(skill => skill.cost > 0 || skill.maxManaCost > 0)
+    .flatMap(actor => Array.from({ length: castCount(actor, duration) }, (_, index) => ({
+      actor, planned: actor.first + index * actor.interval
+    })))
+    .sort((a, b) => a.planned - b.planned);
+}
+
 function castCycle(skills, scenario) {
   let mana = scenario.startMana;
   let time = 0;
@@ -70,11 +78,7 @@ function castCycle(skills, scenario) {
   let firstShortage = null;
   const recovery = scenario.recovery;
   const actors = skills.map(skill => ({ ...skill, ready: skill.first, casts: skill.cost > 0 ? 0 : castCount(skill, scenario.duration), wait: 0 }));
-  const scheduled = actors.filter(actor => actor.cost > 0)
-    .flatMap(actor => Array.from({ length: castCount(actor, scenario.duration) }, (_, index) => ({
-      actor, planned: actor.first + index * actor.interval
-    })))
-    .sort((a, b) => a.planned - b.planned);
+  const scheduled = manaCastSchedule(actors, scenario.duration);
   // A mana-blocked cast holds its place in the entered rotation so extra recovery cannot redirect mana to another cast.
   for (const { actor, planned } of scheduled) {
     time = Math.max(time, actor.ready, planned);
@@ -109,20 +113,35 @@ function castCycle(skills, scenario) {
   };
 }
 
-function manaCastResults(scenario, stats, reductions) {
+function manaCastParameters(stats, reductions) {
   const generalCooldown = stats.cooldownReduction || 0;
   const manaCooldown = stats.manaSkillCooldownReduction || 0;
   const furnaceCost = (stats.manaFurnace?.maxManaCostPercent ?? 0) / 100;
   const key = JSON.stringify([generalCooldown, manaCooldown, furnaceCost, reductions]);
-  if (scenario.castResults.has(key)) return scenario.castResults.get(key);
+  return { generalCooldown, manaCooldown, furnaceCost, key };
+}
+
+function manaCastSkills(scenario, reductions, { generalCooldown, manaCooldown, furnaceCost }) {
   const factor = scenario.reductions === 'product'
     ? reductions.reduce((value, reduction) => value * (1 - reduction / 100), 1)
     : Math.max(0, 1 - reductions.reduce((sum, reduction) => sum + reduction, 0) / 100);
-  const skills = scenario.skills.map(skill => ({
-    ...skill,
-    interval: skill.cooldownEligible ? Math.max(0.1, skill.interval *
-      (1 - Math.min(95, generalCooldown + (skill.usesMana ? manaCooldown : 0)) / 100)) : skill.interval,
-    cost: skill.usesMana ? skill.cost * factor + scenario.maxMana * furnaceCost : skill.cost
+  return scenario.skills.map(skill => {
+    const cooldown = Math.min(95, generalCooldown + (skill.usesMana ? manaCooldown : 0));
+    return {
+      ...skill,
+      interval: skill.cooldownItem ? skillCooldownSeconds(skill.cooldownItem, cooldown)
+        : skill.cooldownEligible ? Math.max(0.1, skill.interval * (1 - cooldown / 100)) : skill.interval,
+      cost: skill.usesMana ? skill.cost * factor : skill.cost,
+      maxManaCost: skill.usesMana ? furnaceCost : 0
+    };
+  });
+}
+
+function manaCastResults(scenario, stats, reductions) {
+  const parameters = manaCastParameters(stats, reductions);
+  if (scenario.castResults.has(parameters.key)) return scenario.castResults.get(parameters.key);
+  const skills = manaCastSkills(scenario, reductions, parameters).map(skill => ({
+    ...skill, cost: skill.cost + scenario.maxMana * skill.maxManaCost
   }));
   const { firstShortage, actors } = castCycle(skills, scenario);
   const byName = new Map(actors.map(actor => [actor.key, actor]));
@@ -131,8 +150,42 @@ function manaCastResults(scenario, stats, reductions) {
     ...actor, lostCasts: Math.max(0, reference.get(actor.key) - actor.casts)
   })).sort((a, b) => b.lostCasts - a.lostCasts || b.wait - a.wait);
   const result = { byName, reference, firstShortage, delayedSkills };
-  scenario.castResults.set(key, result);
+  scenario.castResults.set(parameters.key, result);
   return result;
+}
+
+// In a full-start scenario whose recovery scales with max mana, every cast segment must fit one capacity plus its intervening recovery.
+export function minimumSustainableMana(scenario, stats = {}) {
+  if (!scenario?.normalizedCapacity) return null;
+  const reductions = stats.manaCostReductions || [];
+  const parameters = manaCastParameters(stats, reductions);
+  const key = `capacity:${parameters.key}`;
+  if (scenario.castResults.has(key)) return scenario.castResults.get(key);
+  const skills = manaCastSkills(scenario, reductions, parameters);
+  let recoveryRatio = 0;
+  let recoveryIndex = 0;
+  const casts = manaCastSchedule(skills, scenario.duration).map(cast => {
+    while (scenario.recovery[recoveryIndex]?.time <= cast.planned + EPSILON) recoveryRatio += scenario.recovery[recoveryIndex++].amount;
+    return { ...cast, recoveryRatio };
+  });
+  let required = 0;
+  for (let end = 0; end < casts.length; end += 1) {
+    let fixedCost = 0;
+    let percentCost = 0;
+    for (let start = end; start >= 0; start -= 1) {
+      fixedCost += casts[start].actor.cost;
+      percentCost += casts[start].actor.maxManaCost;
+      const available = 1 + casts[end].recoveryRatio - casts[start].recoveryRatio - percentCost;
+      if (available > EPSILON) required = Math.max(required, fixedCost / available);
+      else if (available < -EPSILON || fixedCost > EPSILON) {
+        required = Infinity;
+        break;
+      }
+    }
+    if (!Number.isFinite(required)) break;
+  }
+  scenario.castResults.set(key, required);
+  return required;
 }
 
 export function evaluateManaCandidate(scenario, stats, damage) {
