@@ -1,3 +1,6 @@
+import { normalHoningOutcome } from './honing-probability.js';
+export { NORMAL_HONING_PITY_RULES } from './honing-probability.js';
+
 const RAW_ARMGUARD_HONING_ROWS = [
   // stage, rate, growth shard, growth silver, attempt shard, destruction, guardian, leapstone, fusion, gold, silver
   [1, 15, 145000, 1450000, 14500, 600, 1800, 30, 22, 5200, 80000],
@@ -39,13 +42,6 @@ export const ARMGUARD_LIMIT_BREAKS = Object.freeze([
   Object.freeze({ stage: 15, fromGrade: '전설', toGrade: '유물', materials: Object.freeze({ '사령의 잔영': 240 }), substitute: Object.freeze({ '죽음의 손': 120 }) }),
   Object.freeze({ stage: 20, fromGrade: '유물', toGrade: '고대', materials: Object.freeze({ '죽음의 손': 150 }), substitute: null })
 ]);
-
-export const NORMAL_HONING_PITY_RULES = Object.freeze({
-  failBonusRate: 0.1,
-  maxRateMultiplier: 2,
-  artisanFactor: 0.46511,
-  artisanLimit: 100
-});
 
 // Provisional until Smilegate publishes the armguard support-material caps.
 export const ARMGUARD_BREATH_ESTIMATE = Object.freeze({
@@ -106,37 +102,8 @@ export function armguardLimitBreaksBetween(fromStage, toStage) {
   return ARMGUARD_LIMIT_BREAKS.filter(row => row.stage >= from && row.stage < to);
 }
 
-function armguardAttemptRatePercent(ratePercent, attempt) {
-  const base = Number(ratePercent || 0);
-  const bonus = base * NORMAL_HONING_PITY_RULES.failBonusRate * (Math.max(1, attempt) - 1);
-  return Math.min(base * NORMAL_HONING_PITY_RULES.maxRateMultiplier, base + bonus);
-}
-
-function armguardPityAttempts(ratePercent) {
-  let artisan = 0;
-  for (let attempt = 1; attempt < 10000; attempt += 1) {
-    artisan += armguardAttemptRatePercent(ratePercent, attempt) * NORMAL_HONING_PITY_RULES.artisanFactor;
-    if (artisan >= NORMAL_HONING_PITY_RULES.artisanLimit) return attempt + 1;
-  }
-  return 0;
-}
-
 export function armguardPityProbability(ratePercent, supportRatePercent = 0) {
-  const support = Math.max(0, Number(supportRatePercent || 0));
-  const pityAttempts = (() => {
-    let artisan = 0;
-    for (let attempt = 1; attempt < 10000; attempt += 1) {
-      artisan += (armguardAttemptRatePercent(ratePercent, attempt) + support) * NORMAL_HONING_PITY_RULES.artisanFactor;
-      if (artisan >= NORMAL_HONING_PITY_RULES.artisanLimit) return attempt + 1;
-    }
-    return 0;
-  })();
-  if (!pityAttempts) return 0;
-  let probability = 1;
-  for (let attempt = 1; attempt < pityAttempts; attempt += 1) {
-    probability *= Math.max(0, 1 - (armguardAttemptRatePercent(ratePercent, attempt) + support) / 100);
-  }
-  return probability;
+  return normalHoningOutcome(ratePercent, supportRatePercent).pityProbability;
 }
 
 export function armguardExpectedPityCount(fromStage, toStage) {

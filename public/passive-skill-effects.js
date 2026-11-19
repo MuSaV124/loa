@@ -1,4 +1,5 @@
-import { SKILL_EFFECT_KEYS, hasSkillEffects, parseSkillEffectText } from './skill-effects.js?v=5.15.14';
+import { SKILL_EFFECT_KEYS, hasSkillEffects, parseSkillEffectText, withoutCritRateDamageClause } from './skill-effects.js';
+import { classCoreClauseAvailable } from './class-damage-rules.js';
 
 const EFFECT_KEYS = [...SKILL_EFFECT_KEYS];
 
@@ -60,6 +61,7 @@ function clauses(value) {
   return cleanText(value)
     .replace(/((?:증가|감소|상승|강화)하고|변경되고),\s*/gi, '$1.\n')
     .replace(/((?:증가|감소|상승|강화)하고)\s+(?=[가-힣A-Za-z0-9 ·]{1,24}\s*스킬)/gi, '$1.\n')
+    .replace(/((?:증가|감소)하지만)\s+(?=(?:기력|충격|집중|난무|일반|스택트|루인)\s*스킬)/gi, '$1.\n')
     .split(/\n|(?<=[.!?])\s+/)
     .map(row => row.trim())
     .filter(Boolean);
@@ -74,6 +76,8 @@ function removeNonCombatDamage(value) {
 }
 
 function mergeEffects(target, source) {
+  if (source?.forcedCrit) target.forcedCrit = true;
+  if (source?.critRateToDamage > 0) target.critRateToDamage = Math.max(target.critRateToDamage || 0, source.critRateToDamage);
   for (const key of EFFECT_KEYS) {
     const value = Number(source?.[key] || 0);
     if (!Number.isFinite(value) || Math.abs(value) < 0.0001) continue;
@@ -150,7 +154,7 @@ function categorySelector(clause, knownCategories) {
     if (stanceCategory) return stanceCategory.replace(/\s*스킬\s*$/, '').trim();
   }
 
-  const explicit = source.match(/(?:^|[,.]\s*|\s)(초각성|각성기|일반|충격|기력|포격|실버호크|고대의?\s*정령|루인|헤드어택|백어택|캐스팅|곰|망자)\s*스킬(?:의|이|가|은|는|을|로|에서|에)/i);
+  const explicit = source.match(/(?:^|[,.]\s*|\s)(초각성|각성기|일반|충격|기력|포격|실버호크|고대의?\s*정령|루인|집중|난무|핸드건|샷건|라이플|헤드어택|백어택|캐스팅|곰|망자)\s*스킬(?:의|이|가|은|는|을|로|에서|에|(?=\s+(?:피해|치명타)))/i);
   if (explicit) return explicit[1].trim();
   const damageCategory = source.match(/(?:^|\s)(초각성기|각성기)(?:의)?\s*피해량/i);
   return damageCategory?.[1]?.replace(/기$/, '')?.trim() || '';
@@ -180,7 +184,7 @@ function inferredSkillContextTargets(clause) {
 }
 
 function isSubjectlessEffectClause(clause) {
-  return /^(?:치명타|적에게\s*주는|추가\s*피해|피해량|공격\s*속도|이동\s*속도|공격력)/i.test(String(clause || '').trim());
+  return /^(?:치명타|공격이\s*항상\s*치명타|적에게\s*주는|추가\s*피해|피해량|공격\s*속도|이동\s*속도|공격력)/i.test(String(clause || '').trim());
 }
 
 function signedPercent(value, direction) {
@@ -190,17 +194,20 @@ function signedPercent(value, direction) {
 
 function augmentPassiveEffects(parsed, clause, classification) {
   const effects = { ...parsed };
-  const text = String(clause || '');
+  const text = withoutCritRateDamageClause(clause);
   if (classification.scope !== 'global') {
     let strongestDamage = Number(effects.skillDamage || 0);
-    for (const match of text.matchAll(/(?:총\s*)?피해량(?:이|가|을|를)?\s*(?:\d+\s*회\s*동안\s*)?(?:추가로\s*)?(\d+(?:\.\d+)?)\s*%\s*(증가|강화|감소|낮아지)/gi)) {
+    const damageText = effects.critHitDamage ? '' : text;
+    for (const match of damageText.matchAll(/(?:총\s*)?피해량(?:이|가|을|를)?\s*(?:\d+\s*회\s*동안\s*)?(?:추가로\s*)?(\d+(?:\.\d+)?)\s*%\s*(증가|강화|감소|낮아지)/gi)) {
       const value = signedPercent(match[1], match[2]);
       if (Math.abs(value) > Math.abs(strongestDamage)) strongestDamage = value;
     }
     effects.skillDamage = round2(strongestDamage);
   }
-  const enemy = text.match(/적에게\s*주는\s*피해(?:량)?(?:이|가)?\s*(?:추가로\s*)?(?:최대\s*)?(\d+(?:\.\d+)?)\s*%\s*(증가|상승|감소)/i)
-    || text.match(/자신에게\s*받는\s*피해량(?:이|가)?\s*(\d+(?:\.\d+)?)\s*%\s*(증가|상승|감소)/i);
+  const enemy = !effects.critHitDamage && !effects.critRateToDamage && (
+    text.match(/(?:적에게\s*주는\s*(?:모든\s*)?|^모든\s*)피해(?:량)?(?:이|가)?\s*(?:추가로\s*)?(?:최대\s*)?(\d+(?:\.\d+)?)\s*%\s*(증가|상승|감소)/i)
+    || text.match(/자신에게\s*받는\s*피해량(?:이|가)?\s*(\d+(?:\.\d+)?)\s*%\s*(증가|상승|감소)/i)
+  );
   if (enemy && Math.abs(signedPercent(enemy[1], enemy[2])) > Math.abs(Number(effects.enemyDamage || 0))) {
     effects.enemyDamage = round2(signedPercent(enemy[1], enemy[2]));
   }
@@ -259,6 +266,7 @@ function extractScopedSkillEffects(effects, { skillItems = [], shareNames = [], 
     const payload = parseTooltipPayload(effect);
     let pendingTargets = [];
     for (const clause of clauses(payload.text)) {
+      if (!classCoreClauseAvailable(payload.nodeName, clause, skillItems)) continue;
       let classification = classifyClause(clause, { knownSkills, knownCategories });
       if (classification.scope === 'global' && pendingTargets.length && isSubjectlessEffectClause(clause)) {
         classification = { scope: 'skill', targets: pendingTargets, selector: '' };

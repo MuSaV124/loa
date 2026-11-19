@@ -142,7 +142,7 @@ async function verifyViewport(viewport) {
   const source = await page.locator('#sourceSummary').textContent();
   assert.match(source, /스킬 효과 실험값/);
   assert.match(source, /표본 기술/);
-  assert.match(source, /치적·치피는 실제 주력기에서 확인된 각각의 최댓값/);
+  assert.match(source, /표시 치적·치피는 주력기의 각 최댓값/);
   assert.match(source, /치적 기준 스킬/);
   assert.match(source, /캐릭터 공통 치적/);
   assert.match(source, /스킬별 지분 합산/);
@@ -366,6 +366,7 @@ async function verifyArcanaCardExpectation() {
   assert.match(noteText, /황제의 칙령 · 황제\+또황 33\.0% · 실전 41\.6장\/분/);
   assert.match(noteText, /도태 7\.00%\/17\.65% · 재상 5\.65%\/32\.41% · 제후 6\.40%\/16\.26%/);
   assert.match(noteText, /3분 딜타임 약 124\.8장·도태 8\.7장·재상 7\.1장·제후 8\.0장/);
+  assert.match(noteText, /도태의 치적 \+20%·치피 \+50%/);
   assert.match(noteText, /재상 치적 \+20%·제후 일반 스킬 피해 \+50%/);
   assert.match(noteText, /다크니스 엣지 최대 중첩 치적 \+27\.6%/);
   assert.doesNotMatch(noteText, /급소 노출/);
@@ -387,6 +388,22 @@ async function verifyArcanaCardExpectation() {
   assert.match(arcanaKeen, /스킬별 치적·치피 재계산/);
   assert.match(arcanaKeen, /도태\/재상 기대 가동률 포함/);
   const bestRecommendation = await page.locator('#recommendList .comboRow.best').innerText();
+  const topRows = page.locator('#recommendList .comboRow');
+  const topValues = await topRows.locator('.rowMetric:first-child b').allTextContents();
+  assert.equal(topValues.length, 5);
+  const numericValues = topValues.map(Number);
+  assert.ok(numericValues.every(value => Number.isFinite(value) && value > 0));
+  assert.deepEqual(numericValues, [...numericValues].sort((a, b) => b - a));
+  assert.deepEqual(await topRows.locator('.nodePill').allTextContents(), [
+    '마나 용광로 Lv.2', '뭉툭한 가시 Lv.2', '마나 용광로 Lv.2', '뭉툭한 가시 Lv.2', '마나 용광로 Lv.2'
+  ]);
+  assert.doesNotMatch(await topRows.allTextContents().then(rows => rows.join(' ')), /감점|치적 95%|실전 추천값/);
+  if (process.env.LOA_REPORT_TOP5 === '1') {
+    console.log(JSON.stringify(await topRows.evaluateAll(rows => rows.map(row => ({
+      build: Array.from(row.querySelectorAll('.tierLine strong'), value => value.textContent),
+      value: row.querySelector('.rowMetric b').textContent
+    }))), null, 2));
+  }
   assert.match(bestRecommendation, /끝마/, `황제 카드 수급을 반영한 1순위에 끝마가 포함되어야 합니다: ${bestRecommendation}`);
   const skillScope = await page.locator('.skillCritScope').innerText();
   assert.match(skillScope, /다크 리저렉션/);

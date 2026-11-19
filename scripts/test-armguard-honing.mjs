@@ -74,4 +74,12 @@ assert.deepEqual(armguardBreathMixesForMode(25, 'optimal', true), [
 ]);
 assert.deepEqual(armguardBreathMixesForMode(25, 'optimal', false), [{ lava: 0, glacier: 0, total: 0 }]);
 
+const { normalHoningAttemptRatePercent, normalHoningOutcome } = await import('../public/honing-probability.js');
+assert.equal(normalHoningAttemptRatePercent(90, 8, 20), 100);
+assert.equal(normalHoningOutcome(90, 20).expectedAttempts, 1);
+assert.deepEqual(normalHoningOutcome(Infinity), { pityAttempts: 0, expectedAttempts: 0, pityProbability: 0 });
+const honing = normalHoningOutcome(15, 5);
+assert.ok(honing.expectedAttempts > 1 && honing.expectedAttempts <= honing.pityAttempts);
+assert.equal(honing.pityProbability, armguardPityProbability(15, 5));
+
 console.log('armguard honing tests passed');

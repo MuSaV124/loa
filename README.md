@@ -1,4 +1,10 @@
-# Lost Ark Node Recommend Calculator v5.15.14
+# Lost Ark Node Recommend Calculator v5.16.0
+
+## v5.16.0
+
+- 2026-11-18 다중 치명타와 뭉툭한 가시, 아르카나 도태, 창술사 확정 치명 규칙 및 11-19 임시 점검을 반영했습니다.
+- 딜러 2/4/5티어 추천을 기대 피해 배율로 정렬하고, 서포터 공증·낙인 추정과 재련 확률 공통화를 적용했습니다.
+- [계산 경로, 공식 출처, TOP5 비교 및 검증 범위](docs/calculation-engine.md)
 
 ## v5.15.14
 

@@ -10,6 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const SUITES = [
+  'test-damage-math.mjs',
   'test-evolution-math.mjs',
   'test-advanced-honing-math.mjs',
   'test-armguard-honing.mjs',

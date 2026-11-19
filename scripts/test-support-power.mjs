@@ -110,4 +110,18 @@ const exactCombined = supportUpgradeImpact({
 const expectedCombined = (1.01 ** 0.3 * 1.02 ** 0.6 * 1.03 ** 0.1 - 1) * 100;
 assert.ok(Math.abs(exactCombined.combinedPercent - expectedCombined) < 1e-10);
 
+const patchedBrand = {
+  name: '율동의 하프', currentTree: true, baseCooldownSeconds: 24,
+  selectedTripods: [{ description: '적중된 적에게 12.0초간 음표 낙인이 생겨 자신 및 파티원이 주는 피해가 10.0% 증가한다.' }]
+};
+const plainSupport = { ...snapshot, profile: { ...snapshot.profile, stats: [] }, gems: { items: [] } };
+const brand = supportContributionModel(plainSupport, { skillEffects: { cycleItems: [patchedBrand] } });
+assert.equal(brand.detail.brandUptimeModeled, true);
+assert.equal(brand.detail.brandUptime, 0.5);
+for (const [className, secondClass] of [['홀리나이트', '축복의 오라'], ['발키리', '해방자']]) {
+  const overview = supportContributionModel({ ...plainSupport, profile: { ...plainSupport.profile, className, secondClass } });
+  assert.equal(overview.detail.actualCooldownA, 30);
+  assert.equal(overview.detail.actualCooldownB, 30);
+}
+
 console.log('support power tests passed');

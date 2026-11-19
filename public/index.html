@@ -14,7 +14,7 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값과 선택한 진화 노드·추가 효과를 재계산해 비교합니다.</p>
         </div>
-        <span class="badge">v5.15.14 · 완갑·전율 공식 출시 데이터 반영</span>
+        <span class="badge">v5.16.0 · 다중 치명타 업데이트</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
@@ -119,13 +119,13 @@
 
     <section id="recommendPanel" class="calcTabPanel panel">
       <div class="sectionHead recommendHead">
-        <div><h2>2/4/5티어 조합 추천</h2><p id="recommendDescription" class="hint">공식 기대값과 치적 안정성·단타·마나 조건을 반영한 실전 추천값을 함께 비교합니다.</p></div>
+        <div><h2>2/4/5티어 조합 추천</h2><p id="recommendDescription" class="hint">레이드 기대 피해 추정치 기준으로 조합을 비교합니다.</p></div>
         <div class="recommendChecks">
           <div class="recommendCheckRow">
-            <label class="miniCheck" title="뭉툭한 가시의 노크리 체감 위험을 실전 추천값에서 2.5% 감점합니다."><span>단타 주력기</span><input id="singleHitMainSkill" type="checkbox" /></label>
+            <label class="miniCheck" title="기준 스킬이 치명타로 적중하지 않을 확률을 표시합니다."><span>단타 주력기</span><input id="singleHitMainSkill" type="checkbox" /></label>
             <label class="miniCheck"><span>쿨감 효과 제외</span><input id="excludeCooldown" type="checkbox" /></label>
             <label class="miniCheck"><span>주력기 마나 사용 안함</span><input id="noManaMainSkill" type="checkbox" /></label>
-            <label class="miniCheck" title="끝마·금주·무마의 마나 안정성 보너스를 적용하고 마나 용광로를 추천에서 제외합니다."><span>마나 부족 직업</span><input id="manaShortageClass" type="checkbox" /></label>
+            <label class="miniCheck" title="마나 용광로를 추천 후보에서 제외합니다."><span>마나 부족 직업</span><input id="manaShortageClass" type="checkbox" /></label>
           </div>
           <label class="shareControl" title="쿨감이 실제 딜 사이클을 줄이는 주력기 딜 지분입니다. 쿨감 효과 제외 체크 시 0%로 처리됩니다.">
             <span>주력기 딜 지분 <em>쿨감 환산용</em></span>
@@ -270,7 +270,7 @@
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <div class="version">Version 5.15.14</div>
-  <script type="module" src="/app.js?v=5.15.14"></script>
+  <div class="version">Version 5.16.0</div>
+  <script type="module" src="/app.js?v=20261118"></script>
 </body>
 </html>

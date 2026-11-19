@@ -23,6 +23,11 @@ export const SKILL_EFFECT_LABELS = {
 };
 
 const PERCENT = '([+-]?\\d+(?:\\.\\d+)?)\\s*%';
+const CRIT_RATE_DAMAGE_CLAUSE = /모든\s*치명타\s*발생\s*확률\s*1(?:\.0+)?\s*%\s*당\s*(?:적에게\s*주는\s*)?피해(?:량)?(?:이|가)?\s*(\d+(?:\.\d+)?)\s*%\s*증가/i;
+const FORCED_CRIT_CLAUSE = /항상\s*치명타(?:로|가|가\s*발생)|확정\s*치명/i;
+export function withoutCritRateDamageClause(text) {
+  return String(text || '').replace(CRIT_RATE_DAMAGE_CLAUSE, '');
+}
 const CHANGE = '(?:(?:만큼|추가로)\\s*)?(증가|감소|높아지|낮아지)';
 const EFFECT_PATTERNS = {
   critRate: [
@@ -211,6 +216,8 @@ function mergeStrongestEffects(target, source) {
     const value = Number(source?.[key] || 0);
     if (Math.abs(value) > Math.abs(Number(target[key] || 0))) target[key] = round2(value);
   }
+  if (source.forcedCrit) target.forcedCrit = true;
+  if (source.critRateToDamage > 0) target.critRateToDamage = Math.max(target.critRateToDamage || 0, source.critRateToDamage);
 }
 
 function parseOwnSkillEffectText(text) {
@@ -238,12 +245,15 @@ function parseBaseSkillEffects(skill) {
 }
 
 export function parseSkillEffectText(value) {
-  const text = decodeEntities(value);
+  const text = decodeEntities(value).replace(/\(\s*PvP\s*[+-]?\d+(?:\.\d+)?\s*%\s*\)/gi, '');
   const effects = emptyEffects();
   if (!text) return effects;
 
+  if (FORCED_CRIT_CLAUSE.test(text)) effects.forcedCrit = true;
+  const conversion = text.match(CRIT_RATE_DAMAGE_CLAUSE);
+  if (conversion) effects.critRateToDamage = Number(conversion[1]);
   for (const key of SKILL_EFFECT_KEYS) {
-    let source = text;
+    let source = withoutCritRateDamageClause(text);
     if (key === 'enemyDamage') source = removeCritHitDamageClauses(source);
     if (key === 'skillDamage') source = removeSpecificDamageClauses(removeCritHitDamageClauses(source));
     effects[key] = strongestMatch(source, EFFECT_PATTERNS[key]);
@@ -252,10 +262,13 @@ export function parseSkillEffectText(value) {
 }
 
 export function hasSkillEffects(effects) {
-  return SKILL_EFFECT_KEYS.some(key => Math.abs(Number(effects?.[key] || 0)) > 0.0001);
+  return Boolean(effects?.forcedCrit || effects?.critRateToDamage)
+    || SKILL_EFFECT_KEYS.some(key => Math.abs(Number(effects?.[key] || 0)) > 0.0001);
 }
 
 function mergeTripodEffects(target, source) {
+  if (source.forcedCrit) target.effects.forcedCrit = true;
+  if (source.critRateToDamage > 0) target.effects.critRateToDamage = Math.max(target.effects.critRateToDamage || 0, source.critRateToDamage);
   for (const key of SKILL_EFFECT_KEYS) {
     const value = Number(source?.[key] || 0);
     if (!Number.isFinite(value) || Math.abs(value) < 0.0001) continue;
@@ -269,11 +282,6 @@ function mergeTripodEffects(target, source) {
 
 function hasConditionalWording(text) {
   return /(?:적중|공격|스킬|사용|유지|차지|홀딩|폭주|변신|스탠스|게이지|생명력)[^.!?]{0,28}(?:시|동안|경우)|(?:이상|이하)일?\s*때|피격이상\s*면역|백어택|헤드어택|보스\s*등급|조건/gi.test(text);
-}
-
-function hasGuaranteedCritWording(text, effects) {
-  return Number(effects?.critRate || 0) >= 99.99
-    || /항상\s*치명타|확정\s*치명|치명타로\s*적중/gi.test(text);
 }
 
 function hasTimedSpeedWording(text) {
@@ -371,10 +379,7 @@ function parseSelectedTripod(tripod) {
   const joinedText = texts.join(' ');
   const effects = emptyEffects();
   for (const text of texts) {
-    const parsed = parseOwnSkillEffectText(text);
-    for (const key of SKILL_EFFECT_KEYS) {
-      if (Math.abs(Number(parsed[key] || 0)) > Math.abs(Number(effects[key] || 0))) effects[key] = parsed[key];
-    }
+    mergeStrongestEffects(effects, parseOwnSkillEffectText(text));
   }
   // A tripod's "적에게 주는 피해" applies to that skill, not the character-wide
   // enemy-damage bucket. Keep the exported text parser generic, then normalize it
@@ -393,7 +398,7 @@ function parseSelectedTripod(tripod) {
     effects,
     timedSpeedBuff: hasTimedSpeedWording(joinedText) && Boolean(effects.attackSpeed || effects.moveSpeed),
     conditional: hasConditionalWording(joinedText),
-    guaranteedCrit: hasGuaranteedCritWording(joinedText, effects),
+    guaranteedCrit: Boolean(effects.forcedCrit),
     description: joinedText,
     cooldown: mergeCooldownRules(texts.map(parseCooldownRuleText).filter(rule => /재사용\s*대기시간|쿨타임|쿨다운/i.test(rule.text))),
     ignoredCooldown: texts.some(text => /재사용\s*대기시간|쿨타임|쿨다운/i.test(text))
@@ -407,6 +412,14 @@ export function extractCombatSkillEffects(skills) {
     const selectedTripods = (Array.isArray(skill?.Tripods) ? skill.Tripods : [])
       .filter(tripod => tripod?.IsSelected === true)
       .map(parseSelectedTripod);
+    // The API supplies total skill share, without the strike share for these two tripods.
+    for (const tripod of selectedTripods) {
+      if (!tripod.effects.critRateToDamage) continue;
+      if (!['철량추/지면 강타', '절룡세/급소 강타'].includes(`${skill.Name}/${tripod.name}`)) continue;
+      delete tripod.effects.forcedCrit;
+      delete tripod.effects.critRateToDamage;
+      tripod.partialCritRuleUnmodeled = true;
+    }
     result.selectedTripodCount += selectedTripods.length;
     result.conditionalTripodCount += selectedTripods.filter(tripod => tripod.conditional).length;
     result.cooldownTripodCount += selectedTripods.filter(tripod => tripod.ignoredCooldown).length;
@@ -471,7 +484,7 @@ export function extractCombatSkillEffects(skills) {
 export function skillExperimentItems(skillEffects) {
   return (Array.isArray(skillEffects?.items) ? skillEffects.items : [])
     .filter(item => Number(item?.level || 0) > 0)
-    .filter(item => (Array.isArray(item?.selectedTripods) && item.selectedTripods.length > 0) || hasSkillEffects(item?.effects));
+    .filter(item => item?.currentTree || (Array.isArray(item?.selectedTripods) && item.selectedTripods.length > 0) || hasSkillEffects(item?.effects));
 }
 
 export function minimumSkillEffectProfile(skillEffects) {
@@ -494,8 +507,10 @@ export function minimumSkillEffectProfile(skillEffects) {
 }
 
 export function formatSkillEffectSummary(effects) {
-  return SKILL_EFFECT_KEYS
+  const parts = SKILL_EFFECT_KEYS
     .filter(key => Math.abs(Number(effects?.[key] || 0)) > 0.0001)
-    .map(key => `${SKILL_EFFECT_LABELS[key]} ${Number(effects[key]) > 0 ? '+' : ''}${round2(effects[key])}%`)
-    .join(' / ');
+    .map(key => `${SKILL_EFFECT_LABELS[key]} ${Number(effects[key]) > 0 ? '+' : ''}${round2(effects[key])}%`);
+  if (effects?.forcedCrit) parts.push('항상 치명타');
+  if (effects?.critRateToDamage) parts.push(`치적 1%p당 피해 +${effects.critRateToDamage}%`);
+  return parts.join(' / ');
 }

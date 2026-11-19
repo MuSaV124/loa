@@ -1033,25 +1033,23 @@
       "maxLevel": 2,
       "costPerLevel": 15,
       "icon": "🗡️",
-      "description": "치명타 적중률은 최대 80%로 제한됩니다. 공격 시 80%를 초과한 치명타 적중률이 진화형 피해로 전환되며, 노드 전체 진화형 피해에는 레벨별 상한이 있습니다.",
+      "description": "치명타 적중률은 최대 80%이며 다중 치명타가 발생하지 않습니다. 80%를 초과한 치명타 적중률은 상한 없이 진화형 피해로 전환됩니다.",
       "levels": {
         "1": {
-          "evolutionDamage": 7.5,
+          "evolutionDamage": 9.5,
           "critCap": 80,
-          "overCritToEvolutionDamageRate": 1.25,
-          "overCritEvolutionDamageCap": 52.5
+          "overCritToEvolutionDamageRate": 1.2
         },
         "2": {
-          "evolutionDamage": 15,
+          "evolutionDamage": 19,
           "critCap": 80,
-          "overCritToEvolutionDamageRate": 1.5,
-          "overCritEvolutionDamageCap": 60
+          "overCritToEvolutionDamageRate": 1.4
         }
       },
       "iconImage": "/images/evolution/뭉툭한 가시.webp",
       "displayLevels": {
-        "1": "기본 진화형 피해 7.5% 증가. 초과 치명타 적중률의 125%를 진화형 피해로 전환하며, 전환 피해는 최대 52.5%·노드 전체는 최대 60%",
-        "2": "기본 진화형 피해 15% 증가. 초과 치명타 적중률의 150%를 진화형 피해로 전환하며, 전환 피해는 최대 60%·노드 전체는 최대 75%"
+        "1": "기본 진화형 피해 9.5% 증가. 초과 치명타 적중률의 120%를 상한 없이 진화형 피해로 전환",
+        "2": "기본 진화형 피해 19% 증가. 초과 치명타 적중률의 140%를 상한 없이 진화형 피해로 전환"
       }
     },
     {

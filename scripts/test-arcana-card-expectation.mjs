@@ -20,7 +20,7 @@ import {
 assert.equal(findArcanaCardExpectation({ className: '브레이커', secondClass: '권왕파천무' }), null);
 assert.equal(findArcanaCardExpectation({ className: '아르카나', secondClass: '황제의 칙령' })?.key, 'emperor');
 assert.equal(findArcanaCardExpectation({ CharacterClassName: '아르카나', Title: '황후의 은총' })?.key, 'empress');
-assert.equal(ARCANA_CULL_EFFECT.critRate, 100);
+assert.equal(ARCANA_CULL_EFFECT.critRate, 20);
 assert.equal(ARCANA_CULL_EFFECT.critDamage, 50);
 assert.equal(ARCANA_CULL_EFFECT.durationSeconds, 4);
 assert.equal(ARCANA_CHANCELLOR_EFFECT.critRate, 20);

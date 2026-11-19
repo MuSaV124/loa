@@ -1,19 +1,21 @@
-import { calculateBluntSpike, calculatePracticalRecommendationScore, calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=5.15.14';
+import { calculateSonicBreakEvolutionDamage, shiftClickTargetLevel } from './evolution-math.js?v=20261118';
+import { BASE_CRIT_DAMAGE, CRIT_RATE_PER_STAT, NOVEMBER_2026_PATCH_URL, expectedHitDamage, multiplyPercentSources } from './damage-math.js?v=20261118';
 import { emptyCardEffects } from './card-effects.js?v=5.15.14';
 import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=5.15.14';
 import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=5.15.14';
-import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=5.15.14';
-import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=5.15.14';
+import { emptySkillEffectState, formatSkillEffectSummary, skillExperimentItems } from './skill-effects.js?v=20261118';
+import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=20261118';
 import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=5.15.14';
 import { combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=5.15.14';
-import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency } from './skill-cycle.js?v=5.15.14';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=5.15.14';
-import { ADRENALINE_ENGRAVING_NAME, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=5.15.14';
+import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency, normalizeSkillCycleName } from './skill-cycle.js?v=20261118';
+import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=20261118';
+import { ADRENALINE_ENGRAVING_NAME, KEEN_BLUNT_NAME, KEEN_BLUNT_DAMAGE_FACTOR, RELIC_ENGRAVING_RULES, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=20261118';
 import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=5.15.14';
 import { allocateOwnedMaterials, buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey, upperAncientRefineBookName, upperAncientRefineBookRateBonusPercent } from './spec-planner.js?v=5.15.14';
-import { ARMGUARD_BREATH_ESTIMATE, ARMGUARD_HONING_INFO, NORMAL_HONING_PITY_RULES, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardLimitBreaksBetween, armguardPityProbability } from './armguard-honing.js?v=5.15.14';
+import { ARMGUARD_BREATH_ESTIMATE, ARMGUARD_HONING_INFO, armguardBreathMaxCombined, armguardBreathMixesForMode, armguardHoningRowForCurrentStage, armguardHoningRowsBetween, armguardLimitBreaksBetween } from './armguard-honing.js?v=20261119';
+import { normalHoningAttemptRatePercent, normalHoningOutcome } from './honing-probability.js';
 import { estimateArmguardCombatPower } from './armguard-power.js?v=5.15.14';
-import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=5.15.14';
+import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=20261118';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
   MARKET_REFRESH_COOLDOWN_MS,
@@ -24,7 +26,7 @@ import {
   remainingCooldownMs
 } from './cache-policy.js?v=5.15.14';
 
-const VERSION = '5.15.14';
+const VERSION = '5.16.0';
 const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
 const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
@@ -110,7 +112,7 @@ function recalculateSelectedSettings() {
 }
 
 function isGuaranteedCritSkill(item) {
-  return Boolean(item?.guaranteedCrit) || Number(item?.effects?.critRate || 0) >= 99.99;
+  return Boolean(item?.effects?.forcedCrit || item?.guaranteedCrit);
 }
 
 function isConditionalSkill(item) {
@@ -152,7 +154,7 @@ function renderArcanaIdentityNote() {
   const emperorText = model.key === 'emperor'
     ? ' 재상 치적 +20%·제후 일반 스킬 피해 +50%는 일반 스킬에만 적용하며, 도태와 겹치는 상태까지 기대값으로 계산합니다.'
     : '';
-  note.innerHTML = `<b>아르카나 카드·스킬 기대값 적용</b><span>${escapeHtml(formatArcanaCardExpectation(model))}. ${escapeHtml(combatText)}${escapeHtml(streamText)} 도태의 치적 +100%·치피 +50%를 기대 가동률로 계산합니다.${escapeHtml(emperorText)} 카드 직접 피해는 전투분석 딜 지분을 유지합니다.</span><small>확률/가동률은 슬래시 앞뒤 순서입니다. 카드 보유·사용 타이밍과 보스 기믹에 따라 실제 DPS는 달라질 수 있습니다.</small>`;
+  note.innerHTML = `<b>아르카나 카드·스킬 기대값 적용</b><span>${escapeHtml(formatArcanaCardExpectation(model))}. ${escapeHtml(combatText)}${escapeHtml(streamText)} 도태의 치적 +${ARCANA_CULL_EFFECT.critRate}%·치피 +${ARCANA_CULL_EFFECT.critDamage}%를 기대 가동률로 계산합니다.${escapeHtml(emperorText)} 카드 직접 피해는 전투분석 딜 지분을 유지합니다.</span><small>확률/가동률은 슬래시 앞뒤 순서입니다. 카드 보유·사용 타이밍과 보스 기믹에 따라 실제 DPS는 달라질 수 있습니다.</small>`;
 }
 
 function renderSkillEffectControl() {
@@ -383,10 +385,6 @@ const T4_NORMAL_HONING_BASE_RATES = {
   23: 0.5,
   24: 0.5
 };
-const T4_NORMAL_HONING_FAIL_BONUS_RATE = NORMAL_HONING_PITY_RULES.failBonusRate;
-const T4_NORMAL_HONING_MAX_RATE_MULTIPLIER = NORMAL_HONING_PITY_RULES.maxRateMultiplier;
-const T4_NORMAL_HONING_ARTISAN_FACTOR = NORMAL_HONING_PITY_RULES.artisanFactor;
-const T4_NORMAL_HONING_ARTISAN_LIMIT = NORMAL_HONING_PITY_RULES.artisanLimit;
 const T4_NORMAL_HONING_BOOK_BONUS_MULTIPLIER = 1;
 const T4_NORMAL_HONING_FULL_BREATH_BONUS_MULTIPLIER = 1;
 const T4_NORMAL_REFINE_ATTEMPT_COSTS = {
@@ -579,7 +577,7 @@ function applyProfileDefaults(profile, selection = state.selected) {
   $('baseCritStat').value = Math.round(baseCritStat);
   $('baseSwiftStat').value = Math.round(baseSwiftStat);
 }
-function critRateFromStat(critStat) { return Number(critStat || 0) * 0.03579; }
+function critRateFromStat(critStat) { return Number(critStat || 0) * CRIT_RATE_PER_STAT; }
 function speedFromSwift(swiftStat) { return Number(swiftStat || 0) / 58.21; }
 function buildIndex(db) {
   const map = new Map();
@@ -1359,45 +1357,10 @@ function normalHoningBaseRatePercent(next) {
   const rate = Number(T4_NORMAL_HONING_BASE_RATES[from] || 0);
   return Number.isFinite(rate) && rate > 0 ? rate : 0;
 }
-function normalHoningAttemptRatePercent(ratePercent, attempt, supportRatePercent = 0) {
-  const base = Number(ratePercent || 0);
-  const support = Number(supportRatePercent || 0);
-  const turn = Math.max(1, Math.floor(Number(attempt || 1)));
-  if (!Number.isFinite(base) || base <= 0) return 0;
-  const bonus = base * T4_NORMAL_HONING_FAIL_BONUS_RATE * (turn - 1);
-  return Math.min(base * T4_NORMAL_HONING_MAX_RATE_MULTIPLIER, base + bonus) + (Number.isFinite(support) && support > 0 ? support : 0);
-}
-function normalHoningArtisanGainPercent(attemptRatePercent) {
-  const gain = Number(attemptRatePercent || 0) * T4_NORMAL_HONING_ARTISAN_FACTOR;
-  return Number.isFinite(gain) && gain > 0 ? gain : 0;
-}
-function normalHoningPityAttempts(ratePercent, supportRatePercent = 0) {
-  if (!Number.isFinite(Number(ratePercent)) || Number(ratePercent) <= 0) return 0;
-  let artisan = 0;
-  for (let attempt = 1; attempt < 10000; attempt += 1) {
-    artisan += normalHoningArtisanGainPercent(normalHoningAttemptRatePercent(ratePercent, attempt, supportRatePercent));
-    if (artisan >= T4_NORMAL_HONING_ARTISAN_LIMIT) return attempt + 1;
-  }
-  return 0;
-}
 function buildNormalHoningRateSchedule(ratePercent, pityAttempts, supportRatePercent = 0) {
   const cap = Math.floor(Number(pityAttempts || 0));
   if (!cap) return [];
   return Array.from({ length: cap }, (_, index) => round2(normalHoningAttemptRatePercent(ratePercent, index + 1, supportRatePercent)));
-}
-function expectedAttemptsWithPity(ratePercent, pityAttempts, supportRatePercent = 0) {
-  const cap = Math.floor(Number(pityAttempts || 0));
-  if (!Number.isFinite(cap) || cap <= 0) return 0;
-  let expected = 0;
-  let survive = 1;
-  for (let attempt = 1; attempt <= cap; attempt += 1) {
-    expected += survive;
-    if (attempt === cap) break;
-    const p = normalHoningAttemptRatePercent(ratePercent, attempt, supportRatePercent) / 100;
-    if (!Number.isFinite(p) || p <= 0) return 0;
-    survive *= Math.max(0, 1 - p);
-  }
-  return expected;
 }
 function normalHoningOptionalNames(materials) {
   const names = Object.keys(materials || {});
@@ -1444,14 +1407,14 @@ function describeNormalHoningStrategy(strategy) {
 function calculateNormalHoningAttemptStats(next, strategy = {}) {
   const ratePercent = normalHoningBaseRatePercent(next);
   const supportRatePercent = normalHoningSupportRatePercent(ratePercent, strategy);
-  const pityAttempts = normalHoningPityAttempts(ratePercent, supportRatePercent);
-  const expectedAttempts = expectedAttemptsWithPity(ratePercent, pityAttempts, supportRatePercent);
+  const { pityAttempts, expectedAttempts, pityProbability } = normalHoningOutcome(ratePercent, supportRatePercent);
   const rateSchedule = buildNormalHoningRateSchedule(ratePercent, Math.min(pityAttempts, 11), supportRatePercent);
   return {
     ratePercent,
     supportRatePercent,
     pityAttempts,
     expectedAttempts,
+    pityProbability,
     maxRatePercent: normalHoningAttemptRatePercent(ratePercent, 11, supportRatePercent),
     rateSchedule,
     basis: ratePercent > 0 ? 'support-optimized-fail-bonus-with-artisan' : 'missing-base-rate'
@@ -1535,7 +1498,7 @@ function calculateArmguardRangeExpectedCost(fromStage, toStage, priceMap, breath
     const selected = candidates[0];
     const baseline = candidates.find(candidate => candidate.breathCount === 0) || selected;
     const stats = selected.stats;
-    const pityProbability = armguardPityProbability(row.ratePercent, stats.supportRatePercent);
+    const { pityProbability } = stats;
     expectedAttempts += stats.expectedAttempts;
     pityAttempts += stats.pityAttempts;
     expectedPityCount += pityProbability;
@@ -3638,15 +3601,6 @@ function collectItemDamageSources(group, key, groupLabel) {
   if (!usedItem && Number(group?.[key] || 0)) pushDamageSource(list, groupLabel, group[key]);
   return list;
 }
-function multiplyPercentSources(sources) {
-  let multiplier = 1;
-  for (const src of sources || []) {
-    const v = typeof src === 'number' ? src : Number(src?.value || 0);
-    if (!Number.isFinite(v)) continue;
-    multiplier *= (1 + v / 100);
-  }
-  return multiplier;
-}
 function effectivePercentFromSources(sources) {
   return (multiplyPercentSources(sources) - 1) * 100;
 }
@@ -3699,7 +3653,13 @@ function getBaseStats(selection = state.selected) {
     const moveSpeedRatio = Math.max(0, Math.min((moveSpeed - 100) / 40, 1));
     replacementEffects.conditionalDamage = Math.round(num(replacementEffects.conditionalDamage) * moveSpeedRatio * 100) / 100;
   }
-  const engravingDamageMultiplier = !engravingSimulation.adrenalineEnabled && engravingSimulation.replacementName === '예리한 둔기' ? 0.98 : 1;
+  const keenBook = engravingItemByName(KEEN_BLUNT_NAME);
+  const replacesKeen = engravingSimulation.replacementName === KEEN_BLUNT_NAME;
+  const simulatedKeen = replacesKeen && !engravingSimulation.adrenalineEnabled
+    && (state.engraving?.adrenaline?.adopted || engravingSimulation.originalReplacement);
+  const keenBluntBookCritDamage = simulatedKeen ? num(replacementEffects.critDamage)
+    : replacesKeen && engravingSimulation.adrenalineEnabled ? 0 : num(keenBook?.effects?.critDamage);
+  const engravingDamageMultiplier = keenBluntBookCritDamage > 0 ? KEEN_BLUNT_DAMAGE_FACTOR : 1;
   let dynamicEnlightenmentCritRate = 0;
   let dynamicEnlightenmentCritDamage = 0;
   for (const item of state.enlightenment.items || []) {
@@ -3746,7 +3706,7 @@ function getBaseStats(selection = state.selected) {
     swiftStat,
     statCritRate,
     critRate: statCritRate + num(state.accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.arkGrid.critRate) + num(engravingEffects.critRate) + num(state.abilityStone?.effects?.critRate) + num(skillBuffEffects.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate + num(state.card?.buckets?.critRate),
-    critDamage: 200 + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.arkGrid.critDamage) + num(engravingEffects.critDamage) + num(state.abilityStone?.effects?.critDamage) + num(skillBuffEffects.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage + num(state.card?.buckets?.critDamage),
+    critDamage: BASE_CRIT_DAMAGE + num(state.accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.arkGrid.critDamage) + num(engravingEffects.critDamage) + num(state.abilityStone?.effects?.critDamage) + num(skillBuffEffects.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage + num(state.card?.buckets?.critDamage),
     critHitDamage: num(state.accessory.critHitDamage) + num(state.bracelet.critHitDamage) + num(state.enlightenment.critHitDamage) + num(engravingEffects.critHitDamage) + num(state.abilityStone?.effects?.critHitDamage) + num(skillBuffEffects.critHitDamage),
     critHitDamageSources,
     evolutionDamage: num(state.enlightenment.evolutionDamage) + extraEvolutionDamage,
@@ -3766,6 +3726,7 @@ function getBaseStats(selection = state.selected) {
     adrenalineAttackPower: num(adrenalineEffect.attackPower),
     attackPower: num(adrenalineEffect.attackPower) + num(state.abilityStone?.attackPower) + num(state.abilityStone?.effects?.attackPower) + num(engravingEffects.attackPower) + num(skillBuffEffects.attackPower),
     engravingDamageMultiplier,
+    keenBluntBookCritDamage,
     engravingEffects,
     replacementEngraving: engravingSimulation.adrenalineEnabled ? null : { name: engravingSimulation.replacementName, level: engravingSimulation.replacementBookLevel, effects: replacementEffects },
     swiftSpeedBonus,
@@ -3843,37 +3804,11 @@ function selectionWithoutTiers(selection = state.selected, tiers = [4, 5]) {
   }
   return next;
 }
-function scoreCore(stats) {
-  // Lost Ark damage buckets: same bucket effects are additive first, then each bucket is multiplied.
-  // Expected value = crit EV × 진화형피해 × 추가피해 × 적에게주는피해 × 속성피해 × 공격력증가.
-  // 속성 피해는 카드 세트가 공격 속성을 변환했을 때만 붙으며 다른 버킷과 독립이다.
-  const rawCritRate = stats.critRate + stats.skillCritBonus + (stats.adrenalineCritRate || 0);
-  let effectiveCritRate = rawCritRate;
-  let evo = stats.evolutionDamage;
-  let overCrit = 0;
-  let convertedEvolutionDamage = 0;
-  if (stats.critCap != null) {
-    const bluntSpike = calculateBluntSpike(rawCritRate, stats);
-    overCrit = bluntSpike.overCrit;
-    convertedEvolutionDamage = bluntSpike.convertedEvolutionDamage;
-    effectiveCritRate = bluntSpike.effectiveCritRate;
-    evo += convertedEvolutionDamage;
-  }
-  const critChance = Math.max(0, Math.min(effectiveCritRate, 100)) / 100;
+function scoreCore(stats, cooldownContext = null) {
+  const hit = expectedHitDamage(stats);
   const critHitSources = safePercentSources(stats.critHitDamageSources, stats.critHitDamage, '치명타 적중 주피');
-  const critHitMultiplier = multiplyPercentSources(critHitSources);
-  const critMultiplier = (1 - critChance) + critChance * (stats.critDamage / 100) * critHitMultiplier;
-  const evoMultiplier = 1 + evo / 100;
-  const addMultiplier = 1 + stats.additionalDamage / 100;
-  const enemyMultiplier = stats.enemyDamageSources?.length ? multiplyPercentSources(stats.enemyDamageSources) : (1 + (stats.enemyDamage || 0) / 100);
-  const effectiveEnemyDamage = (enemyMultiplier - 1) * 100;
-  const effectiveCritHitDamage = (critHitMultiplier - 1) * 100;
   const displayEnemyDamage = additivePercentFromSources(stats.enemyDamageSources);
   const displayCritHitDamage = additivePercentFromSources(critHitSources);
-  const attributeMultiplier = 1 + (stats.attributeDamage || 0) / 100;
-  const attackMultiplier = 1 + (stats.attackPower || 0) / 100;
-  const skillDamageMultiplier = 1 + (stats.skillDamage || 0) / 100;
-  const engravingDamageMultiplier = Number(stats.engravingDamageMultiplier || 1);
   // v4.8.8: 쿨감의 이론 DPS 증가분을 사용자가 입력한 '주력기 딜 지분'만큼 반영.
   // 쿨감 효과 제외 체크 시 끝마/무마/최적화 훈련 등 모든 cooldownReduction은 점수에서 0으로 처리.
   const cooldownExcluded = isCooldownExcluded();
@@ -3881,37 +3816,40 @@ function scoreCore(stats) {
   const manaSkillCooldownReduction = cooldownExcluded ? 0 : Math.max(0, Math.min(Number(stats.manaSkillCooldownReduction || 0), 95));
   const cooldownReduction = Math.max(0, Math.min(generalCooldownReduction + manaSkillCooldownReduction, 95));
   const mainSkillDamageSharePct = cooldownExcluded ? 0 : Math.max(0, Math.min(Number($('mainSkillDamageShare')?.value ?? 60), 100));
-  const cooldownEvaluation = cooldownExcluded
+  const cooldownEvaluation = cooldownContext?.evaluation ?? (cooldownExcluded
     ? { multiplier: 1, affectedSharePercent: 0, modeled: Boolean(state.skillCycle?.items?.length) }
     : evaluateEvolutionCooldown(state.skillCycle, generalCooldownReduction, {
       fallbackSharePercent: mainSkillDamageSharePct,
       manaSkillReduction: manaSkillCooldownReduction
-    });
+    }));
   const cooldownRatio = cooldownEvaluation.affectedSharePercent / 100;
-  const cooldownMultiplier = cooldownEvaluation.multiplier;
-  const value = critMultiplier * evoMultiplier * addMultiplier * enemyMultiplier * attributeMultiplier * attackMultiplier * skillDamageMultiplier * engravingDamageMultiplier * cooldownMultiplier;
-  return { value, attributeDamage: stats.attributeDamage || 0, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, cooldownModeled: cooldownEvaluation.modeled, skillDamageMultiplier, engravingDamageMultiplier, rawCritRate, critRate: rawCritRate, effectiveCritRate, critDamage: stats.critDamage, critHitDamage: effectiveCritHitDamage, displayCritHitDamage, evo, baseEvo: stats.evolutionDamage, convertedEvolutionDamage, overCrit, additionalDamage: stats.additionalDamage, enemyDamage: effectiveEnemyDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, skillDamage: stats.skillDamage || 0, sonicBreakEvolutionDamage: stats.sonicBreakEvolutionDamage || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
+  const ratios = cooldownEvaluation.ratiosByShareName;
+  const cooldownMultiplier = cooldownContext?.shareName && ratios
+    ? ratios.get(normalizeSkillCycleName(cooldownContext.shareName)) ?? 1
+    : cooldownEvaluation.multiplier;
+  const value = hit.value * cooldownMultiplier;
+  return { ...hit, value: Number.isFinite(value) ? value : 0, cooldownEvaluation, attributeDamage: stats.attributeDamage || 0, cooldownReduction, cooldownRatio: cooldownRatio * 100, cooldownMultiplier, cooldownModeled: cooldownEvaluation.modeled, critRate: hit.rawCritRate, critDamage: stats.critDamage, displayCritHitDamage, baseEvo: stats.evolutionDamage, additionalDamage: stats.additionalDamage, displayEnemyDamage, attackPower: stats.attackPower || 0, skillDamage: stats.skillDamage || 0, sonicBreakEvolutionDamage: stats.sonicBreakEvolutionDamage || 0, moveAttackSpeed: stats.moveAttackSpeed || 0, attackSpeed: stats.attackSpeed || stats.moveAttackSpeed || 0, moveSpeed: stats.moveSpeed || stats.moveAttackSpeed || 0 };
 }
 
-function scoreCoreWithArcanaExpectation(stats, { emperorNormalSkill = false } = {}) {
-  const normal = scoreCore(stats);
+function scoreCoreWithArcanaExpectation(stats, { emperorNormalSkill = false, cooldownContext = null, normal = scoreCore(stats, cooldownContext) } = {}) {
   const model = currentArcanaCardExpectation(normal.cooldownReduction);
   if (!model || !normal.value) return normal;
 
   const cullStats = cloneBaseStats(stats);
   cullStats.skillCritBonus = num(cullStats.skillCritBonus) + ARCANA_CULL_EFFECT.critRate;
   cullStats.critDamage = num(cullStats.critDamage) + ARCANA_CULL_EFFECT.critDamage;
-  const cull = scoreCore(cullStats);
+  const cardCooldown = { ...cooldownContext, evaluation: normal.cooldownEvaluation };
+  const cull = scoreCore(cullStats, cardCooldown);
   let chancellor = null;
   let cullChancellor = null;
   let value = weightedArcanaCardValue(normal.value, cull.value, model);
   if (model.key === 'emperor' && emperorNormalSkill) {
     const chancellorStats = cloneBaseStats(stats);
     chancellorStats.skillCritBonus = num(chancellorStats.skillCritBonus) + ARCANA_CHANCELLOR_EFFECT.critRate;
-    chancellor = scoreCore(chancellorStats);
+    chancellor = scoreCore(chancellorStats, cardCooldown);
     const cullChancellorStats = cloneBaseStats(cullStats);
     cullChancellorStats.skillCritBonus = num(cullChancellorStats.skillCritBonus) + ARCANA_CHANCELLOR_EFFECT.critRate;
-    cullChancellor = scoreCore(cullChancellorStats);
+    cullChancellor = scoreCore(cullChancellorStats, cardCooldown);
     value = weightedEmperorNormalSkillCardValue(normal.value, cull.value, chancellor.value, cullChancellor.value, model);
   }
   const combat = arcanaCombatExpectation(model);
@@ -3956,8 +3894,9 @@ function applyExperimentalSkillEffects(stats, item) {
   if (item?.usesMana && num(out.manaSkillEvolutionDamage) > 0) {
     out.evolutionDamage += num(out.manaSkillEvolutionDamage);
   }
-  // 확정 치명 트라이포드의 +100%도 원시 치적에 포함해 뭉툭한 가시 초과 치적 전환에 사용한다.
   out.skillCritBonus = num(out.skillCritBonus) + num(effects.critRate);
+  out.forcedCrit = Boolean(effects.forcedCrit);
+  out.critRateToDamage = num(effects.critRateToDamage);
   out.critDamage += num(effects.critDamage);
   if (effects.critHitDamage) {
     out.critHitDamage += num(effects.critHitDamage);
@@ -3969,7 +3908,7 @@ function applyExperimentalSkillEffects(stats, item) {
     out.enemyDamage = effectivePercentFromSources(out.enemyDamageSources);
   }
   out.attackPower += num(effects.attackPower);
-  out.skillDamage = num(out.skillDamage) + num(effects.skillDamage);
+  out.skillDamage = effectivePercentFromSources([out.skillDamage, effects.skillDamage]);
   out.attackSpeed += num(effects.attackSpeed);
   out.moveSpeed += num(effects.moveSpeed);
   out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed);
@@ -4069,15 +4008,18 @@ function score(stats) {
     const emperorNormalSkill = arcanaModel?.key === 'emperor' && normalizedSkillName(unit.category) === normalizedSkillName('일반 스킬');
     const usesMana = !isNoManaMainSkillEnabled() && unit.item?.usesMana === true;
     const skillStats = applyExperimentalSkillEffects(stats, { name: unit.name, effects, usesMana });
-    const resultWithoutArcana = scoreCore(skillStats);
-    const result = scoreCoreWithArcanaExpectation(skillStats, { emperorNormalSkill });
+    const cooldownContext = { evaluation: baseResult.cooldownEvaluation, shareName: unit.shareName };
+    const resultWithoutArcana = scoreCore(skillStats, cooldownContext);
+    const result = scoreCoreWithArcanaExpectation(skillStats, { emperorNormalSkill, cooldownContext, normal: resultWithoutArcana });
     return {
       name: unit.name,
       shareName: unit.shareName,
       level: Number(unit.item?.level || 0),
       share: unit.weight,
       conditional: isConditionalSkill(unit.item) || [...passive.rules, ...arkGrid.rules].some(rule => rule.scope === 'state') || streamApplies || emperorNormalSkill,
-      guaranteedCrit: isGuaranteedCritSkill(unit.item) || Number(effects.critRate || 0) >= 99.99,
+      guaranteedCrit: Boolean(effects.forcedCrit) || isGuaranteedCritSkill(unit.item),
+      partialCritRuleUnmodeled: unit.item?.selectedTripods?.some(tripod => tripod.partialCritRuleUnmodeled),
+      critInteractionUnverified: Boolean(effects.forcedCrit && stats.critCap != null),
       summary: formatSkillEffectSummary(effects) || '수치 효과 없음',
       effects,
       passiveRules: [...passive.rules, ...arkGrid.rules],
@@ -4094,7 +4036,7 @@ function score(stats) {
   });
   const modeledWeight = Math.min(1, rows.reduce((sum, row) => sum + Number(row.share || 0), 0));
   const weightedMultiplier = (1 - modeledWeight) + rows.reduce((sum, row) => sum + Number(row.share || 0) * (row.value / baseResult.value), 0);
-  const appliedRows = rows.filter(row => hasNumericSkillEffects(row.effects) || row.result?.arcanaCardExpectation?.emperorNormalSkill);
+  const appliedRows = rows.filter(row => hasNumericSkillEffects(row.effects) || row.value !== baseResult.value);
   if (!appliedRows.length) {
     return {
       ...baseResult,
@@ -4109,7 +4051,7 @@ function score(stats) {
   const critDamageAnchor = [...referenceRows].sort((a, b) => Number(b.critDamage || 0) - Number(a.critDamage || 0) || Number(b.share || 0) - Number(a.share || 0))[0];
   const weightedConvertedEvolutionDamage = rows.reduce((sum, row) => sum + Number(row.share || 0) * Number(row.convertedEvolutionDamage || 0), 0)
     + (1 - modeledWeight) * Number(baseResult.convertedEvolutionDamage || 0);
-  const baseWithoutArcana = scoreCore(stats);
+  const baseWithoutArcana = scoreCore(fallbackStats, { evaluation: baseResult.cooldownEvaluation });
   const weightedValue = baseResult.value * weightedMultiplier;
   const weightedValueWithoutArcana = (1 - modeledWeight) * baseWithoutArcana.value
     + rows.reduce((sum, row) => sum + Number(row.share || 0) * Number(row.valueWithoutArcana || 0), 0);
@@ -4120,6 +4062,7 @@ function score(stats) {
   return {
     ...baseResult,
     value: weightedValue,
+    critical: critRateAnchor?.result?.critical ?? baseResult.critical,
     rawCritRate: Number(critRateAnchor?.rawCritRate ?? baseResult.rawCritRate),
     critRate: Number(critRateAnchor?.rawCritRate ?? baseResult.critRate),
     effectiveCritRate: Number(critRateAnchor?.effectiveCritRate ?? baseResult.effectiveCritRate),
@@ -4308,7 +4251,7 @@ function buildSourceSummary(current) {
     if (eff.additionalDamage) addEvolution.push(sourceLine(label, eff.additionalDamage));
     if (eff.enemyDamage || eff.finalDamage) enemyEvolution.push(sourceLine(label, Number(eff.enemyDamage || 0) + Number(eff.finalDamage || 0)));
   }
-  if (current.result.convertedEvolutionDamage > 0) evoEvolution.push(sourceLine('[진화] 뭉가 전환', current.result.convertedEvolutionDamage, `80% 초과분 · Lv.2 전환 최대 60% / 총 뭉가 진피 75%`));
+  if (current.result.convertedEvolutionDamage > 0) evoEvolution.push(sourceLine('[진화] 뭉가 전환', current.result.convertedEvolutionDamage, '80% 초과분 · 전환 상한 없음'));
   const critLines = [sourceLine('치명 스탯', current.stats.statCritRate || 0, `치명 ${Math.round(current.stats.critStat || 0)}${getStatNodeLine('치명') ? ' · ' + getStatNodeLine('치명') : ''}`)];
   if (base.adrenalineCritRate) critLines.push(sourceLine('아드레날린', base.adrenalineCritRate));
   if (base.critSynergy) critLines.push(sourceLine('치적 시너지', base.critSynergy));
@@ -4428,7 +4371,8 @@ function buildSourceSummary(current) {
   }
   skillExperimentLines.push(...(skillExperiment.items || []).map(row => {
     const flags = [
-      row.guaranteedCrit ? '확정 치명' : '',
+      row.partialCritRuleUnmodeled ? '일부 타격의 치명 규칙 미검증' : row.guaranteedCrit ? '확정 치명' : '',
+      row.critInteractionUnverified ? '확정 치명과 뭉가 중첩 미검증' : '',
       row.conditional ? '조건 충족' : '',
       row.convertedEvolutionDamage > 0 ? `뭉가 전환 +${fmt(row.convertedEvolutionDamage)}%` : ''
     ].filter(Boolean);
@@ -4438,7 +4382,7 @@ function buildSourceSummary(current) {
 
   const engravingExpectedLines = [];
   if (base.engravingDamageMultiplier !== 1) {
-    engravingExpectedLines.push(sourceLine('예리한 둔기 평균 페널티', (base.engravingDamageMultiplier - 1) * 100, `피해 배율 ×${fmt(base.engravingDamageMultiplier)}`));
+    engravingExpectedLines.push(sourceLine('예리한 둔기 평균 페널티', (base.engravingDamageMultiplier - 1) * 100, `피해 배율 ×${fmt(base.engravingDamageMultiplier)} 가정 · 발동률 미검증`));
   }
   const arcanaExpectation = current.result.arcanaCardExpectation;
   const arcanaExpectationLines = arcanaExpectation ? [
@@ -4466,7 +4410,7 @@ function buildSourceSummary(current) {
     ${sourceGroup('이동 속도', 'cyan', moveSpeedLines, current.result.moveSpeed)}
     ${enlightenmentAppliedDetailHtml(base)}
     ${engravingAppliedDetailHtml()}
-    <div class="sourceFoot">UI와 노드 판단의 치적·치피는 실제 주력기에서 확인된 <b>각각의 최댓값</b>을 표시합니다. 적주피·치명타 적중 주피는 내부 기대값에서 출처별 곱연산으로 적용하며, 개별 스킬 전용 피해 효과와 전체 DPS는 전투 분석 딜 지분으로 합산합니다. 상태 조건은 충족 기준이며, 보유 자원 1당처럼 현재 수량을 알 수 없는 가변 효과는 임의 합산하지 않습니다. 공이속은 N초 동안/간 지속 문구가 있는 효과만 적용하고, 확정 치명의 치적 +100%는 해당 스킬의 뭉가 초과 치적 전환에만 사용합니다. 뭉가 Lv.2는 <b>기본 진피 15% + 초과 치적 전환 최대 60% = 총 75%</b> 기준입니다.</div>
+    <div class="sourceFoot">표시 치적·치피는 주력기의 각 최댓값입니다. 기대 피해는 스킬별 효과와 전투분석 또는 추정 딜 지분을 사용합니다. 조건 충족과 기존 버프·쿨감 가정을 포함한 레이드 모델이며, 스킬별 실측 검증은 미완료입니다. 뭉툭한 가시는 치적 80% 제한과 상한 없는 진화형 피해 전환을 적용합니다.</div>
   `;
   const reset = $('resetViewButton');
   if (reset) reset.addEventListener('click', () => { state.selected = JSON.parse(JSON.stringify(state.apiSelected || {})); renderEvolutionTiers(); setCalculationDirty(true); });
@@ -4477,10 +4421,15 @@ function renderCombatStats(current = statsWithSelection(state.selected)) {
 }
 
 function keenEfficiency(current, bonusCritDamage) {
-  const before = Number(current?.result?.value || 0);
-  const afterStats = cloneBaseStats(current?.stats || {});
-  afterStats.critDamage = Number(afterStats.critDamage || 200) + Number(bonusCritDamage || 0);
-  const after = Number(score(afterStats)?.value || 0) * 0.98;
+  const beforeStats = cloneBaseStats(current?.stats || {});
+  beforeStats.critDamage = num(beforeStats.critDamage, BASE_CRIT_DAMAGE) - num(beforeStats.keenBluntBookCritDamage);
+  beforeStats.engravingDamageMultiplier = 1;
+  const before = score(beforeStats).value;
+  const after = score({
+    ...beforeStats,
+    critDamage: beforeStats.critDamage + bonusCritDamage,
+    engravingDamageMultiplier: KEEN_BLUNT_DAMAGE_FACTOR
+  }).value;
   if (!before || !Number.isFinite(before) || !Number.isFinite(after)) return 0;
   return ((after / before) - 1) * 100;
 }
@@ -4488,15 +4437,15 @@ function renderKeenEfficiency(current) {
   const el = $('keenEfficiency');
   if (!el) return;
   const rows = [
-    { name: '전설 예둔', bonus: 44 },
-    { name: '유물 예둔', bonus: 52 }
+    { name: '전설 예둔', bonus: relicEngravingEffect(KEEN_BLUNT_NAME, 0).critDamage },
+    { name: '유물 예둔', bonus: relicEngravingEffect(KEEN_BLUNT_NAME, 4).critDamage }
   ].map(row => {
     const eff = keenEfficiency(current, row.bonus);
-    const recommend = eff >= 16;
-    return `<div class="keenCard ${recommend ? 'recommend' : 'normal'}">
-      <div><b>${row.name}</b><span>치명타 피해 +${row.bonus}% / 평균 페널티 0.98 적용</span></div>
+    const increase = eff >= 0;
+    return `<div class="keenCard ${increase ? 'recommend' : 'normal'}">
+      <div><b>${row.name}</b><span>치명타 피해 +${row.bonus}% / 평균 배율 ×${KEEN_BLUNT_DAMAGE_FACTOR} 가정</span></div>
       <strong>${eff.toFixed(2)}%</strong>
-      <em>${recommend ? '추천' : '비추천'}</em>
+      <em>${increase ? '증가' : '감소'}</em>
     </div>`;
   }).join('');
   const experimentItems = current?.result?.skillExperiment?.items || [];
@@ -4528,31 +4477,6 @@ function sameNameSet(a, b) {
   const aa = [...(a || [])].sort().join('|');
   const bb = [...(b || [])].sort().join('|');
   return aa === bb;
-}
-
-function tier5NameFromSelection(selection) {
-  return selectedEntries(selection || {}).find(row => Number(row.tier) === 5)?.name || '';
-}
-
-function practicalRecommendationFor(fiveName, calc, selection) {
-  return calculatePracticalRecommendationScore({
-    expectedValue: calc?.result?.value,
-    rawCritRate: calc?.result?.critRate,
-    fiveName,
-    selection,
-    singleHitMainSkill: Boolean($('singleHitMainSkill')?.checked),
-    manaShortageClass: Boolean($('manaShortageClass')?.checked),
-    noManaMainSkill: Boolean($('noManaMainSkill')?.checked)
-  });
-}
-
-function practicalAdjustmentParts(adjustment) {
-  const parts = [];
-  if (adjustment?.critLowPenalty > 0) parts.push(`치적 95% 미만 -${fmt(adjustment.critLowPenalty)}%`);
-  if (adjustment?.critOverPenalty > 0) parts.push(`유효 치적 상한 초과 -${fmt(adjustment.critOverPenalty)}%`);
-  if (adjustment?.singleHitPenalty > 0) parts.push(`단타 뭉가 -${fmt(adjustment.singleHitPenalty)}%`);
-  if (adjustment?.manaStabilityBonus > 0) parts.push(`마나 안정성 +${fmt(adjustment.manaStabilityBonus)}%`);
-  return parts;
 }
 
 function manaConditionNoteText(calc) {
@@ -4612,8 +4536,24 @@ function candidateTag(c) {
   return tags.join('');
 }
 function practicalNoteHtml(candidate) {
-  const parts = practicalAdjustmentParts(candidate);
-  return parts.length ? `<div class="practicalNote">${escapeHtml(parts.join(' · '))}</div>` : '';
+  if (candidate.supportModel) return '';
+  const result = candidate.calc.result;
+  const chance = result.critical?.critHitChance;
+  const notes = [];
+  if ($('singleHitMainSkill')?.checked && Number.isFinite(chance)) {
+    notes.push(`기준 스킬 비치명 확률 ${fmt((1 - chance) * 100)}%`);
+  }
+  if (result.skillExperiment?.items?.some(row => row.critInteractionUnverified || row.partialCritRuleUnmodeled)) {
+    notes.push('일부 스킬의 특수 치명 규칙 미검증');
+  }
+  return notes.length ? `<div class="practicalNote">${escapeHtml(notes.join(' · '))}</div>` : '';
+}
+
+function criticalOutcomeLabel(critical) {
+  const tiers = critical?.guaranteedTiers ?? 0;
+  if (tiers < 2) return `기준 스킬 다중 치명 ${fmt((critical?.multiCritChance ?? 0) * 100)}%`;
+  const next = critical.nextTierChance > 0 ? ` · ${tiers + 1}중 ${fmt(critical.nextTierChance * 100)}%` : '';
+  return `기준 스킬 ${tiers}중 확정${next}`;
 }
 function calculateAndRender() {
   const current = statsWithSelection(state.selected);
@@ -4623,7 +4563,7 @@ function calculateAndRender() {
   const recommendDescription = $('recommendDescription');
   if (recommendDescription) recommendDescription.textContent = supportMode
     ? '현재 공증 스킬 주기와 낙인·아이덴티티·파티 버프를 반영해 서포터 진화 노드를 비교합니다.'
-    : '공식 기대값과 치적 안정성·단타·마나 조건을 반영한 실전 추천값을 함께 비교합니다.';
+    : '1·3티어를 고정하고 2·4·5티어 후보를 레이드 기대 피해 추정치로 정렬합니다.';
   for (const id of ['singleHitMainSkill', 'noManaMainSkill', 'manaShortageClass']) {
     const label = $(id)?.closest('label');
     if (label) label.classList.toggle('hidden', supportMode);
@@ -4636,14 +4576,8 @@ function calculateAndRender() {
   const manaShortageClass = Boolean($('manaShortageClass')?.checked) && !noManaMainSkill;
   const apiSupportModel = supportMode ? supportContributionModel(state.powerSnapshot, { ...supportModelContext(), selection: apiSelection }) : null;
   const currentSupportModel = supportMode ? supportContributionModel(state.powerSnapshot, { ...supportModelContext(), selection: state.selected }) : null;
-  const apiAdjustment = supportMode
-    ? { value: Number(apiSupportModel?.totalBuffPower || 1), singleHitPenalty: 0, critOverPenalty: 0, critLowPenalty: 0, manaStabilityBonus: 0 }
-    : practicalRecommendationFor(tier5NameFromSelection(apiSelection), apiBase, apiSelection);
-  const currentAdjustment = supportMode
-    ? { value: Number(currentSupportModel?.totalBuffPower || 1), singleHitPenalty: 0, critOverPenalty: 0, critLowPenalty: 0, manaStabilityBonus: 0 }
-    : practicalRecommendationFor(tier5NameFromSelection(state.selected), current, state.selected);
-  const apiPracticalValue = Number(apiAdjustment.value);
-  const currentPracticalValue = Number(currentAdjustment.value);
+  const apiPracticalValue = supportMode ? Number(apiSupportModel?.totalBuffPower || 1) : apiBaseValue;
+  const currentPracticalValue = supportMode ? Number(currentSupportModel?.totalBuffPower || 1) : currentValue;
   const baseValue = apiPracticalValue > 0 ? apiPracticalValue : (apiBaseValue || currentPracticalValue || currentValue || 1);
   const currentDiff = ((currentPracticalValue / baseValue) - 1) * 100;
   const candidates = [];
@@ -4698,19 +4632,11 @@ function calculateAndRender() {
         next[fiveName] = { level: fiveLevel, source: 'candidate' };
         const calc = statsWithSelection(next);
         const supportModel = supportMode ? supportContributionModel(state.powerSnapshot, { ...supportModelContext(), selection: next }) : null;
-        const adjustment = supportMode
-          ? { value: Number(supportModel?.totalBuffPower || 1), singleHitPenalty: 0, critOverPenalty: 0, critLowPenalty: 0, manaStabilityBonus: 0 }
-          : practicalRecommendationFor(fiveName, calc, next);
-        const adjustedValue = Number(adjustment.value);
-        const recValue = Number.isFinite(adjustedValue) ? adjustedValue : Number(calc.result.value || 0);
+        const recValue = supportMode ? Number(supportModel?.totalBuffPower || 1) : calc.result.value;
+        if (!Number.isFinite(recValue) || recValue < 0) continue;
         candidates.push({
           tier2Entries, fourNames, fourLevel, fiveName, fiveLevel, calc, recValue,
-          expectedValue: supportMode ? Number(supportModel?.totalBuffPower || 1) : Number(calc.result.value || 0),
           supportModel,
-          singleHitPenalty: adjustment.singleHitPenalty,
-          critOverPenalty: adjustment.critOverPenalty,
-          critLowPenalty: adjustment.critLowPenalty,
-          manaStabilityBonus: adjustment.manaStabilityBonus,
           diff: ((recValue / baseValue) - 1) * 100
         });
       }
@@ -4721,23 +4647,21 @@ function calculateAndRender() {
   const currentDiffText = `${currentDiff >= 0 ? '+' : ''}${currentDiff.toFixed(2)}%`;
   const apiManaConditionNote = manaConditionNoteText(apiBase);
   const currentManaConditionNote = manaConditionNoteText(current);
-  const apiPracticalParts = [...practicalAdjustmentParts(apiAdjustment), ...(apiManaConditionNote ? [apiManaConditionNote] : [])];
-  const currentPracticalParts = [...practicalAdjustmentParts(currentAdjustment), ...(currentManaConditionNote ? [currentManaConditionNote] : [])];
   const apiPracticalLabel = supportMode
     ? `<small>공증 가동률 ${(Number(apiSupportModel?.detail?.overallAttackUptime || 0) * 100).toFixed(1)}%</small>`
-    : `<small>실전 ${apiAdjustment.value.toFixed(4)}${apiPracticalParts.length ? ` · ${escapeHtml(apiPracticalParts.join(' · '))}` : ''}</small>`;
+    : (apiManaConditionNote ? `<small>${escapeHtml(apiManaConditionNote)}</small>` : '');
   const currentPracticalLabel = supportMode
     ? `<small>공증 가동률 ${(Number(currentSupportModel?.detail?.overallAttackUptime || 0) * 100).toFixed(1)}%</small>`
-    : `<small>실전 ${currentAdjustment.value.toFixed(4)}${currentPracticalParts.length ? ` · ${escapeHtml(currentPracticalParts.join(' · '))}` : ''}</small>`;
+    : (currentManaConditionNote ? `<small>${escapeHtml(currentManaConditionNote)}</small>` : '');
   const apiScoreLabel = supportMode ? 'API 종합 기여' : 'API 기대값';
   const currentScoreLabel = supportMode ? '현재 종합 기여' : '현재 기대값';
-  const apiScoreValue = supportMode ? `${((apiAdjustment.value - 1) * 100).toFixed(2)}%` : apiBaseValue.toFixed(4);
-  const currentScoreValue = supportMode ? `${((currentAdjustment.value - 1) * 100).toFixed(2)}%` : currentValue.toFixed(4);
+  const apiScoreValue = supportMode ? `${((apiPracticalValue - 1) * 100).toFixed(2)}%` : apiBaseValue.toFixed(4);
+  const currentScoreValue = supportMode ? `${((currentPracticalValue - 1) * 100).toFixed(2)}%` : currentValue.toFixed(4);
   $('currentScore').innerHTML = `<div class="apiBaselineRow">
     <div><span>${apiScoreLabel}</span><b>${apiScoreValue}</b>${apiPracticalLabel}</div>
     <div><span>${currentScoreLabel}</span><b>${currentScoreValue}</b>${currentPracticalLabel}</div>
-    <div><span>${supportMode ? '파티 기여 API 대비' : '실전값 API 대비'}</span><b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>
-    <p>${supportMode ? '서포터는 현재 공증 스킬 주기·낙인·아이덴티티·진화 노드로 종합 파티 기여를 계산합니다.' : '기대값은 피해 공식만 계산하고, 실전 추천값은 치적 안정성·단타 주력기·마나 부족 설정을 별도 반영합니다.'}</p>
+    <div><span>${supportMode ? '파티 기여 API 대비' : '기대 피해 API 대비'}</span><b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>
+    <p>${supportMode ? `파티 기여 추정치 · 낙인 ${apiSupportModel?.detail?.brandUptimeModeled ? `단일 스킬 기준 ${fmt(apiSupportModel.detail.brandUptime * 100)}%` : '상시 적용 가정'}` : `<a href="${NOVEMBER_2026_PATCH_URL}" target="_blank" rel="noopener noreferrer">11월 18일 다중 치명타</a>를 반영한 레이드 추정치입니다. 스킬 지분, 버프 가동률과 조건부 효과에 따라 실제 피해는 달라질 수 있습니다.`}</p>
   </div>`;
   const apiManaDetail = apiManaConditionNote ? ` · ${escapeHtml(apiManaConditionNote)}` : '';
   $('baseInfo').innerHTML = supportMode
@@ -4758,8 +4682,8 @@ function calculateAndRender() {
         ${practicalNoteHtml(c)}
       </div>
       <div class="rowMetrics">
-        <div class="rowMetric"><span>${supportMode ? '종합 파티 기여' : '실전 추천값'}</span><b>${supportMode ? `${((c.recValue - 1) * 100).toFixed(2)}%` : c.recValue.toFixed(4)}</b><small>${supportMode ? `상시 ${Number(c.supportModel?.allTimePercent || 0).toFixed(2)}%` : `기대값 ${c.expectedValue.toFixed(4)}`}</small></div>
-        <div class="rowMetric"><span>${supportMode ? '파티 기여 API 대비' : '실전 API 대비'}</span><b class="${cls}">${pct(c.diff)}</b></div>
+        <div class="rowMetric"><span>${supportMode ? '종합 파티 기여' : '기대 피해 배율'}</span><b>${supportMode ? `${((c.recValue - 1) * 100).toFixed(2)}%` : c.recValue.toFixed(4)}</b><small>${supportMode ? `상시 ${Number(c.supportModel?.allTimePercent || 0).toFixed(2)}%` : criticalOutcomeLabel(c.calc.result.critical)}</small></div>
+        <div class="rowMetric"><span>${supportMode ? '파티 기여 API 대비' : '기대 피해 API 대비'}</span><b class="${cls}">${pct(c.diff)}</b></div>
         <div class="rowMetric"><span>${supportMode ? '공증 가동률' : '치적'}</span><b>${supportMode ? `${(Number(c.supportModel?.detail?.overallAttackUptime || 0) * 100).toFixed(1)}%` : `${fmt(c.calc.result.critRate)}%`}</b></div>
       </div>
     </article>`;
@@ -4769,7 +4693,7 @@ function calculateAndRender() {
 }
 
 async function loadDb() {
-  state.evolution = await fetch('/data/evolution.json').then(r => r.json());
+  state.evolution = await fetch('/data/evolution.json?v=20261118').then(r => r.json());
   state.index = buildIndex(state.evolution);
   state.selected = defaultSelection();
   state.apiSelected = JSON.parse(JSON.stringify(state.selected));

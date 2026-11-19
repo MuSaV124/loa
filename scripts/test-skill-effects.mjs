@@ -85,7 +85,7 @@ const guaranteed = extractCombatSkillEffects([{
     Tooltip: '피격이상 면역인 적에게 공격 적중 시 치명타 적중률이 100% 증가하며 치명타 피해가 60% 증가한다.'
   }]
 }]);
-assert.equal(guaranteed.calculableItems[0].guaranteedCrit, true);
+assert.equal(guaranteed.calculableItems[0].guaranteedCrit, false, '수치형 치적 +100%는 항상 치명타 문구와 구분해야 한다.');
 assert.equal(guaranteed.calculableItems[0].conditional, true);
 assert.equal(guaranteed.conditionalTripodCount, 1);
 assert.equal(skillExperimentItems(guaranteed).length, 1);

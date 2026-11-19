@@ -606,6 +606,7 @@ function conditionalOpportunityMap(model, passiveReduction, options = {}) {
 
 function compareOpportunityMaps(model, before, after) {
   let affectedShare = 0;
+  const ratiosByShareName = new Map();
   const multiplier = (model?.shareRows || []).reduce((factor, shareRow) => {
     const key = normalizeSkillCycleName(shareRow?.name);
     const targetNames = Array.isArray(shareRow?.targetNames) ? shareRow.targetNames : [];
@@ -621,9 +622,10 @@ function compareOpportunityMaps(model, before, after) {
       if (beforeVirtual > 0 && afterVirtual > 0) ratio = afterVirtual / beforeVirtual;
     }
     if (Math.abs(ratio - 1) > 0.000001) affectedShare += number(shareRow.normalizedShare);
+    ratiosByShareName.set(key, ratio);
     return factor + number(shareRow.normalizedShare) * (ratio - 1);
   }, 1);
-  return { multiplier, affectedSharePercent: round3(affectedShare * 100) };
+  return { multiplier, affectedSharePercent: round3(affectedShare * 100), ratiosByShareName };
 }
 
 function evaluateGemCooldown(model) {
@@ -660,6 +662,7 @@ export function evaluateEvolutionCooldown(model, passiveReduction, { fallbackSha
   return {
     multiplier: comparison.multiplier,
     affectedSharePercent: comparison.affectedSharePercent,
+    ratiosByShareName: comparison.ratiosByShareName,
     modeled: true,
     cycleLinkCount: number(model.appliedCycleLinkCount)
   };

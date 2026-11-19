@@ -1,7 +1,7 @@
 const ARCANA_CLASS_NAME = '아르카나';
 
 export const ARCANA_CULL_EFFECT = Object.freeze({
-  critRate: 100,
+  critRate: 20, // 2026-11-18 공식 패치 (공지 13598).
   critDamage: 50,
   durationSeconds: 4
 });

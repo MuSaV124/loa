@@ -1,4 +1,5 @@
 import { buildSkillCycleModel, findSkillCycleItem, skillCooldownSeconds } from './skill-cycle.js';
+import { collectSkillTooltipTexts } from './skill-effects.js?v=20261118';
 
 const SUPPORT_SPECS = new Set(['절실한 구원', '만개', '축복의 오라', '해방자', '빛의 수호자']);
 const DEALER_SPECS = new Set(['진실된 용맹', '회귀', '심판자', '빛의 기사']);
@@ -17,15 +18,15 @@ const SUPPORT_SKILLS = {
     cooldownA: 30,
     cooldownB: 24,
     durationA: 8,
-    durationB: 5
+    durationB: 6
   },
   홀리나이트: {
     attackA: ['신의 분노'],
     attackB: ['천상의 축복'],
     identity: ['신앙 스킬'],
     care: ['신성한 보호', '빛의 광시곡'],
-    cooldownA: 27,
-    cooldownB: 35,
+    cooldownA: 30,
+    cooldownB: 30,
     durationA: 8,
     durationB: 8
   },
@@ -44,8 +45,8 @@ const SUPPORT_SKILLS = {
     attackB: ['숭고한 도약'],
     identity: ['신앙 스킬'],
     care: ['구원의 은총', '구원의 터'],
-    cooldownA: 27,
-    cooldownB: 36,
+    cooldownA: 30,
+    cooldownB: 30,
     durationA: 8,
     durationB: 8
   }
@@ -209,6 +210,28 @@ function enlightenmentBonuses(items = []) {
   return { identityMultiplier, brand };
 }
 
+function skillBrandUptime(skillCycle, skillEffects, evolutionCooldown) {
+  const uptimes = [];
+  for (const skill of skillEffects?.cycleItems || skillEffects?.items || []) {
+    if (skill.currentTree === false) continue;
+    const cycle = findSkillCycleItem(skillCycle, skill.name);
+    if (!cycle) continue;
+    const cooldown = skillCooldownSeconds(cycle, evolutionCooldown);
+    if (!(cooldown > 0)) continue;
+    for (const tripod of skill.selectedTripods || []) {
+      const descriptions = collectSkillTooltipTexts(tripod.description ?? tripod.Tooltip);
+      for (const description of descriptions) {
+        if (!/음표\s*낙인|먹물\s*낙인|빛의\s*흔적/.test(description)) continue;
+        if (!/파티원/.test(description)) continue;
+        const match = description.match(/(?:음표\s*낙인|먹물\s*낙인|빛의\s*흔적)[^.]{0,35}?(\d+(?:\.\d+)?)\s*초\s*간|(?:^|\D)(\d+(?:\.\d+)?)\s*초\s*간[^.]{0,24}?(?:음표\s*낙인|먹물\s*낙인|빛의\s*흔적)/);
+        if (match) uptimes.push(clamp(Number(match[1] ?? match[2]) / cooldown, 0, 1));
+      }
+    }
+  }
+  // Multi-hit refreshes and rotation overlap need a cast timeline. Use the best single source.
+  return { uptime: uptimes.length ? Math.max(...uptimes) : 1, modeled: uptimes.length > 0 };
+}
+
 export function supportContributionModel(snapshot, context = {}) {
   if (!isSupportSnapshot(snapshot)) return null;
   const className = normalized(snapshot?.profile?.className);
@@ -264,7 +287,8 @@ export function supportContributionModel(snapshot, context = {}) {
   const attackFactor = (170000 + supportAttackAmount * overallAttackUptime) / 170000;
 
   const brandBonus = sumSupportEffect(snapshot, 'brandPower') + evolution.brand + core.brand + enlightenment.brand;
-  const brandFactor = 1 + (10 * (1 + brandBonus / 100)) / 100;
+  const brand = skillBrandUptime(skillCycle, context.skillEffects, evolution.cooldown);
+  const brandFactor = 1 + 0.10 * (1 + brandBonus / 100) * brand.uptime;
   const partyDamageFactor = 1 + evolution.partyDamage / 145;
   const allTimeBuffPower = attackFactor * brandFactor * partyDamageFactor;
 
@@ -318,6 +342,8 @@ export function supportContributionModel(snapshot, context = {}) {
       allyAttackB,
       allyDamageBonus,
       brandBonus,
+      brandUptime: brand.uptime,
+      brandUptimeModeled: brand.modeled,
       identityGain,
       skillCycleApplied: Boolean(cycleA || cycleB),
       actualCooldownA,

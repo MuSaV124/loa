@@ -1,4 +1,7 @@
 export const ADRENALINE_ENGRAVING_NAME = '아드레날린';
+export const KEEN_BLUNT_NAME = '예리한 둔기';
+// 기존 평균 페널티 가정. 공식 발동률은 확인되지 않았다.
+export const KEEN_BLUNT_DAMAGE_FACTOR = 0.98;
 
 const EMPTY_EFFECT = Object.freeze({
   critRate: 0,
@@ -19,7 +22,7 @@ export const RELIC_ENGRAVING_RULES = Object.freeze({
   '원한': { levels: levelEffects('enemyDamage', [18, 18.75, 19.5, 20.25, 21]) },
   '저주받은 인형': { levels: levelEffects('enemyDamage', [14, 14.75, 15.5, 16.25, 17]) },
   '아드레날린': { levels: [14, 15.5, 17, 18.5, 20].map(critRate => ({ attackPower: 5.4, critRate })) },
-  '예리한 둔기': { levels: levelEffects('critDamage', [44, 46, 48, 50, 52]) },
+  [KEEN_BLUNT_NAME]: { levels: levelEffects('critDamage', [44, 46, 48, 50, 52]) },
   '질량 증가': { levels: levelEffects('enemyDamage', [16, 16.75, 17.5, 18.25, 19], { attackSpeed: -10 }) },
   '돌격대장': { levels: levelEffects('conditionalDamage', [16, 16.8, 17.6, 18.4, 19.2]) },
   '기습의 대가': { levels: levelEffects('conditionalDamage', [19.8, 20.5, 21.2, 21.9, 22.6]) },
