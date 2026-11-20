@@ -81,7 +81,7 @@ const baselineSkillItem = {
 };
 const characterResponse = {
   ok: true,
-  apiVersion: '6.1.1',
+  apiVersion: '6.1.4',
   profile: {
     CharacterName: '스킬표본', CharacterClassName: '브레이커', ServerName: '아브렐슈드',
     ItemAvgLevel: '1,700.00', CombatPower: '5,000.00', CharacterImage: '',
@@ -119,7 +119,7 @@ async function verifyViewport(viewport) {
   const page = await browser.newPage({ viewport });
   await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(characterResponse) }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
-  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.1');
+  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.4');
   await page.getByPlaceholder('캐릭터명 입력').fill('스킬표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /스킬표본/ }).waitFor();
@@ -378,6 +378,8 @@ async function verifyArcanaCardExpectation() {
   await page.getByPlaceholder('캐릭터명 입력').fill('아르카나표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /아르카나표본/ }).waitFor();
+  await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
+  await page.locator('#evolutionRecalculateButton').click();
 
   const note = page.locator('#arcanaIdentityNote');
   await note.getByText('아르카나 카드·스킬 기대값 적용').waitFor();
@@ -449,7 +451,7 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   };
   const fixture = {
     ok: true,
-    apiVersion: '6.1.1',
+    apiVersion: '6.1.4',
     profile: { ...characterResponse.profile, CharacterName: '다중치명표본', Stats: [] },
     arkPassive: { Effects: [{ Name: '입식 타격가', Level: 2 }] },
     accessoryEffects: accessory,
@@ -462,9 +464,12 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
     },
     skillEffects: { items: [
       { name: '기본 기술', level: 14, currentTree: true, effects: {} },
-      { name: '치적 치피 기술', level: 14, currentTree: true, effects: { critRate: 20, critDamage: 100 } }
+      { name: '기본 기술 강화', level: 14, currentTree: true, effects: { critRate: 20, critDamage: 100 } }
     ] }
   };
+  await page.route('**/combat-analyzer.json', route => route.fulfill({ json: {
+    fallbackBuilds: { '검증용 직업각인': { '기본 기술': 0.5, '기본 기술 강화': 0.5 } }
+  } }));
   await page.route('**/api/character**', route => route.fulfill({ json: fixture }));
   await page.route('**/api/market-prices?**', route => route.fulfill({
     json: { ok: true, items: [{ name: '표본 시세', price: 1000 }], lowest: { price: 1000 }, rows: [] }
@@ -495,14 +500,22 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
     }, 0);
   };
   const currentScore = page.locator('#currentScore .apiBaselineRow > div').nth(1).locator('b');
+  assert.equal(await page.locator('#standingStacks, #inFightingUptime').count(), 0);
   const normal = expected({ evo: 21 });
+  if (process.env.LOA_REPORT_TOP5 === '1' && viewport.width > 600) {
+    const highCritTop = await page.locator('#recommendList .comboRow').evaluateAll(items => items.map(row => ({
+      nodes: [...row.querySelectorAll('.tierLine strong')].map(label => label.textContent).join(' / '),
+      value: row.querySelector('.rowMetric b').textContent
+    })));
+    console.log(JSON.stringify({ highCritCurrent: await currentScore.innerText(), highCritTop }, null, 2));
+  }
   assert.equal(await currentScore.innerText(), normal.toFixed(4));
   const keenValues = await page.locator('#keenEfficiency .keenCard strong').allTextContents();
   assert.deepEqual(keenValues, [0.44, 0.52].map(keen =>
     `${((0.98 * expected({ evo: 21, keen }) / normal - 1) * 100).toFixed(2)}%`
   ));
 
-  // Fixed fixture with cooldown and mana nodes excluded. Compute all 36
+  // Fixed fixture with cooldown and mana nodes excluded. Compute all 45
   // eligible combinations before comparing the first five rendered rows.
   const tier2 = [
     { label: '한돌 Lv.3', evo: 30, crit: 0 },
@@ -518,13 +531,14 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
     { label: '뭉툭한 가시 Lv.2', evo: 19, blunt: true },
     { label: '음속 돌파 Lv.2', evo: 2.8 },
     { label: '인파이팅 Lv.2', evo: 18 },
-    { label: '입식 타격가 Lv.2', evo: 21 }
+    { label: '입식 타격가 Lv.2', evo: 21 },
+    { label: '안정된 관리자 Lv.2', evo: 0 }
   ];
   const candidates = tier2.flatMap(a => tier4.flatMap(b => tier5.map(c => ({
     nodes: [a.label, b.label, c.label],
     value: expected({ crit: a.crit + b.crit, evo: a.evo + b.evo + c.evo, mastery: b.mastery, blunt: c.blunt, critHit: b.critHit })
   }))));
-  assert.equal(candidates.length, 36);
+  assert.equal(candidates.length, 45);
   const top = candidates.sort((a, b) => b.value - a.value).slice(0, 5);
   const rows = await page.locator('#recommendList .comboRow').evaluateAll(items => items.map(row => ({
     nodes: [
@@ -545,6 +559,7 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   for (const row of rows) {
     if (row.nodes[1].includes('회심') && !row.nodes[2].includes('뭉툭한 가시')) {
       assert.match(row.note, /치명타 적중 주피 중첩 미검증/);
+      assert.match(row.note, /이론 A \d+\.\d{4} \/ B \d+\.\d{4}/);
     }
   }
 
@@ -563,6 +578,9 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   await blunt.click();
   await page.locator('#evolutionRecalculateButton').click();
   assert.equal(await currentScore.innerText(), expected({ evo: 19, blunt: true }).toFixed(4));
+  const evolutionSummary = page.locator('#sourceSummary .sourceGroup').filter({ has: page.getByText('진피', { exact: true }) });
+  assert.equal(await evolutionSummary.locator('.sourceLine').filter({ hasText: '뭉가 전환' }).locator('b').textContent(), '+210.00%');
+  assert.equal(await evolutionSummary.locator('summary em').textContent(), '+229.00%');
 
   // Reproduce the TOP5 using the actual controls and compare each in A/B.
   // On mobile replay the highest-scoring candidate and both gear changes.
@@ -737,6 +755,8 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
     await page.getByPlaceholder('캐릭터명 입력').fill('마나표본');
     await page.getByRole('button', { name: '검색', exact: true }).click();
     await page.getByRole('heading', { name: /마나표본/ }).waitFor();
+    await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
+    await page.locator('#evolutionRecalculateButton').click();
     if (analyzerMatched) {
       const status = page.locator('#manaRecommendationStatus');
       const rows = page.locator('#recommendList .comboRow');
@@ -758,6 +778,36 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
       await page.locator('#manaRecommendationMode').selectOption('theory');
       assert.match(await status.textContent(), /이론상 기대 피해 순위/);
       if (process.env.LOA_REPORT_TOP5 === '1') console.log(JSON.stringify({ before, artist, theory: await actual() }, null, 2));
+      if (viewport.width > 600) {
+        await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
+        await page.locator('#manaRecommendationMode').selectOption('auto');
+        const autoHighCrit = {};
+        for (const [critRate, critDamage, evolution, node, outcome] of [
+          [110, 150, 100, '입식 타격가', /다중 치명 (?!0\.00%)\d+\.\d+%/],
+          [180, 0, 0, '뭉툭한 가시', /다중 치명 0\.00%/]
+        ]) {
+          await page.locator('#extraCritRate').fill(String(critRate));
+          await page.locator('#extraCritDamage').fill(String(critDamage));
+          await page.locator('#extraEvolutionDamage').fill(String(evolution));
+          await page.locator('#evolutionRecalculateButton').click();
+          let verifiedRows = 0;
+          autoHighCrit[critRate] = {};
+          for (const support of ['none', 'bard', 'artist', 'paladin', 'valkyrie']) {
+            await page.locator('#manaSupport').selectOption(support);
+            assert.match(await status.textContent(), /가정 기반 자동 TOP5/);
+            const matching = rows.filter({ hasText: `${node} Lv.2` });
+            for (const label of await matching.locator('.rowMetric small:first-of-type').allTextContents()) {
+              assert.match(label, outcome);
+              verifiedRows += 1;
+            }
+            autoHighCrit[critRate][support] = await actual();
+            assert.equal(autoHighCrit[critRate][support].length, 5);
+            assert.ok(autoHighCrit[critRate][support].every(row => row.multiplier > 0));
+          }
+          assert.ok(verifiedRows > 0, `${critRate}% 입력에서 검산 대상 노드가 자동 TOP5에 있어야 합니다.`);
+        }
+        if (process.env.LOA_REPORT_TOP5 === '1') console.log(JSON.stringify({ autoHighCrit }, null, 2));
+      }
       return;
     }
     assert.match(await page.locator('#manaAutoStatus').textContent(), /공식 스킬 비용 2\/2.*공식 API 최대 마나 100.*실전 운용 주기 미확인/);
@@ -768,6 +818,9 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
     await page.locator('#extraCritRate').fill(String(critBonus));
     await page.locator('#evolutionRecalculateButton').click();
     assert.match(await page.locator('#sourceSummary').textContent(), /마나 용광로.*\+7(?:\.0+)?%/s);
+    const evolutionSummary = page.locator('#sourceSummary .sourceGroup').filter({ has: page.getByText('진피', { exact: true }) });
+    assert.equal(await evolutionSummary.locator('summary em').textContent(), '+27.00%');
+    assert.match(await evolutionSummary.textContent(), /마나 스킬 추가 진피[^+]*\+10\.00%/);
     const status = page.locator('#manaRecommendationStatus');
     const rows = page.locator('#recommendList .comboRow');
     const top = () => rows.evaluateAll(items => items.map(row => (
@@ -808,13 +861,14 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
     ]) {
       await page.locator('#manaSupport').selectOption(support);
       assert.match(await page.locator('#manaSupportSummary').textContent(), /공식 툴팁/);
+      const missingSupportInput = support === 'artist' ? /이론상 기대 피해 순위/ : /가정 포함 마나 반영 순위/;
       assert.match(await status.textContent(), /이론상 기대 피해 순위/);
       await set('manaSupportUptime', 0);
       await page.locator('#applyManaScenario').click();
       assert.deepEqual(await top(), scarce);
       await set('manaSupportUptime', 100);
       await page.locator('#applyManaScenario').click();
-      assert.match(await status.textContent(), /이론상 기대 피해 순위/);
+      assert.match(await status.textContent(), missingSupportInput);
       if (support !== 'artist') {
         await page.locator('#manaRecommendationMode').selectOption('estimate');
         assert.match(await status.textContent(), /가정 기반 마나 비교/);

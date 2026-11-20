@@ -85,7 +85,7 @@ function compare(support, maxMana, alternate = false) {
 }
 const noSupport = compare('none', exactCapacity.maxMana);
 assert.notDeepEqual(noSupport.automatic, noSupport.theory);
-assert.equal(noSupport.automatic[0], '가시·금단');
+assert.equal(noSupport.automatic[0], '뭉툭한 가시');
 assert.equal(compare('artist', exactCapacity.maxMana).automatic[0], '뭉툭한 가시');
 const enough = compare('none', 2000);
 assert.deepEqual(enough.automatic, enough.theory);

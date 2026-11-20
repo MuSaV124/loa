@@ -1,5 +1,5 @@
 import { SKILL_EFFECT_KEYS, hasSkillEffects, parseSkillEffectText, withoutCritRateDamageClause } from './skill-effects.js';
-import { classCoreClauseAvailable } from './class-damage-rules.js';
+import { classCoreClauseAvailable, classScopedDamageTargets, SKILL_TYPE } from './class-damage-rules.js';
 
 const EFFECT_KEYS = [...SKILL_EFFECT_KEYS];
 
@@ -59,7 +59,7 @@ function nodeNameFromDescription(value) {
 
 function clauses(value) {
   return cleanText(value)
-    .replace(/((?:증가|감소|상승|강화)하고|변경되고),\s*/gi, '$1.\n')
+    .replace(/((?:증가|감소|상승|강화)(?:하고|하며)|변경되고),\s*/gi, '$1.\n')
     .replace(/((?:증가|감소|상승|강화)하고)\s+(?=[가-힣A-Za-z0-9 ·]{1,24}\s*스킬)/gi, '$1.\n')
     .replace(/((?:증가|감소)하지만)\s+(?=(?:기력|충격|집중|난무|일반|스택트|루인)\s*스킬)/gi, '$1.\n')
     .split(/\n|(?<=[.!?])\s+/)
@@ -157,7 +157,7 @@ function categorySelector(clause, knownCategories) {
   const explicit = source.match(/(?:^|[,.]\s*|\s)(초각성|각성기|일반|충격|기력|포격|실버호크|고대의?\s*정령|루인|집중|난무|핸드건|샷건|라이플|헤드어택|백어택|캐스팅|곰|망자)\s*스킬(?:의|이|가|은|는|을|로|에서|에|(?=\s+(?:피해|치명타)))/i);
   if (explicit) return explicit[1].trim();
   const damageCategory = source.match(/(?:^|\s)(초각성기|각성기)(?:의)?\s*피해량/i);
-  return damageCategory?.[1]?.replace(/기$/, '')?.trim() || '';
+  return damageCategory?.[1] || '';
 }
 
 function inferredDamageTargets(clause) {
@@ -197,7 +197,7 @@ function augmentPassiveEffects(parsed, clause, classification) {
   const text = withoutCritRateDamageClause(clause);
   if (classification.scope !== 'global') {
     let strongestDamage = Number(effects.skillDamage || 0);
-    const damageText = effects.critHitDamage ? '' : text;
+    const damageText = text.replace(/(?:적에게\s*주는\s*(?:모든\s*)?|자신에게\s*받는\s*|(?:치명타|추가)\s*)피해량?(?:이|가|을|를)?\s*(?:최대\s*)?(?:추가로\s*)?[+-]?\d+(?:\.\d+)?\s*%/gi, ' ');
     for (const match of damageText.matchAll(/(?:총\s*)?피해량(?:이|가|을|를)?\s*(?:\d+\s*회\s*동안\s*)?(?:추가로\s*)?(\d+(?:\.\d+)?)\s*%\s*(증가|강화|감소|낮아지)/gi)) {
       const value = signedPercent(match[1], match[2]);
       if (Math.abs(value) > Math.abs(strongestDamage)) strongestDamage = value;
@@ -215,6 +215,9 @@ function augmentPassiveEffects(parsed, clause, classification) {
 }
 
 function classifyClause(clause, { knownSkills, knownCategories }) {
+  if (/각성기\s*(?:를|을)?\s*제외한\s*모든\s*스킬/i.test(clause)) {
+    return { scope: 'non-awakening', targets: [], selector: '각성기 제외' };
+  }
   const explicitTargets = unique([
     ...quotedSkillTargets(clause),
     ...inferredDamageTargets(clause)
@@ -239,7 +242,7 @@ function classifyClause(clause, { knownSkills, knownCategories }) {
   const contextTargets = /치명타/i.test(clause) ? inferredSkillContextTargets(clause) : [];
   if (contextTargets.length) return { scope: 'skill', targets: contextTargets, selector: '' };
 
-  if (/(?:상태|태세|변신|폭주|페르소나|아덴|아이덴티티|효과)[^.!?]{0,35}(?:중|에서|진입\s*시|동안|일\s*때|유지되는\s*동안)/i.test(clause)) {
+  if (/(?:상태|태세|변신|폭주|페르소나|아덴|아이덴티티|효과)[^.!?]{0,35}(?:중|에서|(?:진입|돌입)\s*시|동안|일\s*때)/i.test(clause)) {
     return { scope: 'state', targets: [], selector: '상태 조건' };
   }
   return { scope: 'global', targets: [], selector: '' };
@@ -257,6 +260,7 @@ function extractScopedSkillEffects(effects, { skillItems = [], shareNames = [], 
     ...identitySkills
   ].filter(Boolean));
   const knownCategories = unique(skillItems.map(item => item?.category).filter(Boolean));
+  const knownDamageSkills = new Set([...skillItems.map(item => item?.name), ...shareNames].filter(Boolean).map(normalize));
   const acceptedCategories = new Set(categories.map(category => normalize(category)));
   const seen = new Set();
 
@@ -267,7 +271,14 @@ function extractScopedSkillEffects(effects, { skillItems = [], shareNames = [], 
     let pendingTargets = [];
     for (const clause of clauses(payload.text)) {
       if (!classCoreClauseAvailable(payload.nodeName, clause, skillItems)) continue;
-      let classification = classifyClause(clause, { knownSkills, knownCategories });
+      const classTargets = classScopedDamageTargets(payload.nodeName, clause);
+      let classification = classTargets ? { scope: 'skill', targets: classTargets, selector: '' }
+        : classifyClause(clause, { knownSkills, knownCategories });
+      const activationUnknown = classification.scope === 'state'
+        || /폭주\s*(?:중|상태\s*돌입\s*시)|여우비가\s*활성화되어\s*있는\s*동안|카드\s*사용\s*시\s*\d+(?:\.\d+)?\s*초|효과를\s*보유하는\s*동안|중첩\s*수에\s*따라/i.test(clause);
+      if (classification.scope === 'global' && activationUnknown) {
+        classification = { scope: 'state', targets: [], selector: '상태 조건' };
+      }
       if (classification.scope === 'global' && pendingTargets.length && isSubjectlessEffectClause(clause)) {
         classification = { scope: 'skill', targets: pendingTargets, selector: '' };
       }
@@ -294,11 +305,16 @@ function extractScopedSkillEffects(effects, { skillItems = [], shareNames = [], 
         scope: classification.scope,
         targets: classification.targets,
         selector: classification.selector,
+        // The tooltip establishes the condition, not its uptime in a rotation.
+        activationUnknown,
         effects: effectsForRule,
         rawEffects: parsed,
         text: clause
       };
       result.items.push(row);
+      if (row.activationUnknown || classTargets?.every(target => !knownDamageSkills.has(normalize(target)))) {
+        result.unresolved.push(row);
+      }
       if (classification.scope === 'global') mergeEffects(result.globalEffects, effectsForRule);
       else result.rules.push(row);
     }
@@ -340,9 +356,15 @@ function matchesText(left, right) {
   return Boolean(a && b && (a === b || a.includes(b) || b.includes(a)));
 }
 
-export function passiveRuleMatchesSkill(rule, skill, { identitySkills = [] } = {}) {
+export function passiveRuleMatchesSkill(rule, skill) {
   if (!rule || !skill) return false;
-  if (rule.scope === 'state') return true;
+  if (rule.activationUnknown || rule.scope === 'state') return false;
+  const item = skill.item || skill;
+  const category = normalize(item.category || skill.category);
+  const type = item.skillTypeKnown === true ? item.skillType : null;
+  if (rule.scope === 'non-awakening') {
+    return type === SKILL_TYPE.regular || type === SKILL_TYPE.hyperSkill || (type == null && category === '초각성스킬');
+  }
   const names = unique([skill.name, skill.shareName, ...(skill.targetNames || [])].filter(Boolean));
   if (rule.scope === 'skill') {
     const normalizedNames = new Set(names.map(normalize));
@@ -351,17 +373,17 @@ export function passiveRuleMatchesSkill(rule, skill, { identitySkills = [] } = {
   if (rule.scope !== 'category') return false;
 
   const selector = String(rule.selector || '').replace(/\s*스킬\s*$/, '').trim();
-  if (/초각성/i.test(selector)) {
-    return names.some(name => identitySkills.some(identity => matchesText(name, identity)));
-  }
+  if (selector === '초각성') return type === SKILL_TYPE.hyperSkill || (type == null && category === '초각성스킬');
+  if (selector === '각성기') return type === SKILL_TYPE.awakening || (type == null && category === '각성기');
+  if (selector === '초각성기') return type === SKILL_TYPE.hyperAwakening || (type == null && category === '초각성기');
   return names.some(name => matchesText(name, selector)) || matchesText(skill.category, selector);
 }
 
-export function passiveEffectsForSkill(passiveState, skill, options = {}) {
+export function passiveEffectsForSkill(passiveState, skill) {
   const effects = emptyEffects();
   const rules = [];
   for (const rule of passiveState?.rules || []) {
-    if (!passiveRuleMatchesSkill(rule, skill, options)) continue;
+    if (!passiveRuleMatchesSkill(rule, skill)) continue;
     mergeEffects(effects, rule.effects);
     rules.push(rule);
   }

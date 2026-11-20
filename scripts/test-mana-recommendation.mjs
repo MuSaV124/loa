@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { expectedHitDamage } from '../public/damage-math.js';
+import { maintainedEvolutionDamage } from '../public/evolution-math.js';
 import { evaluateManaCandidate, manaFurnaceDamage, prepareManaScenario, rankManaCandidates } from '../public/mana-recommendation.js';
+import { resolveManaEnvironment } from '../public/support-mana.js';
 
 const { nodes } = JSON.parse(readFileSync(new URL('../public/data/evolution.json', import.meta.url), 'utf8'));
 const furnace = nodes.find(node => node.name === '마나 용광로').levels;
 const blunt = nodes.find(node => node.name === '뭉툭한 가시').levels;
+const standing = nodes.find(node => node.name === '입식 타격가').levels;
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
 const manaSkill = { name: '화염', usesMana: true, manaCost: 200, manaUsageKnown: true };
 const nonManaSkill = { name: '비마나 기술', usesMana: false, manaUsageKnown: true };
@@ -72,6 +75,49 @@ assert.match(evaluateManaCandidate(scenario(), {}, { ...damage, arcanaCardExpect
 assert.match(prepareManaScenario({ ...baseInput, skills: baseInput.skills.slice(1) }, names, [manaSkill, nonManaSkill]).reason, /조건 누락/);
 assert.match(prepareManaScenario({ ...baseInput, maxMana: NaN }, names, [manaSkill, nonManaSkill]).reason, /최대 마나/);
 
+for (const [support, receivedTimes, manualRestore, casts] of [
+  ['none', [], undefined, 2], ['bard', [0], 15, 3], ['artist', [5], 60, 4],
+  ['paladin', [0], 40, 5], ['valkyrie', [0], 40, 5]
+]) {
+  const environment = resolveManaEnvironment({ support, duration: 10, maxMana: 100, naturalMana: 0, receivedTimes, manualRestore });
+  assert.equal(environment.quality, 'input');
+  const run = scenario({ environment });
+  // 75% share at 220% crit / 250% crit damage, 25% at 200% / 300%.
+  // Both tier-five nodes share the same ordinary evolution bonus and cast schedule.
+  for (const [node, expectedManaSkill, expectedOtherSkill] of [
+    [blunt[2], 2.2 * 3.40, 2.6 * 3.12], [standing[2], 4.3 * 1.46, 5 * 1.46]
+  ]) {
+    const stats = { ...node, critRate: 200, evolutionDamage: 25 + maintainedEvolutionDamage(node) };
+    const first = expectedHitDamage({ ...stats, skillCritBonus: 20, critDamage: 250 });
+    const second = expectedHitDamage({ ...stats, critDamage: 300 });
+    near(first.value, expectedManaSkill);
+    near(second.value, expectedOtherSkill);
+    const skillResult = (other, critInteractionUnverified = false) => {
+      const items = [
+        { name: names[0], share: .75, value: first.value },
+        { name: names[1], share: .25, value: other, critInteractionUnverified }
+      ];
+      return { value: .75 * first.value + .25 * other, skillExperiment: { items } };
+    };
+    const result = evaluateManaCandidate(run, stats, skillResult(second.value));
+    near(result.value, .75 * expectedManaSkill * casts / 5 + .25 * expectedOtherSkill);
+    assert.equal(result.delayedSkills[0]?.lostCasts ?? 0, 5 - casts, support);
+    assert.equal(result.firstShortage === null, casts === 5, support);
+
+    const guaranteed = expectedHitDamage({ ...stats, critDamage: 300, forcedCrit: true, critRateToDamage: .6 });
+    const hasCap = node.critCap != null;
+    const withException = evaluateManaCandidate(run, stats, skillResult(guaranteed.value, hasCap));
+    if (hasCap) {
+      assert.equal(withException.quality, 'estimate');
+      assert.match(withException.assumptions.join(' '), /확정 치명과 뭉가/);
+      near(withException.value, .75 * expectedManaSkill * casts / 5 + .25 * guaranteed.value);
+    } else {
+      near(guaranteed.value, 3 * 2.2 * 1.46);
+      near(withException.value, .75 * expectedManaSkill * casts / 5 + .25 * 3 * 2.2 * 1.46);
+    }
+  }
+}
+
 function compareBuilds(critRate, recoveryMana) {
   const run = scenario({ recoveryMana });
   const rows = [
@@ -107,5 +153,34 @@ assert.equal(ranked.practical.length, 0);
 assert.deepEqual(ranked.unverified, [unverified]);
 const sustainable = { calc: { result: {} }, recValue: 4, mana: { firstShortage: null, value: 4 } };
 const higherWithDelay = { calc: { result: {} }, recValue: 6, mana: { firstShortage: 1, value: 5 } };
-assert.equal(rankManaCandidates([sustainable, higherWithDelay], true).practical[0], sustainable);
+assert.equal(rankManaCandidates([sustainable, higherWithDelay], true).practical[0], higherWithDelay);
+const equalWithDelay = { ...higherWithDelay, mana: { ...higherWithDelay.mana, value: 4 } };
+assert.equal(rankManaCandidates([equalWithDelay, sustainable], true).practical[0], sustainable);
+
+// Equal cast availability for A/B. Only the skill that actually suffers
+// a mana delay loses its share of the interpretation difference.
+const withCritAssumption = evaluateManaCandidate(scenario(), {}, {
+  ...damage, critHitStackingUnverified: true,
+  alternateValue: damage.value + .75,
+  skillExperiment: { items: damage.skillExperiment.items.map((row, i) =>
+    i === 0 ? { ...row, alternateValue: row.value + 1 } : row) }
+});
+near(withCritAssumption.value, empty.value);
+near(withCritAssumption.alternateValue - withCritAssumption.value,
+  .75 * (1 - (empty.delayedSkills[0]?.lostCasts || 0) / 5));
+assert.equal(withCritAssumption.quality, 'estimate');
+const uncertainClassEffect = evaluateManaCandidate(scenario(), {}, { ...damage, unverifiedClassEffects: true });
+near(uncertainClassEffect.value, empty.value);
+assert.equal(uncertainClassEffect.quality, 'estimate');
+assert.match(uncertainClassEffect.assumptions.join(' '), /직업 효과/);
+const firstCritRule = { calc: { result: { alternateValue: 5.1 } }, recValue: 4.8,
+  mana: { value: 4.8, alternateValue: 5.1, quality: 'estimate' } };
+const fixedCritRule = { calc: { result: { alternateValue: 5 } }, recValue: 5,
+  mana: { value: 5, alternateValue: 5, quality: 'input' } };
+const variants = rankManaCandidates([firstCritRule, fixedCritRule], true);
+assert.deepEqual(variants.evaluated, [fixedCritRule, firstCritRule]);
+assert.deepEqual(variants.evaluatedAlternate, [firstCritRule, fixedCritRule]);
+assert.deepEqual(variants.theoreticalAlternate, [firstCritRule, fixedCritRule]);
+assert.deepEqual(variants.practical, [fixedCritRule]);
+assert.ok(variants.unverified.includes(firstCritRule));
 console.log('mana recommendation tests passed');

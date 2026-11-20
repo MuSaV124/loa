@@ -101,6 +101,17 @@ assert.ok(Math.abs(exactSupport.detail.actualCooldownA - exactSupport.detail.act
 const manaSupport = supportContributionModel(snapshot, { selection: { '마나 용광로': { level: 2 } }, skillEffects: exactSkillEffects });
 const stableSupport = supportContributionModel(snapshot, { selection: { '안정된 관리자': { level: 2 } }, skillEffects: exactSkillEffects });
 assert.ok(stableSupport.totalBuffPower < manaSupport.totalBuffPower, '안정된 관리자의 아이덴티티 획득량 -6%를 서포터 노드 추천에 반영해야 한다.');
+const standingSupport = supportContributionModel(snapshot, {
+  selection: { '입식 타격가': { level: 2 } }, skillEffects: exactSkillEffects
+});
+assert.equal(standingSupport.detail.brandBonus, manaSupport.detail.brandBonus);
+const bardMissingCooldown = (name) => supportContributionModel(snapshot, {
+  skillEffects: { items: [{ name, selectedTripods: [{ name: '빠른 준비' }] }] }
+});
+assert.equal(bardMissingCooldown('사운드 쇼크').detail.actualCooldownA,
+  supportContributionModel(snapshot).detail.actualCooldownA);
+assert.ok(bardMissingCooldown('천상의 연주').detail.actualCooldownA <
+  supportContributionModel(snapshot).detail.actualCooldownA);
 
 const exactCombined = supportUpgradeImpact({
   before: { totalBuffPower: 1, carePower: 1 },

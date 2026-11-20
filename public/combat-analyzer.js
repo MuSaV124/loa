@@ -138,17 +138,25 @@ export function combatAnalyzerGemFactors(data, snapshot, skillEffects, options =
   const tables = { ...DEFAULT_GEM_TABLES, ...(data?.gemTables || {}) };
   const totalShare = skillNames.reduce((sum, name) => sum + Number(shares[name] || 0), 0);
   const weightedDamage = skillNames.reduce((sum, name) => {
-    const gem = gems.find(item =>
+    const matchingGems = gems.filter(item =>
       normalizeCombatAnalyzerText(gemSkillName(item)) === normalizeCombatAnalyzerText(name)
       && profileGemKind(item) === 'damage'
       && item?.valid !== false
     );
-    return sum + (gem ? gemBonus(gem, tables, 'damage') * Number(shares[name] || 0) : 0);
+    const highestBonus = Math.max(0, ...matchingGems.map(gem => gemBonus(gem, tables, 'damage')));
+    return sum + highestBonus * Number(shares[name] || 0);
   }, 0);
   const damageFactor = totalShare > 0 ? 1 + (weightedDamage / totalShare) / 100 : 1;
-  const cooldownGems = gems.filter(gem => profileGemKind(gem) === 'cooldown' && gem?.valid !== false);
+  const cooldownBySkill = new Map();
+  for (const gem of gems.filter(item => profileGemKind(item) === 'cooldown' && item?.valid !== false)) {
+    const key = normalizeCombatAnalyzerText(gemSkillName(gem)) || gem;
+    const previous = cooldownBySkill.get(key);
+    if (!previous || gemBonus(gem, tables, 'cooldown') > gemBonus(previous, tables, 'cooldown')) {
+      cooldownBySkill.set(key, gem);
+    }
+  }
   let cooldownWeight = 0;
-  const weightedCooldown = cooldownGems.reduce((sum, gem) => {
+  const weightedCooldown = [...cooldownBySkill.values()].reduce((sum, gem) => {
     const weight = 2 ** Math.max(0, Number(gem?.level || 1) - 1);
     cooldownWeight += weight;
     return sum + gemBonus(gem, tables, 'cooldown') * weight;

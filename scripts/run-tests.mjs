@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const SUITES = [
   'test-damage-math.mjs',
+  'test-damage-groups.mjs',
   'test-evolution-math.mjs',
   'test-advanced-honing-math.mjs',
   'test-armguard-honing.mjs',

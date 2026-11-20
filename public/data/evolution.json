@@ -855,11 +855,11 @@
       "levels": {
         "1": {
           "critRate": 10,
-          "critDamage": 16
+          "directionalCritDamage": 16
         },
         "2": {
           "critRate": 20,
-          "critDamage": 32
+          "directionalCritDamage": 32
         }
       },
       "iconImage": "/images/evolution/일격.webp",
@@ -1092,10 +1092,10 @@
       "description": "공격이 적중하면 정면 승부 효과를 얻습니다. 방향성 공격 여부와 관계없이 적중이 발동 조건입니다.",
       "levels": {
         "1": {
-          "evolutionDamage": 9
+          "inFightingDamage": 9
         },
         "2": {
-          "evolutionDamage": 18
+          "inFightingDamage": 18
         }
       },
       "iconImage": "/images/evolution/인파이팅.webp",
@@ -1113,10 +1113,12 @@
       "description": "전투 시작 시 입식 타격 효과를 최대 중첩으로 얻습니다. 피격 이상 시 3중첩을 잃고, 이후 2초마다 1중첩씩 회복합니다.",
       "levels": {
         "1": {
-          "evolutionDamage": 10.5
+          "evolutionDamage": 6,
+          "standingStriker": { "damagePerStack": 0.75, "maxStacks": 6 }
         },
         "2": {
-          "evolutionDamage": 21
+          "evolutionDamage": 12,
+          "standingStriker": { "damagePerStack": 1.5, "maxStacks": 6 }
         }
       },
       "iconImage": "/images/evolution/입식 타격가.webp",

@@ -1,0 +1,279 @@
+{
+  "asOf": "2026-11-20",
+  "source": "https://cdn-lostark.game.onstove.com/2018/obt/assets/js/pc.js?20261118080153",
+  "rows": [
+    {
+      "className": "디스트로이어",
+      "group": "전사(남)",
+      "identity": "중력 제어 시스템",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "워로드",
+      "group": "전사(남)",
+      "identity": "방어태세/전장의 방패",
+      "balance18": false,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "버서커",
+      "group": "전사(남)",
+      "identity": "폭주모드",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "홀리나이트",
+      "group": "전사(남)",
+      "identity": "신앙 게이지",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "슬레이어",
+      "group": "전사(여)",
+      "identity": "폭주 모드",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "발키리",
+      "group": "전사(여)",
+      "identity": "신앙 게이지",
+      "balance18": true,
+      "combatFix18": true,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "스트라이커",
+      "group": "무도가(남)",
+      "identity": "엘리멘탈 버블",
+      "balance18": false,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "브레이커",
+      "group": "무도가(남)",
+      "identity": "기력/충격/투지 에너지",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "배틀마스터",
+      "group": "무도가(여)",
+      "identity": "엘리멘탈 버블",
+      "balance18": false,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "인파이터",
+      "group": "무도가(여)",
+      "identity": "기력/충격 에너지",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "기공사",
+      "group": "무도가(여)",
+      "identity": "금강선공",
+      "balance18": false,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "창술사",
+      "group": "무도가(여)",
+      "identity": "듀얼 스탠스",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": true,
+      "hotfix20": false
+    },
+    {
+      "className": "데빌헌터",
+      "group": "헌터(남)",
+      "identity": "퀵 스탠스",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "블래스터",
+      "group": "헌터(남)",
+      "identity": "포격 모드",
+      "balance18": true,
+      "combatFix18": true,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "호크아이",
+      "group": "헌터(남)",
+      "identity": "실버호크 소환",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "스카우터",
+      "group": "헌터(남)",
+      "identity": "드론과 배터리",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "건슬링어",
+      "group": "헌터(여)",
+      "identity": "퀵 스탠스",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "바드",
+      "group": "마법사",
+      "identity": "세레나데",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": true,
+      "hotfix20": true
+    },
+    {
+      "className": "서머너",
+      "group": "마법사",
+      "identity": "고대정령 소환",
+      "balance18": false,
+      "combatFix18": true,
+      "hotfix19": true,
+      "hotfix20": false
+    },
+    {
+      "className": "아르카나",
+      "group": "마법사",
+      "identity": "카드 덱",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": true,
+      "hotfix20": false
+    },
+    {
+      "className": "소서리스",
+      "group": "마법사",
+      "identity": "마력 방출/점멸",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "블레이드",
+      "group": "암살자",
+      "identity": "블레이드 아츠",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "데모닉",
+      "group": "암살자",
+      "identity": "악마화",
+      "balance18": false,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "리퍼",
+      "group": "암살자",
+      "identity": "페르소나",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "소울이터",
+      "group": "암살자",
+      "identity": "사신화",
+      "balance18": false,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "도화가",
+      "group": "스페셜리스트(여)",
+      "identity": "저무는 달 / 떠오르는 해",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": true,
+      "hotfix20": true
+    },
+    {
+      "className": "기상술사",
+      "group": "스페셜리스트(여)",
+      "identity": "여우비",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "환수사",
+      "group": "스페셜리스트(여)",
+      "identity": "금술 : 찢 곰 / 금술 : 여우 별 소나기",
+      "balance18": false,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "차원술사",
+      "group": "스페셜리스트(남)",
+      "identity": "차원 시계",
+      "balance18": true,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    },
+    {
+      "className": "가디언나이트",
+      "group": "가디언나이트",
+      "identity": [
+        "엠버레스의 기운과 소켓",
+        "엠버레스 오브 게이지"
+      ],
+      "balance18": false,
+      "combatFix18": false,
+      "hotfix19": false,
+      "hotfix20": false
+    }
+  ]
+}

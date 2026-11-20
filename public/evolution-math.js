@@ -47,3 +47,9 @@ export function calculateSonicBreakEvolutionDamage(attackSpeed, moveSpeed, effec
 
   return Math.min(damage, Number(effect.maxEvolutionDamage ?? Infinity));
 }
+
+export function maintainedEvolutionDamage(effect) {
+  const standing = effect.standingStriker;
+  return (effect.evolutionDamage || 0) + (standing ? standing.maxStacks * standing.damagePerStack : 0)
+    + (effect.inFightingDamage || 0);
+}

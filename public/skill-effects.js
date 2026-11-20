@@ -1,3 +1,5 @@
+import { SKILL_TYPE, tripodCritCoversPartialHits } from './class-damage-rules.js';
+
 export const SKILL_EFFECT_KEYS = [
   'critRate',
   'critDamage',
@@ -29,6 +31,9 @@ export function withoutCritRateDamageClause(text) {
   return String(text || '').replace(CRIT_RATE_DAMAGE_CLAUSE, '');
 }
 const CHANGE = '(?:(?:만큼|추가로)\\s*)?(증가|감소|높아지|낮아지)';
+const CRIT_HIT_DAMAGE_CLAUSE = new RegExp(
+  `치명타(?:로|가)?\\s*적중\\s*시[^.!?|]{0,45}?적에게\\s*주는\\s*피해(?:량)?(?:이|가|을|를)?\\s*${PERCENT}\\s*${CHANGE}`, 'gi'
+);
 const EFFECT_PATTERNS = {
   critRate: [
     new RegExp(`치명타\\s*(?:적중\\s*)?(?:확률|률)(?:이|가|을|를)?\\s*${PERCENT}\\s*${CHANGE}`, 'gi')
@@ -37,7 +42,7 @@ const EFFECT_PATTERNS = {
     new RegExp(`치명타\\s*(?:피해|피해량)(?:이|가|을|를)?\\s*${PERCENT}\\s*${CHANGE}`, 'gi')
   ],
   critHitDamage: [
-    new RegExp(`치명타\\s*적중\\s*시[^.!?]{0,45}?적에게\\s*주는\\s*피해(?:량)?(?:이|가|을|를)?\\s*${PERCENT}\\s*${CHANGE}`, 'gi')
+    CRIT_HIT_DAMAGE_CLAUSE
   ],
   additionalDamage: [
     new RegExp(`추가\\s*피해(?:량)?(?:이|가|을|를)?\\s*${PERCENT}\\s*${CHANGE}`, 'gi')
@@ -173,6 +178,17 @@ export function parseSkillManaUsage(tooltip) {
   return { usesMana: distinctCosts.length === 1, manaCost: distinctCosts.length === 1 ? distinctCosts[0] : 0, manaUsageKnown };
 }
 
+export function parseSkillAttackDirection(skill) {
+  const tooltip = typeof skill?.Tooltip === 'string' ? parseJsonString(skill.Tooltip) : skill?.Tooltip;
+  const description = tooltip?.Element_005?.value;
+  if (typeof description !== 'string') return null;
+  const direction = decodeEntities(description).match(/공격\s*타입\s*:\s*(백|헤드)\s*어택/)?.[1];
+  if (!direction) return false;
+  const removed = (skill?.Tripods || []).some(tripod => tripod.IsSelected === true
+    && /더\s*이상\s*(?:백|헤드)\s*어택(?:\s*공격)?이\s*적용되지/.test(collectSkillTooltipTexts(tripod.Tooltip).join(' ')));
+  return removed ? false : direction;
+}
+
 function signedValue(rawValue, direction) {
   const value = Number(rawValue);
   if (!Number.isFinite(value)) return 0;
@@ -192,8 +208,8 @@ function strongestMatch(text, patterns) {
   return round2(selected);
 }
 
-function removeCritHitDamageClauses(text) {
-  return text.replace(/치명타\s*적중\s*시[^.!?]{0,80}?적에게\s*주는\s*피해(?:량)?(?:이|가|을|를)?\s*[+-]?\d+(?:\.\d+)?\s*%\s*(?:증가|감소|높아지|낮아지)[^.!?]*/gi, ' ');
+export function withoutCritHitDamageClauses(text) {
+  return text.replace(CRIT_HIT_DAMAGE_CLAUSE, ' ');
 }
 
 function removeSpecificDamageClauses(text) {
@@ -259,8 +275,8 @@ export function parseSkillEffectText(value) {
   if (conversion) effects.critRateToDamage = Number(conversion[1]);
   for (const key of SKILL_EFFECT_KEYS) {
     let source = withoutCritRateDamageClause(text);
-    if (key === 'enemyDamage') source = removeCritHitDamageClauses(source);
-    if (key === 'skillDamage') source = removeSpecificDamageClauses(removeCritHitDamageClauses(source));
+    if (key === 'enemyDamage') source = withoutCritHitDamageClauses(source);
+    if (key === 'skillDamage') source = removeSpecificDamageClauses(withoutCritHitDamageClauses(source));
     effects[key] = strongestMatch(source, EFFECT_PATTERNS[key]);
   }
   return effects;
@@ -419,10 +435,12 @@ export function extractCombatSkillEffects(skills) {
       .map(parseSelectedTripod);
     // The API supplies total skill share, without the strike share for these two tripods.
     for (const tripod of selectedTripods) {
-      if (!tripod.effects.critRateToDamage) continue;
-      if (!['철량추/지면 강타', '절룡세/급소 강타'].includes(`${skill.Name}/${tripod.name}`)) continue;
+      if (!tripodCritCoversPartialHits(skill.Name, tripod.name)) continue;
       delete tripod.effects.forcedCrit;
       delete tripod.effects.critRateToDamage;
+      tripod.effects.critRate = 0;
+      tripod.effects.critDamage = 0;
+      tripod.guaranteedCrit = false;
       tripod.partialCritRuleUnmodeled = true;
     }
     result.selectedTripodCount += selectedTripods.length;
@@ -463,8 +481,10 @@ export function extractCombatSkillEffects(skills) {
       level: Number(skill?.Level || 0),
       type: String(skill?.Type || '').trim(),
       skillType: Number(skill?.SkillType || 0),
-      cooldownEligible: Number(skill?.SkillType || 0) === 0,
+      skillTypeKnown: skill?.SkillType != null && Number.isFinite(Number(skill.SkillType)),
+      cooldownEligible: Number(skill?.SkillType || 0) === SKILL_TYPE.regular,
       ...manaUsage,
+      attackDirection: parseSkillAttackDirection(skill),
       category: skillCategory(skill),
       baseCooldownSeconds: baseCooldownSeconds(skill),
       cooldown,

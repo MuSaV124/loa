@@ -36,7 +36,7 @@ assert.equal(breaker.globalEffects.enemyDamage, 29, '전역 적주피 21%와 8%�
 assert.equal(breaker.globalEffects.critRate, 0, '개별 스킬 치적은 전역 치적으로 합산하면 안 된다.');
 assert.equal(passiveEffectsForSkill(breaker, { name: '권왕십이식 : 낙화' }).effects.critRate, 15);
 assert.equal(passiveEffectsForSkill(breaker, { name: '권왕십이식 : 풍랑' }).effects.critRate, 15);
-assert.equal(passiveEffectsForSkill(breaker, { name: '성운멸쇄권' }, { identitySkills: ['성운멸쇄권'] }).effects.critRate, 20);
+assert.equal(passiveEffectsForSkill(breaker, { name: '성운멸쇄권', skillType: 1, skillTypeKnown: true }).effects.critRate, 20);
 assert.equal(passiveEffectsForSkill(breaker, { name: '파천섬광', category: '충격 스킬' }).effects.critRate, 0);
 assert.equal(passiveEffectsForSkill(breaker, { name: '성운멸쇄권' }).effects.skillDamage, 0, '에너지 1당 피해는 보유량 없이 임의 계산하면 안 된다.');
 
@@ -78,11 +78,43 @@ const categoryScopes = extractArkPassiveSkillEffects([
   shareNames: ['포격 스킬', '실버호크 스킬', '고대의 정령 스킬', '적룡필살']
 });
 
-assert.equal(passiveEffectsForSkill(categoryScopes, { name: '포격 스킬' }).effects.critRate, 50, '상태 공통 10%와 포격 계열 40%는 해당 계열에서만 합산해야 한다.');
-assert.equal(passiveEffectsForSkill(categoryScopes, { name: '실버호크 스킬' }).effects.critRate, 50);
-assert.equal(passiveEffectsForSkill(categoryScopes, { name: '고대의 정령 스킬' }).effects.critRate, 26);
-assert.equal(passiveEffectsForSkill(categoryScopes, { name: '적룡필살' }).effects.critRate, 110);
-assert.equal(passiveEffectsForSkill(categoryScopes, { name: '스나이프', category: '일반 스킬' }).effects.critRate, 10);
+assert.equal(passiveEffectsForSkill(categoryScopes, { name: '포격 스킬' }).effects.critRate, 40);
+assert.equal(passiveEffectsForSkill(categoryScopes, { name: '실버호크 스킬' }).effects.critRate, 40);
+assert.equal(passiveEffectsForSkill(categoryScopes, { name: '고대의 정령 스킬' }).effects.critRate, 16);
+assert.equal(passiveEffectsForSkill(categoryScopes, { name: '적룡필살' }).effects.critRate, 100);
+assert.equal(passiveEffectsForSkill(categoryScopes, { name: '스나이프', category: '일반 스킬' }).effects.critRate, 0);
+assert.equal(categoryScopes.unresolved.find(row => row.nodeName === '잠식된 달')?.effects.critRate, 10);
+
+const patchScopes = extractArkPassiveSkillEffects([
+  passive('깨달음', '환류 강화', '각성기를 제외한 모든 스킬의 피해량이 52.0% 증가한다.'),
+  passive('깨달음', '격분', '폭주 중 적에게 주는 치명타 피해가 57.0% 증가한다.'),
+  passive('깨달음', '맑은 날', '여우비가 활성화되어 있는 동안 기상 스킬의 피해량이 42.0% 증가한다.'),
+  passive('깨달음', '황제의 자비', '카드 사용 시 8.0초 간 적에게 주는 피해가 6% 증가한다.')
+]);
+const ordinary = { name: '일반기', skillType: 0, skillTypeKnown: true };
+const awakening = { name: '각성 기술', skillType: 100, skillTypeKnown: true };
+assert.equal(passiveEffectsForSkill(patchScopes, ordinary).effects.skillDamage, 52);
+assert.equal(passiveEffectsForSkill(patchScopes, { ...ordinary, skillType: 1 }).effects.skillDamage, 52);
+assert.equal(passiveEffectsForSkill(patchScopes, awakening).effects.skillDamage, 0);
+assert.equal(passiveEffectsForSkill(patchScopes, { ...awakening, skillType: 101 }).effects.skillDamage, 0);
+assert.equal(passiveEffectsForSkill(patchScopes, { name: '유형 미확인' }).effects.skillDamage, 0);
+assert.equal(passiveEffectsForSkill(patchScopes, { name: '펼치기', category: '기상 스킬' }).effects.skillDamage, 0);
+assert.equal(passiveEffectsForSkill(patchScopes, ordinary).effects.critDamage, 0);
+assert.equal(patchScopes.globalEffects.enemyDamage, 0);
+assert.deepEqual(patchScopes.unresolved.map(row => row.nodeName), ['격분', '맑은 날', '황제의 자비']);
+
+const scopedEnemy = extractArkGridSkillEffects([{ name: '연가 창식', activeTexts: [
+  '집중 스킬이 적에게 주는 피해량이 7.0% 증가한다.'
+] }]);
+assert.equal(passiveEffectsForSkill(scopedEnemy, { name: '적룡포', category: '집중 스킬' }).effects.skillDamage, 7);
+assert.equal(passiveEffectsForSkill(scopedEnemy, { name: '맹룡열파', category: '난무 스킬' }).effects.skillDamage, 0);
+const gravity = passive('깨달음', '중력 수련', '중력 가중 모드 기본 공격과 볼텍스 그래비티의 치명타 적중률이 30.0% 증가하며 적에게 주는 피해가 28.0% 증가한다.');
+const gravityGroup = extractArkPassiveSkillEffects([gravity], { shareNames: ['중력 가중 스킬', '퍼펙트 스윙'] });
+assert.equal(gravityGroup.unresolved.length, 1);
+assert.equal(passiveEffectsForSkill(gravityGroup, { name: '중력 가중 스킬' }).effects.critRate, 0);
+assert.equal(passiveEffectsForSkill(gravityGroup, { name: '중력 가중 모드 기본 공격' }).effects.critRate, 30);
+assert.equal(passiveEffectsForSkill(gravityGroup, { name: '볼텍스 그래비티' }).effects.skillDamage, 28);
+assert.equal(passiveEffectsForSkill(gravityGroup, { name: '퍼펙트 스윙' }).effects.skillDamage, 0);
 
 const glaivier = extractArkPassiveSkillEffects([
   passive('깨달음', '절정 I', '난무 스탠스 전환 시 이동속도가 15.0% 증가하고, 집중 스탠스 전환 시 공격속도가 15.0% 증가한다.'),
@@ -134,7 +166,8 @@ const flurryGridEffects = passiveEffectsForSkill(glaivierGrid, { name: '맹룡�
 const focusGridEffects = passiveEffectsForSkill(glaivierGrid, { name: '적룡포', category: '집중 스킬' }).effects;
 assert.equal(flurryGridEffects.skillDamage, 34);
 assert.equal(focusGridEffects.critRate, -20);
-assert.equal(focusGridEffects.skillDamage, 32, '조건부 적주피 20%와 집중 피해 10%는 해당 계열에서 곱연산해야 한다.');
+assert.equal(focusGridEffects.critHitDamage, 20, '구버전 연가 창식의 20%는 치명타 적중 시에만 적용한다.');
+assert.equal(focusGridEffects.skillDamage, 10, '청룡기의 집중 피해는 별도 스킬 피해다.');
 
 const leap = extractArkPassiveSkillEffects([
   passive('도약', '풀려난 힘', '초각성 스킬이 적에게 주는 피해가 15.0% 증가한다.'),
@@ -145,7 +178,8 @@ const leap = extractArkPassiveSkillEffects([
   identitySkills: ['성운멸쇄권', '플레임 블레이드', '브레이킹 문']
 });
 
-assert.equal(passiveEffectsForSkill(leap, { name: '성운멸쇄권' }, { identitySkills: ['성운멸쇄권', '플레임 블레이드', '브레이킹 문'] }).effects.skillDamage, 15);
+assert.equal(passiveEffectsForSkill(leap, { name: '성운멸쇄권', skillType: 1, skillTypeKnown: true }).effects.skillDamage, 15);
+assert.equal(passiveEffectsForSkill(leap, { name: '성운멸쇄권', skillType: 101, skillTypeKnown: true }).effects.skillDamage, 0);
 assert.equal(passiveEffectsForSkill(leap, { name: '플레임 블레이드' }, { identitySkills: ['성운멸쇄권', '플레임 블레이드', '브레이킹 문'] }).effects.critDamage, 90);
 assert.equal(passiveEffectsForSkill(leap, { name: '블레이드 버스트' }, { identitySkills: ['성운멸쇄권', '플레임 블레이드', '브레이킹 문'] }).effects.critDamage, 60);
 assert.equal(passiveEffectsForSkill(leap, { name: '일반 공격' }, { identitySkills: ['성운멸쇄권'] }).effects.skillDamage, 0);

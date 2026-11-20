@@ -4,6 +4,7 @@ import {
   formatSkillEffectSummary,
   hasSkillEffects,
   minimumSkillEffectProfile,
+  parseSkillAttackDirection,
   parseSkillManaUsage,
   parseSkillEffectText,
   skillExperimentItems
@@ -26,6 +27,14 @@ assert.deepEqual(parseSkillManaUsage({ Element_004: { value: '마나의 4%를 �
   { usesMana: false, manaCost: 0, manaUsageKnown: false });
 assert.deepEqual(parseSkillManaUsage({ Element_011: { value: '마나 125 소모' } }),
   { usesMana: false, manaCost: 0, manaUsageKnown: false });
+const withDirection = type => ({ Tooltip: JSON.stringify({ Element_005: { value: `<BR><FONT>공격 타입 : ${type}</FONT>` } }) });
+assert.equal(parseSkillAttackDirection(withDirection('백 어택')), '백');
+assert.equal(parseSkillAttackDirection(withDirection('헤드 어택')), '헤드');
+assert.equal(parseSkillAttackDirection(withDirection('없음')), false);
+assert.equal(parseSkillAttackDirection({ Tooltip: '{}' }), null);
+const removeBackAttack = { Tooltip: '더 이상 백어택 공격이 적용되지 않지만 범위가 증가한다.' };
+assert.equal(parseSkillAttackDirection({ ...withDirection('백 어택'), Tripods: [{ ...removeBackAttack, IsSelected: true }] }), false);
+assert.equal(parseSkillAttackDirection({ ...withDirection('백 어택'), Tripods: [{ ...removeBackAttack, IsSelected: false }] }), '백');
 
 const direct = parseSkillEffectText(`
   치명타 적중률이 24.5% 증가하고 치명타 피해가 80% 증가한다.
@@ -250,6 +259,23 @@ for (const [className, skillName] of loawaPopularSkillSamples) {
   assert.equal(classResult.calculableItems[0]?.name, skillName, `${className} 실사용 스킬 표본 파싱 실패`);
   assert.equal(classResult.calculableItems[0]?.effects?.critRate, 10, `${className} 효과값 파싱 실패`);
   assert.equal(minimumSkillEffectProfile(classResult).effects.critRate, 10, `${className} 추천 최소치 적용 실패`);
+}
+
+for (const [skillName, tripodName, target] of [
+  ['진 용출권', '작렬하는 주먹', '내려찍는 추가 공격'],
+  ['사형 집행', '급소 타격', '어퍼킥'],
+  ['네이팜탄', '급소 포격', '폭발 공격'],
+  ['어퍼 슬래쉬', '강력한 회오리', '두 번째 공격의 회오리']
+]) {
+  const skill = extractCombatSkillEffects([{
+    Name: skillName, Level: 14, SkillType: 0,
+    Tripods: [{ Name: tripodName, IsSelected: true,
+      Tooltip: `${target}의 치명타 적중률이 80.0% 증가하고 치명타 피해가 100.0% 증가한다.` }]
+  }]).items[0];
+  assert.equal(skill.effects.critRate, 0, skillName);
+  assert.equal(skill.effects.critDamage, 0, skillName);
+  assert.ok(skill.selectedTripods[0].partialCritRuleUnmodeled, skillName);
+  assert.ok(skill.skillTypeKnown, skillName);
 }
 
 console.log('skill effect tests passed');

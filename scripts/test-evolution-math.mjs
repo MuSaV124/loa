@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import {
   calculateBluntSpike,
   calculateSonicBreakEvolutionDamage,
+  maintainedEvolutionDamage,
   shiftClickTargetLevel
 } from '../public/evolution-math.js';
 
@@ -68,6 +69,12 @@ assert.match(node('진군').description, /5m/);
 assert.match(node('진군').description, /7초/);
 assert.match(node('입식 타격가').description, /피격 이상/);
 assert.match(node('마나 용광로').description, /최대 마나의 2%/);
+for (const [lv, base, perStack, active] of [[1, 6, .75, 9], [2, 12, 1.5, 18]]) {
+  const standing = level('입식 타격가', lv);
+  assert.equal(maintainedEvolutionDamage(standing), base + perStack * 6);
+  const inFighting = level('인파이팅', lv);
+  assert.equal(maintainedEvolutionDamage(inFighting), active);
+}
 
 // 로펙 표본: 공속 150.85%, 이속 145.85%에서 음속 돌파 Lv.2 진피 21.01%.
 approx(calculateSonicBreakEvolutionDamage(150.85, 145.85, sonicLv2), 21.01);

@@ -1,5 +1,5 @@
 import { buildSkillCycleModel, findSkillCycleItem, skillCooldownSeconds } from './skill-cycle.js';
-import { collectSkillTooltipTexts } from './skill-effects.js?v=6.1.1';
+import { collectSkillTooltipTexts } from './skill-effects.js?v=6.1.2';
 
 const SUPPORT_SPECS = new Set(['절실한 구원', '만개', '축복의 오라', '해방자', '빛의 수호자']);
 const DEALER_SPECS = new Set(['진실된 용맹', '회귀', '심판자', '빛의 기사']);
@@ -94,11 +94,9 @@ function selectionLevel(selection, name) {
   return number(selection?.[name]?.level ?? selection?.[name]);
 }
 
-function selectedTripodText(skillEffects) {
-  return (skillEffects?.items || []).flatMap(item => [
-    item?.name,
-    ...(item?.selectedTripods || []).flatMap(tripod => [tripod?.name, tripod?.description, tripod?.text])
-  ]).filter(Boolean).join(' ');
+function hasSelectedTripod(skillEffects, names, tripodName) {
+  return (skillEffects?.items || []).some(skill => names.some(name => normalized(skill.name) === normalized(name))
+    && skill.selectedTripods?.some(tripod => tripod.name === tripodName));
 }
 
 function arkGridText(snapshot) {
@@ -145,9 +143,12 @@ function damageGemFor(gems, names) {
 }
 
 function averageSupportCooldown(gems, excludedNames) {
-  const rows = (gems || []).filter(gem => gem?.valid !== false && gemKind(gem) === 'cooldown' && !skillMatches(gem, excludedNames));
-  if (!rows.length) return 0;
-  return rows.reduce((sum, gem) => sum + gemPercent(gem), 0) / rows.length;
+  const bySkill = new Map();
+  for (const gem of (gems || []).filter(item => item?.valid !== false && gemKind(item) === 'cooldown' && !skillMatches(item, excludedNames))) {
+    const key = normalized(gem.skillName) || gem;
+    bySkill.set(key, Math.max(bySkill.get(key) || 0, gemPercent(gem)));
+  }
+  return bySkill.size ? [...bySkill.values()].reduce((sum, bonus) => sum + bonus, 0) / bySkill.size : 0;
 }
 
 export function isSupportSnapshot(snapshot) {
@@ -240,7 +241,6 @@ export function supportContributionModel(snapshot, context = {}) {
   const evolution = evolutionBonuses(context.selection || {});
   const core = coreBonuses(snapshot);
   const enlightenment = enlightenmentBonuses(context.enlightenmentItems || []);
-  const tripodText = selectedTripodText(context.skillEffects || {});
 
   const rawSwift = statValue(snapshot, '신속');
   const rawSpec = statValue(snapshot, '특화');
@@ -250,8 +250,8 @@ export function supportContributionModel(snapshot, context = {}) {
 
   let cooldownA = config.cooldownA;
   let cooldownB = config.cooldownB;
-  if (className === '바드' && tripodText.includes('빠른 준비')) cooldownA = 24;
-  if (className === '도화가' && tripodText.includes('빠른 준비')) cooldownB = 24;
+  if (className === '바드' && hasSelectedTripod(context.skillEffects, config.attackA, '빠른 준비')) cooldownA = 24;
+  if (className === '도화가' && hasSelectedTripod(context.skillEffects, config.attackB, '빠른 준비')) cooldownB = 24;
 
   const cooldownGemA = cooldownGemFor(gems, config.attackA);
   const cooldownGemB = cooldownGemFor(gems, config.attackB);
@@ -274,7 +274,8 @@ export function supportContributionModel(snapshot, context = {}) {
   const uptimeB = clamp(config.durationB / actualCooldownB, 0, 1);
   const overallAttackUptime = clamp((config.durationA + config.durationB) / Math.max(config.durationA + config.durationB, actualCooldownA, actualCooldownB), 0, 1);
 
-  const attackPower = statValue(snapshot, '공격력') || 170000;
+  const baseAttackPower = Math.max(0, number(snapshot?.profile?.baseAttackPower));
+  const attackPower = baseAttackPower || statValue(snapshot, '공격력') || 170000;
   const attackGemA = damageGemFor(gems, config.attackA);
   const attackGemB = damageGemFor(gems, config.attackB);
   const accessoryAttack = sumSupportEffect(snapshot, 'allyAttackBuff');
@@ -293,9 +294,10 @@ export function supportContributionModel(snapshot, context = {}) {
   const allTimeBuffPower = attackFactor * brandFactor * partyDamageFactor;
 
   const identityGemLevel = damageGemFor(gems, config.identity);
-  const allyDamageBonus = sumSupportEffect(snapshot, 'allyDamageBuff') + core.allyDamage + identityGemLevel;
+  const commonAllyDamageBonus = sumSupportEffect(snapshot, 'allyDamageBuff') + core.allyDamage;
+  const allyDamageBonus = commonAllyDamageBonus + identityGemLevel;
   const identityFactor = 1 + 0.13 * enlightenment.identityMultiplier * (1 + allyDamageBonus / 100) * (1 + effectiveSpec / 20.791 / 100);
-  const awakeningFactor = 1 + 0.10 * (1 + allyDamageBonus / 100);
+  const awakeningFactor = 1 + 0.10 * (1 + commonAllyDamageBonus / 100);
   const fullBuffPower = allTimeBuffPower * identityFactor * awakeningFactor;
 
   const averageCooldown = averageSupportCooldown(gems, config.care);
@@ -330,6 +332,7 @@ export function supportContributionModel(snapshot, context = {}) {
     detail: {
       className,
       attackPower,
+      attackPowerBasis: baseAttackPower > 0 ? 'base' : 'estimated',
       effectiveSwift,
       effectiveSpec,
       uptimeA,
@@ -341,6 +344,7 @@ export function supportContributionModel(snapshot, context = {}) {
       allyAttackA,
       allyAttackB,
       allyDamageBonus,
+      awakeningAllyDamageBonus: commonAllyDamageBonus,
       brandBonus,
       brandUptime: brand.uptime,
       brandUptimeModeled: brand.modeled,

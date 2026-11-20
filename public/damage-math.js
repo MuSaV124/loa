@@ -1,4 +1,4 @@
-import { calculateBluntSpike } from './evolution-math.js?v=6.1.1';
+import { calculateBluntSpike } from './evolution-math.js?v=6.1.3';
 
 export const BASE_CRIT_DAMAGE = 200;
 export const CRIT_RATE_PER_STAT = 0.03579; // 기존 Lv.70 환산값. 공식 반올림 정밀도는 미검증.
@@ -30,13 +30,18 @@ export function expectedCriticalDamage({
   const critFactor = Math.max(0, finite(critDamage, BASE_CRIT_DAMAGE) / 100);
   const extraTiers = Math.max(0, rate / 100 - 1);
   const convertedDamage = forcedCrit && canCrit ? rawRate * finite(critRateToDamage) : 0;
-  const expectedMultiplier = (1 - critHitChance)
-    + critHitChance * critFactor * Math.max(0, finite(critHitMultiplier, 1))
-    + extraTiers * (critFactor - 1);
+  const onCrit = Math.max(0, finite(critHitMultiplier, 1));
+  const firstTier = (1 - critHitChance) + critHitChance * critFactor * onCrit;
+  const extraDamage = extraTiers * (critFactor - 1);
+  const conversionFactor = percentFactor(convertedDamage);
+  const multiplier = Math.max(0, firstTier + extraDamage) * conversionFactor;
+  // The patch specifies one trigger. The scope of that trigger remains unverified.
+  const alternateMultiplier = Math.max(0, firstTier + extraDamage * onCrit) * conversionFactor;
   return {
     guaranteedTiers, nextTierChance, critHitChance, convertedDamage,
     multiCritChance: Math.max(0, Math.min(1, rate / 100 - 1)),
-    multiplier: Math.max(0, expectedMultiplier) * percentFactor(convertedDamage)
+    multiplier, alternateMultiplier,
+    multiCritBonus: multiplier - Math.max(0, firstTier) * conversionFactor
   };
 }
 
@@ -53,18 +58,23 @@ export function expectedHitDamage(stats = {}) {
     critRate: conversion.effectiveCritRate,
     critDamage: stats.critDamage,
     critHitMultiplier,
-    multiCrit: !blunt && stats.multiCrit !== false,
+    multiCrit: !blunt,
     canCrit: stats.canCrit !== false,
     forcedCrit: !blunt && Boolean(stats.forcedCrit),
     critRateToDamage: stats.critRateToDamage
   });
   const skillDamageMultiplier = percentFactor(stats.skillDamage);
   const engravingDamageMultiplier = Math.max(0, finite(stats.engravingDamageMultiplier, 1));
-  const value = critical.multiplier * percentFactor(evolutionDamage) * percentFactor(stats.additionalDamage)
-    * enemyMultiplier * percentFactor(stats.attributeDamage) * percentFactor(stats.attackPower)
-    * skillDamageMultiplier * engravingDamageMultiplier;
+  const applyDamageGroups = multiplier => {
+    const value = multiplier * percentFactor(evolutionDamage) * percentFactor(stats.additionalDamage)
+      * enemyMultiplier * percentFactor(stats.attributeDamage) * percentFactor(stats.attackPower)
+      * skillDamageMultiplier * engravingDamageMultiplier;
+    return Number.isFinite(value) ? value : 0;
+  };
   return {
-    value: Number.isFinite(value) ? value : 0,
+    value: applyDamageGroups(critical.multiplier),
+    alternateValue: applyDamageGroups(critical.alternateMultiplier),
+    multiCritContribution: applyDamageGroups(critical.multiCritBonus),
     critical, rawCritRate, ...conversion, evo: evolutionDamage,
     critHitStackingUnverified: critical.multiCritChance > 0 && critHitMultiplier !== 1,
     enemyDamage: (enemyMultiplier - 1) * 100,

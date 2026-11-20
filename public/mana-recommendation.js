@@ -196,9 +196,14 @@ export function evaluateManaCandidate(scenario, stats, damage) {
   if (!rows.length || Math.abs(rows.reduce((sum, row) => sum + row.share, 0) - 1) > 1e-6) {
     return { reason: '전체 피해 지분을 스킬별로 연결하지 못함' };
   }
-  if (damage.critHitStackingUnverified || rows.some(row => row.critInteractionUnverified || row.partialCritRuleUnmodeled)) {
-    return { reason: '일부 피해 효과의 치명 규칙 적용 순서 미검증' };
-  }
+  const assumptions = [
+    damage.unverifiedClassEffects && '일부 직업 효과 발동·적용 범위 미확인',
+    damage.critHitStackingUnverified && '회심 범위 A/B 가정',
+    rows.some(row => row.critInteractionUnverified) && '확정 치명과 뭉가 중첩 시 뭉가 규칙으로 추정',
+    rows.some(row => row.partialCritRuleUnmodeled) && '별도 치명 규칙이 있는 일부 타격 효과 미반영',
+    rows.some(row => row.directionalCritUnverified) && '방향 미확인 스킬의 일격 치피 미반영',
+    rows.some(row => row.braceletDirectionUnverified) && '방향 미확인 스킬의 팔찌 방향성 주피 미반영'
+  ].filter(Boolean);
   const reductions = stats.manaCostReductions || [];
   const manaDependent = reductions.length || stats.manaFurnace || stats.manaSkillCooldownReduction;
   if (manaDependent && scenario.skills.some(skill => skill.usesMana == null)) return { reason: '일부 스킬의 마나 사용 여부 미확인' };
@@ -207,24 +212,37 @@ export function evaluateManaCandidate(scenario, stats, damage) {
   const { byName, reference, firstShortage, delayedSkills } = manaCastResults(scenario, stats, reductions);
   if (rows.some(row => !reference.get(normalizeSkillCycleName(row.name)))) return { reason: '전투 구간에 사용 기회가 없는 피해 스킬 포함' };
   let value = damage.value;
+  let alternateValue = damage.alternateValue ?? value;
   for (const row of rows) {
     const name = normalizeSkillCycleName(row.name);
-    value -= row.share * row.value * (1 - byName.get(name).casts / reference.get(name));
+    const lostShare = row.share * (1 - byName.get(name).casts / reference.get(name));
+    value -= lostShare * row.value;
+    alternateValue -= lostShare * (row.alternateValue ?? row.value);
   }
-  return { value: Math.max(0, value), firstShortage, delayedSkills, quality: scenario.environment?.quality || 'input' };
+  return {
+    value: Math.max(0, value), alternateValue: Math.max(0, alternateValue), firstShortage, delayedSkills, assumptions,
+    quality: assumptions.length ? 'estimate' : scenario.environment?.quality || 'input'
+  };
 }
 
 export function rankManaCandidates(candidates, compareMana) {
   const theoretical = candidates.filter(candidate => !candidate.calc.result.manaDamageUnverified)
     .sort((a, b) => b.recValue - a.recValue);
   theoretical.forEach((candidate, i) => { candidate.theoryRank = i + 1; });
+  const compareAvailability = (a, b) => Number(a.mana.firstShortage != null) - Number(b.mana.firstShortage != null);
   const evaluated = compareMana ? theoretical.filter(candidate => Number.isFinite(candidate.mana?.value))
-    .sort((a, b) => Number(a.mana.firstShortage != null) - Number(b.mana.firstShortage != null)
-      || b.mana.value - a.mana.value || a.theoryRank - b.theoryRank) : [];
+    .sort((a, b) => b.mana.value - a.mana.value || compareAvailability(a, b) || a.theoryRank - b.theoryRank) : [];
   evaluated.forEach((candidate, i) => { candidate.scenarioRank = i + 1; });
   const practical = evaluated.filter(candidate => candidate.mana.quality !== 'estimate');
   practical.forEach((candidate, i) => { candidate.manaRank = i + 1; });
   const unverified = candidates.filter(candidate => candidate.calc.result.manaDamageUnverified
     || (compareMana && (!Number.isFinite(candidate.mana?.value) || candidate.mana?.quality === 'estimate')));
-  return { theoretical, practical, evaluated, unverified };
+  const theoryValueB = candidate => candidate.supportModel
+    ? candidate.recValue : candidate.calc.result.alternateValue ?? candidate.recValue;
+  const theoreticalAlternate = [...theoretical].sort((a, b) => theoryValueB(b) - theoryValueB(a));
+  const theoryRankB = new Map(theoreticalAlternate.map((candidate, i) => [candidate, i]));
+  const manaValueB = candidate => candidate.mana.alternateValue ?? candidate.mana.value;
+  const evaluatedAlternate = [...evaluated].sort((a, b) => manaValueB(b) - manaValueB(a)
+    || compareAvailability(a, b) || theoryRankB.get(a) - theoryRankB.get(b));
+  return { theoretical, practical, evaluated, unverified, theoreticalAlternate, evaluatedAlternate };
 }

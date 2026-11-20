@@ -7,7 +7,7 @@ import { extractArkGridSkillEffects } from '../public/passive-skill-effects.js';
 import { extractCardEffects } from '../public/card-effects.js';
 import { extractAvatarEffects } from '../public/avatar-effects.js';
 
-const API_VERSION = '6.1.1';
+const API_VERSION = '6.1.4';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const OFFICIAL_ARMGUARD_ICON = `${CDN_PREFIX}efui_iconatlas/bracer/bracer_1.png`;
 const CHARACTER_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
@@ -68,7 +68,10 @@ async function loadCharacterData(name, apiKey) {
     fetchOptionalJson(combatSkillsUrl, apiKey, 9000)
   ]);
 
-  const data = response.data;
+  return parseCharacterArmory(response.data, { arkGrid, combatSkills });
+}
+
+export function parseCharacterArmory(data, { arkGrid = {}, combatSkills = {} } = {}) {
   if (!data || typeof data !== 'object') {
     const error = new Error('Open API 응답에 캐릭터 데이터가 없습니다.');
     error.status = 502;
@@ -290,7 +293,7 @@ function extractEquipmentSnapshot(equipment) {
   };
 }
 
-function parseEquipmentSnapshotItem(item) {
+export function parseEquipmentSnapshotItem(item) {
   const tooltip = parseTooltip(item?.Tooltip);
   const text = tooltipText(item?.Tooltip);
   const name = stripHtml(item?.Name || '');
@@ -322,6 +325,7 @@ function parseEquipmentSnapshotItem(item) {
       matchNumber(text, [/아이템\s*레벨[^0-9]{0,12}([0-9,.]+)/])
     ]),
     quality,
+    ...(type === '무기' ? { qualityAdditionalDamage: matchNumber(text, [/추가\s*피해(?:량)?\s*\+?\s*(\d+(?:\.\d+)?)\s*%/]) } : {}),
     weaponPower: matchNumber(text, [/무기\s*공격력[^0-9+-]{0,12}\+?([0-9,.]+)/]),
     attackPower: matchNumber(text, [/(?<!무기\s*)공격력[^0-9+-]{0,12}\+?([0-9,.]+)/]),
     rawKnownKeys: Object.keys(item || {}).sort()
@@ -1020,7 +1024,22 @@ const BRACELET_OPTION_GRADE_VALUES = {
   }
 };
 
-function parseAccessoryText(text, itemType = '', itemGrade = '') {
+const ACCESSORY_CRIT_HIT_DAMAGE = /치명타(?:로|가)?\s*적중\s*시\s*적에게\s*주는\s*피해(?:량)?(?:이|가)?\s*\+?(\d+(?:\.\d+)?)\s*%\s*(?:증가)?/g;
+const ACCESSORY_DIRECTIONAL_DAMAGE = /(백\s*어택|헤드\s*어택|방향성\s*공격이\s*아닌)\s*스킬이\s*적에게\s*주는\s*피해(?:량)?(?:이|가)?\s*\+?(\d+(?:\.\d+)?)\s*%\s*(?:증가)?/g;
+const ACCESSORY_ENEMY_DAMAGE = /(?<!무력화\s*상태의\s*)적에게\s*주는\s*피해(?:가)?\s*\+?(\d+(?:\.\d+)?)\s*%\s*(?:증가)?/g;
+
+function accessoryUnconditionalDamageText(source) {
+  const mask = match => ' '.repeat(match.length);
+  return source.replace(ACCESSORY_CRIT_HIT_DAMAGE, mask).replace(ACCESSORY_DIRECTIONAL_DAMAGE, mask);
+}
+
+function directionalDamageKey(label) {
+  if (label.startsWith('백')) return 'back';
+  if (label.startsWith('헤드')) return 'head';
+  return 'nonDirectional';
+}
+
+export function parseAccessoryText(text, itemType = '', itemGrade = '') {
   const out = { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, attackPowerFlat: 0, weaponPowerFlat: 0, attackPowerPercent: 0, weaponPowerPercent: 0, strength: 0, dexterity: 0, intelligence: 0, critStat: 0, swiftStat: 0, specStat: 0, identityGain: 0, brandPower: 0, allyAttackBuff: 0, allyDamageBuff: 0, partyHeal: 0, partyShield: 0, maxHp: 0, maxMana: 0, statusDuration: 0, combatHpRegen: 0, attackMoveSpeed: 0, seedDamage: 0, seedDamageReduction: 0, physicalDefense: 0, magicDefense: 0, resourceRecovery: 0, spaceCooldown: 0, optionGrades: {} };
   const source = stripHtml(text);
 
@@ -1150,20 +1169,9 @@ function parseAccessoryText(text, itemType = '', itemGrade = '') {
   ], source, itemType, itemGrade);
 
   // 치명타 적중 시 적주피는 일반 적주피가 아니라 치명타 배율 안에서 별도 곱연산으로 계산합니다.
-  addMatches(out, 'critHitDamage', source, [
-    /공격이\s*치명타로\s*적중\s*시\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], source, itemType, itemGrade);
-
-  const enemyDamageSource = source.replace(/공격이\s*치명타로\s*적중\s*시\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?\d+(?:\.\d+)?%\s*(?:증가)?/g, '');
-
-  // "무력화 상태의 적에게 주는 피해"와 치명타 적중 시 피해는 별도 조건부라 제외하고,
-  // 일반 적주피/쿨증 적주피/백·헤드·비방향성 적주피는 각 출처별 곱연산으로 계산합니다.
-  addMatches(out, 'enemyDamage', enemyDamageSource, [
-    /(?<!무력화\s*상태의\s*)(?<!치명타로\s*적중\s*시\s*)적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
-    /백어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
-    /헤드어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g,
-    /방향성\s*공격이\s*아닌\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/g
-  ], enemyDamageSource, itemType, itemGrade);
+  addMatches(out, 'critHitDamage', source, [ACCESSORY_CRIT_HIT_DAMAGE], source, itemType, itemGrade);
+  const enemyDamageSource = accessoryUnconditionalDamageText(source);
+  addMatches(out, 'enemyDamage', enemyDamageSource, [ACCESSORY_ENEMY_DAMAGE], enemyDamageSource, itemType, itemGrade);
 
   if (itemType === '팔찌') adjustBraceletStackedEffects(source, out);
   if (itemType === '팔찌') out.optionSlots = extractBraceletOptionSlots(source, out, itemGrade);
@@ -1171,6 +1179,10 @@ function parseAccessoryText(text, itemType = '', itemGrade = '') {
   for (const key of Object.keys(out)) {
     if (key === 'optionGrades' || key === 'optionSlots') continue;
     out[key] = Math.round(out[key] * 100) / 100;
+  }
+  for (const match of source.matchAll(ACCESSORY_DIRECTIONAL_DAMAGE)) {
+    const key = directionalDamageKey(match[1]);
+    (out.directionalEnemyDamage ??= {})[key] = (out.directionalEnemyDamage[key] || 0) + Number(match[2]);
   }
   return out;
 }
@@ -1256,16 +1268,14 @@ function extractBraceletOptionSlots(text, effects, itemGrade = '') {
     push('enemyDamage', '이중 적주피', Number(match[1]), 'enemyDamage', `무력화 피해 ${pctForServer(Number(match[2]))}`);
   }
   const sourceWithoutDualEnemy = source.replace(/적에게\s*주는\s*피해(?:가)?\s*(?:\+)?\d+(?:\.\d+)?%\s*증가하며\s*,?\s*무력화\s*상태의\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?\d+(?:\.\d+)?%/gi, '');
-  for (const match of sourceWithoutDualEnemy.matchAll(/(?<!무력화\s*상태의\s*)적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%\s*(?:증가)?/gi)) {
+  for (const match of accessoryUnconditionalDamageText(sourceWithoutDualEnemy).matchAll(ACCESSORY_ENEMY_DAMAGE)) {
     push('enemyDamage', '적주피', Number(match[1]), 'enemyDamage');
   }
 
-  const backAttack = firstMatchNumber(source, [/백어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
-  if (backAttack) push('enemyDamage', '백어택 주피', backAttack, 'enemyDamage');
-  const headAttack = firstMatchNumber(source, [/헤드어택\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
-  if (headAttack) push('enemyDamage', '헤드어택 주피', headAttack, 'enemyDamage');
-  const nonDirectional = firstMatchNumber(source, [/방향성\s*공격이\s*아닌\s*스킬이\s*적에게\s*주는\s*피해(?:가)?\s*(?:\+)?(\d+(?:\.\d+)?)%/i]);
-  if (nonDirectional) push('enemyDamage', '비방향성 주피', nonDirectional, 'enemyDamage');
+  const directionalLabels = { back: '백어택 주피', head: '헤드어택 주피', nonDirectional: '비방향성 주피' };
+  for (const match of source.matchAll(ACCESSORY_DIRECTIONAL_DAMAGE)) {
+    push('enemyDamage', directionalLabels[directionalDamageKey(match[1])], Number(match[2]), 'enemyDamage');
+  }
 
   for (const match of source.matchAll(/추가\s*피해(?:가|\s*\+)?\s*(?:\+)?(\d+(?:\.\d+)?)\s*%/gi)) {
     const near = source.slice(match.index, Math.min(source.length, match.index + 120));

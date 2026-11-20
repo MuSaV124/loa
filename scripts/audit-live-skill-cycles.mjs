@@ -5,7 +5,7 @@ import { combatAnalyzerSkillShares, findCombatAnalyzerProfile } from '../public/
 import { buildSkillCycleModel, evaluateEvolutionCooldown } from '../public/skill-cycle.js';
 
 const API_BASE = process.env.LOA_SKILL_AUDIT_API_BASE || 'https://loa-beige.vercel.app';
-const APP_VERSION = process.env.LOA_SKILL_AUDIT_APP_VERSION || '6.1.1';
+const APP_VERSION = process.env.LOA_SKILL_AUDIT_APP_VERSION || '6.1.4';
 const SUPPORT_ENGRAVINGS = new Set(['축복의 오라', '절실한 구원', '만개']);
 
 const calibrationReferences = JSON.parse(await readFile(new URL('./combat-power-class-samples.json', import.meta.url), 'utf8'));

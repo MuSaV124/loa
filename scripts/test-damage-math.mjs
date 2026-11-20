@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { expectedCriticalDamage, expectedHitDamage } from '../public/damage-math.js';
+import { maintainedEvolutionDamage } from '../public/evolution-math.js';
 import { extractCombatSkillEffects, parseSkillEffectText } from '../public/skill-effects.js';
 import { extractArkGridSkillEffects, extractArkPassiveSkillEffects, passiveEffectsForSkill } from '../public/passive-skill-effects.js';
 
@@ -45,12 +47,65 @@ close(expectedCriticalDamage({ critRate: 120, critDamage: 250, critHitMultiplier
 assert.equal(expectedHitDamage({ critRate: 100, critHitDamage: 12 }).critHitStackingUnverified, false);
 assert.equal(expectedHitDamage({ critRate: 100.01, critHitDamage: 12 }).critHitStackingUnverified, true);
 assert.equal(expectedHitDamage({ critRate: 220, critHitDamage: 12, critCap: 80 }).critHitStackingUnverified, false);
+for (const [critRate, firstOnly, wholeHit] of [[80, 2.44, 2.44], [120, 3.10, 3.136], [220, 4.6, 4.816], [320, 6.1, 6.496]]) {
+  const hit = expectedHitDamage({ critRate, critDamage: 250, critHitDamage: 12 });
+  assert.ok(Math.abs(hit.value - firstOnly) < 1e-10, critRate);
+  assert.ok(Math.abs(hit.alternateValue - wholeHit) < 1e-10, critRate);
+}
 
 const blunt = expectedHitDamage({ critRate: 180, critDamage: 250, critCap: 80, evolutionDamage: 19, overCritToEvolutionDamageRate: 1.4 });
 assert.equal(blunt.critical.multiCritChance, 0);
 close(blunt.critical.critHitChance, .8);
 close(blunt.convertedEvolutionDamage, 140);
 close(blunt.value, (.2 + .8 * 2.5) * 2.59);
+
+const { nodes } = JSON.parse(readFileSync(new URL('../public/data/evolution.json', import.meta.url), 'utf8'));
+const bluntLevels = nodes.find(node => node.name === '뭉툭한 가시').levels;
+const standingLevels = nodes.find(node => node.name === '입식 타격가').levels;
+for (const node of nodes) {
+  if (node.name === '뭉툭한 가시') continue;
+  for (const [level, effects] of Object.entries(node.levels || {})) {
+    const label = `${node.name} Lv.${level}`;
+    assert.equal(effects.critCap, undefined, label);
+    // Node selection owns the multi-crit policy even if the stats carry an opt-out.
+    for (const [critRate, tiers, chance, multiplier] of [[120, 1, .2, 2.8], [220, 2, .2, 4.3], [300, 3, 0, 5.5]]) {
+      const hit = expectedHitDamage({ ...effects, critRate, critDamage: 250, multiCrit: false });
+      assert.equal(hit.effectiveCritRate, critRate, label);
+      assert.equal(hit.convertedEvolutionDamage, 0, label);
+      assert.equal(hit.critical.guaranteedTiers, tiers, label);
+      close(hit.critical.nextTierChance, chance);
+      close(hit.critical.multiplier, multiplier + 2.5 * (effects.critHitDamage ?? 0) / 100);
+    }
+  }
+}
+for (const [level, bluntBase, conversionRate, standingBase] of [[1, 9.5, 1.2, 10.5], [2, 19, 1.4, 21]]) {
+  for (const [critRate, commonCritical, tiers, nextChance] of [
+    [80, 2.2, 0, .8], [100, 2.5, 1, 0], [120, 2.8, 1, .2], [150, 3.25, 1, .5],
+    [200, 4, 2, 0], [220, 4.3, 2, .2], [300, 5.5, 3, 0]
+  ]) {
+    const otherEvolution = 25;
+    const hit = (effect, commonEvolution) => expectedHitDamage({
+      ...effect, critRate: critRate - 35, skillCritBonus: 20, adrenalineCritRate: 15, critDamage: 250,
+      evolutionDamage: effect.evolutionDamage + commonEvolution
+    });
+    const spike = hit(bluntLevels[level], otherEvolution);
+    const standing = hit({ ...standingLevels[level], evolutionDamage: maintainedEvolutionDamage(standingLevels[level]) }, otherEvolution);
+    const conversion = (critRate - 80) * conversionRate;
+    close(spike.effectiveCritRate, 80);
+    close(spike.critical.critHitChance, .8);
+    close(spike.critical.multiCritChance, 0);
+    close(spike.convertedEvolutionDamage, conversion);
+    close(spike.evo, otherEvolution + bluntBase + conversion);
+    close(spike.value, 2.2 * (1 + (otherEvolution + bluntBase + conversion) / 100));
+    close(standing.effectiveCritRate, critRate);
+    assert.equal(standing.critical.guaranteedTiers, tiers);
+    close(standing.critical.nextTierChance, nextChance);
+    close(standing.convertedEvolutionDamage, 0);
+    close(standing.evo, otherEvolution + standingBase);
+    close(standing.critical.multiplier, commonCritical);
+    close(standing.value, commonCritical * (1 + (otherEvolution + standingBase) / 100));
+  }
+}
 close(expectedHitDamage({
   critRate: 120, critDamage: 250, evolutionDamage: 20, additionalDamage: 10,
   enemyDamageSources: [10, { value: 15 }], attackPower: 5, skillDamage: 30, attributeDamage: 15
@@ -64,6 +119,19 @@ assert.equal(glaivier.critRate, 0);
 assert.equal(glaivier.skillDamage, 0);
 assert.equal(glaivier.critDamage, 60);
 close(expectedHitDamage({ ...glaivier, critRate: 120, critDamage: 260 }).value, 2.6 * 1.72);
+for (const critRate of [80, 220, 300]) {
+  const standing = expectedHitDamage({ ...glaivier, ...standingLevels[2], critRate, critDamage: 260,
+    evolutionDamage: maintainedEvolutionDamage(standingLevels[2]) });
+  assert.equal(standing.critical.guaranteedTiers, 1);
+  close(standing.critical.multiCritChance, 0);
+  close(standing.critical.convertedDamage, critRate * .6);
+  close(standing.value, 2.6 * (1 + critRate * .006) * 1.21);
+  // Preserve the current theoretical assumption until the interaction is confirmed in-game.
+  const spike = expectedHitDamage({ ...glaivier, ...bluntLevels[2], critRate, critDamage: 260 });
+  close(spike.critical.critHitChance, .8);
+  close(spike.critical.multiCritChance, 0);
+  close(spike.value, (.2 + .8 * 2.6) * (1.19 + (critRate - 80) * .014));
+}
 assert.equal(parseSkillEffectText('치명타 적중률이 100% 증가한다.').forcedCrit, undefined);
 assert.equal(parseSkillEffectText('치명타 적중률이 80.0% (PvP 40.0%) 증가한다.').critRate, 80);
 
