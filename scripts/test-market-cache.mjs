@@ -5,6 +5,7 @@ import {
   isUsableMaterialSection
 } from '../server/market-cache.js';
 import { T4_MATERIAL_GROUPS } from '../api/market-prices.js';
+import refreshMarketCache from '../api/refresh-market-cache.js';
 
 const now = new Date('2026-07-26T03:00:00.000Z');
 
@@ -85,5 +86,21 @@ assert.throws(() => createNextMarketSnapshot(null, {
   ...freshResults,
   material: { status: 'rejected', reason: new Error('재료 조회 실패') }
 }, { now, apiVersion: 'test' }), /새 응답과 이전 캐시가 모두 유효하지 않습니다/);
+
+const originalEnvironment = process.env.VERCEL_ENV;
+try {
+  process.env.VERCEL_ENV = 'preview';
+  const response = {
+    setHeader() {},
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; }
+  };
+  await refreshMarketCache({ method: 'POST' }, response);
+  assert.equal(response.statusCode, 403);
+  assert.equal(response.body.ok, false);
+} finally {
+  if (originalEnvironment === undefined) delete process.env.VERCEL_ENV;
+  else process.env.VERCEL_ENV = originalEnvironment;
+}
 
 console.log('market cache tests passed');

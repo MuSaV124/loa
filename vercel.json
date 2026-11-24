@@ -1,35 +1,17 @@
 {
   "version": 2,
+  "outputDirectory": "public",
   "functions": {
     "api/**/*.js": {
       "maxDuration": 60
     }
   },
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/(?:index\\.html)?",
-      "dest": "/public/index.html"
-    },
-    {
-      "src": "/(?:simulator|market|ratios)/?",
-      "dest": "/public/index.html"
-    },
-    {
-      "src": "/character/[^/]+(?:/(?:nodes|combat))?/?",
-      "dest": "/public/index.html"
-    },
-    {
-      "src": "/(.+\\.[^/]+)",
-      "dest": "/public/$1"
-    },
-    {
-      "src": "/.*",
-      "dest": "/public/index.html",
-      "status": 404
-    }
+  "rewrites": [
+    { "source": "/character/:name", "destination": "/index.html" },
+    { "source": "/character/:name/nodes", "destination": "/index.html" },
+    { "source": "/character/:name/combat", "destination": "/index.html" },
+    { "source": "/simulator", "destination": "/index.html" },
+    { "source": "/market", "destination": "/index.html" },
+    { "source": "/ratios", "destination": "/index.html" }
   ]
 }

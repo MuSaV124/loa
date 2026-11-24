@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { access, readFile, unlink } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, relative, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
-import { normalizeRoutes } from '@vercel/routing-utils';
+import { getTransformedRoutes } from '@vercel/routing-utils';
 import { evolutionAllocations } from '../public/evolution-math.js';
 import { pagePath } from '../public/page-route.js';
 import { encodeSpecScenario } from '../public/spec-planner.js';
@@ -15,7 +15,8 @@ const evolutionPoints = Value => [{ Name: '진화', Value }];
 const waitForRecommendations = page => page.locator('#recommendList:not([aria-busy])').waitFor({ state: 'attached', timeout: 60000 });
 const openNodeRecommendation = page => page.locator('#characterNodesLink').click();
 
-const publicRoot = join(process.cwd(), 'public');
+const vercelConfig = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
+const publicRoot = join(process.cwd(), vercelConfig.outputDirectory);
 const chromeDebugLog = join(process.cwd(), 'debug.log');
 let chromeDebugLogExisted = true;
 try { await access(chromeDebugLog); } catch { chromeDebugLogExisted = false; }
@@ -28,25 +29,24 @@ const contentTypes = {
   '.svg': 'image/svg+xml',
   '.webp': 'image/webp'
 };
-const vercelConfig = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
-const { routes: vercelRoutes, error: routeError } = normalizeRoutes(vercelConfig.routes);
+const { routes: vercelRoutes, error: routeError } = getTransformedRoutes(vercelConfig);
 assert.equal(routeError, null);
 
 const server = createServer(async (req, res) => {
   try {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
-    const route = vercelRoutes.find(route => new RegExp(route.src).test(pathname));
-    if (!route?.dest) throw new Error('no file route');
-    const output = pathname.replace(new RegExp(route.src), route.dest);
-    if (!output.startsWith('/public/')) throw new Error('test API requires a fixture');
-    const filePath = normalize(join(publicRoot, output.slice('/public/'.length)));
-    if (!filePath.startsWith(publicRoot)) throw new Error('invalid path');
+    const route = vercelRoutes.find(route => route.src && new RegExp(route.src).test(pathname));
+    const output = route?.dest ? new URL(pathname.replace(new RegExp(route.src), route.dest), 'http://localhost').pathname : pathname;
+    if (output.startsWith('/api/')) throw new Error('test API requires a fixture');
+    const filePath = join(publicRoot, output === '/' ? 'index.html' : decodeURIComponent(output.slice(1)));
+    const underRoot = relative(publicRoot, filePath);
+    if (!underRoot || underRoot === '..' || underRoot.startsWith('..' + sep)) throw new Error('invalid path');
     const body = await readFile(filePath);
-    res.writeHead(route.status || 200, { 'Content-Type': contentTypes[extname(filePath)] || 'application/octet-stream' });
+    res.writeHead(200, { 'Content-Type': contentTypes[extname(filePath)] || 'application/octet-stream' });
     res.end(body);
   } catch {
-    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end('{}');
+    res.writeHead(404, { 'Content-Type': contentTypes['.html'] });
+    res.end(await readFile(join(publicRoot, '404.html')));
   }
 });
 
