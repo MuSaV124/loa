@@ -104,14 +104,14 @@ try {
     if (url.endsWith('/markets/options')) {
       optionCalls += 1;
       assert.equal(init.method, 'GET');
-      return json({ Categories: [{ Code: 50000, CodeName: '강화 재료' },
-        { Code: 70000, CodeName: '아크 그리드', Subs: [{ Code: 70010, CodeName: '젬' }] }] });
+      return json({ Categories: [{ Code: 50000, CodeName: '강화 재료',
+        Subs: [{ Code: 50010, CodeName: '아크 그리드 재료' }] }] });
     }
     assert.match(url, /\/markets\/items$/);
     calls += 1;
     const { ItemName, Sort, CategoryCode } = JSON.parse(init.body);
     assert.equal(Sort, 'CURRENT_MIN_PRICE');
-    assert.equal(CategoryCode, /(?:질서|혼돈)의 젬/.test(ItemName) ? 70010 : 50000);
+    assert.equal(CategoryCode, /(?:질서|혼돈)의 젬/.test(ItemName) ? 50010 : 50000);
     const data = {
       '운명의 돌파석': [wireRow('위대한 운명의 돌파석', 66110226, 3), wireRow(ItemName, 66110225, 12)],
       '운명의 파괴석': [wireRow(ItemName, 66102006, 152, 100), wireRow('운명의 파괴석 결정', 66102007, 20, 100)],

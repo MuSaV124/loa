@@ -622,7 +622,7 @@ async function searchEngravingListFresh(apiKey, maxPages) {
 
 async function searchT4Materials(apiKey, query) {
   const force = String(query.force || '') === '1';
-  const cacheKey = 't4Materials:v11:market-categories';
+  const cacheKey = 't4Materials:v12:ark-grid-materials';
   return getCachedMarketList(cacheKey, force, async () => searchT4MaterialsFresh(apiKey), isUsableT4MaterialList);
 }
 
@@ -634,10 +634,11 @@ async function getMaterialMarketCategories(apiKey) {
   const code = entry => Number.isInteger(Number(entry?.Code)) && Number(entry.Code) > 0 ? Number(entry.Code) : null;
   const name = entry => String(entry?.CodeName ?? '').replace(/\s/g, '');
   const honing = categories.find(entry => ['강화재료', '재련재료'].includes(name(entry)) || code(entry) === 50000);
-  const grid = categories.find(entry => name(entry) === '아크그리드');
-  const gems = [...(grid?.Subs || []), ...categories.flatMap(entry => entry.Subs || []), ...categories]
+  const gridMaterials = [...(honing?.Subs || []), ...categories]
+    .find(entry => ['아크그리드재료', '아크그리드'].includes(name(entry)) && code(entry));
+  const gems = [...(gridMaterials?.Subs || []), ...(honing?.Subs || []), ...categories]
     .find(entry => ['젬', '아크그리드젬'].includes(name(entry)) && code(entry));
-  return { materials: code(honing), gems: code(gems) ?? code(grid) };
+  return { materials: code(honing), gems: code(gems) ?? code(gridMaterials) ?? code(honing) };
 }
 
 async function searchT4MaterialsFresh(apiKey) {
