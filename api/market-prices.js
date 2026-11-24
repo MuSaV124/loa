@@ -622,13 +622,28 @@ async function searchEngravingListFresh(apiKey, maxPages) {
 
 async function searchT4Materials(apiKey, query) {
   const force = String(query.force || '') === '1';
-  const cacheKey = 't4Materials:v10:validated-bundles';
+  const cacheKey = 't4Materials:v11:market-categories';
   return getCachedMarketList(cacheKey, force, async () => searchT4MaterialsFresh(apiKey), isUsableT4MaterialList);
 }
 
+async function getMaterialMarketCategories(apiKey) {
+  const options = await getCachedMarketList('materialMarketOptions', false, () =>
+    requestLostArk(apiKey, 'https://developer-lostark.game.onstove.com/markets/options'), data => Array.isArray(data?.Categories));
+  const categories = options?.Categories;
+  if (!Array.isArray(categories)) throw new Error('거래소 검색 카테고리 응답 형식 오류');
+  const code = entry => Number.isInteger(Number(entry?.Code)) && Number(entry.Code) > 0 ? Number(entry.Code) : null;
+  const name = entry => String(entry?.CodeName ?? '').replace(/\s/g, '');
+  const honing = categories.find(entry => ['강화재료', '재련재료'].includes(name(entry)) || code(entry) === 50000);
+  const grid = categories.find(entry => name(entry) === '아크그리드');
+  const gems = [...(grid?.Subs || []), ...categories.flatMap(entry => entry.Subs || []), ...categories]
+    .find(entry => ['젬', '아크그리드젬'].includes(name(entry)) && code(entry));
+  return { materials: code(honing), gems: code(gems) ?? code(grid) };
+}
+
 async function searchT4MaterialsFresh(apiKey) {
+  const categories = await getMaterialMarketCategories(apiKey);
   const tasks = T4_MATERIAL_GROUPS.flatMap(group => group.items.map(name => ({ group: group.group, name })));
-  const results = await mapWithConcurrency(tasks, 8, task => searchMarketMaterial(apiKey, task.name, task.group));
+  const results = await mapWithConcurrency(tasks, 8, task => searchMarketMaterial(apiKey, task.name, task.group, categories));
   const rows = [];
   const tried = [];
   for (let i = 0; i < results.length; i += 1) {
@@ -655,16 +670,14 @@ function isUsableT4MaterialList(data) {
   return !importantMissing && missingCount < Math.max(3, Math.ceil(items.length * 0.25));
 }
 
-async function searchMarketMaterial(apiKey, name, group) {
+async function searchMarketMaterial(apiKey, name, group, categories) {
   const tried = [];
   const matched = [];
   const aliases = materialSearchAliases(name);
   const isArkGridGem = isArkGridGemName(name);
-  const queries = [{ keyword: aliases[0], categoryCode: 0 }];
-  if (aliases.length > 1 || !isArkGridGem) {
-    queries.push({ keyword: aliases[1] || aliases[0], categoryCode: isArkGridGem ? 0 : 50000 });
-  }
-  for (const { keyword, categoryCode } of queries) {
+  const categoryCode = isArkGridGem ? categories.gems : categories.materials;
+  if (!categoryCode) throw new Error(`거래소 검색 카테고리 미확인 (${group})`);
+  for (const keyword of aliases.slice(0, 2)) {
     const payload = { Sort: 'CURRENT_MIN_PRICE', SortCondition: 'ASC', CategoryCode: categoryCode, ItemGrade: isArkGridGem ? ARK_GRID_GEM_GRADE : undefined, ItemName: keyword, PageNo: 1 };
     stripUndefined(payload);
     const data = await requestLostArk(apiKey, MARKET_ENDPOINT, { method: 'POST', body: payload });

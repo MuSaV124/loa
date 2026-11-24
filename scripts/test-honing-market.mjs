@@ -99,11 +99,19 @@ const json = (data, init = {}) => Response.json(data, init);
 try {
   process.env.LOSTARK_API_KEY = 'market-test-success';
   let calls = 0;
+  let optionCalls = 0;
   globalThis.fetch = async (url, init) => {
+    if (url.endsWith('/markets/options')) {
+      optionCalls += 1;
+      assert.equal(init.method, 'GET');
+      return json({ Categories: [{ Code: 50000, CodeName: '강화 재료' },
+        { Code: 70000, CodeName: '아크 그리드', Subs: [{ Code: 70010, CodeName: '젬' }] }] });
+    }
     assert.match(url, /\/markets\/items$/);
     calls += 1;
-    const { ItemName, Sort } = JSON.parse(init.body);
+    const { ItemName, Sort, CategoryCode } = JSON.parse(init.body);
     assert.equal(Sort, 'CURRENT_MIN_PRICE');
+    assert.equal(CategoryCode, /(?:질서|혼돈)의 젬/.test(ItemName) ? 70010 : 50000);
     const data = {
       '운명의 돌파석': [wireRow('위대한 운명의 돌파석', 66110226, 3), wireRow(ItemName, 66110225, 12)],
       '운명의 파괴석': [wireRow(ItemName, 66102006, 152, 100), wireRow('운명의 파괴석 결정', 66102007, 20, 100)],
@@ -123,6 +131,7 @@ try {
   assert.equal(item('질서의 젬 : 안정').price, 8111);
   assert.equal(first.items.length, T4_MATERIAL_GROUPS.flatMap(group => group.items).length);
   assert.ok(calls <= first.items.length * 2);
+  assert.equal(optionCalls, 1);
 
   process.env.LOSTARK_API_KEY = 'market-test-throttled';
   calls = 0;
