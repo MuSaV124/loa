@@ -17,6 +17,7 @@ import { ARMGUARD_BREATH_ESTIMATE, ARMGUARD_HONING_INFO, allocateArmguardLimitBr
 import { normalHoningAttemptDistribution, normalHoningAttemptRatePercent } from './honing-probability.js';
 import { calculateHoningMaterialCost, goldEfficiency } from './honing-cost.js';
 import { materialPurchaser, materialQuote } from './material-quotes.js';
+import { marketFreshness, preservesPricedItems } from './market-freshness.js';
 import { MANA_RECOMMENDATION_SECONDS, createManaRanking, evaluateManaCandidate, manaFurnaceDamage, minimumSustainableMana, prepareManaScenario } from './mana-recommendation.js?v=6.1.7';
 import { AUTO_MANA_RECOVERY_SOURCE, buildAutomaticManaAnalysis } from './mana-automatic.js?v=6.1.7';
 import { buildCharacterManaProfile, findVerifiedManaProfile, MANA_PROFILE_PATCH, withManaCooldowns } from './mana-character.js?v=6.1.8';
@@ -508,6 +509,11 @@ const MARKET_CLIENT_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
 const MARKET_REFRESH_STORAGE_KEY = 'loa-market-refresh-v1';
 const MARKET_SNAPSHOT_STORAGE_KEY = 'loa-market-snapshot-v1';
 const MARKET_SNAPSHOT_CHECK_MS = 5 * 60 * 1000;
+const MARKET_SECTION_ROUTES = {
+  gem: '/api/market-prices?mode=gemList', engraving: '/api/market-prices?mode=engravingList',
+  material: '/api/market-prices?mode=t4Materials', crystal: '/api/crystal-price'
+};
+const MARKET_SECTION_LABELS = { gem: '보석', engraving: '각인서', material: '강화 재료·젬', crystal: '크리스탈' };
 const MATERIAL_QUOTE_STALE_MS = 40 * 60 * 1000;
 let materialQuoteSection = null;
 let materialQuoteRefreshFailed = false;
@@ -526,6 +532,7 @@ const MARKET_REFRESH_BUTTON_IDS = {
 let marketRefreshTimes = readStoredObject(MARKET_REFRESH_STORAGE_KEY);
 let marketSnapshotHydrated = false;
 let marketSnapshotAvailable = false;
+let marketSnapshotSectionTimes = null;
 let marketSnapshotNetworkState = 'idle';
 let activeCharacterName = '';
 let activeCharacterSavedAt = 0;
@@ -3317,23 +3324,66 @@ function buildT4MaterialPriceMap(data) {
   return map;
 }
 function materialQuoteStatus() {
-  const updated = Date.parse(materialQuoteSection?.updatedAt || '');
-  const stamp = Number.isFinite(updated)
-    ? `마지막 조회 ${new Date(updated).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} KST`
-    : '조회 시각 없음';
-  const stale = Number.isFinite(updated) && Date.now() - updated >= MATERIAL_QUOTE_STALE_MS;
   const incomplete = materialQuoteSection?.items?.some(item => item.missing || item.error);
-  return [stamp, stale && '오래된 캐시', (materialQuoteRefreshFailed || materialSnapshotRefreshFailed) && '갱신 실패', incomplete && '일부 가격 누락'].filter(Boolean).join(' · ');
+  return [marketFreshnessText(marketFreshness(materialQuoteSection?.updatedAt)),
+    (materialQuoteRefreshFailed || materialSnapshotRefreshFailed) && '갱신 실패', incomplete && '일부 가격 누락'].filter(Boolean).join(' · ');
 }
+
+function marketFreshnessText(status) {
+  return status.state === 'unknown' ? status.label
+    : `마지막 정상 갱신 ${status.stamp} · ${status.elapsed} 경과 · ${status.label}`;
+}
+
+function marketSectionData(section) {
+  if (section === 'material') return materialQuoteSection;
+  if (section === 'crystal') return crystalPriceCache;
+  return marketResponseCache.get(MARKET_SECTION_ROUTES[section])?.data;
+}
+
+function renderMarketFreshness() {
+  const now = Date.now();
+  const statuses = Object.fromEntries(Object.keys(MARKET_SECTION_LABELS).map(section => {
+    const data = marketSectionData(section);
+    return [section, marketFreshness(section === 'crystal' ? data?.latest?.dt || data?.updatedAt : data?.updatedAt, now)];
+  }));
+  const marketStatus = $('marketFreshnessStatus');
+  const selected = statuses[selectedMarketTab];
+  const sectionTimes = Object.keys(MARKET_SECTION_ROUTES).map(section => marketFreshness(marketSnapshotSectionTimes?.[section], now));
+  const auto = sectionTimes.every(status => status.stamp) ? sectionTimes.sort((a, b) => a.time - b.time)[0] : null;
+  const shown = selected || auto || marketFreshness(null, now);
+  const autoWarning = selected && auto && auto.time !== selected.time
+    && ['delayed', 'stale'].includes(auto.state) && `자동 캐시(가장 오래된 항목) · ${marketFreshnessText(auto)}`;
+  marketStatus.dataset.freshness = autoWarning && shown.state === 'current' ? auto.state : shown.state;
+  marketStatus.textContent = [selected ? MARKET_SECTION_LABELS[selectedMarketTab] : '자동 캐시(가장 오래된 항목)',
+    marketFreshnessText(shown), autoWarning].filter(Boolean).join(' · ');
+  const simulatorStatus = $('simulatorMarketFreshness');
+  const entries = Object.entries(statuses);
+  const oldest = entries.filter(([, status]) => status.stamp).sort(([, a], [, b]) => a.time - b.time)[0];
+  const stale = entries.filter(([, status]) => ['delayed', 'stale'].includes(status.state));
+  const unavailable = entries.filter(([, status]) => status.state === 'unknown');
+  const labels = list => list.map(([section]) => MARKET_SECTION_LABELS[section]).join('·');
+  const warning = stale.length && `오래된 ${labels(stale)} 시세가 계산에 사용될 수 있습니다.`;
+  const unknown = unavailable.length && `갱신 시각 미확인 (${labels(unavailable)})`;
+  simulatorStatus.dataset.freshness = oldest?.[1].state || 'unknown';
+  simulatorStatus.textContent = [oldest && `${MARKET_SECTION_LABELS[oldest[0]]} 기준 ${marketFreshnessText(oldest[1])}`, warning, unknown]
+    .filter(Boolean).join(' · ');
+}
+
 function renderMaterialQuoteStatus() {
   document.querySelectorAll('[data-material-quote-status]').forEach(status => {
     status.textContent = `거래소 최저 등록가 · ${materialQuoteStatus()}`;
   });
+  renderMarketFreshness();
 }
 function applyMaterialQuotes(data) {
   const time = Date.parse(data?.updatedAt || '');
   const previousTime = Date.parse(materialQuoteSection?.updatedAt || '');
   if (!Number.isFinite(time) || time <= previousTime) return false;
+  if (!preservesPricedItems('material', materialQuoteSection, data)) {
+    materialQuoteRefreshFailed = true;
+    renderMaterialQuoteStatus();
+    return false;
+  }
   const next = buildT4MaterialPriceMap(data);
   const previous = t4MaterialPriceCache;
   const changed = new Set();
@@ -3362,6 +3412,7 @@ async function loadCrystalPrice(force = false) {
   crystalPriceInflight = fetchMarketJson(`/api/crystal-price${force ? '?force=1' : ''}`)
     .then(data => {
       crystalPriceCache = data;
+      renderMarketFreshness();
       return data;
     })
     .finally(() => { crystalPriceInflight = null; });
@@ -5192,6 +5243,9 @@ async function calculateAndRender() {
     const showMana = defaultRecommendation && !supportMode;
     const estimates = supportMode ? ranks.estimatesSupport : ranks.estimates;
     const showEstimate = mode === 'estimate' && estimates.length > 0;
+    const manaVerificationUnavailable = (defaultRecommendation || mode === 'estimate')
+      && (!manaInput?.scenario || (!ranks.counts.evaluated && !ranks.counts.shortage));
+    const unavailableReason = manaVerificationUnavailable ? manaInput?.reason || '피해·스킬 입력이 부족합니다.' : '';
     const shown = defaultRecommendation ? (supportMode ? ranks.measuredSupport : ranks.measured)
       : mode === 'shortage' ? ranks.shortage : mode === 'unverified' ? ranks.unverified
         : mode === 'estimate' ? estimates : supportMode ? ranks.support : ranks.theoretical;
@@ -5204,12 +5258,12 @@ async function calculateAndRender() {
     const orderChanged = compareCritical && damageTopB.some((c, i) => c !== top[i]);
     const status = $('manaRecommendationStatus');
     if (status) {
-      const detail = [!budgetKnown && '보유 진화 포인트 미조회 · API 장착 포인트 범위에서 비교', manaInput?.reason,
-        defaultRecommendation && !ranks.counts.measured && '300초 시전·마나 실측과 대조된 후보가 없습니다.',
-        mode === 'estimate' && (manaInput?.detail || manaInput?.scenario?.environment?.assumption),
+      const detail = [!budgetKnown && '보유 진화 포인트 미조회 · API 장착 포인트 범위에서 비교', unavailableReason || manaInput?.reason,
+        defaultRecommendation && !manaVerificationUnavailable && !ranks.counts.measured && '300초 시전·마나 실측과 대조된 후보가 없습니다.',
+        mode === 'estimate' && !manaVerificationUnavailable && (manaInput?.detail || manaInput?.scenario?.environment?.assumption),
         mode === 'theory' && manaInput?.threshold && '상세에 가상 운용의 최소 최대 MP 표시'].filter(Boolean).join(' · ');
       const { candidates, passed, shortage, measured } = ranks.counts;
-      const label = defaultRecommendation
+      const label = manaVerificationUnavailable ? '300초 검증 불가' : defaultRecommendation
         ? `300초 실측 검증 ${formatNumber(measured)}개 · 추정 통과 ${formatNumber(passed - measured)}개 · 부족 ${formatNumber(shortage)}개 · 판정 보류 ${formatNumber(candidates - passed - shortage)}개`
         : { theory: supportMode ? '파티 기여 비교' : '이론상 기대 피해 순위', estimate: `300초 추정 검증 · 마나 통과 ${formatNumber(ranks.counts.estimates)}개`,
           shortage: '마나 부족 후보의 이론상 기대 피해', unverified: '미검증 후보' }[mode];
@@ -5304,8 +5358,9 @@ async function calculateAndRender() {
         </div>
         ${candidateDetailsHtml(c, manaInput)}
       </article>`;
-    }).join('')}</div>` : `<div class="emptyNotice">${defaultRecommendation ? '300초 실측 검증을 통과한 후보가 없습니다.'
-      : mode === 'estimate' ? '300초 추정 사이클에서 마나 조건을 충족한 후보가 없습니다.' : '이 비교에 표시할 후보가 없습니다.'}</div>`;
+    }).join('')}</div>` : `<div class="emptyNotice">${manaVerificationUnavailable ? '이론상 기대 피해에서 후보를 비교할 수 있습니다.'
+      : defaultRecommendation ? '300초 실측 검증을 통과한 후보가 없습니다.'
+        : mode === 'estimate' ? '300초 추정 사이클에서 마나 조건을 충족한 후보가 없습니다.' : '이 비교에 표시할 후보가 없습니다.'}</div>`;
   };
   renderRecommendation();
   recommendList.removeAttribute('aria-busy');
@@ -5997,6 +6052,7 @@ function renderMarketSubTab() {
     avatarPanel.style.display = isAvatar ? '' : 'none';
   }
   if (isAvatar) prepareLegendAvatarTab();
+  renderMarketFreshness();
   autoLoadMarketSubTab();
 }
 
@@ -6072,6 +6128,10 @@ function applyMarketSnapshot(snapshot, { persist = true } = {}) {
   if (!isUsableClientMarketSnapshot(snapshot)) return false;
   marketSnapshotAvailable = true;
   const sections = snapshot.sections;
+  if (persist) {
+    marketSnapshotSectionTimes = Object.fromEntries(Object.keys(MARKET_SECTION_ROUTES).map(section =>
+      [section, snapshot.sectionUpdatedAt?.[section] || sections[section].updatedAt]));
+  }
   applyMarketSnapshotSection('gem', sections.gem);
   applyMarketSnapshotSection('engraving', sections.engraving);
   applyMarketSnapshotSection('material', sections.material);
@@ -6085,9 +6145,11 @@ function applyMarketSnapshot(snapshot, { persist = true } = {}) {
   applyMarketSnapshotSection('crystal', sections.crystal);
   if (persist) {
     const stored = compactClientMarketSnapshot(snapshot);
-    if (materialQuoteSection) {
-      stored.sections.material = compactClientMarketSection('material', materialQuoteSection);
-      stored.sectionUpdatedAt.material = materialQuoteSection.updatedAt;
+    for (const section of Object.keys(MARKET_SECTION_ROUTES)) {
+      const active = marketSectionData(section);
+      if (!active) continue;
+      stored.sections[section] = compactClientMarketSection(section, active);
+      stored.sectionUpdatedAt[section] = active.updatedAt || null;
     }
     writeStoredObject(MARKET_SNAPSHOT_STORAGE_KEY, stored);
   }
@@ -6098,13 +6160,11 @@ function applyMarketSnapshot(snapshot, { persist = true } = {}) {
 function applyMarketSnapshotSection(section, rawData) {
   const data = { ...rawData, cached: true, cacheSource: 'automatic-snapshot' };
   if (section === 'material' && !applyMaterialQuotes(data)) return;
-  const routes = {
-    gem: '/api/market-prices?mode=gemList',
-    engraving: '/api/market-prices?mode=engravingList',
-    material: '/api/market-prices?mode=t4Materials',
-    crystal: '/api/crystal-price'
-  };
-  const route = routes[section];
+  const previous = marketSectionData(section);
+  if (section !== 'material' && (!preservesPricedItems(section, previous, data)
+    || (previous && !Number.isFinite(Date.parse(data.updatedAt || '')))
+    || Date.parse(data.updatedAt || '') < Date.parse(previous?.updatedAt || ''))) return;
+  const route = MARKET_SECTION_ROUTES[section];
   if (route && section !== 'material') {
     marketResponseCache.set(canonicalMarketRequestKey(route, window.location.origin), {
       data,
@@ -6123,15 +6183,16 @@ function applyMarketSnapshotSection(section, rawData) {
   }
   marketListLoadState[section] = 'loaded';
   rememberMarketRefresh(section, false);
+  renderMarketFreshness();
 }
 
 function updateStoredMarketSnapshotSection(section, data) {
   const snapshot = readStoredObject(MARKET_SNAPSHOT_STORAGE_KEY);
   if (!isUsableClientMarketSnapshot(snapshot)) return;
-  const updatedAt = data?.updatedAt || new Date().toISOString();
+  const updatedAt = data?.updatedAt;
+  if (!Number.isFinite(Date.parse(updatedAt || '')) || !preservesPricedItems(section, snapshot.sections[section], data)) return;
   snapshot.sections[section] = compactClientMarketSection(section, data);
   snapshot.sectionUpdatedAt = { ...(snapshot.sectionUpdatedAt || {}), [section]: updatedAt };
-  snapshot.updatedAt = new Date().toISOString();
   writeStoredObject(MARKET_SNAPSHOT_STORAGE_KEY, snapshot);
 }
 
@@ -6141,7 +6202,7 @@ function compactClientMarketSnapshot(snapshot) {
     schemaVersion: Number(snapshot.schemaVersion || 1),
     apiVersion: snapshot.apiVersion || VERSION,
     source: snapshot.source || 'market-cache',
-    updatedAt: snapshot.updatedAt || new Date().toISOString(),
+    updatedAt: snapshot.updatedAt || null,
     sectionUpdatedAt: { ...(snapshot.sectionUpdatedAt || {}) },
     refresh: { errors: { material: snapshot.refresh?.errors?.material || '' } },
     sections: {
@@ -6159,7 +6220,7 @@ function compactClientMarketSection(section, data) {
       ok: true,
       mode: 'gemList',
       source: data.source || '',
-      updatedAt: data.updatedAt || new Date().toISOString(),
+      updatedAt: data.updatedAt || null,
       rows: (data.rows || []).map(row => ({
         level: Number(row.level || 0),
         damage: compactClientMarketItem(row.damage),
@@ -6172,7 +6233,7 @@ function compactClientMarketSection(section, data) {
       ok: true,
       mode: 'engravingList',
       source: data.source || '',
-      updatedAt: data.updatedAt || new Date().toISOString(),
+      updatedAt: data.updatedAt || null,
       items: (data.items || []).map(compactClientMarketItem).filter(Boolean)
     };
   }
@@ -6181,7 +6242,7 @@ function compactClientMarketSection(section, data) {
       ok: true,
       mode: 't4Materials',
       source: data.source || '',
-      updatedAt: data.updatedAt || new Date().toISOString(),
+      updatedAt: data.updatedAt || null,
       groups: Array.isArray(data.groups) ? data.groups : [],
       items: (data.items || []).map(item => compactClientMarketItem(item, true)).filter(Boolean)
     };
@@ -6593,7 +6654,14 @@ async function fetchMarketJson(url, { skipMemoryCache = false } = {}) {
       const res = await fetch(url, { cache: 'default', signal: controller.signal });
       const data = await readJsonSafely(res);
       if (!res.ok || !data?.ok) throw new Error(data?.error || data?.message || '시세 조회 실패');
+      const section = Object.keys(MARKET_SECTION_ROUTES).find(section => MARKET_SECTION_ROUTES[section] === key);
+      const previous = section && marketSectionData(section);
+      if (previous && section !== 'material' && (!preservesPricedItems(section, previous, data)
+        || !Number.isFinite(Date.parse(data.updatedAt || '')) || Date.parse(data.updatedAt) < Date.parse(previous.updatedAt))) {
+        return { ...previous, cached: true };
+      }
       marketResponseCache.set(key, { data, expiresAt: Date.now() + MARKET_CLIENT_CACHE_TTL_MS });
+      if (section) renderMarketFreshness();
       return data;
     } catch (error) {
       if (error?.name === 'AbortError') throw new Error('조회 시간이 초과되었습니다. 잠시 뒤 다시 누르면 서버 캐시 또는 다음 조회에서 더 빨리 응답할 수 있습니다.');
@@ -6830,8 +6898,9 @@ async function loadMarketCrystalPrice(force = false) {
     updateStoredMarketSnapshotSection('crystal', data);
     rememberMarketRefresh('crystal', force);
   } catch (error) {
-    marketListLoadState.crystal = 'idle';
-    renderMarketError(resultEl, error.message || '크리스탈 시세를 불러오지 못했습니다.');
+    marketListLoadState.crystal = crystalPriceCache ? 'loaded' : 'idle';
+    if (crystalPriceCache) renderCrystalMarketPrice(resultEl, crystalPriceCache);
+    else renderMarketError(resultEl, error.message || '크리스탈 시세를 불러오지 못했습니다.');
   } finally {
     updateMarketRefreshButtons();
   }
@@ -6872,6 +6941,7 @@ if (!window.__lostarkCalculatorBootedV5110) {
   setInterval(updateMarketRefreshButtons, 1000);
   setInterval(updateCharacterRefreshButton, 1000);
   setInterval(preloadMarketPriceLists, MARKET_SNAPSHOT_CHECK_MS);
+  setInterval(renderMaterialQuoteStatus, 60000);
   document.addEventListener('visibilitychange', preloadMarketPriceLists);
   $('ratioSearchInput')?.addEventListener('input', renderRatioPanel);
   preloadMarketPriceLists();

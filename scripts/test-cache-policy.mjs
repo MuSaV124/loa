@@ -8,6 +8,7 @@ import {
   isCompatibleCharacterCacheData,
   remainingCooldownMs
 } from '../public/cache-policy.js';
+import { marketFreshness } from '../public/market-freshness.js';
 
 assert.equal(SHARED_PRICE_CACHE_TTL_MS, 30 * 60 * 1000);
 assert.equal(MARKET_REFRESH_COOLDOWN_MS, 10 * 60 * 1000);
@@ -32,5 +33,19 @@ const currentCharacter = { ok: true, apiVersion: '5.9.3', profile: { CharacterNa
 assert.equal(isCompatibleCharacterCacheData(currentCharacter, '5.9.3'), true);
 assert.equal(isCompatibleCharacterCacheData(currentCharacter, '5.9.2'), false);
 assert.equal(isCompatibleCharacterCacheData({ ...currentCharacter, apiVersion: undefined }, '5.9.3'), false);
+
+const collectedAt = '2026-11-24T00:00:00.000Z';
+const collected = Date.parse(collectedAt);
+const hour = 60 * 60 * 1000;
+assert.equal(marketFreshness(collectedAt, collected + hour).state, 'current');
+assert.equal(marketFreshness(collectedAt, collected + hour + 1).state, 'delayed');
+assert.equal(marketFreshness(collectedAt, collected + 24 * hour).state, 'delayed');
+const stale = marketFreshness(collectedAt, collected + 25 * hour);
+assert.equal(stale.state, 'stale');
+assert.equal(stale.elapsed, '1일 1시간');
+assert.match(stale.stamp, /9:00.*KST/);
+for (const invalid of [null, 'invalid', '2026-11-25T00:00:00Z']) {
+  assert.equal(marketFreshness(invalid, collected).state, 'unknown');
+}
 
 console.log('cache policy tests passed');

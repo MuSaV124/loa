@@ -20,8 +20,8 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ ok: false, error: '허용되지 않은 요청 방식입니다.' });
   }
-  if (process.env.VERCEL_ENV === 'preview') {
-    return res.status(403).json({ ok: false, error: 'Preview에서는 시세 캐시를 갱신할 수 없습니다.' });
+  if (process.env.VERCEL_ENV !== 'production') {
+    return res.status(403).json({ ok: false, error: '시세 캐시 갱신은 Production 환경에서만 허용됩니다.' });
   }
 
   const expectedSecret = process.env.MARKET_CACHE_REFRESH_SECRET || '';
@@ -60,6 +60,9 @@ async function refreshMarketCache() {
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const snapshot = createNextMarketSnapshot(baseRecord?.snapshot, results, { apiVersion: API_VERSION });
+    if (!snapshot.refresh.freshSections.length) {
+      throw new Error('갱신할 수 있는 시세가 없어 기존 캐시를 유지했습니다.');
+    }
     try {
       const blob = await writeMarketSnapshot(snapshot, { ifMatch: baseRecord?.etag });
       return {

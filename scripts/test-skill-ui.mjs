@@ -729,7 +729,9 @@ async function verifyHoningMarketRefresh(viewport) {
     const costs = page.locator('.powerCostPrep');
     await costs.evaluate(element => { element.open = true; });
     const status = costs.locator('[data-material-quote-status]');
-    await status.getByText(/오래된 캐시.*갱신 실패/).waitFor();
+    await status.getByText(/KST.*경과.*갱신 지연.*갱신 실패/).waitFor();
+    const freshness = page.locator('#simulatorMarketFreshness');
+    assert.match(await freshness.innerText(), /갱신 지연.*오래된.*시세가 계산에 사용될 수 있습니다/);
     assert.equal(directQueries, 1);
     await page.locator('#armguardFromStage').selectOption('15');
     await page.locator('#armguardToStage').selectOption('16');
@@ -743,8 +745,9 @@ async function verifyHoningMarketRefresh(viewport) {
     await page.clock.fastForward(5 * 60 * 1000 + 1000);
     await page.waitForFunction(() => {
       const labels = [...document.querySelectorAll('[data-material-quote-status]')];
-      return labels.length && labels.every(el => /KST/.test(el.textContent) && !/오래된|갱신 실패/.test(el.textContent));
+      return labels.length && labels.every(el => /KST.*경과.*정상/.test(el.textContent) && !/갱신 실패/.test(el.textContent));
     });
+    assert.equal(await freshness.getAttribute('data-freshness'), 'current');
     assert.equal(refreshes, 2);
     assert.equal(directQueries, 1);
     assert.notEqual(await rankCost.textContent(), before[0]);
@@ -764,6 +767,9 @@ async function verifyHoningMarketRefresh(viewport) {
     }
     const panel = await costs.evaluate(el => ({ width: el.clientWidth, scroll: el.scrollWidth }));
     assert.ok(panel.scroll <= panel.width + 1);
+    await page.locator('[data-tab="market"]').click();
+    await page.locator('[data-market-tab="material"]').click();
+    assert.match(await page.locator('#marketFreshnessStatus').innerText(), /강화 재료·젬.*마지막 정상 갱신.*KST.*경과.*정상/);
   } finally {
     await page.close();
   }
@@ -813,9 +819,17 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
     const rows = page.locator('#recommendList .comboRow');
     const mode = page.locator('#manaRecommendationMode');
     assert.equal(await page.locator('#manaDuration').inputValue(), '300');
-    assert.match(await page.locator('#recommendList').innerText(), /300초 실측 검증을 통과한 후보가 없습니다/);
     assert.equal(await rows.count(), 0);
-    assert.match(await status.textContent(), /300초 실측 검증 0개/);
+    if (analyzerMatched) {
+      assert.match(await page.locator('#recommendList').innerText(), /300초 실측 검증을 통과한 후보가 없습니다/);
+      assert.match(await status.textContent(), /300초 실측 검증 0개/);
+    } else {
+      assert.match(await page.locator('#recommendList').innerText(), /이론상 기대 피해에서 후보를 비교/);
+      assert.match(await status.textContent(), /300초 검증 불가.*전투분석 피해 지분 미확인/);
+      await mode.selectOption('estimate');
+      assert.equal(await rows.count(), 0);
+      assert.match(await status.textContent(), /300초 검증 불가.*전투분석 피해 지분 미확인/);
+    }
     await mode.selectOption('theory');
     assert.equal(await rows.count(), 5);
     assert.match(await status.textContent(), /이론상 기대 피해 순위/);
@@ -852,7 +866,7 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
     await mode.selectOption('estimate');
     assert.equal(await rows.count(), 5);
     for (const row of await rows.all()) {
-      assert.match(await row.innerText(), /300초 마나 안정/);
+      assert.match(await row.innerText(), /300초 마나 안정 \(추정\)/);
       assert.equal(await row.locator('.comboDetails').getAttribute('open'), null);
       assert.match(await row.locator('.comboDetails').textContent(), /300초 최소 잔여 마나.*마나 부족 0회.*시전 누락 0회/s);
     }

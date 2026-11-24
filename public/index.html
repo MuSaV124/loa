@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LOSTARK 진화 노드 추천 계산기</title>
-  <link rel="stylesheet" href="/style.css?v=routes-2" />
+  <link rel="stylesheet" href="/style.css?v=routes-3" />
 </head>
 <body>
   <main class="wrap">
@@ -68,9 +68,10 @@
 
     <section id="powerSnapshotPanel" class="panel powerSnapshotPanel hidden simulatorPanel">
       <div class="sectionHead">
-        <div><h2>스펙업 효율 시뮬레이터</h2><p class="hint">현재 직업각인·아크그리드·스킬별 딜 지분과 실시간 비용을 비교합니다.</p></div>
+        <div><h2>스펙업 효율 시뮬레이터</h2><p class="hint">현재 직업각인·아크그리드·스킬별 딜 지분과 시세 기준 비용을 비교합니다.</p></div>
         <button id="simulatorBackButton" class="simulatorBackButton" type="button">계산기로 돌아가기</button>
       </div>
+      <p id="simulatorMarketFreshness" class="marketFreshness" role="status">시세 갱신 시각 확인 중</p>
       <div id="powerSnapshotView" class="powerSnapshotView"></div>
     </section>
 
@@ -267,6 +268,7 @@
         <button class="marketSubButton" type="button" data-market-tab="material">재료</button>
         <button class="marketSubButton" type="button" data-market-tab="crystal">크리스탈</button>
       </div>
+      <p id="marketFreshnessStatus" class="marketFreshness" role="status">시세 갱신 시각 확인 중</p>
       <div id="marketAccessoryPanel" class="marketSubPanel">
         <div class="marketSearchBox">
           <div class="marketSelectGrid">
@@ -346,6 +348,6 @@
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
   <div class="version">Version 6.1.8</div>
-  <script type="module" src="/app.js?v=6.1.8-routes.1"></script>
+  <script type="module" src="/app.js?v=6.1.8-routes.3"></script>
 </body>
 </html>

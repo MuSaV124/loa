@@ -30,6 +30,9 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .message.info { background: #12324a; color: #d9efff; }
 .hidden { display: none; }
 .hiddenByRoute { display: none !important; }
+.marketFreshness { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0 0 12px; overflow-wrap: anywhere; }
+.marketFreshness[data-freshness="delayed"],
+.marketFreshness[data-freshness="stale"] { color: var(--amber); }
 .routeNotice, #characterNav, #combatPanel { grid-column: 1 / -1; }
 #combatPanel { min-width: 0; }
 .characterNav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

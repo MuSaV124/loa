@@ -1,4 +1,5 @@
 import { BlobNotFoundError, BlobPreconditionFailedError, get, head, put } from '@vercel/blob';
+import { preservesPricedItems } from '../public/market-freshness.js';
 
 export const MARKET_CACHE_PATH = 'loa/market-cache.json';
 export const MARKET_CACHE_SCHEMA_VERSION = 1;
@@ -72,22 +73,28 @@ export function createNextMarketSnapshot(previous, results, { now = new Date(), 
   for (const section of MARKET_CACHE_SECTIONS) {
     const result = normalizeSectionResult(results?.[section]);
     const candidate = result.value;
-    if (!result.error && SECTION_VALIDATORS[section](candidate)) {
+    const previousSection = previous?.sections?.[section];
+    const previousUsable = SECTION_VALIDATORS[section](previousSection);
+    const previousTime = Date.parse(previous?.sectionUpdatedAt?.[section] || previousSection?.updatedAt || '');
+    const candidateTime = Date.parse(candidate?.updatedAt || '');
+    const canReplace = SECTION_VALIDATORS[section](candidate)
+      && Number.isFinite(candidateTime) && !(candidateTime < previousTime)
+      && (!previousUsable || preservesPricedItems(section, previousSection, candidate));
+    if (!result.error && canReplace) {
       sections[section] = compactSection(section, candidate);
-      sectionUpdatedAt[section] = candidate.updatedAt || updatedAt;
+      sectionUpdatedAt[section] = candidate.updatedAt;
       freshSections.push(section);
       continue;
     }
 
-    const previousSection = previous?.sections?.[section];
-    if (SECTION_VALIDATORS[section](previousSection)) {
+    if (previousUsable) {
       sections[section] = previousSection;
       sectionUpdatedAt[section] = previous?.sectionUpdatedAt?.[section]
         || previousSection.updatedAt
         || previous?.updatedAt
         || updatedAt;
       preservedSections.push(section);
-      errors[section] = result.error || '새 응답 검증 실패';
+      errors[section] = result.error || '새 응답의 가격 범위 또는 수집 시각 검증 실패';
       continue;
     }
 
@@ -183,7 +190,7 @@ function compactBase(data, extra) {
     apiVersion: data.apiVersion || '',
     source: data.source || '',
     mode: data.mode || '',
-    updatedAt: data.updatedAt || new Date().toISOString(),
+    updatedAt: data.updatedAt,
     ...extra
   };
 }

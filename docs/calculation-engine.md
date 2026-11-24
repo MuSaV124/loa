@@ -20,6 +20,18 @@
 | 시세·경매·참고 통계 | `api/market-*.js`, `api/refresh-market-cache.js`, `api/crystal-price.js`, `server/market-cache.js`, `cache-policy.js`, `class-benchmark.js/.json` | 거래소·경매장·크리스탈 시세와 2026-07-30 대표 빌드. `scripts/update-*.mjs`와 보정 자료 생성 스크립트가 표본을 갱신 |
 | 기타 API와 화면 | `api/lostark-news.js`, `api/inven-arkpassive.js`, `api/legend-avatars.js`, `public/index.html`, `public/style.css`, 이미지·아이콘, `vercel.json` | 공지·DB·아바타 조회, 렌더링·라우팅. 별도의 피해 공식은 없음 |
 
+## 2부 개편 시 계산 코드 분리 범위
+
+공식 개편 적용 전에는 현행 기능의 계산 오류, API 파싱, 장애, UI, 보안만 유지보수한다. 신규 특성·보석 규칙은 공식 데이터가 공개된 뒤 별도 개발 브랜치에서 연결한다.
+
+| 영역 | 재사용할 경로 | 현행 진화 노드에서 분리할 부분 |
+| --- | --- | --- |
+| 피해와 전투 특성 | `damage-math.js`의 `expectedCriticalDamage`, `expectedHitDamage`와 `app.js`의 `prepareSkillScoring`, `score`, `scoreCore` | `statsWithSelection`의 노드 배분 인자를 분리하고 집계된 효과를 피해 계산의 입력으로 전달한다. 뭉툭한 가시 전환, 회심 A/B, 진화 쿨감 해석은 노드 어댑터로 이동한다. 공통 다중 치명 계산은 보존한다. |
+| 직업별 스킬·아이덴티티 | `api/character.js`, `skill-effects.js`, `passive-skill-effects.js`, `class-damage-rules.js`, `arcana-card-expectation.js`, `skill-cycle.js`의 `buildSkillCycleModel`, `skillCooldownSeconds`, `evaluateSkillCastFrequency` | `app.js`의 `weightedSkillUnits`와 스킬별 조건 판정을 공통 입력으로 옮긴다. `evaluateEvolutionCooldown`과 `support-power.js`의 진화 노드 보정은 경계에서 분리한다. |
+| 300초 시전과 자원 | `mana-recommendation.js`의 `prepareManaScenario`, `evaluateManaRotation`, `minimumSustainableMana`, `mana-character.js`, `mana-automatic.js`, `support-mana.js` | `manaFurnaceDamage`와 진화 효과를 받는 비용·쿨타임 인자를 분리한다. 시전·회복 이벤트, 실측·추정 판정과 부족·지연·누락 집계는 공통 경로로 유지한다. `evaluateManaCandidate`의 기대 피해 가중 기능과 `createManaRanking`의 현행 노드 순위 사용처를 구분한다. |
+| 보석·골드 효율 | `gem-math.js`, `combat-analyzer.js`의 `gemUpgradeEfficiency`, `spec-simulation.js`, `spec-planner.js`의 `buildUpgradePlan`·시나리오 직렬화, `combat-power-calibration.js`, `honing-cost.js`, 시세 API와 캐시 | `app.js`의 `specScenarioGemFactor`와 A/B 비교에서 진화 보정을 호출하는 경로를 분리한다. 공식 전투력 상승과 기대 피해 상승은 기존처럼 별도 지표로 유지한다. |
+| 제거와 URL 호환 | `page-route.js`, `vercel.json`, 기존 캐릭터·전투·골드 계산 주소 | 게임에 삭제가 적용된 뒤 `data/evolution.json`, `evolution-math.js`, `classifyEvolution`, `renderEvolutionTiers`, `applyEvolutionEntries`, `calculateAndRender`의 노드 탐색·TOP5 및 관련 UI를 제거한다. `/character/:name/nodes`는 URL 인코딩을 유지해 공개된 후속 특성 페이지 또는 캐릭터 개요로 연결한다. 제거 직전 버전은 Git 태그나 브랜치로 보존한다. |
+
 ## 공식 규칙과 가정
 
 - 일반 치명 확률을 100으로 나눈 값을 `r`, 치명타 피해 배율을 `c`로 둔다. 기본 피해가 1일 때 `floor(r)`회만큼 `c−1`을 확정 추가하고 다음 단계가 `r−floor(r)`의 확률로 적용된다. 평균은 `1+r×(c−1)`이다. 예를 들어 치적 120%, 치피 250%에서는 80% 확률로 2.5배, 20% 확률로 4배여서 평균은 2.8배다. 치명타 적중 시의 발동 횟수는 한 공격당 최대 한 번이다.
