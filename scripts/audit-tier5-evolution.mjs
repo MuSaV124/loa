@@ -158,6 +158,12 @@ function makeCharacter(fixture) {
 
 async function runBrowserAudit() {
   const damageGroups = process.argv.includes('--damage-groups');
+  const allTiers = process.argv.includes('--all-tiers');
+  const fullDuration = process.argv.includes('--300');
+  const manualMana = fullDuration || process.argv.includes('--same-mana');
+  const verifyCache = process.argv.includes('--verify-cache');
+  const precision = process.argv.includes('--precision');
+  if (precision) assert.ok(allTiers && fullDuration, '--precision requires --all-tiers --300');
   const chromePath = process.env.PLAYWRIGHT_CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
   const executablePath = await access(chromePath).then(() => chromePath).catch(() => undefined);
   const browser = await chromium.launch({ executablePath, headless: true, args: ['--disable-gpu'] });
@@ -178,10 +184,84 @@ async function runBrowserAudit() {
         assert.ok(file.startsWith(publicPath));
         let body = await readFile(file);
         if (url.pathname === '/app.js') {
-          const source = body.toString('utf8');
+          const source = body.toString('utf8').replace(/\r\n/g, '\n');
           assert.ok(source.includes(capturePoint));
-          body = source.replace(capturePoint, capturePoint + '\n globalThis.tier5Capture = { candidates, ranks, top, manaInput };')
+          body = source.replace(capturePoint, capturePoint + (allTiers
+            ? '\n globalThis.tier5Capture = { ranks, top, manaInput, evaluate, generationMs, rankingMs };'
+            : '\n globalThis.tier5Capture = { candidates: legacy, ranks: rankManaCandidates(legacy, Boolean(manaInput?.scenario)), top, manaInput };'))
             + '\n globalThis.tier5Audit = { state, loadCombatAnalyzer, applyCharacterData, calculateAndRender, statsWithSelection, selectionWithoutTiers, getNode, expectedHitDamage, support: SUPPORT_MANA };';
+          if (!allTiers) {
+            body = body.replace("const showMana = defaultRecommendation && !supportMode;", "const showMana = defaultRecommendation && !supportMode && ranks.evaluated.length > 0;")
+              .replace('const shown = defaultRecommendation ? (supportMode ? ranks.measuredSupport : ranks.measured)',
+                'const shown = defaultRecommendation ? (showMana ? ranks.evaluated : ranks.theoretical)')
+              .replace('const damageRankB = showMana ? ranks.measuredAlternate', 'const damageRankB = showMana ? ranks.evaluatedAlternate');
+            const marker = 'const allocations = evolutionAllocations(nodes, fixed.map(row => ({ points: cost(row) })), pointBudget);';
+            assert.ok(body.includes(marker));
+            // Replay the old candidate domain through the current score and mana functions.
+            body = `import { rankManaCandidates } from './mana-recommendation.js';\n${body.replace(marker, `
+              const legacy = [];
+              const fixed3 = selectedEntries(state.selected).filter(row => row.tier === 3);
+              const spent = fixed.reduce((sum, row) => sum + cost(row), 0) + 50 + fixed3.reduce((sum, row) => sum + cost(row), 0);
+              const fifthLevel = Math.min(2, Math.floor((pointBudget - spent) / 15));
+              const allowed = nodes.filter(node => node.tier === 2 ? node.name !== '축복의 여신'
+                : node.tier === 3 ? fixed3.some(row => row.name === node.name)
+                : node.tier === 4 ? ['회심', '달인', '분쇄'].includes(node.name) : true);
+              const groups = new Map();
+              if (fifthLevel > 0) for (const entries of evolutionAllocations(allowed, fixed.map(row => ({ points: cost(row) })), pointBudget)) {
+                const second = entries.filter(row => row.tier === 2);
+                const third = entries.filter(row => row.tier === 3);
+                const fourth = entries.filter(row => row.tier === 4);
+                const fifth = entries.filter(row => row.tier === 5);
+                if (second.reduce((sum, row) => sum + cost(row), 0) !== 30 || third.length !== fixed3.length
+                  || third.some(row => state.selected[row.name]?.level !== row.level) || fourth.length !== 2
+                  || fifth.length !== 1 || fifth[0].level !== fifthLevel) continue;
+                const key = second.map(row => row.name + row.level).join('/');
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(entries);
+              }
+              const order = selection => selection.reduce((sum, entry) => sum + (entry.tier === 4
+                ? 10 * 2 ** allOptions(4).indexOf(entry.name) : entry.tier === 5 ? allOptions(5).indexOf(entry.name) : 0), 0);
+              const allocations = [...groups.values()].flatMap(group => group.sort((a, b) => order(a) - order(b))).values();
+            `).replace('const stats = applyEvolutionEntries(entries, baseStats, excludeCooldown);\n      // With', `
+              const tier2Entries = entries.filter(row => row.tier === 2);
+              const fourNames = entries.filter(row => row.tier === 4).map(row => row.name);
+              const five = entries.find(row => row.tier === 5);
+              legacy.push({ ...evaluate(entries), entries, tier2Entries, fourNames, fourLevel: 1, fiveName: five.name, fiveLevel: five.level });
+              const stats = applyEvolutionEntries(entries, baseStats, excludeCooldown);\n      // With`)} `;
+          }
+          if (precision) {
+            const marker = 'if (Number.isFinite(recValue) && recValue >= 0) ranks.add';
+            assert.ok(body.includes(marker));
+            const environmentInput = "const support = $('manaSupport')?.value || 'none';\n  const times =";
+            assert.ok(body.includes(environmentInput));
+            body = body.replace('value: mana.value, alternateValue: mana.alternateValue, quality: mana.quality, validation: mana.validation,',
+              'value: mana.value, alternateValue: mana.alternateValue, quality: mana.quality, validation: mana.validation, rotation: mana.rotation,')
+              .replace('mana: compactMana(mana), fallbackMana:', 'mana: compactMana(mana && { ...mana, rotation: mana }), fallbackMana:')
+              .replace(environmentInput, 'globalThis.manaPrecisionAdjust?.(input);\n  ' + environmentInput)
+              .replace(marker, `globalThis.manaPrecisionCollect(entries, summary.mana);
+              ${marker}`);
+          }
+          if (verifyCache) {
+            const marker = 'if (Number.isFinite(recValue) && recValue >= 0) ranks.add';
+            assert.ok(body.includes(marker));
+            body = `import { evaluateManaRotation } from './mana-recommendation.js';\n${body.replace(marker, `const reference = evaluate(entries);
+              if (manaInput?.scenario?.strict) {
+                const uncached = evaluateManaRotation(manaInput.scenario, stats, { cache: false });
+                if (uncached && (uncached.sustainable !== reference.mana.sustainable || uncached.validation !== reference.mana.validation
+                  || uncached.firstShortage !== reference.mana.firstShortage
+                  || uncached.shortageCount !== reference.mana.shortageCount || uncached.minMana !== reference.mana.minMana
+                  || uncached.endMana !== reference.mana.endMana || uncached.consumedMana !== reference.mana.consumedMana
+                  || uncached.shortages.some((event, i) => event.time !== reference.mana.shortages[i].time
+                    || event.deficit !== reference.mana.shortages[i].deficit || event.skill !== reference.mana.shortages[i].skill)
+                  || uncached.skillCasts.some((skill, i) => skill.casts !== reference.mana.skillCasts[i].casts))) throw Error('Cached rotation mismatch');
+              }
+              if (![ [reference.recValue, recValue], [reference.calc.result.alternateValue, summary.calc.result.alternateValue],
+                [reference.calc.result.manaDamageUnverified, summary.calc.result.manaDamageUnverified],
+                [reference.mana?.value, summary.mana?.value], [reference.mana?.alternateValue, summary.mana?.alternateValue],
+                [reference.mana?.quality, summary.mana?.quality], [reference.mana?.firstShortage, summary.mana?.firstShortage]
+              ].every(([before, cached]) => Object.is(before, cached))) throw Error('Cached score mismatch: ' + JSON.stringify(entries));
+              ${marker}`)}`;
+          }
         }
         await route.fulfill({ body, contentType: (mime[extname(file)] || 'application/octet-stream') + '; charset=utf-8' });
       } catch (error) {
@@ -191,6 +271,162 @@ async function runBrowserAudit() {
     await page.goto(origin, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => globalThis.tier5Audit?.state?.evolution);
     await page.evaluate(() => globalThis.tier5Audit.loadCombatAnalyzer().then(Boolean));
+    if (allTiers) {
+      const cases = [];
+      for (const fixture of manualMana || verifyCache ? scenarios.filter(row => row.key === '마나 부족') : scenarios) {
+        cases.push(await page.evaluate(async ({ fixture, data, manualMana, fixtureSkills, supportKeys, fullDuration, verifyCache, precision }) => {
+          const audit = globalThis.tier5Audit;
+          const field = id => document.getElementById(id);
+          audit.applyCharacterData(data);
+          for (const [id, value] of Object.entries({ extraCritRate: fixture.crit, extraCritDamage: fixture.critDamage - 200,
+            extraEvolutionDamage: fixture.extraEvolution, extraAttackSpeed: fixture.speed - (114 + 500 / 58.21),
+            extraMoveSpeed: fixture.speed - (114 + 500 / 58.21), manaSupport: 'none', manaRecommendationMode: 'auto' })) field(id).value = value;
+          let primaryWinner;
+          const capture = async () => {
+            const nodes = new Map();
+            const rotations = new Map();
+            if (precision) globalThis.manaPrecisionCollect = (entries, mana) => {
+              if (!mana?.rotation?.completed) throw Error('Missing 300-second rotation');
+              rotations.set(mana.rotation, (rotations.get(mana.rotation) || 0) + 1);
+              for (const { tier, name, level } of entries) {
+                const key = `${tier}T ${name}`;
+                if (!nodes.has(key)) nodes.set(key, { total: 0, passed: 0, levels: {} });
+                const counts = nodes.get(key);
+                counts.levels[level] ??= { total: 0, passed: 0 };
+                counts.total++;
+                counts.levels[level].total++;
+                if (mana.eligible) {
+                  counts.passed++;
+                  counts.levels[level].passed++;
+                }
+              }
+            };
+            const started = performance.now();
+            await audit.calculateAndRender();
+            const { ranks, manaInput, evaluate, generationMs, rankingMs } = globalThis.tier5Capture;
+            if (precision && field('manaSupport').value === 'none') {
+              const { recovery } = manaInput.scenario;
+              const offeredNatural = recovery.reduce((total, event) => total + (event.natural || 0), 0);
+              if (offeredNatural !== 300 * fixture.tick || recovery.some(event => event.natural > 0 && event.amount < event.natural)) {
+                throw Error('Sensitivity scenarios must preserve total offered natural recovery');
+              }
+            }
+            const pack = candidate => {
+              const full = evaluate(candidate.entries);
+              return { entries: candidate.entries, theory: full.recValue, alternate: full.calc.result.alternateValue,
+                mana: full.mana?.value, manaAlternate: full.mana?.alternateValue, firstShortage: full.mana?.firstShortage,
+                reason: full.mana?.reason, skillCasts: full.mana?.skillCasts,
+                ...(fullDuration && full.mana && { eligible: full.mana.eligible, shortageCount: full.mana.shortageCount,
+                  minMana: full.mana.minMana, endMana: full.mana.endMana, manaDelay: full.mana.manaDelay, lostCasts: full.mana.lostCasts,
+                  totalDamage: full.mana.totalDamage, firstMiss: full.mana.shortages?.[0],
+                  ...(precision && { consumed: full.mana.consumedMana, recovered: full.mana.recoveredMana,
+                    natural: full.mana.naturalRecovered, extra: full.mana.extraRecovered, overflow: full.mana.discardedRecovery }) }) };
+            };
+            const formerWinner = [{ name: '끝없는 마나', tier: 2, level: 2 }, { name: '최적화 훈련', tier: 2, level: 1 },
+              { name: '무한한 마력', tier: 3, level: 2 }, { name: '회심', tier: 4, level: 1 }, { name: '달인', tier: 4, level: 1 },
+              { name: '뭉툭한 가시', tier: 5, level: 2 }];
+            const totalMs = performance.now() - started;
+            let diagnostic;
+            if (precision) {
+              primaryWinner ??= ranks.sustainable[0]?.entries;
+              const firstTime = {};
+              const firstDeficit = {};
+              const allDeficits = {};
+              const bySkill = {};
+              const causes = { budget: 0, timingOrCap: 0, positiveEnding: 0 };
+              let missing = 0;
+              const add = (bins, value, limits, count) => {
+                const upper = limits.find(limit => value < limit);
+                const label = upper == null ? `${limits.at(-1)}+` : `${limits[limits.indexOf(upper) - 1] || 0}–<${upper}`;
+                bins[label] = (bins[label] || 0) + count;
+              };
+              for (const [rotation, count] of rotations) {
+                const first = rotation.shortages[0];
+                if (first) {
+                  const times = [30, 60, 120, 180, 240, 300];
+                  const deficits = [10, 25, 50, 100, 200, 400];
+                  missing += count;
+                  add(firstTime, first.time, times, count);
+                  add(firstDeficit, first.deficit, deficits, count);
+                  for (const event of rotation.shortages) add(allDeficits, event.deficit, deficits, count);
+                  const required = rotation.skillCasts.reduce((sum, skill) => sum + skill.cost * skill.plannedCasts, 0);
+                  const offered = manaInput.scenario.startMana + rotation.recoveredMana + rotation.discardedRecovery;
+                  causes[required > offered + 1e-8 ? 'budget' : 'timingOrCap'] += count;
+                  if (rotation.endMana > 0) causes.positiveEnding += count;
+                }
+                for (const skill of rotation.skillCasts) {
+                  bySkill[skill.name] ??= { planned: 0, spent: 0, casts: 0 };
+                  const totals = bySkill[skill.name];
+                  totals.planned += skill.cost * skill.plannedCasts * count;
+                  totals.spent += skill.cost * skill.casts * count;
+                  totals.casts += skill.casts * count;
+                }
+              }
+              assertDiagnostic(missing, ranks.counts.shortage);
+              diagnostic = { firstTime, firstDeficit, allDeficits, causes, nodes: Object.fromEntries(nodes), bySkill,
+                ...(primaryWinner && { primaryWinner: pack({ entries: primaryWinner }) }) };
+            }
+            return { key: fixture.key, generationMs, rankingMs, totalMs, counts: ranks.counts, diagnostic,
+              theory: ranks.theoretical.map(pack), theoryB: ranks.theoreticalAlternate.map(pack),
+              mana: (fullDuration ? ranks.sustainable : ranks.evaluated).map(pack),
+              manaB: (fullDuration ? ranks.sustainableAlternate : ranks.evaluatedAlternate).map(pack),
+              ...(fullDuration && { priorWinner: pack({ entries: formerWinner }), shown: ranks.sustainable.length }) };
+          };
+          function assertDiagnostic(actual, expected) {
+            if (actual !== expected) throw Error(`Diagnostic count mismatch (${actual}/${expected})`);
+          }
+          if (!manualMana) return [await capture()];
+          const set = (id, value) => { field(id).value = String(value); };
+          field('manaShortageClass').checked = true;
+          const duration = fullDuration ? 300 : 45;
+          set('manaDuration', duration);
+          set('manaMax', fixture.mana);
+          set('manaStart', fixture.mana);
+          set('manaRecovery', fixture.tick);
+          set('manaFirstRecovery', 1);
+          set('manaRecoveryInterval', 1);
+          set('manaCostReductions', 'product');
+          delete field('manaRotation').dataset.manaSource;
+          set('manaRotation', fixtureSkills.map((s, i) => [s.name, s.first, s.cooldown, audit.state.skillEffects.items[i].manaCost].join(' | ')).join('\n'));
+          set('manaExtraRecovery', '');
+          const results = [];
+          for (const support of verifyCache ? ['none'] : supportKeys) {
+            const profile = audit.support[support];
+            set('manaSupport', support);
+            set('manaSupportUptime', 100);
+            set('manaSupportTimes', support === 'none' ? '' : Array.from({ length: Math.ceil(duration / 30) },
+              (_, i) => i * 30 + (support === 'artist' ? 3 : 0)).join(','));
+            set('manaSupportRestore', support === 'none' ? '' : support === 'artist'
+              ? fixture.mana * profile.percent / 100 : fixture.tick * (1 + profile.percent / 100));
+            results.push({ ...await capture(), support });
+          }
+          if (precision) {
+            set('manaSupport', 'none');
+            const variants = {
+              B: input => input.skills.forEach((skill, i) => {
+                [skill.castTime, skill.aftercast] = [[1, .3], [1.3, .3], [.5, .2]][i];
+              }),
+              C: input => { input.recoveryMana *= 2; input.firstRecovery = input.recoveryInterval = 2; },
+              D: input => {
+                input.skills[1].activeWindows = Array.from({ length: 10 }, (_, i) => ({ start: i * 30 + 3, end: i * 30 + 19 }));
+                input.extraRecovery = Array.from({ length: 10 }, (_, i) => ({ time: i * 30 + 3, amount: 60 }));
+              },
+              '동시 시전 우선': input => { input.recoveryOrder = 'after-cast'; }
+            };
+            for (const [variant, adjust] of Object.entries(variants)) {
+              globalThis.manaPrecisionAdjust = adjust;
+              results.push({ ...await capture(), support: 'none', variant });
+            }
+            delete globalThis.manaPrecisionAdjust;
+          }
+          return results;
+        }, { fixture, data: makeCharacter(fixture), manualMana, fixtureSkills, supportKeys, fullDuration, verifyCache, precision }).then(rows => {
+          rows.forEach(row => assert.equal(row.counts.candidates, 470572));
+          return rows;
+        }));
+      }
+      return cases.flat();
+    }
     if (damageGroups) {
       const fixture = scenarios[0];
       const data = makeCharacter(fixture);
@@ -201,14 +437,14 @@ async function runBrowserAudit() {
       const bracelet = parseAccessoryText('백어택 스킬이 적에게 주는 피해가 3% 증가한다.', '팔찌', '고대');
       data.braceletEffects = { enemyDamage: bracelet.enemyDamage, items: [{ type: '팔찌', effects: bracelet }] };
       const weapon = parseEquipmentSnapshotItem({ Type: '무기', Tooltip: '추가 피해 +30.00%' });
-      const recommendation = await page.evaluate(({ data, weapon }) => {
+      const recommendation = await page.evaluate(async ({ data, weapon }) => {
         const audit = globalThis.tier5Audit;
         audit.applyCharacterData(data);
         const put = (id, value) => { document.getElementById(id).value = String(value); };
         put('manaRecommendationMode', 'theory');
         put('extraCritRate', 45);
         put('extraEvolutionDamage', 25);
-        audit.calculateAndRender();
+        await audit.calculateAndRender();
         const { candidates, ranks } = globalThis.tier5Capture;
         const label = c => [...c.tier2Entries.map(e => `${e.name}${e.level}`), '/', ...c.fourNames, '/', `${c.fiveName}${c.fiveLevel}`].join(' ');
         const rank = new Map(ranks.theoretical.map((c, i) => [label(c), i + 1]));
@@ -257,7 +493,7 @@ async function runBrowserAudit() {
     const results = [];
     for (const fixture of scenarios) {
       const data = makeCharacter(fixture);
-      const result = await page.evaluate(({ fixture, data, fixtureSkills, supportKeys }) => {
+      const result = await page.evaluate(async ({ fixture, data, fixtureSkills, supportKeys }) => {
         const audit = globalThis.tier5Audit;
         const field = id => document.getElementById(id);
         const put = (id, value) => { field(id).value = String(value); };
@@ -272,7 +508,7 @@ async function runBrowserAudit() {
         put('extraAttackSpeed', fixture.speed - speedBeforeTier3);
         put('extraMoveSpeed', fixture.speed - speedBeforeTier3);
         put('extraEvolutionDamage', fixture.extraEvolution);
-        audit.calculateAndRender();
+        await audit.calculateAndRender();
         const { candidates, ranks } = globalThis.tier5Capture;
         const n = value => value == null || !Number.isFinite(value) ? null : +value.toFixed(8);
         const label = c => [...c.tier2Entries.map(e => `${e.name}${e.level}`), '/', ...c.fourNames, '/', `${c.fiveName}${c.fiveLevel}`].join(' ');
@@ -353,7 +589,7 @@ async function runBrowserAudit() {
             const profile = audit.support[support];
             put('manaSupportRestore', support === 'none' ? '' : support === 'artist'
               ? fixture.mana * profile.percent / 100 : fixture.tick * (1 + profile.percent / 100));
-            audit.calculateAndRender();
+            await audit.calculateAndRender();
             const capture = globalThis.tier5Capture;
             const evaluated = capture.ranks.evaluated;
             const describe = c => ({ ...pack(c), manaValue: n(c.mana?.value), manaValueB: n(c.mana?.alternateValue),
@@ -411,20 +647,32 @@ async function runBrowserAudit() {
       }
       results.push(result);
     }
-    const pointCheck = await page.evaluate(data => [120, 125, 140].map(points => {
+    const pointCheck = await page.evaluate(async data => {
       const audit = globalThis.tier5Audit;
-      data.arkPassive.Points[0].Value = points;
-      document.getElementById('manaShortageClass').checked = false;
-      document.getElementById('manaRecommendationMode').value = 'theory';
-      audit.applyCharacterData(data);
-      const { candidates } = globalThis.tier5Capture;
-      return [points, candidates.length, [...new Set(candidates.map(c => c.fiveLevel))]];
-    }), makeCharacter(scenarios[0]));
+      const results = [];
+      for (const points of [120, 125, 140]) {
+        data.arkPassive.Points[0].Value = points;
+        document.getElementById('manaShortageClass').checked = false;
+        document.getElementById('manaRecommendationMode').value = 'theory';
+        audit.applyCharacterData(data);
+        await audit.calculateAndRender();
+        const { candidates } = globalThis.tier5Capture;
+        results.push([points, candidates.length, [...new Set(candidates.map(c => c.fiveLevel))]]);
+      }
+      return results;
+    }, makeCharacter(scenarios[0]));
     assert.deepEqual(pointCheck, [[120, 0, []], [125, 558, [1]], [140, 558, [2]]]);
     return { kind: '가정 기반 모의 캐릭터 및 서포터 회복', fixtureSkills, duration: 45, pointCheck, results };
   } finally {
     await browser.close();
   }
+}
+
+if (process.argv.includes('--all-tiers')) {
+  const cases = await runBrowserAudit();
+  await writeFile(resolve(process.argv[2]), JSON.stringify(cases, null, 2) + '\n');
+  console.log(JSON.stringify(cases.map(({ key, counts, generationMs, rankingMs }) => ({ key, counts, generationMs, rankingMs }))));
+  process.exit(0);
 }
 
 if (process.argv.includes('--damage-groups')) {
@@ -438,6 +686,17 @@ if (process.argv.includes('--damage-groups')) {
 
 const grid = runGrid();
 const combos = await runBrowserAudit();
+const baselineArg = process.argv.indexOf('--baseline');
+if (baselineArg >= 0) {
+  const baseline = JSON.parse(await readFile(resolve(process.argv[baselineArg + 1]), 'utf8'));
+  assert.deepEqual(grid, baseline.grid);
+  assert.deepEqual(combos.pointCheck, baseline.combos.pointCheck);
+  const results = rows => rows.map(({ key, all, theory, theoryB, mana }) => ({
+    key, all, theory, theoryB,
+    mana: Object.fromEntries(Object.entries(mana).map(([support, row]) => [support, { all: row.all, top: row.top, topB: row.topB }]))
+  }));
+  assert.deepEqual(results(combos.results), results(baseline.combos.results));
+}
 const output = resolve(process.argv[2] || 'docs/tier5-maintained-audit-data.json');
 await writeFile(output, JSON.stringify({ grid, combos }) + '\n');
 console.log(JSON.stringify({

@@ -53,3 +53,45 @@ export function maintainedEvolutionDamage(effect) {
   return (effect.evolutionDamage || 0) + (standing ? standing.maxStacks * standing.damagePerStack : 0)
     + (effect.inFightingDamage || 0);
 }
+
+export const EVOLUTION_TIER_LIMITS = { 1: 40, 2: 30, 3: 20, 4: 20, 5: 30 };
+const PRIOR_TIER_POINTS = { 2: 40, 3: 20, 4: 20, 5: 20 };
+
+export function* evolutionAllocations(nodes, fixedEntries, pointBudget) {
+  const tier1Points = fixedEntries.reduce((sum, entry) => sum + entry.points, 0);
+  if (!Number.isInteger(pointBudget) || tier1Points > pointBudget || tier1Points > EVOLUTION_TIER_LIMITS[1]) return;
+  const tiers = [2, 3, 4, 5];
+  const options = tiers.map(tier => nodes.filter(node => node.tier === tier));
+  const entries = [];
+  const levels = new Map();
+
+  function* walkTier(index, budget, priorPoints) {
+    if (index === tiers.length) {
+      if (entries.length) yield [...entries];
+      return;
+    }
+    const tier = tiers[index];
+    const maxPoints = priorPoints >= PRIOR_TIER_POINTS[tier] ? Math.min(budget, EVOLUTION_TIER_LIMITS[tier]) : 0;
+    yield* walkNode(0, 0);
+
+    function* walkNode(nodeIndex, points) {
+      if (nodeIndex === options[index].length) {
+        yield* walkTier(index + 1, budget - points, points);
+        return;
+      }
+      const node = options[index][nodeIndex];
+      const eligible = !node.requires || (levels.get(node.requires.name) || 0) >= node.requires.level;
+      const max = eligible ? Math.min(node.maxLevel, Math.floor((maxPoints - points) / node.costPerLevel)) : 0;
+      yield* walkNode(nodeIndex + 1, points);
+      for (let level = 1; level <= max; level++) {
+        entries.push({ name: node.name, tier, level });
+        levels.set(node.name, level);
+        yield* walkNode(nodeIndex + 1, points + level * node.costPerLevel);
+        entries.pop();
+      }
+      levels.delete(node.name);
+    }
+  }
+
+  yield* walkTier(0, pointBudget - tier1Points, tier1Points);
+}

@@ -20,6 +20,7 @@ assert.equal(skillManaCostProfile({ ...raw, Tripods: [{ ...reduction, IsSelected
 assert.equal(skillManaCostProfile({ ...raw, Rune: focus }).preEvolutionCost, null);
 assert.equal(skillManaCostProfile({ ...raw, Tripods: [{ ...reduction, Tooltip: '폭주 중 마나 소모량이 30% 감소한다.' }] }).preEvolutionCost, null);
 assert.equal(skillManaCostProfile({ Tooltip: JSON.stringify({ Element_011: { value: '마나 999 소모' } }) }).baseCost, null);
+assert.equal(skillManaCostProfile({ Tooltip: JSON.stringify({ title: { leftText: '재사용 대기시간 12초' } }) }).preEvolutionCost, null);
 
 const profile = { CharacterName: '마나 API 표본', CharacterClassName: '데모닉', Stats: [{ Type: '최대 마나', Value: '3,500' }] };
 const character = buildCharacterManaProfile(profile, undefined, [raw], [skill]);
@@ -131,7 +132,7 @@ try {
   const first = mockResponse();
   await characterHandler({ query }, first);
   assert.equal(first.statusCode, 200);
-  assert.equal(first.body.apiVersion, '6.1.4');
+  assert.equal(first.body.apiVersion, '6.1.7');
   assert.equal(first.body.manaProfile.maxMana, 3500);
   assert.equal(first.body.manaProfile.skills[0].preEvolutionCost, 280);
   assert.doesNotMatch(JSON.stringify(first.body), /test-token/);

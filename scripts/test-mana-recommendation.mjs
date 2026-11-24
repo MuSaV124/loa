@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { expectedHitDamage } from '../public/damage-math.js';
 import { maintainedEvolutionDamage } from '../public/evolution-math.js';
-import { evaluateManaCandidate, manaFurnaceDamage, prepareManaScenario, rankManaCandidates } from '../public/mana-recommendation.js';
+import { createManaRanking, evaluateManaCandidate, evaluateManaRotation, manaFurnaceDamage, prepareManaScenario, rankManaCandidates } from '../public/mana-recommendation.js';
 import { resolveManaEnvironment } from '../public/support-mana.js';
 
 const { nodes } = JSON.parse(readFileSync(new URL('../public/data/evolution.json', import.meta.url), 'utf8'));
@@ -183,4 +183,144 @@ assert.deepEqual(variants.evaluatedAlternate, [firstCritRule, fixedCritRule]);
 assert.deepEqual(variants.theoreticalAlternate, [firstCritRule, fixedCritRule]);
 assert.deepEqual(variants.practical, [fixedCritRule]);
 assert.ok(variants.unverified.includes(firstCritRule));
+
+// Rank with collisions in each tiebreaker and compare against a full sort.
+const rankingSamples = Array.from({ length: 1000 }, (_, i) => ({
+  recValue: (i * 7) % 19,
+  calc: { result: { alternateValue: (i * 13) % 21, manaDamageUnverified: i % 17 === 0 } },
+  mana: i % 13 === 0 ? null : {
+    value: (i * 11) % 23, alternateValue: (i * 17) % 27,
+    firstShortage: i % 7 === 0 ? 3 : null, quality: i % 5 === 0 ? 'estimate' : 'input'
+  }
+}));
+const fullSort = rankManaCandidates(rankingSamples, true);
+const streaming = createManaRanking(true);
+rankingSamples.forEach(streaming.add);
+for (const key of ['theoretical', 'theoreticalAlternate', 'evaluated', 'evaluatedAlternate', 'unverified']) {
+  assert.deepEqual(streaming[key], fullSort[key].slice(0, 5), key);
+}
+assert.deepEqual(streaming.estimates, fullSort.evaluated.filter(row => row.mana.quality === 'estimate').slice(0, 5));
+assert.deepEqual(streaming.estimatesAlternate, fullSort.evaluatedAlternate.filter(row => row.mana.quality === 'estimate').slice(0, 5));
+assert.equal(streaming.counts.candidates, rankingSamples.length);
+assert.equal(streaming.counts.evaluated, fullSort.evaluated.length);
+
+const strike = { name: '검증 타격', first: 0, interval: 10, cost: 10 };
+const known = skill => ({ ...skill, currentTree: true, usesMana: skill.cost !== 0, manaUsageKnown: true });
+const rotationInput = { maxMana: 400, startMana: 50, recoveryMana: 0, firstRecovery: 0, recoveryInterval: 1,
+  reductions: 'product', skills: [strike], extraRecovery: [] };
+function condition(overrides = {}) {
+  const input = { ...rotationInput, duration: 300, strict: true, ...overrides };
+  const prepared = prepareManaScenario(input, [input.skills[0].name], input.skills.map(known));
+  assert.ok(prepared.scenario, prepared.reason);
+  return prepared.scenario;
+}
+const hit = { value: 2, alternateValue: 2.5, skillExperiment: { items: [{ name: strike.name, value: 2, alternateValue: 2.5, share: 1 }] } };
+assert.equal(evaluateManaCandidate(condition({ duration: 45, strict: false }), {}, hit).firstShortage, null);
+const early = evaluateManaCandidate(condition(), {}, hit);
+assert.equal(early.firstShortage, 50);
+assert.equal(early.eligible, false);
+assert.equal(early.manaDelay, 0);
+assert.equal(early.lostCasts, early.shortageCount);
+
+const last = condition({ startMana: 300, skills: [{ ...strike, interval: 1, cost: 1 }] });
+const finalFailure = evaluateManaRotation(last);
+assert.deepEqual(finalFailure.shortages, [{ time: 300, skill: strike.name, deficit: 1 }]);
+assert.equal(finalFailure.skillCasts[0].casts, 300);
+assert.equal(finalFailure.skillCasts[0].plannedCasts, 301);
+assert.equal(finalFailure.completed, true);
+assert.deepEqual(evaluateManaRotation(last, {}, { cache: false }), finalFailure);
+const enough300 = condition({ startMana: 301, skills: [{ ...strike, interval: 1, cost: 1 }] });
+const passed = evaluateManaCandidate(enough300, {}, hit);
+assert.equal(passed.eligible, true);
+assert.equal(passed.minMana, 0);
+assert.equal(passed.totalDamage, 600);
+const assumed = condition({ startMana: 400 });
+assert.equal(evaluateManaCandidate(assumed, {}, hit).validation, 'estimate');
+assert.equal(evaluateManaCandidate(assumed, {}, hit).eligible, true);
+
+const recoveredAfterMiss = condition({ startMana: 0, skills: [{ ...strike, interval: 100 }], extraRecovery: [{ time: 299, amount: 200 }] });
+const positiveEnding = evaluateManaRotation(recoveredAfterMiss);
+assert.equal(positiveEnding.firstShortage, 0);
+assert.equal(positiveEnding.endMana, 190);
+assert.equal(positiveEnding.sustainable, false);
+assert.deepEqual(positiveEnding.shortages.map(event => event.time), [0, 100, 200]);
+
+const expires = condition({ startMana: 0, skills: [{ ...strike, interval: 1 }],
+  environment: { quality: 'input', windows: [{ start: 0, end: 8, amount: 10 }] } });
+assert.equal(evaluateManaRotation(expires).firstShortage, 8);
+assert.equal(evaluateManaRotation(expires).extraRecovered, 80);
+const lateCast = [{ ...strike, first: 299 }];
+const supportOptions = { duration: 300, maxMana: 400, naturalMana: 0 };
+const artist300 = resolveManaEnvironment({ ...supportOptions, support: 'artist', receivedTimes: [299], manualRestore: 10 });
+assert.equal(evaluateManaRotation(condition({ startMana: 0, skills: lateCast })).sustainable, false);
+assert.equal(evaluateManaRotation(condition({ startMana: 0, skills: lateCast, environment: artist300 })).sustainable, true);
+
+const level = (name, lv) => nodes.find(node => node.name === name).levels[lv];
+const tierMix = {
+  manaCostReductions: [level('끝없는 마나', 2).manaReduction, level('무한한 마력', 2).manaReduction],
+  manaSkillCooldownReduction: level('끝없는 마나', 2).manaSkillCooldownReduction + level('무한한 마력', 2).manaSkillCooldownReduction,
+  cooldownReduction: level('선각자', 1).cooldownReduction, manaFurnace: furnace[2].manaFurnace
+};
+const mixed = evaluateManaRotation(condition({ skills: [{ ...strike, cost: 100 }] }), tierMix);
+near(mixed.skillCasts[0].cost, 100 * .8 * .84 + 400 * .02);
+near(mixed.skillCasts[0].interval, 6.7);
+
+const locked = condition({ skills: [{ ...strike, castTime: 2 }, { ...strike, name: '대기 기술', first: .1, cost: 20 }] });
+assert.deepEqual(evaluateManaRotation(locked).shortages.slice(0, 2).map(event => [event.time, event.skill]), [[12, '대기 기술'], [22, '대기 기술']]);
+const casting = condition({ startMana: 0, skills: [{ ...strike, type: '캐스팅', castTime: 2, first: 286 }],
+  extraRecovery: [{ time: 288, amount: 10 }] });
+assert.deepEqual(evaluateManaRotation(casting).shortages, [{ time: 300, skill: strike.name, deficit: 10 }]);
+const lateShortage = evaluateManaRotation(condition({ startMana: 0, skills: [{ ...strike, first: 299.99 }],
+  extraRecovery: [{ time: 300, amount: 20 }] }));
+assert.equal(lateShortage.firstShortage, 299.99);
+assert.equal(lateShortage.endMana, 20);
+assert.equal(lateShortage.sustainable, false);
+const colliding = { startMana: 0, skills: [{ ...strike, first: 300 }], extraRecovery: [{ time: 300, amount: 10 }] };
+assert.equal(evaluateManaRotation(condition(colliding)).sustainable, true);
+assert.equal(evaluateManaRotation(condition({ ...colliding, recoveryOrder: 'after-cast' })).firstShortage, 300);
+const duringCast = condition({ startMana: 0, skills: [{ ...strike, type: '캐스팅 스킬', castTime: 2, first: 298 }],
+  extraRecovery: [{ time: 299, amount: 10 }] });
+assert.equal(evaluateManaRotation(duringCast).sustainable, true);
+const capped = evaluateManaRotation(condition({ startMana: 400, skills: [{ ...strike, first: 300 }],
+  extraRecovery: [{ time: 299, amount: 99 }] }));
+assert.equal(capped.endMana, 390);
+assert.equal(capped.recoveredMana, 0);
+assert.equal(capped.discardedRecovery, 99);
+const fractional = evaluateManaRotation(condition({ startMana: .3, skills: [{ ...strike, interval: 100, cost: .1,
+  activeWindows: [{ start: 0, end: 300 }] }] }));
+assert.equal(fractional.sustainable, true);
+assert.equal(fractional.minMana, 0);
+const release = evaluateManaRotation(condition({ startMana: 10, skills: [
+  { ...strike, castTime: 2, aftercast: 1, activeWindows: [{ start: 0, end: 3 }] },
+  { ...strike, name: '대기 기술', first: 1, activeWindows: [{ start: 3, end: 4 }] },
+  { ...strike, name: '사용 불가', activeWindows: [] }
+] }));
+assert.deepEqual(release.shortages.map(event => [event.time, event.skill]), [[3, '대기 기술']]);
+assert.deepEqual(release.skillCasts.map(skill => skill.plannedCasts), [1, 1, 0]);
+const interrupted = evaluateManaRotation(condition({ skills: [{ ...strike, type: '지점', first: 299, castTime: 2 }] }));
+assert.equal(interrupted.consumedMana, 0);
+const recorded = { startMana: 10, recoveryOrder: 'before-cast', skills: [{ ...strike, castStarts: [0, 300] }],
+  extraRecovery: [{ time: 200, amount: 10 }],
+  observation: { source: '테스트 기록', duration: 300, startMana: 10, endMana: 0, shortageCount: 0, manaDelay: 0, lostCasts: 0,
+    events: [0, 300].map(time => ({ time, skill: strike.name, before: 10, after: 0 })) } };
+const measured = evaluateManaCandidate(condition(recorded), {}, hit);
+assert.equal(measured.validation, 'measured');
+assert.equal(evaluateManaRotation(condition({ ...recorded, observation: { ...recorded.observation, endMana: 1 } })).validation, 'estimate');
+assert.equal(evaluateManaRotation(condition({ ...recorded, observation: { ...recorded.observation, shortageCount: 1 } })).validation, 'estimate');
+assert.equal(evaluateManaRotation(condition({ ...recorded, environment: { quality: 'estimate' } })).validation, 'estimate');
+const blocked = evaluateManaRotation(condition({ ...recorded, skills: [{ ...strike, castStarts: [0, 1] }] }));
+assert.equal(blocked.unavailable.length, 1);
+assert.equal(blocked.consumedMana, 10);
+assert.equal(blocked.sustainable, false);
+assert.ok(prepareManaScenario({ ...rotationInput, duration: 300, strict: true }, [strike.name], [known(strike), known({ ...strike, name: '누락 스킬' })]).reason);
+
+const strictRanking = createManaRanking(true);
+const invalid = { recValue: 100, mana: { ...early, value: 100 }, calc: { result: hit } };
+const stable = { recValue: 2, mana: passed, calc: { result: hit } };
+const observed = { recValue: 2, mana: measured, calc: { result: hit } };
+[invalid, stable, observed].forEach(strictRanking.add);
+assert.deepEqual(strictRanking.sustainable, [stable, observed]);
+assert.deepEqual(strictRanking.estimates, [stable]);
+assert.deepEqual(strictRanking.measured, [observed]);
+assert.deepEqual(strictRanking.shortage, [invalid]);
 console.log('mana recommendation tests passed');

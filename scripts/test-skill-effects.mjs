@@ -27,6 +27,10 @@ assert.deepEqual(parseSkillManaUsage({ Element_004: { value: '마나의 4%를 �
   { usesMana: false, manaCost: 0, manaUsageKnown: false });
 assert.deepEqual(parseSkillManaUsage({ Element_011: { value: '마나 125 소모' } }),
   { usesMana: false, manaCost: 0, manaUsageKnown: false });
+assert.deepEqual(parseSkillManaUsage({ title: { leftText: '재사용 대기시간 2분' } }),
+  { usesMana: false, manaCost: 0, manaUsageKnown: false });
+assert.deepEqual(parseSkillManaUsage({ Element_004: { value: '자원 소모 없음' } }),
+  { usesMana: false, manaCost: 0, manaUsageKnown: true });
 const withDirection = type => ({ Tooltip: JSON.stringify({ Element_005: { value: `<BR><FONT>공격 타입 : ${type}</FONT>` } }) });
 assert.equal(parseSkillAttackDirection(withDirection('백 어택')), '백');
 assert.equal(parseSkillAttackDirection(withDirection('헤드 어택')), '헤드');

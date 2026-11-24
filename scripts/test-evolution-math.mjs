@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import {
   calculateBluntSpike,
   calculateSonicBreakEvolutionDamage,
+  evolutionAllocations,
   maintainedEvolutionDamage,
   shiftClickTargetLevel
 } from '../public/evolution-math.js';
@@ -46,12 +47,22 @@ assert.deepEqual(level('축복의 여신', 3), { speedBonus: 9 });
 
 assert.deepEqual(level('파괴 전차', 2), { evolutionDamage: 24, attackSpeedBonus: 8 });
 assert.deepEqual(level('타이밍 지배', 2), { evolutionDamage: 16, cooldownReduction: 10 });
-assert.deepEqual(level('정열의 춤사위', 2), { evolutionDamage: 14 });
+assert.deepEqual(level('정열의 춤사위', 1), { evolutionDamage: 7, identityGain: 10 });
+assert.deepEqual(level('정열의 춤사위', 2), { evolutionDamage: 14, identityGain: 20 });
+for (const lv of [1, 2]) {
+  assert.deepEqual(level('무한한 마력', lv), { evolutionDamage: 8 * lv, manaSkillCooldownReduction: 7 * lv, manaReduction: 8 * lv });
+  assert.deepEqual(level('혼신의 강타', lv), { critRate: 12 * lv, evolutionDamage: 2 * lv });
+  assert.deepEqual(level('일격', lv), { critRate: 10 * lv, directionalCritDamage: 16 * lv });
+  assert.deepEqual(level('파괴 전차', lv), { evolutionDamage: 12 * lv, attackSpeedBonus: 4 * lv });
+  assert.deepEqual(level('타이밍 지배', lv), { evolutionDamage: 8 * lv, cooldownReduction: 5 * lv });
+}
 
 assert.deepEqual(level('회심', 1), { critHitDamage: 12 });
 assert.deepEqual(level('달인', 1), { critRate: 7, additionalDamage: 8.5 });
 assert.deepEqual(level('분쇄', 1), { evolutionDamage: 20 });
-for (const name of ['선각자', '진군', '기원']) assert.deepEqual(node(name).levels, {});
+assert.deepEqual(level('선각자', 1), { cooldownReduction: 5 });
+assert.deepEqual(level('진군', 1), { etherSpeedBonus: 4 });
+assert.deepEqual(node('기원').levels, {});
 
 assert.deepEqual(level('음속 돌파', 1).sonicBreak, sonicLv1);
 assert.deepEqual(level('음속 돌파', 2).sonicBreak, sonicLv2);
@@ -92,4 +103,34 @@ for (const [nodeLevel, base, rate] of [[1, 9.5, 1.2], [2, 19, 1.4]]) {
   approx(calculateBluntSpike(250, rule).convertedEvolutionDamage, 170 * rate);
 }
 
-console.log('2/4/5티어 진화 계산 테스트 통과');
+const fixed = [{ points: 40 }];
+assert.equal([...evolutionAllocations(evolution.nodes, [{ points: 39 }], 140)].length, 0);
+for (const [budget, count, countWithTier5] of [[60, 27, 0], [110, 24667, 0], [115, 53017, 28350], [125, 123757, 99090], [140, 470572, 445905]]) {
+  let total = 0;
+  let withTier5 = 0;
+  let mixedTier5 = 0;
+  for (const entries of evolutionAllocations(evolution.nodes, fixed, budget)) {
+    const points = [0, 40, 0, 0, 0, 0];
+    let fifth = 0;
+    for (const { name, level, tier } of entries) {
+      const rule = node(name);
+      assert.ok(level >= 1 && level <= rule.maxLevel);
+      points[tier] += rule.costPerLevel * level;
+      if (tier === 5) fifth++;
+      if (rule.requires) assert.ok(entries.some(entry => entry.name === rule.requires.name && entry.level >= rule.requires.level));
+    }
+    assert.ok(points.reduce((sum, value) => sum + value, 0) <= budget);
+    assert.ok(points[2] <= 30 && points[3] <= 20 && points[4] <= 20 && points[5] <= 30);
+    if (points[3]) assert.ok(points[2] >= 20);
+    if (points[4]) assert.equal(points[3], 20);
+    if (points[5]) assert.equal(points[4], 20);
+    total++;
+    if (fifth) withTier5++;
+    if (fifth === 2) mixedTier5++;
+  }
+  assert.equal(total, count);
+  assert.equal(withTier5, countWithTier5);
+  if (budget === 140) assert.ok(mixedTier5 > 0);
+}
+
+console.log('2·3·4·5티어 레벨별 효과 및 전체 배분 테스트 통과');

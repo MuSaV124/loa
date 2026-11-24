@@ -4,6 +4,16 @@ import { access, readFile, unlink } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
+import { normalizeRoutes } from '@vercel/routing-utils';
+import { evolutionAllocations } from '../public/evolution-math.js';
+import { pagePath } from '../public/page-route.js';
+import { encodeSpecScenario } from '../public/spec-planner.js';
+
+const evolution = JSON.parse(await readFile(new URL('../public/data/evolution.json', import.meta.url), 'utf8'));
+const fixedTier1 = [{ Name: '특화', Level: 30 }, { Name: '인내', Level: 10 }];
+const evolutionPoints = Value => [{ Name: '진화', Value }];
+const waitForRecommendations = page => page.locator('#recommendList:not([aria-busy])').waitFor({ state: 'attached', timeout: 60000 });
+const openNodeRecommendation = page => page.locator('#characterNodesLink').click();
 
 const publicRoot = join(process.cwd(), 'public');
 const chromeDebugLog = join(process.cwd(), 'debug.log');
@@ -18,15 +28,21 @@ const contentTypes = {
   '.svg': 'image/svg+xml',
   '.webp': 'image/webp'
 };
+const vercelConfig = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
+const { routes: vercelRoutes, error: routeError } = normalizeRoutes(vercelConfig.routes);
+assert.equal(routeError, null);
 
 const server = createServer(async (req, res) => {
   try {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
-    const relative = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
-    const filePath = normalize(join(publicRoot, relative));
+    const route = vercelRoutes.find(route => new RegExp(route.src).test(pathname));
+    if (!route?.dest) throw new Error('no file route');
+    const output = pathname.replace(new RegExp(route.src), route.dest);
+    if (!output.startsWith('/public/')) throw new Error('test API requires a fixture');
+    const filePath = normalize(join(publicRoot, output.slice('/public/'.length)));
     if (!filePath.startsWith(publicRoot)) throw new Error('invalid path');
     const body = await readFile(filePath);
-    res.writeHead(200, { 'Content-Type': contentTypes[extname(filePath)] || 'application/octet-stream' });
+    res.writeHead(route.status || 200, { 'Content-Type': contentTypes[extname(filePath)] || 'application/octet-stream' });
     res.end(body);
   } catch {
     res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -81,14 +97,16 @@ const baselineSkillItem = {
 };
 const characterResponse = {
   ok: true,
-  apiVersion: '6.1.4',
+  apiVersion: '6.1.7',
   profile: {
     CharacterName: '스킬표본', CharacterClassName: '브레이커', ServerName: '아브렐슈드',
     ItemAvgLevel: '1,700.00', CombatPower: '5,000.00', CharacterImage: '',
     Stats: [{ Type: '치명', Value: '1500' }, { Type: '신속', Value: '900' }]
   },
-  arkPassive: { Title: '테스트 전직', Effects: [
+  arkPassive: { Title: '테스트 전직', Points: evolutionPoints(115), Effects: [
+    ...fixedTier1,
     { Name: '뭉툭한 가시', Level: 2, Description: '', Tooltip: '' },
+    { Name: '깨달음', Level: 2, Description: '깨달음 4티어 치명의 기록 Lv.2' },
     {
       Name: '도약', Level: 1, Description: '도약 2티어 표본 강화 Lv.1',
       ToolTip: JSON.stringify({
@@ -119,10 +137,12 @@ async function verifyViewport(viewport) {
   const page = await browser.newPage({ viewport });
   await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(characterResponse) }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
-  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.4');
+  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.7');
   await page.getByPlaceholder('캐릭터명 입력').fill('스킬표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /스킬표본/ }).waitFor();
+  await openNodeRecommendation(page);
+  assert.equal(await page.locator('.nodeCard[data-name="치명"].selected').count(), 0);
   await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
 
   await page.locator('#skillEffectPreview').getByText('현재 스킬트리 자동 반영').waitFor();
@@ -174,6 +194,8 @@ async function verifyViewport(viewport) {
   await page.locator('#extraCritRate').fill('7');
   assert.equal(await page.locator('#sourceSummary').textContent(), initialSummary, '추가 효과 입력도 재계산 전에는 결과에 적용되면 안 됩니다.');
   await page.locator('#evolutionRecalculateButton').click();
+
+  await waitForRecommendations(page);
   assert.equal(await page.locator('#evolutionRecalculateButton').evaluate(button => button.classList.contains('pending')), false, '재계산 후 대기 상태가 해제되어야 합니다.');
   assert.equal(await page.locator('#evolutionRecalculateNotice').isVisible(), false, '재계산 후 설정 변경 안내가 사라져야 합니다.');
   assert.notEqual(await page.locator('#sourceSummary').textContent(), initialSummary, '재계산 버튼은 현재 노드와 추가 효과를 결과에 적용해야 합니다.');
@@ -198,7 +220,8 @@ async function verifySupportRecommendation() {
   const response = {
     ...characterResponse,
     profile: { ...characterResponse.profile, CharacterName: '서폿표본', CharacterClassName: '바드', Stats: [{ Type: '신속', Value: '1800' }, { Type: '특화', Value: '600' }] },
-    arkPassive: { Title: '절실한 구원', Effects: [
+    arkPassive: { Title: '절실한 구원', Points: evolutionPoints(140), Effects: [
+      ...fixedTier1,
       { Name: '축복의 여신', Level: 3 }, { Name: '정열의 춤사위', Level: 2 },
       { Name: '선각자', Level: 1 }, { Name: '진군', Level: 1 }, { Name: '마나 용광로', Level: 2 }
     ] },
@@ -219,12 +242,16 @@ async function verifySupportRecommendation() {
   await page.getByPlaceholder('캐릭터명 입력').fill('서폿표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /서폿표본/ }).waitFor();
+  await openNodeRecommendation(page);
+  await waitForRecommendations(page);
+  assert.equal(await page.locator('#recommendList .comboRow').count(), 0);
+  await page.locator('#manaRecommendationMode').selectOption('theory');
   const recommendation = await page.locator('#recommendPanel').innerText();
   assert.match(recommendation, /서포터 진화 노드/);
   assert.match(recommendation, /축복의 여신/);
   assert.match(recommendation, /종합 파티 기여/);
   assert.match(recommendation, /공증 가동률/);
-  assert.match(recommendation, /현재 스킬 주기·파티 기여 기준/);
+  assert.match(recommendation, /현재 스킬 주기에서 파티 버프 기여도/);
   const baseline = Number((await page.locator('#currentScore .apiBaselineRow > div').first().locator('b').innerText()).replace('%', ''));
   const manaFurnace = page.locator('.nodeCard[data-name="마나 용광로"] [data-action="minus"]');
   await manaFurnace.click();
@@ -233,6 +260,8 @@ async function verifySupportRecommendation() {
   await stable.click();
   await stable.click();
   await page.locator('#evolutionRecalculateButton').click();
+
+  await waitForRecommendations(page);
   const changed = Number((await page.locator('#currentScore .apiBaselineRow > div').nth(1).locator('b').innerText()).replace('%', ''));
   assert.ok(changed < baseline);
   await page.locator('#simulatorJumpButton').click();
@@ -283,6 +312,7 @@ async function verifyScopedBreakerCrit() {
   await page.getByPlaceholder('캐릭터명 입력').fill('권왕표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /권왕표본/ }).waitFor();
+  await openNodeRecommendation(page);
   await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
   const scope = await page.locator('.skillCritScope').innerText();
   assert.match(scope, /치적 기준 스킬\s*성운멸쇄권/);
@@ -330,6 +360,7 @@ async function verifyBaseSkillSelfBuff() {
   await page.getByPlaceholder('캐릭터명 입력').fill('창술표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /창술표본/ }).waitFor();
+  await openNodeRecommendation(page);
   await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
   const preview = await page.locator('#skillEffectPreview').innerText();
   assert.match(preview, /기본 자버프 1개/);
@@ -378,8 +409,11 @@ async function verifyArcanaCardExpectation() {
   await page.getByPlaceholder('캐릭터명 입력').fill('아르카나표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /아르카나표본/ }).waitFor();
+  await openNodeRecommendation(page);
   await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
   await page.locator('#evolutionRecalculateButton').click();
+
+  await waitForRecommendations(page);
 
   const note = page.locator('#arcanaIdentityNote');
   await note.getByText('아르카나 카드·스킬 기대값 적용').waitFor();
@@ -408,6 +442,8 @@ async function verifyArcanaCardExpectation() {
   const arcanaKeen = await page.locator('#keenEfficiency').innerText();
   assert.match(arcanaKeen, /스킬별 치적·치피 재계산/);
   assert.match(arcanaKeen, /도태\/재상 기대 가동률 포함/);
+  await waitForRecommendations(page);
+  await page.locator('#manaRecommendationMode').selectOption('theory');
   const bestRecommendation = await page.locator('#recommendList .comboRow.best').innerText();
   const topRows = page.locator('#recommendList .comboRow');
   const topValues = await topRows.locator('.rowMetric:first-child b').allTextContents();
@@ -415,12 +451,16 @@ async function verifyArcanaCardExpectation() {
   const numericValues = topValues.map(Number);
   assert.ok(numericValues.every(value => Number.isFinite(value) && value > 0));
   assert.deepEqual(numericValues, [...numericValues].sort((a, b) => b - a));
-  assert.deepEqual(await topRows.locator('.nodePill').allTextContents(), [
-    '뭉툭한 가시 Lv.2', '뭉툭한 가시 Lv.2', '입식 타격가 Lv.2', '뭉툭한 가시 Lv.2', '뭉툭한 가시 Lv.2'
-  ]);
+  assert.equal(await topRows.locator('.tierLine:nth-child(2)').count(), 5);
+  const details = topRows.first().locator('.comboDetails');
+  assert.equal(await details.getAttribute('open'), null);
+  await details.getByText('상세 계산 보기').click();
+  assert.match(await details.innerText(), /치적.*치피.*진피/s);
+  await details.getByText('상세 계산 보기').press('Enter');
+  assert.equal(await details.getAttribute('open'), null);
   await page.locator('#manaRecommendationMode').selectOption('unverified');
   assert.match(await page.locator('#manaRecommendationStatus').textContent(), /미검증 후보/);
-  await page.locator('#manaRecommendationMode').selectOption('auto');
+  await page.locator('#manaRecommendationMode').selectOption('theory');
   assert.doesNotMatch(await topRows.allTextContents().then(rows => rows.join(' ')), /감점|치적 95%|실전 추천값/);
   if (process.env.LOA_REPORT_TOP5 === '1') {
     console.log(JSON.stringify(await topRows.evaluateAll(rows => rows.map(row => ({
@@ -428,7 +468,7 @@ async function verifyArcanaCardExpectation() {
       value: row.querySelector('.rowMetric b').textContent
     }))), null, 2));
   }
-  assert.match(bestRecommendation, /끝마/, `황제 카드 수급을 반영한 1순위에 끝마가 포함되어야 합니다: ${bestRecommendation}`);
+  assert.match(bestRecommendation, /끝없는 마나|무한한 마력/);
   const skillScope = await page.locator('.skillCritScope').innerText();
   assert.match(skillScope, /다크 리저렉션/);
   assert.match(skillScope, /치적 \+27\.6%/);
@@ -451,9 +491,9 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   };
   const fixture = {
     ok: true,
-    apiVersion: '6.1.4',
+    apiVersion: '6.1.7',
     profile: { ...characterResponse.profile, CharacterName: '다중치명표본', Stats: [] },
-    arkPassive: { Effects: [{ Name: '입식 타격가', Level: 2 }] },
+    arkPassive: { Points: evolutionPoints(140), Effects: [...fixedTier1, { Name: '입식 타격가', Level: 2 }] },
     accessoryEffects: accessory,
     engravingEffects: engraving,
     powerSnapshot: {
@@ -478,6 +518,7 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   await page.getByPlaceholder('캐릭터명 입력').fill('다중치명표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /다중치명표본/ }).waitFor();
+  await openNodeRecommendation(page);
   await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
   await page.locator('#extraCritRate').fill('219.6');
   await page.locator('#extraCritDamage').fill('148.9');
@@ -486,16 +527,19 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   await page.locator('#excludeCooldown').check();
   await page.locator('#evolutionRecalculateButton').click();
 
+  await waitForRecommendations(page);
+
   // The two skills have equal test weight. At 220% and 240% only the second
   // and third tiers occur. Enumerate their outcomes independently of the app.
-  const expected = ({ crit = 0, evo = 0, keen = 0, mastery = 0, blunt = false, critHit = 1 } = {}) => {
+  await page.locator('#manaRecommendationMode').selectOption('theory');
+  const expected = ({ crit = 0, evo = 0, keen = 0, mastery = 0, blunt = 0, critHit = 1 } = {}) => {
     const skills = [[220 + crit, 3.5 + keen], [240 + crit, 4.5 + keen]];
     return skills.reduce((sum, [rate, damage]) => {
       const second = damage * critHit + damage - 1;
       const third = second + damage - 1;
       const thirdChance = (rate - 200) / 100;
       const multiplier = blunt ? 0.2 + 0.8 * damage * critHit : second * (1 - thirdChance) + third * thirdChance;
-      const evolution = 1 + (evo + (blunt ? 1.4 * (rate - 80) : 0)) / 100;
+      const evolution = 1 + (evo + (blunt ? blunt * (rate - 80) : 0)) / 100;
       return sum + multiplier * evolution * (1 + mastery / 100) * 1.18 / 2;
     }, 0);
   };
@@ -515,57 +559,58 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
     `${((0.98 * expected({ evo: 21, keen }) / normal - 1) * 100).toFixed(2)}%`
   ));
 
-  // Fixed fixture with cooldown and mana nodes excluded. Compute all 45
-  // eligible combinations before comparing the first five rendered rows.
-  const tier2 = [
-    { label: '한돌 Lv.3', evo: 30, crit: 0 },
-    { label: '예감 Lv.1|한돌 Lv.2', evo: 25, crit: 4 },
-    { label: '예감 Lv.2|한돌 Lv.1', evo: 20, crit: 8 }
-  ];
-  const tier4 = [
-    { label: '회심 + 달인', evo: 0, crit: 7, mastery: 8.5, critHit: 1.12 },
-    { label: '회심 + 분쇄', evo: 20, crit: 0, mastery: 0, critHit: 1.12 },
-    { label: '달인 + 분쇄', evo: 20, crit: 7, mastery: 8.5, critHit: 1 }
-  ];
-  const tier5 = [
-    { label: '뭉툭한 가시 Lv.2', evo: 19, blunt: true },
-    { label: '음속 돌파 Lv.2', evo: 2.8 },
-    { label: '인파이팅 Lv.2', evo: 18 },
-    { label: '입식 타격가 Lv.2', evo: 21 },
-    { label: '안정된 관리자 Lv.2', evo: 0 }
-  ];
-  const candidates = tier2.flatMap(a => tier4.flatMap(b => tier5.map(c => ({
-    nodes: [a.label, b.label, c.label],
-    value: expected({ crit: a.crit + b.crit, evo: a.evo + b.evo + c.evo, mastery: b.mastery, blunt: c.blunt, critHit: b.critHit })
-  }))));
-  assert.equal(candidates.length, 45);
+  const nodesWithoutCooldown = evolution.nodes.filter(node => !Object.values(node.levels).some(
+    effect => effect.cooldownReduction || effect.manaSkillCooldownReduction
+  ));
+  const candidates = [...evolutionAllocations(nodesWithoutCooldown, [{ points: 40 }], 140)].map(entries => {
+    const input = { crit: 0, evo: 0, mastery: 0, blunt: 0, critHit: 1 };
+    const attack = 114 + 4 * (entries.find(e => e.name === '파괴 전차')?.level || 0);
+    for (const { name, level } of entries) {
+      const effect = evolution.nodes.find(node => node.name === name).levels[level] || {};
+      input.crit += effect.critRate || 0;
+      input.evo += effect.evolutionDamage || 0;
+      input.mastery += effect.additionalDamage || 0;
+      if (name === '회심') input.critHit = 1.12;
+      if (name === '뭉툭한 가시') input.blunt = level === 1 ? 1.2 : 1.4;
+      if (name === '음속 돌파') input.evo += (attack - 100 + 14) * .05 * level;
+      if (name === '입식 타격가') input.evo += 4.5 * level;
+      if (name === '인파이팅') input.evo += 9 * level;
+    }
+    return {
+      nodes: [2, 3, 4, 5].map(tier => entries.filter(e => e.tier === tier).map(e => `${e.name} Lv.${e.level}`).join('|')),
+      input, value: expected(input)
+    };
+  });
   const top = candidates.sort((a, b) => b.value - a.value).slice(0, 5);
   const rows = await page.locator('#recommendList .comboRow').evaluateAll(items => items.map(row => ({
-    nodes: [
-      [...row.querySelectorAll('.chipWrap b')].map(chip => chip.textContent).join('|'),
-      row.querySelector('.tierLine:nth-child(2) strong').textContent,
-      row.querySelector('.nodePill').textContent
-    ],
+    nodes: [...row.querySelectorAll('.tierLine strong')].map(tier => [...tier.querySelectorAll('b')].map(chip => chip.textContent).join('|')),
     value: row.querySelector('.rowMetric b').textContent,
     note: row.querySelector('.practicalNote')?.textContent || '',
-    stages: row.querySelector('.rowMetric small').textContent
+    stages: row.querySelector('.comboCritical').textContent
   })));
-  assert.deepEqual(rows.map(({ nodes, value }) => ({ nodes, value })), top.map(({ nodes, value }) => ({ nodes, value: value.toFixed(4) })));
-  const normalRows = rows.filter(row => !row.nodes[2].includes('뭉툭한 가시'));
-  const bluntRows = rows.filter(row => row.nodes[2].includes('뭉툭한 가시'));
-  assert.ok(normalRows.length > 0 && bluntRows.length > 0);
-  for (const row of normalRows) assert.match(row.stages, /2중 확정 · 3중/);
-  for (const row of bluntRows) assert.match(row.stages, /다중 치명 0\.00%/);
+  assert.deepEqual(rows.map(row => Number(row.value)), top.map(row => Number(row.value.toFixed(4))));
+  const byNodes = new Map(candidates.map(row => [row.nodes.join('/'), row.value.toFixed(4)]));
   for (const row of rows) {
-    if (row.nodes[1].includes('회심') && !row.nodes[2].includes('뭉툭한 가시')) {
+    assert.equal(row.value, byNodes.get(row.nodes.join('/')));
+    if (row.nodes[3].includes('뭉툭한 가시')) assert.match(row.stages, /다중 치명 0\.00%/);
+    else assert.match(row.stages, /2중 확정 · 3중/);
+    if (row.nodes[2].includes('회심') && !row.nodes[3].includes('뭉툭한 가시')) {
       assert.match(row.note, /치명타 적중 주피 중첩 미검증/);
       assert.match(row.note, /이론 A \d+\.\d{4} \/ B \d+\.\d{4}/);
     }
   }
+  const details = page.locator('#recommendList .comboDetails').first();
+  assert.equal(await details.getAttribute('open'), null);
+  await details.locator('summary').click();
+  const width = await details.evaluate(el => ({ width: el.clientWidth, scroll: el.scrollWidth }));
+  assert.ok(width.scroll <= width.width + 1);
+  await details.locator('summary').click();
 
   const criticalMaster = page.locator('.nodeCard[data-name="회심"]');
   await criticalMaster.locator('[data-action="plus"]').click();
   await page.locator('#evolutionRecalculateButton').click();
+
+  await waitForRecommendations(page);
   assert.match(await page.locator('#sourceSummary').textContent(), /치명타 적중 시 피해 증가의 중첩은 미검증/);
   assert.match(await page.locator('#keenEfficiency').innerText(), /치명타 적중 주피 중첩 미검증/);
   await criticalMaster.locator('[data-action="minus"]').click();
@@ -577,37 +622,40 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   await blunt.click();
   await blunt.click();
   await page.locator('#evolutionRecalculateButton').click();
-  assert.equal(await currentScore.innerText(), expected({ evo: 19, blunt: true }).toFixed(4));
+
+  await waitForRecommendations(page);
+  assert.equal(await currentScore.innerText(), expected({ evo: 19, blunt: 1.4 }).toFixed(4));
   const evolutionSummary = page.locator('#sourceSummary .sourceGroup').filter({ has: page.getByText('진피', { exact: true }) });
   assert.equal(await evolutionSummary.locator('.sourceLine').filter({ hasText: '뭉가 전환' }).locator('b').textContent(), '+210.00%');
   assert.equal(await evolutionSummary.locator('summary em').textContent(), '+229.00%');
 
   // Reproduce the TOP5 using the actual controls and compare each in A/B.
   // On mobile replay the highest-scoring candidate and both gear changes.
-  assert.deepEqual(top[0].nodes, ['예감 Lv.2|한돌 Lv.1', '회심 + 달인', '뭉툭한 가시 Lv.2']);
   const metrics = page.locator('#specScenarioOutput .specScenarioMetrics > div');
   const scenarioGain = metrics.nth(1).locator('strong');
   const percent = value => `+${((value / normal - 1) * 100).toFixed(2)}%`;
   const replay = viewport.width > 600 ? [...top].reverse() : [top[0]];
-  const fullName = { 예감: '예리한 감각', 한돌: '한계 돌파' };
   for (const [index, candidate] of replay.entries()) {
     if (index) await page.locator('#simulatorBackButton').click();
-    const labels = [...candidate.nodes[0].split('|'), ...candidate.nodes[1].split(' + '), candidate.nodes[2]];
+    const labels = candidate.nodes.flatMap(tier => tier.split('|')).filter(Boolean);
     const levels = new Map(labels.map(label => {
       const [name, level] = label.split(' Lv.');
-      return [fullName[name] || name, Number(level || 1)];
+      return [name, Number(level)];
     }));
     const active = new Map(await page.locator('.nodeCard.selected').evaluateAll(nodes =>
       nodes.map(node => [node.dataset.name, Number(node.querySelector('.nodeControls b').textContent.replace('Lv.', ''))])
     ));
     const clickNode = (name, action) => page.locator(`.nodeCard[data-name="${name}"] [data-action="${action}"]`).click();
-    for (const [name, level] of active) {
+    for (const [name, level] of [...active].reverse()) {
+      if (fixedTier1.some(node => node.Name === name)) continue;
       for (let step = level; step > (levels.get(name) || 0); step -= 1) await clickNode(name, 'minus');
     }
     for (const [name, level] of levels) {
       for (let step = active.get(name) || 0; step < level; step += 1) await clickNode(name, 'plus');
     }
     await page.locator('#evolutionRecalculateButton').click();
+
+    await waitForRecommendations(page);
     await page.locator('#simulatorJumpButton').click();
     const comparison = page.locator('.specScenarioPanel');
     if (await comparison.getAttribute('open') == null) await comparison.locator('summary').click();
@@ -617,8 +665,8 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   const upgrade = page.locator('.specEfficiencyRow').filter({ hasText: '하하 → 상상' });
   await upgrade.locator('.specScenarioPick > span').click();
   assert.equal(await upgrade.getByRole('checkbox', { name: /표본 반지.*B 비교에 적용/ }).isChecked(), true);
-  assert.equal(await metrics.nth(2).locator('strong').innerText(), '256.15%');
-  const ringScore = expected({ crit: 15 + 1.15, evo: 39, keen: 0.029, mastery: 8.5, blunt: true, critHit: 1.12 });
+  assert.equal(await metrics.nth(2).locator('strong').innerText(), `${(240 + top[0].input.crit + 1.15).toFixed(2)}%`);
+  const ringScore = expected({ ...top[0].input, crit: top[0].input.crit + 1.15, keen: 0.029 });
   assert.equal(await scenarioGain.innerText(), percent(ringScore));
   const changedPower = Number((await metrics.nth(0).locator('strong').innerText()).replaceAll(',', ''));
   assert.ok(changedPower > 5000);
@@ -729,6 +777,7 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
   fixture.profile.Stats = analyzerMatched ? [{ Type: '최대 마나', Value: '665' }] : [{ Type: '최대 마나', Value: '100' }];
   fixture.powerSnapshot.profile.className = '워로드';
   fixture.arkPassive.Effects = [
+    ...fixedTier1,
     { Name: '마나 용광로', Level: 2 },
     { Name: '금단의 주문', Level: 2 }
   ];
@@ -755,175 +804,343 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
     await page.getByPlaceholder('캐릭터명 입력').fill('마나표본');
     await page.getByRole('button', { name: '검색', exact: true }).click();
     await page.getByRole('heading', { name: /마나표본/ }).waitFor();
+    await openNodeRecommendation(page);
     await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
     await page.locator('#evolutionRecalculateButton').click();
-    if (analyzerMatched) {
-      const status = page.locator('#manaRecommendationStatus');
-      const rows = page.locator('#recommendList .comboRow');
-      const actual = () => rows.evaluateAll(items => items.map(row => ({
-        nodes: [...row.querySelectorAll('.tierLine strong')].map(label => label.textContent).join(' / '),
-        multiplier: Number(row.querySelector('.rowMetric small strong')?.textContent)
-      })));
-      const before = await actual();
-      assert.equal(before.length, 5);
-      assert.ok(before.every(row => Number.isFinite(row.multiplier)));
-      assert.match(await status.textContent(), /가정 기반 자동 TOP5/);
-      assert.match(await page.locator('#manaSensitivity').textContent(), /TOP5 순위/);
-      await page.locator('#manaSupport').selectOption('artist');
-      assert.match(await status.textContent(), /가정 기반 자동 TOP5.*도화가/);
-      const artist = await actual();
-      assert.notDeepEqual(artist, before);
-      assert.equal(await page.locator('#manaScenarioPanel').evaluate(element => element.open), false);
-      assert.equal(await page.locator('#manaRecovery').inputValue(), '');
-      await page.locator('#manaRecommendationMode').selectOption('theory');
-      assert.match(await status.textContent(), /이론상 기대 피해 순위/);
-      if (process.env.LOA_REPORT_TOP5 === '1') console.log(JSON.stringify({ before, artist, theory: await actual() }, null, 2));
-      if (viewport.width > 600) {
-        await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
-        await page.locator('#manaRecommendationMode').selectOption('auto');
-        const autoHighCrit = {};
-        for (const [critRate, critDamage, evolution, node, outcome] of [
-          [110, 150, 100, '입식 타격가', /다중 치명 (?!0\.00%)\d+\.\d+%/],
-          [180, 0, 0, '뭉툭한 가시', /다중 치명 0\.00%/]
-        ]) {
-          await page.locator('#extraCritRate').fill(String(critRate));
-          await page.locator('#extraCritDamage').fill(String(critDamage));
-          await page.locator('#extraEvolutionDamage').fill(String(evolution));
-          await page.locator('#evolutionRecalculateButton').click();
-          let verifiedRows = 0;
-          autoHighCrit[critRate] = {};
-          for (const support of ['none', 'bard', 'artist', 'paladin', 'valkyrie']) {
-            await page.locator('#manaSupport').selectOption(support);
-            assert.match(await status.textContent(), /가정 기반 자동 TOP5/);
-            const matching = rows.filter({ hasText: `${node} Lv.2` });
-            for (const label of await matching.locator('.rowMetric small:first-of-type').allTextContents()) {
-              assert.match(label, outcome);
-              verifiedRows += 1;
-            }
-            autoHighCrit[critRate][support] = await actual();
-            assert.equal(autoHighCrit[critRate][support].length, 5);
-            assert.ok(autoHighCrit[critRate][support].every(row => row.multiplier > 0));
-          }
-          assert.ok(verifiedRows > 0, `${critRate}% 입력에서 검산 대상 노드가 자동 TOP5에 있어야 합니다.`);
-        }
-        if (process.env.LOA_REPORT_TOP5 === '1') console.log(JSON.stringify({ autoHighCrit }, null, 2));
-      }
-      return;
-    }
-    assert.match(await page.locator('#manaAutoStatus').textContent(), /공식 스킬 비용 2\/2.*공식 API 최대 마나 100.*실전 운용 주기 미확인/);
-    assert.equal(await page.locator('#manaMax').inputValue(), '100');
-    assert.equal(await page.locator('#manaRecovery').inputValue(), '');
-    assert.match(await page.locator('#manaRotation').inputValue(), /마나 기술 A \|  \|  \| 200/);
-    await page.locator('.advancedInputPanel .advancedInputDetails').evaluate(element => { element.open = true; });
-    await page.locator('#extraCritRate').fill(String(critBonus));
-    await page.locator('#evolutionRecalculateButton').click();
-    assert.match(await page.locator('#sourceSummary').textContent(), /마나 용광로.*\+7(?:\.0+)?%/s);
-    const evolutionSummary = page.locator('#sourceSummary .sourceGroup').filter({ has: page.getByText('진피', { exact: true }) });
-    assert.equal(await evolutionSummary.locator('summary em').textContent(), '+27.00%');
-    assert.match(await evolutionSummary.textContent(), /마나 스킬 추가 진피[^+]*\+10\.00%/);
+
+    await waitForRecommendations(page);
     const status = page.locator('#manaRecommendationStatus');
     const rows = page.locator('#recommendList .comboRow');
-    const top = () => rows.evaluateAll(items => items.map(row => (
-      [...row.querySelectorAll('.tierLine strong')].map(label => label.textContent).join(' / ')
-    )));
-    const theory = await top();
-    assert.equal(theory.length, 5);
+    const mode = page.locator('#manaRecommendationMode');
+    assert.equal(await page.locator('#manaDuration').inputValue(), '300');
+    assert.match(await page.locator('#recommendList').innerText(), /300초 실측 검증을 통과한 후보가 없습니다/);
+    assert.equal(await rows.count(), 0);
+    assert.match(await status.textContent(), /300초 실측 검증 0개/);
+    await mode.selectOption('theory');
+    assert.equal(await rows.count(), 5);
+    assert.match(await status.textContent(), /이론상 기대 피해 순위/);
+    if (analyzerMatched) {
+      await mode.selectOption('estimate');
+      assert.equal(await rows.count(), 0);
+      assert.match(await status.textContent(), /300초 추정 검증 · 마나 통과 0개/);
+      await page.locator('#manaSupport').selectOption('artist');
+      await waitForRecommendations(page);
+      assert.match(await status.textContent(), /도화가/);
+      await mode.selectOption('auto');
+      assert.equal(await rows.count(), 0);
+      return;
+    }
+    assert.match(await page.locator('#manaAutoStatus').textContent(), /공식 스킬 비용 2\/2.*공식 API 최대 마나 100/);
+    assert.equal(await page.locator('#manaRecovery').inputValue(), '');
     const panel = page.locator('#manaScenarioPanel');
     assert.equal(await panel.evaluate(element => element.open), false);
-    assert.match(await status.textContent(), /이론상 기대 피해 순위.*전투분석 피해 지분 미확인/);
-    assert.match(await rows.first().textContent(), /가상 운용 최소 최대 MP/);
-    for (const [support, label] of [['bard', '바드'], ['artist', '도화가'], ['paladin', '홀리나이트'], ['valkyrie', '발키리'], ['none', '서포터 없음']]) {
-      await page.locator('#manaSupport').selectOption(support);
-      assert.equal(await panel.evaluate(element => element.open), false);
-      assert.equal(await page.locator('#manaShortageClass').isChecked(), false);
-      assert.deepEqual(await top(), theory);
-      assert.match(await rows.first().textContent(), new RegExp(label));
-    }
     await panel.locator('summary').first().click();
-    await page.locator('#manaShortageClass').check();
-    assert.deepEqual(await top(), theory, '데이터가 없는 체크 상태는 특정 노드를 배제하지 않는다.');
-    assert.match(await status.textContent(), /전투 시간/);
     const set = (id, value) => page.locator(`#${id}`).fill(String(value));
-    for (const [id, value] of Object.entries({ manaDuration: 14, manaMax: 100, manaStart: 100, manaRecovery: 0, manaFirstRecovery: 1, manaRecoveryInterval: 1 })) {
+    await set('extraCritRate', critBonus);
+    for (const [id, value] of Object.entries({ manaMax: 100, manaStart: 100, manaRecovery: 100, manaFirstRecovery: 1, manaRecoveryInterval: 1 })) {
       await set(id, value);
     }
-    await set('manaRotation', '마나 기술 A | 0 | 2 | 40\n마나 기술 B | 1 | 3 | 20');
+    await set('manaRotation', '마나 기술 A | 0 | 4 | 40 | 0.25 | 0.1\n마나 기술 B | 1 | 6 | 20 | 0.25');
     await page.locator('#manaCostReductions').selectOption('product');
-    await page.locator('#applyManaScenario').click();
-    assert.match(await status.textContent(), /입력 조건 마나 반영 순위/);
-    const scarce = await top();
-    assert.equal(scarce.length, 5);
-    assert.notDeepEqual(scarce, theory);
-    assert.match(await rows.first().textContent(), /마나 부족.*지연/);
-    const supportTop = { none: scarce };
-    for (const [support, label, override] of [
-      ['bard', '바드', 45], ['artist', '도화가', 25], ['paladin', '홀리나이트', 60], ['valkyrie', '발키리', 60]
-    ]) {
-      await page.locator('#manaSupport').selectOption(support);
-      assert.match(await page.locator('#manaSupportSummary').textContent(), /공식 툴팁/);
-      const missingSupportInput = support === 'artist' ? /이론상 기대 피해 순위/ : /가정 포함 마나 반영 순위/;
-      assert.match(await status.textContent(), /이론상 기대 피해 순위/);
-      await set('manaSupportUptime', 0);
+    await mode.selectOption('auto');
+    const apply = async () => {
       await page.locator('#applyManaScenario').click();
-      assert.deepEqual(await top(), scarce);
-      await set('manaSupportUptime', 100);
-      await page.locator('#applyManaScenario').click();
-      assert.match(await status.textContent(), missingSupportInput);
-      if (support !== 'artist') {
-        await page.locator('#manaRecommendationMode').selectOption('estimate');
-        assert.match(await status.textContent(), /가정 기반 마나 비교/);
-        await page.locator('#manaRecommendationMode').selectOption('auto');
-      } else assert.match(await status.textContent(), /실제 적용 시각/);
-      await set('manaSupportTimes', support === 'artist' ? '1, 4, 7, 10, 13' : '0, 8');
-      await set('manaSupportRestore', override);
-      await page.locator('#applyManaScenario').click();
-      assert.match(await status.textContent(), /입력 조건 마나 반영 순위/);
-      assert.match(await rows.first().textContent(), new RegExp(label));
-      supportTop[support] = await top();
+      await waitForRecommendations(page);
+    };
+    await apply();
+    assert.equal(await rows.count(), 0);
+    await mode.selectOption('estimate');
+    assert.equal(await rows.count(), 5);
+    for (const row of await rows.all()) {
+      assert.match(await row.innerText(), /300초 마나 안정/);
+      assert.equal(await row.locator('.comboDetails').getAttribute('open'), null);
+      assert.match(await row.locator('.comboDetails').textContent(), /300초 최소 잔여 마나.*마나 부족 0회.*시전 누락 0회/s);
     }
-    assert.deepEqual(supportTop.paladin, supportTop.valkyrie);
-    assert.ok(Object.values(supportTop).some(result => JSON.stringify(result) !== JSON.stringify(scarce)));
-    await page.locator('#manaSupport').selectOption('bard');
-    assert.equal(await page.locator('#manaSupportRestore').inputValue(), '45');
-    assert.deepEqual(await top(), supportTop.bard);
-    await page.locator('#manaSupport').selectOption('none');
-    assert.deepEqual(await top(), scarce, '서포터 변경 시 적용 버튼 없이 순위를 다시 계산한다.');
-    await page.locator('#manaFood').selectOption('used');
-    assert.match(await status.textContent(), /음식 사용 상태의 회복 1회량 미확인/);
-    await set('manaFoodTick', 100);
-    await page.locator('#applyManaScenario').click();
-    assert.deepEqual(await top(), theory);
-    await page.locator('#manaFood').selectOption('none');
-    await set('manaRecovery', 100);
-    await page.locator('#manaRecovery').press('Tab');
-    assert.deepEqual(await top(), theory, '회복이 충분하면 마나 반영 순위와 이론 순위가 같다.');
-    await page.locator('#manaShortageClass').uncheck();
-    assert.deepEqual(await top(), theory);
-    if (process.env.LOA_REPORT_TOP5 === '1') console.log({ critBonus, theory, supportTop });
-    await page.locator('#manaShortageClass').check();
-    const size = await panel.evaluate(element => ({ width: element.clientWidth, scroll: element.scrollWidth }));
-    assert.ok(size.scroll <= size.width + 1, `${viewport.width}px 마나 입력 패널 ${size.scroll}/${size.width}px`);
+    const best = rows.first().locator('.comboDetails');
+    await best.getByText('상세 계산 보기').click();
+    assert.match(await best.innerText(), /서포터 없음.*300초 총 기대 피해/);
+    assert.match(await best.innerText(), /마나 사이클 추정.*후딜 0.10초/s);
+    const width = await best.evaluate(el => ({ width: el.clientWidth, scroll: el.scrollWidth }));
+    assert.ok(width.scroll <= width.width + 1);
+    await set('manaRecovery', 0);
+    await apply();
+    assert.equal(await rows.count(), 0);
+    await mode.selectOption('shortage');
+    assert.equal(await rows.count(), 5);
+    assert.match(await rows.first().textContent(), /마나 부족 [1-9]\d*회.*시전 누락 [1-9]\d*회.*부족\)/s);
+    assert.match(await rows.first().innerText(), /이론 기대 피해 배율/);
+    await page.locator('#manaSupport').selectOption('artist');
+    await waitForRecommendations(page);
+    assert.match(await status.textContent(), /실제 적용 시각/);
+    await set('manaSupportTimes', '3,33,63,93,123,153,183,213,243,273');
+    await set('manaSupportRestore', 25);
+    await apply();
+    assert.match(await rows.first().textContent(), /추가 회복 [1-9].*도화가/s);
+    await mode.selectOption('auto');
+    assert.equal(await rows.count(), 0);
   } finally {
     await page.close();
   }
 }
 
+const routingOrigin = `http://127.0.0.1:${port}`;
+const routingCharacterA = '경로 표본 +%#?';
+const routingCharacterB = '다른표본';
+const routingCharacterSlow = '느린표본';
+const routingCharacterRetry = '재시도표본';
+const routingCharacterMissing = '없는표본';
+
+async function mockRouteCharacters(context, requests, waitForSlow) {
+  await context.route('**/api/character?**', async route => {
+    const name = new URL(route.request().url()).searchParams.get('name');
+    requests.set(name, (requests.get(name) || 0) + 1);
+    if (name === routingCharacterMissing || (name === routingCharacterRetry && requests.get(name) === 1)) {
+      return route.fulfill({ status: 404, json: { error: '캐릭터를 찾을 수 없습니다.' } });
+    }
+    if (name === routingCharacterSlow) await waitForSlow;
+    const fixture = structuredClone(characterResponse);
+    fixture.profile.CharacterName = name;
+    fixture.powerSnapshot.profile.name = name;
+    return route.fulfill({ json: fixture });
+  });
+}
+
+async function expectPath(page, path) {
+  await page.waitForURL(routingOrigin + path);
+  assert.equal(new URL(page.url()).pathname + new URL(page.url()).search, path);
+}
+
+async function expectCharacter(page, name) {
+  const heading = page.locator('#characterCard h2');
+  await heading.waitFor();
+  assert.ok((await heading.innerText()).startsWith(name + ' / '));
+}
+
+async function submitRouteSearch(page, name) {
+  await page.locator('#characterName').fill(name);
+  await page.locator('#searchButton').click();
+}
+
+async function verifyBrowserRouting({ mobile = false } = {}) {
+  const context = await browser.newContext(mobile
+    ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true }
+    : { viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  const requests = new Map();
+  await mockRouteCharacters(context, requests);
+  try {
+    await page.goto(routingOrigin);
+    await submitRouteSearch(page, routingCharacterA);
+    const overview = pagePath({ page: 'character', name: routingCharacterA });
+    await expectPath(page, overview);
+    await expectCharacter(page, routingCharacterA);
+    assert.equal(await page.locator('#recommendPanel').isVisible(), false);
+    await openNodeRecommendation(page);
+    const nodes = pagePath({ page: 'nodes', name: routingCharacterA });
+    await expectPath(page, nodes);
+    await page.locator('#manaSupport').selectOption('bard');
+    await waitForRecommendations(page);
+    await page.locator('#manaRecommendationMode').selectOption('theory');
+    const filters = { support: 'bard', mode: 'theory' };
+    const filteredNodes = pagePath({ page: 'nodes', name: routingCharacterA, ...filters });
+    await expectPath(page, filteredNodes);
+    const metrics = page.locator('#recommendList .rowMetrics');
+    const expectedMetrics = await metrics.allTextContents();
+    assert.equal(expectedMetrics.length, 5);
+    const details = page.locator('#recommendList .comboDetails').first();
+    await details.locator('summary').click();
+    assert.equal(await details.getAttribute('open'), '');
+    if (!mobile) {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+      await page.locator('#copyCharacterLink').click();
+      await page.getByText('링크를 복사했습니다.').waitFor();
+      const copied = await page.evaluate(() => navigator.clipboard.readText());
+      assert.equal(copied, routingOrigin + filteredNodes);
+      const sharingContext = await browser.newContext();
+      try {
+        const shareRequests = new Map();
+        await mockRouteCharacters(sharingContext, shareRequests);
+        const share = await sharingContext.newPage();
+        assert.equal((await share.goto(copied)).status(), 200);
+        await expectCharacter(share, routingCharacterA);
+        await waitForRecommendations(share);
+        assert.equal(await share.locator('#manaSupport').inputValue(), 'bard');
+        assert.deepEqual(await share.locator('#recommendList .rowMetrics').allTextContents(), expectedMetrics);
+        assert.deepEqual([...shareRequests], [[routingCharacterA, 1]]);
+      } finally {
+        await sharingContext.close();
+      }
+    }
+    const combat = pagePath({ page: 'combat', name: routingCharacterA, ...filters });
+    await page.locator('#characterCombatLink').click();
+    await expectPath(page, combat);
+    await page.locator('#combatPanel').getByRole('heading', { name: '300초 전투 분석' }).waitFor();
+    assert.equal(await page.locator('#evolutionPanel').isVisible(), false);
+    assert.deepEqual(await metrics.allTextContents(), expectedMetrics);
+    assert.equal(await details.getAttribute('open'), '');
+    assert.equal(context.pages().length, 1);
+    await page.goBack();
+    await expectPath(page, filteredNodes);
+    assert.equal(await page.locator('#evolutionPanel').isVisible(), true);
+    assert.equal(await details.getAttribute('open'), '');
+    await page.goBack();
+    await expectPath(page, overview);
+    await page.goBack();
+    await expectPath(page, '/');
+    assert.equal(await page.locator('#characterCard').isVisible(), false);
+    await page.goForward();
+    await expectPath(page, overview);
+    await expectCharacter(page, routingCharacterA);
+    await page.goForward();
+    await expectPath(page, filteredNodes);
+    await waitForRecommendations(page);
+    assert.deepEqual(await metrics.allTextContents(), expectedMetrics);
+    await page.goForward();
+    await expectPath(page, combat);
+    assert.equal(await page.locator('#combatPanel').isVisible(), true);
+    assert.deepEqual([...requests], [[routingCharacterA, 1]]);
+
+    if (mobile) {
+      const width = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
+      assert.ok(width[0] <= width[1] + 1);
+      return;
+    }
+    await page.goBack();
+    await expectPath(page, filteredNodes);
+    assert.equal((await page.reload()).status(), 200);
+    await expectPath(page, filteredNodes);
+    await expectCharacter(page, routingCharacterA);
+    await waitForRecommendations(page);
+    assert.deepEqual(await metrics.allTextContents(), expectedMetrics);
+    assert.equal(requests.get(routingCharacterA), 1, 'Reload uses the compatible character cache');
+    await page.goBack();
+    await expectPath(page, overview);
+    await expectCharacter(page, routingCharacterA);
+    await submitRouteSearch(page, routingCharacterB);
+    await expectPath(page, pagePath({ page: 'character', name: routingCharacterB }));
+    await expectCharacter(page, routingCharacterB);
+    await page.goBack();
+    await expectPath(page, overview);
+    await expectCharacter(page, routingCharacterA);
+    await page.goForward();
+    await expectCharacter(page, routingCharacterB);
+    assert.deepEqual([...requests], [[routingCharacterA, 1], [routingCharacterB, 1]]);
+
+    await page.locator('#siteSimulatorLink').click();
+    const simulator = pagePath({ page: 'simulator', name: routingCharacterB });
+    await expectPath(page, simulator);
+    await page.locator('#powerSnapshotPanel').getByRole('heading', { name: '스펙업 효율 시뮬레이터' }).waitFor();
+    await page.locator('[data-planner-mode="budget"]').click();
+    const budget = page.locator('#specPlannerBudgetInput');
+    await budget.fill('550000');
+    await budget.press('Tab');
+    await page.locator('[data-tab="calculator"]').click();
+    await expectPath(page, '/');
+    await page.goBack();
+    await expectPath(page, simulator);
+    assert.equal(await budget.inputValue(), '550000');
+    assert.equal(requests.get(routingCharacterB), 1);
+    await page.locator('#simulatorBackButton').click();
+    await expectCharacter(page, routingCharacterB);
+  } finally {
+    await context.close();
+  }
+}
+
+async function verifyDirectRoutesAndRequestRace() {
+  const context = await browser.newContext();
+  const requests = new Map();
+  let releaseSlow;
+  const held = new Promise(resolve => { releaseSlow = resolve; });
+  await mockRouteCharacters(context, requests, held);
+  const page = await context.newPage();
+  try {
+    assert.equal((await page.goto(routingOrigin + '/simulator')).status(), 200);
+    await page.locator('#simulatorLanding').getByRole('heading').waitFor();
+    await submitRouteSearch(page, routingCharacterB);
+    await expectPath(page, pagePath({ page: 'simulator', name: routingCharacterB }));
+    await page.locator('#powerSnapshotPanel').waitFor();
+    const oldScenario = encodeSpecScenario({ version: 1, characterName: routingCharacterB, plannerMode: 'budget', plannerBudget: 123000 });
+    await page.goto(routingOrigin + '/?scenario=' + oldScenario);
+    await expectPath(page, pagePath({ page: 'simulator', name: routingCharacterB, scenario: oldScenario }));
+    await page.locator('#specPlannerBudgetInput').waitFor();
+    assert.equal(await page.locator('#specPlannerBudgetInput').inputValue(), '123000');
+
+    const malformed = '/character/%E0%A4%A/nodes';
+    await page.goto(routingOrigin + malformed);
+    await page.locator('#routeNotFound').waitFor();
+    for (const unavailable of ['/character/' + encodeURIComponent(routingCharacterB) + '/stats', '/invalid-route']) {
+      assert.equal((await page.goto(routingOrigin + unavailable)).status(), 404);
+      await page.getByRole('heading', { name: '페이지를 찾을 수 없습니다' }).waitFor();
+      assert.equal(await page.locator('#characterNav').isVisible(), false);
+    }
+    const missing = pagePath({ page: 'character', name: routingCharacterMissing });
+    await page.goto(routingOrigin + missing);
+    await page.locator('#characterRetryButton').waitFor();
+    assert.match(await page.locator('#message').innerText(), /캐릭터를 찾을 수 없습니다/);
+    const retry = pagePath({ page: 'character', name: routingCharacterRetry });
+    await page.goto(routingOrigin + retry);
+    await page.locator('#characterRetryButton').click();
+    await expectCharacter(page, routingCharacterRetry);
+    assert.equal(requests.get(routingCharacterRetry), 2);
+
+    const slow = pagePath({ page: 'nodes', name: routingCharacterSlow });
+    await page.goto(routingOrigin + slow);
+    await page.getByText('캐릭터 정보를 불러오는 중입니다.').waitFor();
+    await page.locator('#characterCombatLink').click();
+    const slowCombat = pagePath({ page: 'combat', name: routingCharacterSlow });
+    await expectPath(page, slowCombat);
+    await page.goBack();
+    await expectPath(page, slow);
+    await page.locator('[data-tab="calculator"]').click();
+    await expectPath(page, '/');
+    const slowResponse = page.waitForResponse(response => response.url().includes(encodeURIComponent(routingCharacterSlow)));
+    releaseSlow();
+    await slowResponse;
+    assert.equal(await page.locator('#characterCard').isVisible(), false, 'A late response cannot take over the home page');
+    await page.goBack();
+    await expectPath(page, slow);
+    await expectCharacter(page, routingCharacterSlow);
+    assert.equal(requests.get(routingCharacterSlow), 1);
+    assert.equal(requests.get(routingCharacterB), 1);
+
+    await page.locator('[data-tab="market"]').click();
+    await expectPath(page, '/market');
+    await page.locator('[data-market-tab="gem"]').click();
+    await expectPath(page, '/market?category=gem');
+    await page.locator('[data-tab="ratio"]').click();
+    await expectPath(page, '/ratios');
+    await page.goBack();
+    await expectPath(page, '/market?category=gem');
+    assert.equal(await page.locator('#marketGemPanel').isVisible(), true);
+  } finally {
+    releaseSlow();
+    await context.close();
+  }
+}
+
 try {
-  await verifyViewport({ width: 1440, height: 1000 });
-  await verifyViewport({ width: 390, height: 844 });
-  await verifyScopedBreakerCrit();
-  await verifyBaseSkillSelfBuff();
-  await verifyArcanaCardExpectation();
-  await verifyHighCritRecommendation();
-  await verifyHighCritRecommendation({ width: 390, height: 844 });
-  await verifySupportRecommendation();
-  await verifyHoningMarketRefresh({ width: 1440, height: 1000 });
-  await verifyHoningMarketRefresh({ width: 390, height: 844 });
-  await verifyManaRecommendation({ width: 1440, height: 1000 }, 150);
-  await verifyManaRecommendation({ width: 390, height: 844 }, 35);
-  await verifyManaRecommendation({ width: 1440, height: 1000 }, 150, true);
-  await verifyManaRecommendation({ width: 390, height: 844 }, 150, true);
-  console.log('skill effect UI tests passed');
+  if (!process.argv.includes('--routing-only')) {
+    await verifyViewport({ width: 1440, height: 1000 });
+    await verifyViewport({ width: 390, height: 844 });
+    await verifyScopedBreakerCrit();
+    await verifyBaseSkillSelfBuff();
+    await verifyArcanaCardExpectation();
+    await verifyHighCritRecommendation();
+    await verifyHighCritRecommendation({ width: 390, height: 844 });
+    await verifySupportRecommendation();
+    await verifyHoningMarketRefresh({ width: 1440, height: 1000 });
+    await verifyHoningMarketRefresh({ width: 390, height: 844 });
+    await verifyManaRecommendation({ width: 1440, height: 1000 }, 150);
+    await verifyManaRecommendation({ width: 390, height: 844 }, 35);
+    await verifyManaRecommendation({ width: 1440, height: 1000 }, 150, true);
+    await verifyManaRecommendation({ width: 390, height: 844 }, 150, true);
+    console.log('skill effect UI tests passed');
+  }
+  await verifyBrowserRouting();
+  await verifyBrowserRouting({ mobile: true });
+  await verifyDirectRoutesAndRequestRace();
+  console.log('desktop and mobile URL routing, sharing, history and request races passed');
 } finally {
   await browser.close();
   await new Promise(resolve => server.close(resolve));

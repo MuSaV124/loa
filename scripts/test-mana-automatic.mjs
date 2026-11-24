@@ -67,6 +67,14 @@ assert.equal(analysis({ verified: measured }).origin, 'verified');
 assert.equal(analysis({ verified: measured, support: 'bard' }).origin, 'verified');
 assert.equal(analysis({ verified: measured, support: 'artist' }).origin, 'automatic');
 assert.equal(analysis({ verified: measured, support: 'artist' }).scenario.environment.baseline, 20);
+const automatic300 = analysis({ character: exactCapacity, duration: 300 });
+assert.equal(automatic300.scenario.duration, 300);
+assert.equal(automatic300.scenario.observation, null);
+assert.match(analysis({ character: exactCapacity, duration: 300,
+  knownSkills: [{ ...knownSkills[0], rune: { name: '심판' } }, knownSkills[1]] }).detail, /심판 발동.*쿨타임·마나 회복 미반영/);
+const measured300 = { ...measured, inputs: { ...measured.inputs, duration: 300 } };
+assert.equal(analysis({ verified: measured300, duration: 300 }).origin, 'automatic');
+assert.equal(analysis({ verified: measured300, duration: 300, support: 'artist' }).origin, 'automatic');
 
 // Synthetic build comparison on a fixed character. Identical recovery without shortages preserves the theory order.
 const builds = [

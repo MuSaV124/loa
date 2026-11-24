@@ -29,6 +29,19 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .message { margin-top: 12px; padding: 12px; border-radius: 8px; background: #7f1d1d; color: #fee2e2; }
 .message.info { background: #12324a; color: #d9efff; }
 .hidden { display: none; }
+.hiddenByRoute { display: none !important; }
+.routeNotice, #characterNav, #combatPanel { grid-column: 1 / -1; }
+.characterNav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.characterNav.hidden { display: none; }
+.characterNav a { padding: 8px 10px; border-radius: 8px; color: var(--muted); font-weight: 800; }
+.characterNav a[aria-current="page"] { color: var(--amber); background: rgba(245,182,66,.12); }
+.characterNav button { margin-inline-start: auto; }
+.tabButton, .characterNav a, .simulatorJumpButton { text-decoration: none; }
+.tabButtonGroup { flex-wrap: wrap; }
+#characterRetryButton { margin-top: 8px; }
+#combatPanel h2 { margin-bottom: 12px; }
+body[data-site-page="combat"] #recommendPanel { grid-column: 1 / -1; }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .character { display: flex; gap: 16px; align-items: center; }
 .character img { width: 84px; height: 84px; object-fit: cover; border-radius: 10px; background: var(--panel2); }
 .character h2 { margin: 0 0 8px; }
@@ -5326,4 +5339,45 @@ body:not(.calculatorReady):not(.marketMode):not(.ratioMode) .tabNav {
 }
 @media (max-width: 760px) {
   .supportPowerGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+#recommendList .buildMain {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 10px;
+}
+#recommendList .miniChip {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  display: inline-block;
+}
+.comboDetails {
+  grid-column: 2 / -1;
+  min-width: 0;
+  color: var(--muted, #9aa8bc);
+  font-size: .8rem;
+}
+.comboDetails summary {
+  width: fit-content;
+  cursor: pointer;
+  color: #bfdbfe;
+  font-weight: 700;
+}
+.comboDetailsBody {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, .2);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.comboDetailsBody ul {
+  margin: 5px 0;
+  padding-inline-start: 20px;
+}
+.comboDetailsBody p {
+  margin: 5px 0;
+}
+@media (max-width: 680px) {
+  #recommendList .buildMain { grid-template-columns: 1fr; }
+  .comboDetails { grid-column: 1 / -1; }
 }

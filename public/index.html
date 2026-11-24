@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LOSTARK 진화 노드 추천 계산기</title>
-  <link rel="stylesheet" href="/style.css?v=6.1.1" />
+  <link rel="stylesheet" href="/style.css?v=routes-1" />
 </head>
 <body>
   <main class="wrap">
@@ -14,21 +14,23 @@
           <h1>LOSTARK 진화 노드 추천 계산기</h1>
           <p>API 값과 선택한 진화 노드·추가 효과를 재계산해 비교합니다.</p>
         </div>
-        <span class="badge">v6.1.4 · 자동 마나 추천</span>
+        <span class="badge">v6.1.7 · 300초 마나 검증</span>
       </div>
       <form id="searchForm" class="search">
         <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
         <button id="searchButton" type="submit">검색</button>
         <button id="characterRefreshButton" class="characterRefreshButton hidden" type="button">캐릭터 갱신</button>
       </form>
-      <div id="message" class="message hidden"></div>
+      <div id="message" class="message hidden" role="status"></div>
+      <button id="characterRetryButton" class="secondary hidden" type="button">다시 시도</button>
     </section>
 
-    <div class="tabNav">
+    <nav class="tabNav" aria-label="사이트 메뉴">
       <div class="tabButtonGroup">
-        <button class="tabButton active" type="button" data-tab="calculator">계산기</button>
-        <button class="tabButton" type="button" data-tab="market">시세</button>
-        <button class="tabButton" type="button" data-tab="ratio">배율</button>
+        <a class="tabButton active" data-tab="calculator" data-route href="/">메인</a>
+        <a class="tabButton" id="siteSimulatorLink" data-tab="simulator" data-route href="/simulator">골드 효율</a>
+        <a class="tabButton" data-tab="market" data-route href="/market">시세</a>
+        <a class="tabButton" data-tab="ratio" data-route href="/ratios">배율</a>
       </div>
       <div id="lostarkNoticeCardTop" class="lostarkNoticeCard tabNoticeCard" aria-live="polite">
         <a class="lostarkNoticeLink" href="https://lostark.game.onstove.com/News/Notice/List" target="_blank" rel="noopener">
@@ -37,9 +39,32 @@
           <small>공식 홈페이지</small>
         </a>
       </div>
-    </div>
+    </nav>
+
+    <section id="routeNotFound" class="panel routeNotice hidden">
+      <h2>페이지를 찾을 수 없습니다</h2>
+      <a href="/" data-route>메인으로 이동</a>
+    </section>
+
+    <section id="simulatorLanding" class="panel routeNotice hidden">
+      <h2>골드 효율 계산기</h2>
+      <p class="hint">캐릭터를 검색하면 골드 대비 스펙업 효율을 계산할 수 있습니다.</p>
+    </section>
 
     <section id="characterCard" class="panel character hidden calcTabPanel"></section>
+
+    <nav id="characterNav" class="panel characterNav hidden" aria-label="캐릭터 메뉴">
+      <a id="characterOverviewLink" data-route>캐릭터 분석</a>
+      <a id="characterNodesLink" data-route>진화 노드 추천</a>
+      <a id="characterCombatLink" data-route>300초 전투 분석</a>
+      <button id="copyCharacterLink" type="button" class="secondary">링크 복사</button>
+      <span id="characterShareStatus" class="srOnly" role="status"></span>
+    </nav>
+
+    <section id="combatPanel" class="panel calcTabPanel hidden">
+      <h2>300초 전투 분석</h2>
+      <div id="combatSkillCycle"></div>
+    </section>
 
     <section id="powerSnapshotPanel" class="panel powerSnapshotPanel hidden simulatorPanel">
       <div class="sectionHead">
@@ -119,7 +144,7 @@
 
     <section id="recommendPanel" class="calcTabPanel panel">
       <div class="sectionHead recommendHead">
-        <div><h2>2/4/5티어 조합 추천</h2><p id="recommendDescription" class="hint">레이드 기대 피해 추정치 기준으로 조합을 비교합니다.</p></div>
+        <div><h2 id="recommendHeading">2·3·4·5티어 조합 추천</h2><p id="recommendDescription" class="hint">레이드 기대 피해 추정치 기준으로 조합을 비교합니다.</p></div>
         <details id="recommendAdvanced" class="advancedInputDetails">
           <summary>추천 세부 설정</summary>
           <div class="recommendChecks">
@@ -149,7 +174,7 @@
         <div class="advancedInputBody">
           <label class="manaManualToggle"><input id="manaShortageClass" type="checkbox" /> 수동 마나 환경 사용</label>
           <div class="manaScenarioGrid">
-            <label>전투 시간(초)<input id="manaDuration" type="number" min="1" max="600" step="any" /></label>
+            <label>전투 시간(초)<input id="manaDuration" type="number" value="300" readonly /></label>
             <label>최대 마나<input id="manaMax" type="number" min="1" step="any" /></label>
             <label>시작 마나<input id="manaStart" type="number" min="0" step="any" /></label>
             <label>음식·서포터 적용 전 회복 1회량<input id="manaRecovery" type="number" min="0" step="any" /></label>
@@ -169,10 +194,10 @@
             <summary>조회한 스킬 소모량과 쿨타임</summary>
             <ul id="manaAutoSkillList"></ul>
           </details>
-          <label>스킬명 | 첫 사용(초) | 재사용 간격(초) | 마나 소모량
+          <label>스킬명 | 첫 사용(초) | 재사용 대기(초) | 마나 소모량 | 시전(초, 선택) | 후딜(초, 선택)
             <textarea id="manaRotation" rows="4" aria-describedby="manaRotationHint"></textarea>
           </label>
-          <p id="manaRotationHint" class="hint">진화 적용 전 사용 간격과 비용을 한 줄에 스킬 하나씩 입력하세요. 조회한 비용은 수정할 수 있습니다. 유틸 스킬을 포함하고 실제 회복이 0인 경우에만 0을 입력하세요.</p>
+          <p id="manaRotationHint" class="hint">진화 적용 전 재사용 대기와 비용을 우선순위대로 입력하세요. 시전·후딜 시간을 비우면 0초를 가정합니다. 사용한 유틸 스킬과 추가 회복도 포함하세요.</p>
           <label>추가 회복 시각(초) | 회복량 (선택)
             <textarea id="manaExtraRecovery" rows="2" aria-label="추가 회복 시각과 회복량"></textarea>
           </label>
@@ -184,10 +209,10 @@
         <div class="recommendMain468">
           <h3>추천 TOP5</h3>
           <label id="manaRecommendationModeLabel" class="manaRecommendationMode">추천 기준
-            <select id="manaRecommendationMode"><option value="auto">자동 추천</option><option value="theory">이론상 기대 피해</option><option value="estimate">가정 기반 비교</option><option value="unverified">미검증 후보</option></select>
+            <select id="manaRecommendationMode"><option value="auto">300초 실측 검증</option><option value="estimate">300초 추정 검증</option><option value="theory">이론상 기대 피해</option><option value="shortage">마나 부족 비교</option><option value="unverified">판정 보류</option></select>
           </label>
           <p id="manaRecommendationStatus" class="hint" aria-live="polite"></p>
-          <p id="manaSensitivity" class="hint"></p>
+          <details id="manaSensitivityPanel" class="comboDetails hidden"><summary>순위 가정 비교</summary><p id="manaSensitivity" class="hint"></p></details>
           <a id="manaRecoverySource" class="hint hidden" target="_blank" rel="noopener noreferrer">자연 회복 가정에 사용한 2024년 관찰 자료</a>
           <div id="recommendList" class="recommendList"></div>
         </div>
@@ -320,7 +345,7 @@
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <div class="version">Version 6.1.4</div>
-  <script type="module" src="/app.js?v=6.1.4"></script>
+  <div class="version">Version 6.1.7</div>
+  <script type="module" src="/app.js?v=6.1.7-routes.1"></script>
 </body>
 </html>

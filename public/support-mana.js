@@ -28,7 +28,7 @@ export function supportManaSummary(profile) {
 
 export function resolveManaEnvironment({
   support = 'none', duration, maxMana, naturalMana, uptime, receivedTimes = [], manualRestore,
-  food = false, foodTick, patch = SUPPORT_MANA_VERIFIED_AT
+  food = false, foodTick, patch = SUPPORT_MANA_VERIFIED_AT, inclusiveEnd = false
 }) {
   const profile = Object.hasOwn(SUPPORT_MANA, support) ? SUPPORT_MANA[support] : null;
   if (!profile) return { reason: '서포터 종류 미확인' };
@@ -39,7 +39,7 @@ export function resolveManaEnvironment({
   if (!profile.skill || uptime === 0) return result;
   if (patch > SUPPORT_MANA_VERIFIED_AT) return { reason: '현재 패치에서 서포터 회복 툴팁 재확인 필요' };
   if (Number.isFinite(uptime) && (uptime < 0 || uptime > 100)) return { reason: '서포터 가동률을 0~100%로 입력해 주세요.' };
-  if (receivedTimes.some(time => !Number.isFinite(time) || time < 0 || time >= duration)) {
+  if (receivedTimes.some(time => !Number.isFinite(time) || time < 0 || (inclusiveEnd ? time > duration : time >= duration))) {
     return { reason: '서포터 효과를 받은 시각을 전투 구간 안으로 입력해 주세요.' };
   }
   if (!receivedTimes.length && (!Number.isFinite(uptime) || profile.kind === 'instant')) {
@@ -66,7 +66,7 @@ export function resolveManaEnvironment({
     const period = profile.duration / (uptime / 100);
     for (let time = 0; time < duration; time += period) times.push(time);
   }
-  result.windows = times.map(start => ({ start, end: Math.min(duration, start + profile.duration), amount: buffed }));
+  result.windows = times.map(start => ({ start, end: inclusiveEnd ? start + profile.duration : Math.min(duration, start + profile.duration), amount: buffed }));
   if (!manual || !receivedTimes.length) {
     result.quality = 'estimate';
     result.assumption = [!receivedTimes.length && '입력 가동률을 균등한 버프 구간으로 가정',

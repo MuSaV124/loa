@@ -1,8 +1,8 @@
 {
   "meta": {
-    "version": "3.5.0",
+    "version": "3.6.0",
     "source": "Lost Ark Ark Passive Evolution nodes",
-    "note": "진화 노드 전체 효과 정리: 치적/치피/진피/추피/적주피 및 뭉가/음속돌파 상한 계산 반영."
+    "note": "진화 노드 효과와 정열의 춤사위 선행 조건을 정의합니다."
   },
   "group": "진화",
   "tiers": {
@@ -920,13 +920,16 @@
       "tier": 3,
       "maxLevel": 2,
       "costPerLevel": 10,
+      "requires": { "name": "축복의 여신", "level": 3 },
       "icon": "🌹",
       "levels": {
         "1": {
-          "evolutionDamage": 7
+          "evolutionDamage": 7,
+          "identityGain": 10
         },
         "2": {
-          "evolutionDamage": 14
+          "evolutionDamage": 14,
+          "identityGain": 20
         }
       },
       "iconImage": "/images/evolution/정열의 춤사위.webp",
@@ -994,7 +997,9 @@
       "maxLevel": 1,
       "costPerLevel": 10,
       "icon": "🧭",
-      "levels": {},
+      "levels": {
+        "1": { "cooldownReduction": 5 }
+      },
       "iconImage": "/images/evolution/선각자.webp",
       "description": "이동기 및 기상기를 제외한 스킬을 사용하면 10초간 통찰을 얻습니다. 최대 5중첩에 도달해야 추가 공격력 강화와 쿨감이 적용됩니다.",
       "displayLevels": {
@@ -1007,7 +1012,9 @@
       "maxLevel": 1,
       "costPerLevel": 10,
       "icon": "🚩",
-      "levels": {},
+      "levels": {
+        "1": { "etherSpeedBonus": 4 }
+      },
       "iconImage": "/images/evolution/진군.webp",
       "description": "아군에게 보호 효과를 사용하면 자신의 5m 안에 진군 에테르를 생성합니다. 에테르 생성에는 7초의 발동 재사용 대기시간이 있습니다.",
       "displayLevels": {

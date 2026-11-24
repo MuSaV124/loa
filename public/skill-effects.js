@@ -173,8 +173,12 @@ export function parseSkillManaUsage(tooltip) {
     }
   }
   const distinctCosts = [...new Set(costs)];
-  const manaUsageKnown = texts.length > 0 && distinctCosts.length < 2
-    && (distinctCosts.length === 1 || !texts[0].includes('마나'));
+  // A cooldown-only header or an unrecognized resource description does not prove a zero MP cost.
+  const explicitNonMana = texts.some(text => !text.includes('마나') && (
+    /(?:기력|충격|배터리|내공)(?:\s*에너지)?\s*[\d,]+\s*(?:소모|생성|획득)/.test(text)
+    || /^(?:자원\s*)?(?:소모(?:량)?\s*없음|무료)(?:[\s|.]*)$/.test(text)
+  ));
+  const manaUsageKnown = distinctCosts.length === 1 || (distinctCosts.length === 0 && explicitNonMana);
   return { usesMana: distinctCosts.length === 1, manaCost: distinctCosts.length === 1 ? distinctCosts[0] : 0, manaUsageKnown };
 }
 

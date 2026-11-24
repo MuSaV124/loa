@@ -117,7 +117,7 @@ try {
     if (url.pathname === '/app.js') {
       const marker = 'const top = shown.slice(0, 5);';
       assert.ok(body.toString('utf8').includes(marker));
-      body = body.toString('utf8').replace(marker, marker + '\n globalThis.auditTop = { candidates, ranks, top, manaInput };')
+      body = body.toString('utf8').replace(marker, marker + '\n globalThis.auditTop = { ranks, top, manaInput, evaluate, generationMs, rankingMs };')
         + '\n globalThis.auditClass = { state, applyCharacterData, loadCombatAnalyzer, refreshSkillCycleModel, refreshPassiveSkillEffects, calculateAndRender };';
     }
     await route.fulfill({ body, contentType: (mime[extname(file)] || 'application/octet-stream') + '; charset=utf-8' });
@@ -130,29 +130,30 @@ try {
       arkGrid: { data: sample.arkGrid, error: sample.arkGridError },
       combatSkills: { data: sample.skills, error: sample.skillEffectsError }
     });
-    const row = await page.evaluate(({ data, kind, shares }) => {
+    const row = await page.evaluate(async ({ data, kind, shares }) => {
       const audit = globalThis.auditClass;
       const field = id => document.getElementById(id);
       if (kind === 'synthetic') audit.state.combatAnalyzer = {
         fallbackBuilds: { [data.arkPassive.Title]: shares }, identitySkills: []
       };
       if (kind === 'api-replay') audit.state.combatAnalyzer = globalThis.auditAnalyzer;
-      field('manaRecommendationMode').value = 'auto';
+      field('manaRecommendationMode').value = 'theory';
       field('manaSupport').value = 'none';
       field('extraCritRate').value = kind === 'synthetic' ? '85' : '0';
       field('extraCritDamage').value = kind === 'synthetic' ? '50' : '0';
-      audit.applyCharacterData(data);
-      audit.calculateAndRender();
-      const { top, ranks, candidates, manaInput } = globalThis.auditTop;
+      await audit.applyCharacterData(data);
+      const { top, ranks, manaInput, evaluate, generationMs, rankingMs } = globalThis.auditTop;
       const n = value => Number.isFinite(value) ? +value.toFixed(8) : null;
-      const pack = candidate => ({
-        tier2: candidate.tier2Entries.map(e => [e.name, e.level]),
-        tier4: candidate.fourNames, tier5: [candidate.fiveName, candidate.fiveLevel],
+      const pack = row => {
+        const candidate = { ...row, ...evaluate(row.entries) };
+        return {
+        tiers: Object.fromEntries([2, 3, 4, 5].map(tier => [tier, row.entries.filter(e => e.tier === tier).map(e => [e.name, e.level])])),
         value: n(candidate.recValue), alternate: candidate.supportModel ? null : n(candidate.calc.result.alternateValue),
         mana: n(candidate.mana?.value), manaAlternate: n(candidate.mana?.alternateValue), quality: candidate.mana?.quality,
         multiCrit: candidate.supportModel ? null : n(candidate.calc.result.multiCritContribution)
-      });
-      const winner = top[0];
+        };
+      };
+      const winner = top.length ? evaluate(top[0].entries) : null;
       return {
         className: data.profile.CharacterClassName,
         build: data.powerSnapshot.profile.secondClass,
@@ -173,7 +174,7 @@ try {
         gridRuleCount: audit.state.arkGridSkillEffects.rules.length,
         unresolved: [...audit.state.passiveSkillEffects.unresolved, ...audit.state.arkGridSkillEffects.unresolved]
           .map(row => [row.nodeName, row.text]),
-        count: candidates.length, nodes: [...new Set(candidates.map(c => c.fiveName))],
+        count: ranks.counts.candidates, generationMs, rankingMs,
         recommendationBasis: field('manaRecommendationStatus').textContent,
         manaReason: manaInput?.reason ?? null,
         top: top.map(pack), theory: ranks.theoretical.slice(0, 5).map(pack),
@@ -190,7 +191,7 @@ try {
     if (sample.kind === 'synthetic') {
       assert.ok(row.top.length && row.skillCount === 3, sample.className);
       assert.equal(row.support, sample.role === 'support', sample.className);
-      assert.equal(row.nodes.length, row.support ? 3 : 6, sample.className);
+      assert.equal(row.count, 470572, sample.className);
     }
     results.push({ kind: sample.kind, ...(sample.name ? { character: sample.name, sourceVersion: sample.apiVersion } : {}), ...row });
   }

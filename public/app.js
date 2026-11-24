@@ -1,4 +1,4 @@
-import { calculateSonicBreakEvolutionDamage, shiftClickTargetLevel, maintainedEvolutionDamage } from './evolution-math.js?v=6.1.3';
+import { calculateSonicBreakEvolutionDamage, evolutionAllocations, EVOLUTION_TIER_LIMITS, shiftClickTargetLevel, maintainedEvolutionDamage } from './evolution-math.js?v=6.1.5';
 import { BASE_CRIT_DAMAGE, CRIT_RATE_PER_STAT, NOVEMBER_2026_PATCH_URL, expectedHitDamage, multiplyPercentSources } from './damage-math.js?v=6.1.3';
 import { emptyCardEffects } from './card-effects.js?v=6.1.1';
 import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=6.1.1';
@@ -8,7 +8,7 @@ import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPas
 import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=6.1.1';
 import { combatAnalyzerGemFactors, combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=6.1.2';
 import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency, normalizeSkillCycleName } from './skill-cycle.js?v=6.1.1';
-import { isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=6.1.4';
+import { buildSupportSkillCycle, isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=6.1.5';
 import { ADRENALINE_ENGRAVING_NAME, KEEN_BLUNT_NAME, KEEN_BLUNT_DAMAGE_FACTOR, RELIC_ENGRAVING_RULES, addEngravingEffects, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=6.1.1';
 import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=6.1.1';
 import { buildHoningScenarioMaterials, buildUpgradePlan, decodeSpecScenario, encodeSpecScenario, mergeMaterials, normalizeOwnedMaterials, scaleMaterials, specEstimateKey, upperAncientRefineBookName, upperAncientRefineBookRateBonusPercent } from './spec-planner.js?v=6.1.1';
@@ -17,11 +17,12 @@ import { ARMGUARD_BREATH_ESTIMATE, ARMGUARD_HONING_INFO, allocateArmguardLimitBr
 import { normalHoningAttemptDistribution, normalHoningAttemptRatePercent } from './honing-probability.js';
 import { calculateHoningMaterialCost, goldEfficiency } from './honing-cost.js';
 import { materialPurchaser, materialQuote } from './material-quotes.js';
-import { evaluateManaCandidate, manaFurnaceDamage, minimumSustainableMana, prepareManaScenario, rankManaCandidates } from './mana-recommendation.js?v=6.1.4';
-import { AUTO_MANA_RECOVERY_SOURCE, buildAutomaticManaAnalysis } from './mana-automatic.js?v=6.1.1';
+import { MANA_RECOMMENDATION_SECONDS, createManaRanking, evaluateManaCandidate, manaFurnaceDamage, minimumSustainableMana, prepareManaScenario } from './mana-recommendation.js?v=6.1.7';
+import { AUTO_MANA_RECOVERY_SOURCE, buildAutomaticManaAnalysis } from './mana-automatic.js?v=6.1.7';
 import { buildCharacterManaProfile, findVerifiedManaProfile, MANA_PROFILE_PATCH, withManaCooldowns } from './mana-character.js';
-import { resolveManaEnvironment, SUPPORT_MANA, SUPPORT_MANA_VERIFIED_AT, supportManaSummary } from './support-mana.js';
+import { resolveManaEnvironment, SUPPORT_MANA, SUPPORT_MANA_VERIFIED_AT, supportManaSummary } from './support-mana.js?v=6.1.7';
 import { estimateArmguardCombatPower } from './armguard-power.js?v=6.1.1';
+import { isCharacterPage, pagePath, readPageRoute, validCharacterName } from './page-route.js';
 import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=6.1.1';
 import {
   CHARACTER_REFRESH_COOLDOWN_MS,
@@ -33,22 +34,12 @@ import {
   remainingCooldownMs
 } from './cache-policy.js?v=6.1.1';
 
-const VERSION = '6.1.4';
-const COOLDOWN_NODE_NAMES = ['최적화 훈련', '끝없는 마나', '무한한 마력', '선각자'];
-const MANA_SKILL_NODE_NAMES = ['끝없는 마나', '금단의 주문', '무한한 마력'];
+const VERSION = '6.1.7';
+const PARTY_EVOLUTION_NODES = new Set(['정열의 춤사위', '선각자', '진군', '기원', '입식 타격가', '마나 용광로', '안정된 관리자']);
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function isNoManaMainSkillEnabled() { return Boolean(document.getElementById('noManaMainSkill')?.checked); }
 function hasCooldownEffect(name) {
-  const node = getNode(name);
-  if (!node) return COOLDOWN_NODE_NAMES.includes(name);
-  return COOLDOWN_NODE_NAMES.includes(name) || Object.values(node.levels || {}).some(effect => Number(effect?.cooldownReduction || 0) > 0);
-}
-function hasCooldownCandidate(tier2Entries, fourNames, fiveName) {
-  return [
-    ...(tier2Entries || []).map(x => x.name),
-    ...(fourNames || []),
-    fiveName
-  ].filter(Boolean).some(name => hasCooldownEffect(name));
+  return Object.values(getNode(name)?.levels || {}).some(effect => effect.cooldownReduction || effect.manaSkillCooldownReduction);
 }
 
 function emptyEngravingState() {
@@ -91,14 +82,24 @@ const state = {
   specPlannerBudget: 1000000,
   armguardRange: { from: 0, to: 25 },
   armguardBreathMode: 'optimal',
-  specScenarioSelectedKeys: new Set(),
-  pendingSharedScenario: null
+  specScenarioSelectedKeys: new Set()
 };
 let simulatorRendered = false;
 let calculationDirty = false;
+let calculationRevision = 0;
+let renderRecommendation = null;
 
 function setCalculationDirty(dirty = true) {
   calculationDirty = Boolean(dirty);
+  if (calculationDirty) {
+    calculationRevision++;
+    renderRecommendation = null;
+    const recommendations = $('recommendList');
+    if (recommendations?.hasAttribute('aria-busy')) {
+      recommendations.removeAttribute('aria-busy');
+      recommendations.textContent = '변경한 설정으로 재계산해 주세요.';
+    }
+  }
   const button = $('evolutionRecalculateButton');
   const notice = $('evolutionRecalculateNotice');
   if (button) {
@@ -109,14 +110,7 @@ function setCalculationDirty(dirty = true) {
 }
 
 function recalculateSelectedSettings() {
-  const button = $('evolutionRecalculateButton');
-  if (button) button.disabled = true;
-  try {
-    calculateAndRender();
-    setCalculationDirty(false);
-  } finally {
-    if (button) button.disabled = false;
-  }
+  return calculateAndRender();
 }
 
 function isGuaranteedCritSkill(item) {
@@ -536,6 +530,12 @@ let marketSnapshotNetworkState = 'idle';
 let activeCharacterName = '';
 let activeCharacterSavedAt = 0;
 let characterRequestPending = false;
+let characterIntent = 0;
+let retryCharacter = null;
+let activePage = { page: 'home' };
+let evolutionPromise;
+const characterRequests = new Map();
+const characterWorkspaces = new Map();
 
 function readStoredObject(key) {
   try {
@@ -621,12 +621,9 @@ function applyProfileDefaults(profile, selection = state.selected) {
 function critRateFromStat(critStat) { return Number(critStat || 0) * CRIT_RATE_PER_STAT; }
 function speedFromSwift(swiftStat) { return Number(swiftStat || 0) / 58.21; }
 function buildIndex(db) {
-  const map = new Map();
-  for (const [tier, names] of Object.entries(db?.tiers || {})) for (const name of names || []) map.set(name, Number(tier));
-  for (const node of db?.nodes || []) map.set(node.name, Number(node.tier));
-  return map;
+  return new Map((db?.nodes || []).map(node => [node.name, node]));
 }
-function getNode(name) { return (state.evolution?.nodes || []).find(n => n.name === name); }
+function getNode(name) { return state.index.get(name); }
 function getLevelEffect(name, level) {
   if (name === '치명') return { critStat: level * 50 };
   if (name === '신속') return { swiftStat: level * 50 };
@@ -835,13 +832,17 @@ function classifyEvolution(effects) {
       continue;
     }
 
-    // 2) API가 설명/툴팁 문자열 안에 진화 노드명을 넣어주는 경우
+    // 2) 진화 슬롯의 제목에서만 노드명을 읽습니다. 깨달음과 도약에도 '치명', '특화'가 등장합니다.
+    const title = normalizeNodeName(effect.description || effect.tooltip);
+    if (effect.name !== '진화' && !/^진화\s*[1-5]\s*티어/.test(title)) continue;
+    const tier = Number(title.match(/^(?:진화\s*)?([1-5])\s*티어/)?.[1] || 0);
     for (const node of knownNodes) {
-      if (!joined.includes(node.name)) continue;
+      if ((tier && node.tier !== tier) || !title.includes(node.name)) continue;
       const escaped = node.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const near = joined.match(new RegExp(`${escaped}[^\d]*(?:Lv\\.?|레벨)?\\s*(\\d+)?`, 'i'));
-      const level = Math.min(parseLevelFromText(near?.[0] || joined, effect.level || 1), node.maxLevel || 1);
+      const near = title.match(new RegExp(`${escaped}\\s*(?:Lv\\.?|레벨)\\s*\\d+`, 'i'));
+      const level = Math.min(parseLevelFromText(near?.[0] || title, effect.level || 1), node.maxLevel || 1);
       selected[node.name] = { level, source: 'api' };
+      break;
     }
   }
   // 검색 캐릭터의 진화 노드가 안 읽히면 이전 캐릭터/기본값을 쓰지 않고 빈 선택으로 둡니다.
@@ -857,27 +858,9 @@ function renderCharacter(profile, arkPassive = null) {
       ${image ? `<img src="${escapeHtml(image)}" alt="" />` : ''}
       <div><div class="characterNameLine"><h2>${escapeHtml(profile?.CharacterName || '-')} / ${escapeHtml(profile?.CharacterClassName || '-')}</h2>${arkPassive?.Title ? `<span>${escapeHtml(arkPassive.Title)}</span>` : ''}</div><p>서버 ${escapeHtml(profile?.ServerName || '-')} · 아이템 레벨 ${escapeHtml(profile?.ItemAvgLevel || '-')} · 전투력 ${escapeHtml(profile?.CombatPower || '-')}</p></div>
     </div>
-    <button id="simulatorJumpButton" class="simulatorJumpButton" type="button">시뮬레이터</button>
+    <a id="simulatorJumpButton" class="simulatorJumpButton" data-route href="${escapeHtml(pagePath({ page: 'simulator', name: profile?.CharacterName }))}">시뮬레이터</a>
   `;
   el.classList.remove('hidden');
-  $('simulatorJumpButton')?.addEventListener('click', () => {
-    openSimulatorPage();
-  });
-}
-function openSimulatorPage() {
-  if (!state.powerSnapshot) return setMessage('캐릭터 검색 후 시뮬레이터를 열 수 있습니다.');
-  if (!simulatorRendered) renderPowerSnapshot(state.powerSnapshot);
-  document.body.classList.add('simulatorMode');
-  document.body.classList.remove('marketMode', 'avatarMode');
-  document.querySelectorAll('.tabButton').forEach(btn => btn.classList.remove('active'));
-  $('powerSnapshotPanel')?.classList.remove('hidden');
-  $('powerSnapshotPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-function closeSimulatorPage() {
-  document.body.classList.remove('simulatorMode');
-  $('powerSnapshotPanel')?.classList.add('hidden');
-  document.querySelector('[data-tab="calculator"]')?.classList.add('active');
-  $('characterCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function gearQualityClass(value) {
   const quality = Number(value);
@@ -1641,6 +1624,7 @@ async function loadCombatAnalyzer() {
         refreshPassiveSkillEffects();
         if (state.foundEffects?.length) state.enlightenment = extractEnlightenmentEffects(state.foundEffects, state.passiveSkillEffects);
         renderSkillEffectControl();
+        if (state.powerSnapshot) calculateAndRender();
         const summary = $('gemAnalyzerSummary');
         if (state.powerSnapshot && simulatorRendered) renderPowerSnapshot(state.powerSnapshot);
         else if (summary && state.powerSnapshot) summary.innerHTML = gemAnalyzerSummaryHtml(state.powerSnapshot);
@@ -2077,8 +2061,16 @@ function accessoryPowerEstimate(candidate, snapshot = state.powerSnapshot) {
     basis: 'Lopec accessory option transition calibration; five dealer-class samples, build-specific estimate'
   };
 }
-function supportModelContext() {
-  return { selection: state.selected, skillEffects: state.skillEffects, enlightenmentItems: state.enlightenment?.items || [] };
+function supportModelContext(selection = state.selected) {
+  const evolutionCooldown = { cooldownReduction: 0, manaSkillCooldownReduction: 0 };
+  if (!isCooldownExcluded()) {
+    for (const { name, level } of selectedEntries(selection)) {
+      const effect = getLevelEffect(name, level);
+      evolutionCooldown.cooldownReduction += effect.cooldownReduction || 0;
+      evolutionCooldown.manaSkillCooldownReduction += effect.manaSkillCooldownReduction || 0;
+    }
+  }
+  return { selection, evolutionCooldown, getEvolutionEffect: getLevelEffect, skillEffects: state.skillEffects, enlightenmentItems: state.enlightenment?.items || [] };
 }
 function supportCombinedPowerEstimate(snapshot, upgradedSnapshot, officialPercent, basis) {
   const before = supportContributionModel(snapshot, supportModelContext());
@@ -2608,7 +2600,7 @@ function renderSpecScenarioComparison() {
   const analyzedGemFactor = !support && gear.modeledGems ? specScenarioGemFactor(snapshot, gear.snapshot) : 1;
   const manaDamageUnknown = !support && [baseCalc, changedCalc].some(calc => calc.result.manaDamageUnverified);
   const damageChange = support ? supportUpgradeImpact({
-    before: supportContributionModel(snapshot, { ...supportModelContext(), selection: apiSelection }),
+    before: supportContributionModel(snapshot, supportModelContext(apiSelection)),
     after: supportContributionModel(gear.snapshot, supportModelContext()),
     officialPercent: basePower > 0 ? officialPowerGain / basePower * 100 : 0
   }).combinedPercent : manaDamageUnknown ? null : expectedDamageChangePercent(baseCalc.result.value, changedCalc.result.value, analyzedGemFactor);
@@ -2649,20 +2641,15 @@ function renderSpecScenarioComparison() {
     if (!payload.characterName) return;
     const currentName = state.powerSnapshot?.profile?.name || '';
     if (payload.characterName !== currentName) {
-      state.pendingSharedScenario = payload;
-      $('characterName').value = payload.characterName;
-      searchCharacter(payload.characterName).then(() => {
-        if (state.powerSnapshot) openSimulatorPage();
-      });
+      const name = validCharacterName(payload.characterName);
+      if (name) navigatePage({ page: 'simulator', name }, { payload });
       return;
     }
     applySpecScenarioPayload(payload);
   };
   if (shareButton) shareButton.onclick = async () => {
     const encoded = encodeSpecScenario(currentSpecScenarioPayload());
-    const url = new URL(window.location.href);
-    url.search = '';
-    url.searchParams.set('scenario', encoded);
+    const url = new URL(pagePath({ page: 'simulator', scenario: encoded }), window.location.origin);
     try {
       await navigator.clipboard.writeText(url.toString());
       shareButton.textContent = '링크 복사됨';
@@ -3593,6 +3580,7 @@ function renderPowerSnapshot(snapshot) {
     </div>
     <details class="powerSnapshotNote simulatorMethodNote"><summary>계산 기준 및 주의사항</summary><p>기대 피해는 공통 피해 엔진과 스킬 지분을 사용합니다. 전투력 추정, 보석의 분석 기반 환산, 재련 기대 비용은 각 항목의 계산 기준을 사용합니다. 스킬 주기와 서포터 가동률은 모델 추정치이며, 실제 전투 순서나 전투 시간별 총 피해와 DPS는 계산하지 않습니다.</p></details>
   `;
+  bindSpecPlannerControls();
   hydratePowerCostMaterialPrices();
   hydrateCrystalPrice();
 }
@@ -3605,7 +3593,7 @@ function renderSummary(profile, arkPassive) {
 function tierCost(tier) {
   let used = 0;
   for (const row of selectedEntries()) if (row.tier === tier) used += (getNode(row.name)?.costPerLevel || 0) * row.level;
-  const max = { 1: 40, 2: 30, 3: 20, 4: 20, 5: 30 }[tier] || 0;
+  const max = EVOLUTION_TIER_LIMITS[tier] || 0;
   return { used, max };
 }
 function clampLevelByTierBudget(name, desiredLevel) {
@@ -3614,7 +3602,7 @@ function clampLevelByTierBudget(name, desiredLevel) {
   const tier = Number(node.tier);
   const maxLevel = Number(node.maxLevel || 0);
   let next = Math.max(0, Math.min(maxLevel, desiredLevel));
-  const tierMax = { 1: 40, 2: 30, 3: 20, 4: 20, 5: 30 }[tier] || Infinity;
+  const tierMax = EVOLUTION_TIER_LIMITS[tier] || Infinity;
   const cost = Number(node.costPerLevel || 0);
   if (!cost) return next;
   let usedWithoutThis = 0;
@@ -3640,6 +3628,8 @@ function nodeEffectText(node, effect = {}) {
   add('enemyDamage', '적에게 주는 피해');
   add('finalDamage', '최종 피해');
   add('cooldownReduction', '재사용 대기시간 감소');
+  add('manaSkillCooldownReduction', '마나 스킬 재사용 대기시간 감소');
+  add('manaSkillEvolutionDamage', '마나 스킬 추가 진화형 피해');
   add('manaReduction', '마나 소모량 감소');
   add('speedBonus', '공격/이동 속도');
   add('attackSpeedBonus', '공격 속도');
@@ -3820,7 +3810,9 @@ function getBaseStats(selection = state.selected, {
   const critSynergy = $('critSynergyEnabled').checked ? num($('critSynergyValue').value) : 0;
   const backAttackCritRate = $('backAttackEnabled').checked ? 10 : 0;
   const backAttackEnemyDamage = $('backAttackEnabled').checked ? 5 : 0;
-  const baseSpeed = 114;
+  const supportMode = isSupportPowerSnapshot(state.powerSnapshot);
+  const partyBlessing = supportMode ? 0 : getLevelEffect('축복의 여신', 3).speedBonus || 0;
+  const baseSpeed = 105 + partyBlessing;
   const enlightenmentAttackSpeed = num(state.enlightenment.attackSpeed);
   const enlightenmentMoveSpeed = num(state.enlightenment.moveSpeed);
   const braceletAttackMoveSpeed = num(state.bracelet.attackMoveSpeed);
@@ -3925,6 +3917,8 @@ function getBaseStats(selection = state.selected, {
     dynamicEnlightenmentCritRate,
     dynamicEnlightenmentCritDamage,
     baseMoveAttackSpeed: baseSpeed,
+    partyBlessing,
+    supportMode,
     moveAttackSpeed: Math.min(attackSpeed, moveSpeed),
     attackSpeed,
     moveSpeed,
@@ -3937,8 +3931,7 @@ function getBaseStats(selection = state.selected, {
     extraMoveSpeed
   };
 }
-function applyEffect(stats, effect, sourceLabel = '진화') {
-  const out = { ...stats };
+function applyEffect(out, effect, sourceLabel, cooldownExcluded) {
   if (effect.critStat) { out.critStat = (out.critStat || 0) + effect.critStat; out.statCritRate = critRateFromStat(out.critStat); out.critRate += critRateFromStat(effect.critStat); }
   if (effect.swiftStat) { out.swiftStat = (out.swiftStat || 0) + effect.swiftStat; out.swiftSpeedBonus = speedFromSwift(out.swiftStat || 0); out.attackSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentAttackSpeed || 0) + (out.braceletAttackMoveSpeed || 0) + (out.arkGridAttackSpeed || 0) + (out.engravingAttackSpeed || 0) + num(out.skillBuffEffects?.attackSpeed) + (out.extraAttackSpeed || 0); out.moveSpeed = (out.baseMoveAttackSpeed || 114) + out.swiftSpeedBonus + (out.enlightenmentMoveSpeed || 0) + (out.braceletAttackMoveSpeed || 0) + (out.arkGridMoveSpeed || 0) + num(out.skillBuffEffects?.moveSpeed) + (out.extraMoveSpeed || 0); out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
   if (effect.critRate) out.critRate += effect.critRate;
@@ -3950,10 +3943,10 @@ function applyEffect(stats, effect, sourceLabel = '진화') {
   }
   if (effect.evolutionDamage) out.evolutionDamage += effect.evolutionDamage;
   if (effect.manaSkillEvolutionDamage) out.manaSkillEvolutionDamage = num(out.manaSkillEvolutionDamage) + effect.manaSkillEvolutionDamage;
-  if (effect.manaSkillCooldownReduction && !isCooldownExcluded()) out.manaSkillCooldownReduction = num(out.manaSkillCooldownReduction) + effect.manaSkillCooldownReduction;
+  if (effect.manaSkillCooldownReduction && !cooldownExcluded) out.manaSkillCooldownReduction = num(out.manaSkillCooldownReduction) + effect.manaSkillCooldownReduction;
   if (effect.manaReduction) out.manaCostReductions = [...(out.manaCostReductions || []), effect.manaReduction];
   if (effect.manaFurnace) out.manaFurnace = effect.manaFurnace;
-  if (effect.cooldownReduction && !isCooldownExcluded()) out.cooldownReduction = (out.cooldownReduction || 0) + effect.cooldownReduction;
+  if (effect.cooldownReduction && !cooldownExcluded) out.cooldownReduction = (out.cooldownReduction || 0) + effect.cooldownReduction;
   if (effect.sonicBreak) {
     const sonicDamage = calculateSonicBreakEvolutionDamage(
       out.attackSpeed || out.moveAttackSpeed || 100,
@@ -3974,12 +3967,14 @@ function applyEffect(stats, effect, sourceLabel = '진화') {
     out.enemyDamage = effectivePercentFromSources(out.enemyDamageSources);
   }
   if (effect.attackPower) out.attackPower = (out.attackPower || 0) + effect.attackPower;
-  if (effect.speedBonus) { out.attackSpeed = (out.attackSpeed || out.moveAttackSpeed || 0) + effect.speedBonus; out.moveSpeed = (out.moveSpeed || out.moveAttackSpeed || 0) + effect.speedBonus; out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
+  // The raid baseline already includes the same party blessing at Lv.3.
+  const speedBonus = Math.max(0, (effect.speedBonus || 0) - (out.partyBlessing || 0))
+    + (out.supportMode ? effect.etherSpeedBonus || 0 : 0);
+  if (speedBonus) { out.attackSpeed += speedBonus; out.moveSpeed += speedBonus; out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed); }
   if (effect.attackSpeedBonus) { out.attackSpeed = (out.attackSpeed || out.moveAttackSpeed || 0) + effect.attackSpeedBonus; out.moveAttackSpeed = Math.min(out.attackSpeed, out.moveSpeed || out.moveAttackSpeed || 0); }
   if (effect.critCap != null) out.critCap = effect.critCap;
   if (effect.overCritToEvolutionDamageRate) out.overCritToEvolutionDamageRate = effect.overCritToEvolutionDamageRate;
   if (effect.overCritEvolutionDamageCap != null) out.overCritEvolutionDamageCap = effect.overCritEvolutionDamageCap;
-  return out;
 }
 function selectedEntries(selection = state.selected) { return Object.entries(selection || {}).map(([name, data]) => ({ name, tier: getNode(name)?.tier, level: Number(data?.level || 0), source: data?.source })).filter(row => row.name && row.level > 0 && row.tier); }
 function cloneSelection(selection = state.selected) { return JSON.parse(JSON.stringify(selection)); }
@@ -3991,29 +3986,28 @@ function selectionWithoutTiers(selection = state.selected, tiers = [4, 5]) {
   }
   return next;
 }
-function scoreCore(stats, cooldownContext = null) {
+function scoreCore(stats, cooldownContext = null, model = null) {
   const hit = expectedHitDamage(stats);
   const critHitSources = safePercentSources(stats.critHitDamageSources, stats.critHitDamage, '치명타 적중 주피');
   const displayEnemyDamage = additivePercentFromSources(stats.enemyDamageSources);
   const displayCritHitDamage = additivePercentFromSources(critHitSources);
   // v4.8.8: 쿨감의 이론 DPS 증가분을 사용자가 입력한 '주력기 딜 지분'만큼 반영.
   // 쿨감 효과 제외 체크 시 끝마/무마/최적화 훈련 등 모든 cooldownReduction은 점수에서 0으로 처리.
-  const cooldownExcluded = isCooldownExcluded();
+  const cooldownExcluded = model?.cooldownExcluded ?? isCooldownExcluded();
   const generalCooldownReduction = cooldownExcluded ? 0 : Math.max(0, Math.min(Number(stats.cooldownReduction || 0), 95));
-  const currentSkills = skillExperimentItems(state.skillEffects);
-  const knownNonManaOnly = currentSkills.length > 0
-    && currentSkills.every(item => item.manaUsageKnown === true && item.usesMana === false);
+  const { knownNonManaOnly, nonManaMain, fallbackSharePercent } = model ?? scoreCooldownInputs();
   const manaSkillCooldownReduction = cooldownExcluded || knownNonManaOnly
-    || (isNoManaMainSkillEnabled() && !state.skillCycle?.items?.some(item => item.usesMana))
+    || nonManaMain
     ? 0 : Math.max(0, Math.min(Number(stats.manaSkillCooldownReduction || 0), 95));
   const cooldownReduction = Math.max(0, Math.min(generalCooldownReduction + manaSkillCooldownReduction, 95));
-  const mainSkillDamageSharePct = cooldownExcluded ? 0 : Math.max(0, Math.min(Number($('mainSkillDamageShare')?.value ?? 60), 100));
-  const cooldownEvaluation = cooldownContext?.evaluation ?? (cooldownExcluded
-    ? { multiplier: 1, affectedSharePercent: 0, modeled: Boolean(state.skillCycle?.items?.length) }
-    : evaluateEvolutionCooldown(state.skillCycle, generalCooldownReduction, {
-      fallbackSharePercent: mainSkillDamageSharePct,
-      manaSkillReduction: manaSkillCooldownReduction
-    }));
+  const cooldownKey = generalCooldownReduction * 100 + manaSkillCooldownReduction;
+  let cooldownEvaluation = cooldownContext?.evaluation ?? model?.cooldownCache.get(cooldownKey);
+  if (!cooldownEvaluation) {
+    cooldownEvaluation = cooldownExcluded
+      ? { multiplier: 1, affectedSharePercent: 0, modeled: Boolean(state.skillCycle?.items?.length) }
+      : evaluateEvolutionCooldown(state.skillCycle, generalCooldownReduction, { fallbackSharePercent, manaSkillReduction: manaSkillCooldownReduction });
+    model?.cooldownCache.set(cooldownKey, cooldownEvaluation);
+  }
   const cooldownRatio = cooldownEvaluation.affectedSharePercent / 100;
   const ratios = cooldownEvaluation.ratiosByShareName;
   const cooldownMultiplier = cooldownContext?.shareName && ratios
@@ -4210,45 +4204,68 @@ function weightedSkillUnits() {
   }));
 }
 
-function score(stats) {
-  const units = weightedSkillUnits();
+function scoreCooldownInputs() {
+  const currentSkills = skillExperimentItems(state.skillEffects);
+  return {
+    knownNonManaOnly: currentSkills.length > 0 && currentSkills.every(item => item.manaUsageKnown === true && item.usesMana === false),
+    nonManaMain: isNoManaMainSkillEnabled() && !state.skillCycle?.items?.some(item => item.usesMana),
+    fallbackSharePercent: Math.max(0, Math.min(Number($('mainSkillDamageShare')?.value ?? 60), 100))
+  };
+}
+
+function prepareSkillScoring() {
+  const arcanaStream = currentArcanaStreamEffect();
+  const arcanaModel = currentArcanaCardExpectation();
+  const noManaMain = isNoManaMainSkillEnabled();
+  const units = weightedSkillUnits().map(unit => {
+    const passive = passiveEffectsForSkill(state.passiveSkillEffects, unit);
+    const arkGrid = passiveEffectsForSkill(state.arkGridSkillEffects, unit);
+    const streamApplies = Boolean(arcanaStream) && normalizedSkillName(unit.name) !== normalizedSkillName(arcanaStream.skillName);
+    const arcanaEffects = streamApplies ? { critRate: arcanaStream.critRate } : {};
+    return {
+      ...unit,
+      effects: mergeSkillEffects(unit.item?.effects || {}, passive.effects, arkGrid.effects, arcanaEffects),
+      passiveRules: [...passive.rules, ...arkGrid.rules],
+      arcanaRules: streamApplies ? [{ category: '스킬 자버프', nodeName: `${arcanaStream.sourceSkill} · ${arcanaStream.sourceTripod}`, effects: arcanaEffects }] : [],
+      emperorNormalSkill: arcanaModel?.key === 'emperor' && normalizedSkillName(unit.category) === normalizedSkillName('일반 스킬'),
+      manualNonMana: noManaMain && unit.item?.manaUsageKnown !== true
+    };
+  });
+  return { units, noManaMain, cooldownExcluded: isCooldownExcluded(), cooldownCache: new Map(), ...scoreCooldownInputs() };
+}
+
+function score(stats, model = prepareSkillScoring()) {
+  const { units } = model;
   const fallbackStats = stats;
-  const baseResult = scoreCoreWithArcanaExpectation(fallbackStats);
+  const baseResult = scoreCoreWithArcanaExpectation(fallbackStats, { normal: scoreCore(fallbackStats, null, model) });
   if (!units.length || !baseResult.value) {
     return {
       ...baseResult,
-      manaDamageUnverified: !isNoManaMainSkillEnabled() && Boolean(stats.manaFurnace || stats.manaSkillEvolutionDamage),
+      manaDamageUnverified: !model.noManaMain && Boolean(stats.manaFurnace || stats.manaSkillEvolutionDamage),
+      directionalCritUnverified: Boolean(stats.directionalCritDamage),
       skillExperimentMultiplier: 1,
       skillExperiment: { applied: false, count: 0, conditionalAssumed: true, items: [], commonCritRate: baseResult.rawCritRate }
     };
   }
 
-  const arcanaStream = currentArcanaStreamEffect();
-  const arcanaModel = currentArcanaCardExpectation();
   const rows = units.map(unit => {
-    const passive = passiveEffectsForSkill(state.passiveSkillEffects, unit);
-    const arkGrid = passiveEffectsForSkill(state.arkGridSkillEffects, unit);
-    const streamApplies = Boolean(arcanaStream) && normalizedSkillName(unit.name) !== normalizedSkillName(arcanaStream.skillName);
-    const arcanaEffects = streamApplies ? { critRate: arcanaStream.critRate } : {};
-    const directionalEffects = stats.directionalCritDamage && unit.item?.attackDirection
-      ? { critDamage: stats.directionalCritDamage } : {};
-    const effects = mergeSkillEffects(unit.item?.effects || {}, passive.effects, arkGrid.effects, arcanaEffects, directionalEffects);
-    const emperorNormalSkill = arcanaModel?.key === 'emperor' && normalizedSkillName(unit.category) === normalizedSkillName('일반 스킬');
-    const manualNonMana = isNoManaMainSkillEnabled() && unit.item?.manaUsageKnown !== true;
+    const { emperorNormalSkill, manualNonMana, passiveRules, arcanaRules } = unit;
+    const effects = stats.directionalCritDamage && unit.item?.attackDirection
+      ? mergeSkillEffects(unit.effects, { critDamage: stats.directionalCritDamage }) : unit.effects;
     const skillStats = applyExperimentalSkillEffects(stats, {
       name: unit.name, effects, usesMana: unit.item?.usesMana === true,
       manaCost: unit.item?.manaCost, manaUsageKnown: manualNonMana || unit.item?.manaUsageKnown === true,
       attackDirection: unit.item?.attackDirection
     });
     const cooldownContext = { evaluation: baseResult.cooldownEvaluation, shareName: unit.shareName };
-    const resultWithoutArcana = scoreCore(skillStats, cooldownContext);
+    const resultWithoutArcana = scoreCore(skillStats, cooldownContext, model);
     const result = scoreCoreWithArcanaExpectation(skillStats, { emperorNormalSkill, cooldownContext, normal: resultWithoutArcana });
     return {
       name: unit.name,
       shareName: unit.shareName,
       level: Number(unit.item?.level || 0),
       share: unit.weight,
-      conditional: isConditionalSkill(unit.item) || [...passive.rules, ...arkGrid.rules].some(rule => rule.scope === 'state') || streamApplies || emperorNormalSkill,
+      conditional: isConditionalSkill(unit.item) || passiveRules.some(rule => rule.scope === 'state') || arcanaRules.length > 0 || emperorNormalSkill,
       guaranteedCrit: Boolean(effects.forcedCrit) || isGuaranteedCritSkill(unit.item),
       partialCritRuleUnmodeled: unit.item?.selectedTripods?.some(tripod => tripod.partialCritRuleUnmodeled),
       critInteractionUnverified: Boolean(effects.forcedCrit && stats.critCap != null),
@@ -4260,22 +4277,27 @@ function score(stats) {
       manaSkillEvolutionDamage: skillStats.appliedManaSkillEvolutionDamage,
       summary: formatSkillEffectSummary(effects) || '수치 효과 없음',
       effects,
-      passiveRules: [...passive.rules, ...arkGrid.rules],
-      arcanaRules: streamApplies ? [{ category: '스킬 자버프', nodeName: `${arcanaStream.sourceSkill} · ${arcanaStream.sourceTripod}`, effects: arcanaEffects }] : [],
+      passiveRules,
+      arcanaRules,
       valueWithoutArcana: resultWithoutArcana.value,
       value: result.value,
       alternateValue: result.alternateValue,
+      cooldownMultiplier: result.cooldownMultiplier,
       gain: ((result.value / baseResult.value) - 1) * 100,
       rawCritRate: result.rawCritRate,
       effectiveCritRate: result.effectiveCritRate,
       critDamage: result.critDamage,
+      critical: result.critical,
+      evolutionDamage: result.evo,
+      additionalDamage: result.additionalDamage,
+      enemyDamage: result.enemyDamage,
       convertedEvolutionDamage: result.convertedEvolutionDamage,
       result
     };
   });
   const modeledWeight = Math.min(1, rows.reduce((sum, row) => sum + Number(row.share || 0), 0));
   const manaDamageUnverified = rows.some(row => row.share > 0 && row.manaDamageUnverified)
-    || ((1 - modeledWeight) > 1e-6 && !isNoManaMainSkillEnabled() && Boolean(stats.manaFurnace || stats.manaSkillEvolutionDamage));
+    || ((1 - modeledWeight) > 1e-6 && !model.noManaMain && Boolean(stats.manaFurnace || stats.manaSkillEvolutionDamage));
   const manaFurnaceDamagePercent = rows.reduce((sum, row) => sum + row.share * row.manaFurnaceDamage, 0);
   const manaSkillEvolutionDamagePercent = rows.reduce((sum, row) => sum + row.share * row.manaSkillEvolutionDamage, 0);
   const weightedMultiplier = (1 - modeledWeight) + rows.reduce((sum, row) => sum + Number(row.share || 0) * (row.value / baseResult.value), 0);
@@ -4298,7 +4320,7 @@ function score(stats) {
   const critDamageAnchor = [...referenceRows].sort((a, b) => Number(b.critDamage || 0) - Number(a.critDamage || 0) || Number(b.share || 0) - Number(a.share || 0))[0];
   const weightedConvertedEvolutionDamage = rows.reduce((sum, row) => sum + Number(row.share || 0) * Number(row.convertedEvolutionDamage || 0), 0)
     + (1 - modeledWeight) * Number(baseResult.convertedEvolutionDamage || 0);
-  const baseWithoutArcana = scoreCore(fallbackStats, { evaluation: baseResult.cooldownEvaluation });
+  const baseWithoutArcana = scoreCore(fallbackStats, { evaluation: baseResult.cooldownEvaluation }, model);
   const weightedValue = baseResult.value * weightedMultiplier;
   const critHitStackingUnverified = Boolean(
     ((1 - modeledWeight) > 0.000001 && baseResult.critHitStackingUnverified)
@@ -4357,19 +4379,19 @@ function cloneBaseStats(stats) {
     critHitDamageSources: [...(stats.critHitDamageSources || [])]
   };
 }
-function statsWithSelection(selection = state.selected, scenarioInputs) {
-  // v4.6.0 계산 엔진 순서 고정:
-  // 1) 선택 세팅 기준 기본 스탯 생성
-  // 2) 4/5티어 추천 계산이면 selection에서 현재 4/5티어를 이미 제거한 상태로 들어옴
-  // 3) 해당 selection의 진화 노드를 전부 적용
-  // 4) 모든 치적/치피/진피/추피/적주피/공증/공이속이 확정된 뒤 score()에서 뭉가를 마지막 처리
-  let s = cloneBaseStats(getBaseStats(selection, scenarioInputs));
-  const entries = selectedEntries(selection).sort((a, b) => Number(a.tier) - Number(b.tier));
+function applyEvolutionEntries(entries, baseStats, cooldownExcluded) {
+  const s = cloneBaseStats(baseStats);
   for (const row of entries) {
     if (row.name === '치명' || row.name === '신속') continue;
-    s = applyEffect(s, getLevelEffect(row.name, row.level), `진화 ${row.name}`);
+    applyEffect(s, getLevelEffect(row.name, row.level), `진화 ${row.name}`, cooldownExcluded);
   }
-  return { stats: s, result: { ...score(s), unverifiedClassEffects: unverifiedPassiveEffectsCount() > 0 } };
+  return s;
+}
+
+function statsWithSelection(selection = state.selected, scenarioInputs) {
+  const entries = selectedEntries(selection).sort((a, b) => a.tier - b.tier);
+  const stats = applyEvolutionEntries(entries, getBaseStats(selection, scenarioInputs), isCooldownExcluded());
+  return { stats, result: { ...score(stats), unverifiedClassEffects: unverifiedPassiveEffectsCount() > 0 } };
 }
 
 function sourceLine(label, value, detail = '') {
@@ -4579,8 +4601,24 @@ function buildSourceSummary(current) {
   if (appliedSkillEffects.additionalDamage) addLines.push(sourceLine('기준 스킬 효과', appliedSkillEffects.additionalDamage));
   addLines.push(...addEvolution);
 
-  const attackSpeedLines = [sourceLine('기본 + 만찬 + 서폿 진화', 114, '100% + 5% + 9%')];
-  const moveSpeedLines = [sourceLine('기본 + 만찬 + 서폿 진화', 114, '100% + 5% + 9%')];
+  const baseSpeedLine = sourceLine('기본 공·이속 + 만찬', 105, '100% + 5%');
+  const attackSpeedLines = [baseSpeedLine];
+  const moveSpeedLines = [baseSpeedLine];
+  const blessing = Math.max(current.stats.partyBlessing || 0,
+    getLevelEffect('축복의 여신', state.selected['축복의 여신']?.level).speedBonus || 0);
+  if (blessing) {
+    const line = sourceLine('전투 축복', blessing, current.stats.partyBlessing ? '파티 버프 가정' : '선택 노드');
+    attackSpeedLines.push(line);
+    moveSpeedLines.push(line);
+  }
+  const etherSpeed = current.stats.supportMode ? getLevelEffect('진군', state.selected['진군']?.level).etherSpeedBonus : 0;
+  if (etherSpeed) {
+    const line = sourceLine('진군 에테르', etherSpeed, '상시 획득 가정');
+    attackSpeedLines.push(line);
+    moveSpeedLines.push(line);
+  }
+  const chariotSpeed = getLevelEffect('파괴 전차', state.selected['파괴 전차']?.level).attackSpeedBonus;
+  if (chariotSpeed) attackSpeedLines.push(sourceLine('파괴 전차', chariotSpeed));
   if (current.stats.swiftSpeedBonus) {
     const swiftDetail = `신속 ${Math.round(current.stats.swiftStat || 0)}${getStatNodeLine('신속') ? ' · ' + getStatNodeLine('신속') : ''}`;
     attackSpeedLines.push(sourceLine('신속 스탯', current.stats.swiftSpeedBonus, swiftDetail));
@@ -4716,90 +4754,82 @@ function renderKeenEfficiency(current) {
   const critHitNote = current?.result?.critHitStackingUnverified ? ' · 다중 치명과 치명타 적중 주피 중첩 미검증' : '';
   el.innerHTML = `<div class="keenNote">계산 기준: 스킬별 치적·치피 재계산 · 치피 ${critDamageRange}${arcanaNote}${critHitNote}</div>${rows}`;
 }
-function shortNodeName(name) {
-  const map = {
-    '끝없는 마나': '끝마',
-    '금단의 주문': '금주',
-    '무한한 마력': '무마',
-    '예리한 감각': '예감',
-    '한계 돌파': '한돌',
-    '최적화 훈련': '최훈'
-  };
-  return map[name] || name;
-}
-function shortNodeLabel(name, level) {
-  return `${shortNodeName(name)} Lv.${level}`;
-}
-function tier4PairLabel(names) {
-  return (names || []).filter(Boolean).join(' + ') || '-';
-}
-function sameNameSet(a, b) {
-  const aa = [...(a || [])].sort().join('|');
-  const bb = [...(b || [])].sort().join('|');
-  return aa === bb;
-}
-
 function manaConditionNoteText(calc) {
   return calc?.result?.manaDamageUnverified ? '일부 스킬의 마나 조건부 피해 미검증' : '';
 }
-function candidateMemo(tier2Entries, fourNames, fiveName, fiveLevel, calc, supportMode = false) {
-  const bits = [];
-  if (hasSameTier245(state.selected, tier2Entries, fourNames, fiveName, fiveLevel)) bits.push('현재 조합');
-  else bits.push(`${tier4PairLabel(fourNames)} / ${fiveName}`);
-  if (fiveName === '뭉툭한 가시') {
-    const base = Number(getLevelEffect(fiveName, fiveLevel).evolutionDamage || 0);
-    const converted = calc?.result?.convertedEvolutionDamage || 0;
-    bits.push(`뭉가 기본 ${fmt(base)}% · 전환 ${fmt(converted)}%`);
+
+function candidateTag(candidate) {
+  const matches = selection => {
+    const entries = selectedEntries(selection).filter(row => row.tier > 1);
+    return entries.length === candidate.entries.length
+      && candidate.entries.every(({ name, level }) => Number(selection[name]?.level) === level);
+  };
+  return [
+    matches(state.apiSelected) ? '<em class="apiTag">API</em>' : '',
+    matches(state.selected) ? '<em class="currentTag">현재</em>' : ''
+  ].join('');
+}
+
+function candidateReason(candidate, usesMana) {
+  if (candidate.supportModel) return '현재 스킬 주기에서 파티 버프 기여도를 비교했습니다.';
+  if (usesMana && candidate.mana.firstShortage == null) return '계산 구간 동안 계획한 스킬을 마나 지연 없이 사용합니다.';
+  if (usesMana && candidate.mana.delayedSkills.some(skill => skill.lostCasts > 0)) {
+    return '마나 부족으로 줄어든 시전 횟수를 피해 배율에 반영했습니다.';
   }
-  if (Boolean($('excludeCooldown')?.checked) && (calc?.result?.cooldownReduction || 0) === 0) bits.push('쿨감 제외');
-  const manaNote = manaConditionNoteText(calc);
-  if (manaNote && !supportMode) bits.push(manaNote);
-  if (calc?.result?.sonicBreakEvolutionDamage > 0) bits.push(`음속 진피 ${fmt(calc.result.sonicBreakEvolutionDamage)}%`);
-  if (supportMode) bits.push('현재 스킬 주기·파티 기여 기준');
-  if (fiveName === '입식 타격가') bits.push('입식 타격 6중첩 유지 기준');
-  else if (!supportMode && fiveName === '인파이팅') bits.push('정면 승부 가동률 100% 기준');
-  else if (fiveName === '마나 용광로') bits.push(calc.result.manaDamageUnverified
-    ? '기본 마나 소모량 미확인' : `스킬 지분 가중 진피 +${fmt(calc.result.manaFurnaceDamagePercent || 0)}%`);
-  else if (fiveName === '안정된 관리자') bits.push('개인 직접 피해 기준 · 아이덴티티 획득 감소의 피해 영향 미검증');
-  return bits.join(' / ');
+  if (usesMana) return '마나 부족에 따른 스킬 시전 지연을 계산했습니다.';
+  if (candidate.calc.result.convertedEvolutionDamage > 0) {
+    return `초과 치명타 적중률을 진화형 피해 ${fmt(candidate.calc.result.convertedEvolutionDamage)}%p로 전환합니다.`;
+  }
+  if (candidate.calc.result.cooldownReduction > 0) return '스킬별 쿨타임 감소를 시전 기회에 반영했습니다.';
+  return '스킬별 피해 지분으로 가중한 기대 피해 배율입니다.';
 }
-function tier2ChipHtml(entries) {
-  return (entries || []).map(x => `<b class="miniChip">${escapeHtml(shortNodeLabel(x.name, x.level))}</b>`).join('');
-}
-function tier2Allocations(options) {
-  const out = [];
-  function walk(i, remain, picked) {
-    if (i >= options.length) {
-      if (remain === 0 && picked.length) out.push(picked.map(x => ({ ...x })));
-      return;
-    }
-    const name = options[i];
+
+function candidateDetailsHtml(candidate, analysis) {
+  const { entries, calc, mana, supportModel } = candidate;
+  const { stats, result } = calc;
+  const nodes = entries.map(({ name, level, tier }) => {
     const node = getNode(name);
-    const max = Math.min(Number(node?.maxLevel || 0), remain);
-    for (let lv = 0; lv <= max; lv++) {
-      if (lv > 0) picked.push({ name, level: lv });
-      walk(i + 1, remain - lv, picked);
-      if (lv > 0) picked.pop();
-    }
-  }
-  walk(0, 3, []); // 2티어 30P = 10P × 3레벨
-  return out;
-}
-function hasSameTier245(selection, tier2Entries, fourNames, fiveName, fiveLevel) {
-  const selected2 = selectedEntries(selection).filter(row => Number(row.tier) === 2).map(row => ({ name: row.name, level: Number(row.level) }));
-  const selected4 = selectedEntries(selection).filter(row => Number(row.tier) === 4).map(row => row.name);
-  const selected5 = selectedEntries(selection).filter(row => Number(row.tier) === 5);
-  const a = [...selected2].sort((x,y) => x.name.localeCompare(y.name));
-  const b = [...tier2Entries].sort((x,y) => x.name.localeCompare(y.name));
-  const same2 = a.length === b.length && a.every((x,i) => x.name === b[i].name && x.level === b[i].level);
-  return same2 && sameNameSet(fourNames, selected4)
-    && selected5.length === 1 && selected5[0].name === fiveName && selected5[0].level === fiveLevel;
-}
-function candidateTag(c) {
-  const tags = [];
-  if (hasSameTier245(state.apiSelected, c.tier2Entries, c.fourNames, c.fiveName, c.fiveLevel)) tags.push('<em class="apiTag">API</em>');
-  if (hasSameTier245(state.selected, c.tier2Entries, c.fourNames, c.fiveName, c.fiveLevel)) tags.push('<em class="currentTag">현재</em>');
-  return tags.join('');
+    const effect = node.displayLevels?.[level] || nodeEffectText(node, getLevelEffect(name, level));
+    return `<li><b>${tier}T ${escapeHtml(name)} Lv.${level}</b> · ${escapeHtml(effect)}</li>`;
+  }).join('');
+  const skills = (result.skillExperiment?.items || []).filter(row => row.share > 0).map(row =>
+    `<li><b>${escapeHtml(row.name)}</b> · 기대 배율 ${row.value.toFixed(4)} · 치적 ${fmt(row.rawCritRate)}% (적용 ${fmt(row.effectiveCritRate)}%) · 치피 ${fmt(row.critDamage)}% · ${criticalOutcomeLabel(row.critical)} · 진피 ${fmt(row.evolutionDamage)}% · 적주피 ${fmt(row.enemyDamage)}% · 추피 ${fmt(row.additionalDamage)}%</li>`
+  ).join('');
+  const has = name => entries.some(entry => entry.name === name);
+  const assumptions = [
+    has('입식 타격가') && '입식 타격 6중첩 유지',
+    has('인파이팅') && '정면 승부 가동률 100%',
+    has('달인') && '달인 5중첩 유지',
+    has('선각자') && '통찰 5중첩 유지',
+    has('축복의 여신') && stats.partyBlessing > 0 && '기본 공·이속에 파티 전투 축복 Lv.3 반영',
+    has('진군') && (supportModel ? '진군 에테르 상시 획득 가정' : '보호 효과와 에테르 획득에 따른 개인 공·이속 가동률 미검증'),
+    (has('정열의 춤사위') || has('안정된 관리자')) && '딜러 아이덴티티 수급 변화에 따른 스킬 운용 미검증',
+    result.unverifiedClassEffects && '일부 직업 패시브 발동·적용 범위 미확인'
+  ].filter(Boolean);
+  const firstMiss = mana?.shortages?.[0];
+  const manaDetails = mana?.completed ? `<p>마나 사이클 ${mana.validation === 'measured' ? '실측 대조' : '추정'} · ${mana.duration}초 최소 잔여 마나 ${fmt(mana.minMana)} · 종료 마나 ${fmt(mana.endMana)} · 소비 ${fmt(mana.consumedMana)} · 자연 회복 ${fmt(mana.naturalRecovered)} · 추가 회복 ${fmt(mana.extraRecovered)} · 최대치 초과 ${fmt(mana.discardedRecovery)}</p>
+    <p>마나 부족 ${mana.shortageCount}회 · 마나 지연 ${fmt(mana.manaDelay)}초 · 시전 누락 ${mana.lostCasts}회${firstMiss ? ` · 최초 ${fmt(firstMiss.time)}초 ${escapeHtml(firstMiss.skill)} (MP ${fmt(firstMiss.deficit)} 부족)` : ''}</p>
+    <p>${escapeHtml(candidate.supportName || '서포터 없음')}${Number.isFinite(mana.totalDamage) ? ` · 300초 총 기대 피해 ${fmt(mana.totalDamage)} 정규화 단위 · 기대 피해 배율 ${mana.value.toFixed(4)}` : ''} · 이론 배율 ${candidate.recValue.toFixed(4)}</p>
+    <ul>${mana.skillCasts.map(skill => `<li>${escapeHtml(skill.name)} · 쿨 ${fmt(skill.interval)}초${skill.castTime != null ? ` · 시전 ${fmt(skill.castTime)}초` : ''}${skill.aftercast != null ? ` · 후딜 ${fmt(skill.aftercast)}초` : ''} · MP ${fmt(skill.cost)}/회 · ${skill.casts}/${skill.plannedCasts}회</li>`).join('')}</ul>
+    ${mana.unavailable?.length ? `<p>시전 조건 불충족 ${mana.unavailable.length}회</p><ul>${mana.unavailable.map(event => `<li>${fmt(event.time)}초 · ${escapeHtml(event.skill)} · ${escapeHtml(event.reason)}</li>`).join('')}</ul>` : ''}
+    ${firstMiss ? `<details><summary>마나 부족 시점과 부족량</summary><ul>${mana.shortages.map(event => `<li>${fmt(event.time)}초 · ${escapeHtml(event.skill)} · MP ${fmt(event.deficit)} 부족</li>`).join('')}</ul></details>` : ''}
+    <p>${escapeHtml(analysis?.detail || analysis?.scenario?.environment?.assumption || '입력한 첫 시각·재사용 간격·우선순위와 회복 조건 적용')}</p>` : '';
+  const support = supportModel ? `<p>상시 기여 ${fmt(supportModel.allTimePercent)}% · 공증 가동률 ${fmt(supportModel.detail.overallAttackUptime * 100)}% · 아이덴티티 가동률 ${fmt(supportModel.detail.identityUptime * 100)}%</p>` : '';
+  const manaReductions = (stats.manaCostReductions || []).map(value => `${fmt(value)}%`).join(' · ') || '0%';
+  const reductionMethod = { sum: '합산', product: '곱연산' }[analysis?.scenario?.reductions];
+  return `<details class="comboDetails">
+    <summary>상세 계산 보기</summary>
+    <div class="comboDetailsBody">
+      <ul>${nodes}</ul>
+      <p class="comboCritical">${criticalOutcomeLabel(result.critical)} · 진피 ${fmt(result.evo)}% · 적주피 ${fmt(result.displayEnemyDamage)}% · 추피 ${fmt(result.additionalDamage)}% · 공속 ${fmt(result.attackSpeed)}% · 이속 ${fmt(result.moveSpeed)}%</p>
+      <p>공통 쿨감 ${fmt(stats.cooldownReduction || 0)}% · 마나 스킬 쿨감 ${fmt(stats.manaSkillCooldownReduction || 0)}% · 마나 소모 감소 ${manaReductions}${reductionMethod ? ` (${reductionMethod})` : ''}</p>
+      ${skills ? `<ul>${skills}</ul>` : '<p>스킬별 피해 지분 미확인</p>'}
+      ${manaDetails}
+      ${support}
+      ${assumptions.length ? `<p>${escapeHtml(assumptions.join(' · '))}</p>` : ''}
+      ${practicalNoteHtml(candidate, analysis)}
+    </div>
+  </details>`;
 }
 function practicalNoteHtml(candidate, analysis) {
   if (candidate.supportModel) return '';
@@ -4827,7 +4857,9 @@ function practicalNoteHtml(candidate, analysis) {
     }
   }
   if (Number.isFinite(mana?.value)) {
-    notes.push(`이론 ${candidate.theoryRank}위 · ${mana.quality === 'estimate' ? '가정' : '마나 반영'} ${candidate.scenarioRank}위`);
+    const theoryRank = candidate.theoryRank ? `${candidate.theoryRank}위` : 'TOP5 밖';
+    const scenarioRank = candidate.scenarioRank ? `${candidate.scenarioRank}위` : 'TOP5 밖';
+    if (!candidate.supportModel) notes.push(`이론 ${theoryRank} · ${mana.quality === 'estimate' ? '가정' : '마나 반영'} ${scenarioRank}`);
     notes.push(...(mana.assumptions || []));
     if (candidate.supportName) notes.push(candidate.supportName);
     if (Number.isFinite(candidate.manaApiDiff)) notes.push(`같은 마나 조건에서 API 대비 ${pct(candidate.manaApiDiff)}`);
@@ -4841,6 +4873,7 @@ function practicalNoteHtml(candidate, analysis) {
     }
   } else if (mana?.reason) notes.push(mana.reason);
   else if (result.manaDamageUnverified) notes.push('일부 스킬의 마나 조건부 피해 미검증');
+  else if (analysis?.reason) notes.push(analysis.reason);
   if (analysis?.threshold && !result.manaDamageUnverified) {
     const capacity = minimumSustainableMana(analysis.threshold, candidate.calc.stats);
     const alternate = minimumSustainableMana(analysis.alternateThreshold, candidate.calc.stats);
@@ -4861,7 +4894,7 @@ function criticalOutcomeLabel(critical) {
   return `기준 스킬 ${tiers}중 확정${next}`;
 }
 const MANA_INPUT_FIELDS = {
-  manaDuration: 'duration', manaMax: 'maxMana', manaStart: 'startMana', manaRecovery: 'recoveryMana',
+  manaMax: 'maxMana', manaStart: 'startMana', manaRecovery: 'recoveryMana',
   manaFirstRecovery: 'firstRecovery', manaRecoveryInterval: 'recoveryInterval', manaCostReductions: 'reductions'
 };
 const SUPPORT_INPUT_FIELDS = ['manaSupportUptime', 'manaSupportTimes', 'manaSupportRestore'];
@@ -4884,7 +4917,7 @@ function fillManaProfileInputs() {
   const rotation = $('manaRotation');
   if (rotation && (!rotation.value.trim() || rotation.dataset.manaSource)) {
     rotation.value = Array.isArray(inputs.skills)
-      ? inputs.skills.map(row => [row.name, row.first, row.interval, row.cost].join(' | ')).join('\n')
+      ? inputs.skills.map(row => [row.name, row.first, row.interval, row.cost, row.castTime].filter(value => value != null).join(' | ')).join('\n')
       : (character?.skills || []).filter(skill => skill.source === 'official-api')
         .map(skill => `${skill.name} |  |  | ${skill.preEvolutionCost ?? ''}`).join('\n');
     if (rotation.value) rotation.dataset.manaSource = verified ? 'verified-profile' : 'official-api';
@@ -4898,8 +4931,7 @@ function fillManaProfileInputs() {
   }
 }
 
-function renderManaEnvironment(supportMode) {
-  $('manaEnvironment')?.classList.toggle('hidden', supportMode);
+function renderManaEnvironment() {
   const profile = SUPPORT_MANA[$('manaSupport')?.value] || SUPPORT_MANA.none;
   const supportSummary = $('manaSupportSummary');
   if (supportSummary) {
@@ -4945,20 +4977,24 @@ function manaScenarioForRecommendation() {
     .map(line => line.split('|').map(value => value.trim()));
   const skillLines = lines('manaRotation');
   const recoveryLines = lines('manaExtraRecovery');
-  if (skillLines.some(line => line.length !== 4) || recoveryLines.some(line => line.length !== 2)) {
+  if (skillLines.some(line => line.length < 4 || line.length > 6) || recoveryLines.some(line => line.length !== 2)) {
     return { reason: '스킬과 추가 회복 행의 | 구분 형식을 확인해 주세요.' };
   }
-  const knownSkills = skillExperimentItems(state.skillEffects);
+  const knownSkills = (state.skillEffects?.items || []).filter(skill => Number(skill.level) > 0);
   const damageSkills = weightedSkillUnits().filter(unit => unit.weight > 0).map(unit => unit.name);
   const input = {
     duration: field('manaDuration'),
+    strict: field('manaDuration') === MANA_RECOMMENDATION_SECONDS,
     maxMana: field('manaMax'),
     startMana: field('manaStart'),
     recoveryMana: field('manaRecovery'),
     firstRecovery: field('manaFirstRecovery'),
     recoveryInterval: field('manaRecoveryInterval'),
     reductions: $('manaCostReductions')?.value,
-    skills: skillLines.map(([name, first, interval, cost]) => ({ name, first: decimal(first), interval: decimal(interval), cost: decimal(cost) })),
+    skills: skillLines.map(([name, first, interval, cost, castTime, aftercast]) => ({
+      name, first: decimal(first), interval: decimal(interval), cost: decimal(cost),
+      castTime: castTime ? decimal(castTime) : undefined, aftercast: aftercast ? decimal(aftercast) : undefined
+    })),
     extraRecovery: recoveryLines.map(([time, amount]) => ({ time: decimal(time), amount: decimal(amount) }))
   };
   const support = $('manaSupport')?.value || 'none';
@@ -4967,7 +5003,7 @@ function manaScenarioForRecommendation() {
     support, duration: input.duration, maxMana: input.maxMana, naturalMana: input.recoveryMana,
     uptime: field('manaSupportUptime'), receivedTimes: times ? times.split(',').map(decimal) : [],
     manualRestore: field('manaSupportRestore'), food: $('manaFood')?.value === 'used', foodTick: field('manaFoodTick'),
-    patch: MANA_PROFILE_PATCH
+    patch: MANA_PROFILE_PATCH, inclusiveEnd: input.strict
   };
   const base = prepareManaScenario(input, damageSkills, knownSkills);
   if (!base.scenario) return base;
@@ -4987,22 +5023,32 @@ function manaScenarioForRecommendation() {
     environment.assumption = [environment.assumption, 'API 비용은 툴팁 계산값'].filter(Boolean).join(' · ');
   }
   const prepared = prepareManaScenario({ ...input, environment }, damageSkills, knownSkills);
+  if (prepared.scenario?.strict) {
+    prepared.detail = [environment.assumption, '입력한 시작 MP·회복 틱과 스킬 행 순서의 우선순위 적용',
+      '동시각에는 회복을 먼저 적용한다고 가정',
+      input.skills.some(skill => skill.castTime == null || skill.aftercast == null) && '누락된 시전·후딜 시간은 0초로 가정'].filter(Boolean).join(' · ');
+  }
   if (prepared.scenario && support !== 'none') {
     const withoutSupport = resolveManaEnvironment({ ...envInput, support: 'none' });
     prepared.withoutSupport = prepareManaScenario({ ...input, environment: withoutSupport }, damageSkills, knownSkills).scenario;
   }
   return prepared;
 }
-function calculateAndRender() {
+async function calculateAndRender() {
+  const revision = ++calculationRevision;
+  renderRecommendation = null;
+  const recommendList = $('recommendList');
+  recommendList.setAttribute('aria-busy', 'true');
+  recommendList.textContent = '진화 조합을 비교하는 중…';
   const current = statsWithSelection(state.selected);
   const apiSelection = Object.keys(state.apiSelected || {}).length ? state.apiSelected : state.selected;
   const apiBase = statsWithSelection(apiSelection);
   const supportMode = isSupportPowerSnapshot(state.powerSnapshot);
   const recommendDescription = $('recommendDescription');
   if (recommendDescription) recommendDescription.textContent = supportMode
-    ? '공증 스킬 주기와 낙인·아이덴티티·파티 버프로 서포터 진화 노드를 비교합니다. 서포터 자신의 마나 지속 가능성은 미검증입니다.'
-    : '1·3티어를 고정하고 2·4·5티어의 기대 피해를 비교합니다.';
-  for (const id of ['singleHitMainSkill', 'noManaMainSkill', 'manaShortageClass']) {
+    ? '공증 스킬 주기와 낙인·아이덴티티·파티 버프로 서포터 진화 노드를 비교합니다.'
+    : '현재 전투 특성에서 2·3·4·5티어의 기대 피해를 비교합니다.';
+  for (const id of ['singleHitMainSkill', 'noManaMainSkill']) {
     const label = $(id)?.closest('label');
     if (label) label.classList.toggle('hidden', supportMode);
   }
@@ -5010,27 +5056,23 @@ function calculateAndRender() {
   renderKeenEfficiency(current);
   const apiBaseValue = Number(apiBase.result.value || 0);
   const currentValue = Number(current.result.value || 0);
-  const noManaMainSkill = isNoManaMainSkillEnabled() && !weightedSkillUnits().some(unit => unit.weight > 0 && unit.item?.usesMana === true);
   const manualMana = Boolean($('manaShortageClass')?.checked);
-  $('manaScenarioPanel')?.classList.toggle('hidden', supportMode);
-  $('manaRecommendationModeLabel')?.classList.toggle('hidden', supportMode);
-  renderManaEnvironment(supportMode);
-  const manaInput = supportMode ? null : manualMana
+  renderManaEnvironment();
+  const manaInput = manualMana
     ? state.skillCycle?.appliedCycleLinkCount > 0
       ? { reason: '연동 스킬의 재사용 대기시간과 마나 부족의 상호작용 미검증' }
       : manaScenarioForRecommendation()
     : buildAutomaticManaAnalysis({ character: state.manaCharacter, cycle: state.skillCycle,
       knownSkills: skillExperimentItems(state.skillEffects), damageSkills: weightedSkillUnits().filter(unit => unit.weight > 0).map(unit => unit.name),
-      support: $('manaSupport')?.value || 'none' });
-  const supportContext = supportMode ? supportModelContext() : null;
-  const apiSupportModel = supportMode ? supportContributionModel(state.powerSnapshot, { ...supportContext, selection: apiSelection }) : null;
-  const currentSupportModel = supportMode ? supportContributionModel(state.powerSnapshot, supportContext) : null;
+      duration: MANA_RECOMMENDATION_SECONDS, support: $('manaSupport')?.value || 'none' });
+  const supportContext = supportMode ? { ...supportModelContext(), supportSkillCycle: buildSupportSkillCycle(state.powerSnapshot, state.skillEffects) } : null;
+  const apiSupportModel = supportMode ? supportContributionModel(state.powerSnapshot, { ...supportContext, selection: apiSelection, evolutionCooldown: apiBase.stats }) : null;
+  const currentSupportModel = supportMode ? supportContributionModel(state.powerSnapshot, { ...supportContext, evolutionCooldown: current.stats }) : null;
   const apiPracticalValue = supportMode ? Number(apiSupportModel?.totalBuffPower || 1) : apiBaseValue;
   const currentPracticalValue = supportMode ? Number(currentSupportModel?.totalBuffPower || 1) : currentValue;
   const baseValue = apiPracticalValue > 0 ? apiPracticalValue : (apiBaseValue || currentPracticalValue || currentValue || 1);
   const apiManaValue = manaInput?.scenario ? evaluateManaCandidate(manaInput.scenario, apiBase.stats, apiBase.result).value : null;
   const currentDiff = ((currentPracticalValue / baseValue) - 1) * 100;
-  const candidates = [];
   const excludeCooldown = isCooldownExcluded();
   const modeledCycleShare = Number(state.skillCycle?.modeledSharePercent ?? state.skillCycle?.mappedSharePercent ?? 0);
   const shareInput = $('mainSkillDamageShare');
@@ -5049,170 +5091,224 @@ function calculateAndRender() {
       ? `현재 스킬트리 ${state.skillCycle.usedSkillCount}개 · 계산 지분 ${modeledCycleShare.toFixed(1)}% · ${state.skillCycle.analyzerTag || '장착 스킬 추정'} 기준으로 쿨감 노드를 자동 계산합니다.`
       : '스킬 주기나 전투분석 지분이 없을 때만 아래 수동 지분을 사용합니다.';
   }
-  // 효과 데이터가 없는 서포터 노드는 딜러 추천에서 제외합니다.
-  const tier2Options = (supportMode ? ['축복의 여신'] : allOptions(2)).filter(name => {
-    if (!getNode(name) || (!supportMode && name === '축복의 여신')) return false;
-    if (excludeCooldown && hasCooldownEffect(name)) return false;
-    if (!supportMode && noManaMainSkill && MANA_SKILL_NODE_NAMES.includes(name)) return false;
-    return true;
-  });
-  const tier2Candidates = tier2Allocations(tier2Options);
-  const hasDealerEffect = name => Object.keys(getNode(name)?.levels || {}).length > 0;
-  const tier4Options = supportMode ? ['선각자', '진군', '기원'] : allOptions(4).filter(hasDealerEffect);
-  const tier5Options = supportMode
-    ? ['입식 타격가', '마나 용광로', '안정된 관리자']
-    : allOptions(5).filter(name => getNode(name) && !(noManaMainSkill && name === '마나 용광로'));
-
-  const tier4Pairs = [];
-  for (let i = 0; i < tier4Options.length; i++) {
-    for (let j = i + 1; j < tier4Options.length; j++) tier4Pairs.push([tier4Options[i], tier4Options[j]]);
+  const budgetKnown = state.evolutionPointBudget != null;
+  const cost = row => getNode(row.name).costPerLevel * row.level;
+  const fixed = selectedEntries(state.selected).filter(row => row.tier === 1);
+  const pointBudget = state.evolutionPointBudget ?? selectedEntries(apiSelection).reduce((sum, row) => sum + cost(row), 0);
+  const nodes = (state.evolution?.nodes || []).filter(node => !excludeCooldown || !hasCooldownEffect(node.name));
+  const fixedSelection = selectionWithoutTiers(state.selected, [2, 3, 4, 5]);
+  const baseStats = getBaseStats(fixedSelection);
+  const skillModel = prepareSkillScoring();
+  skillModel.unverifiedClassEffects = unverifiedPassiveEffectsCount() > 0;
+  const ranks = createManaRanking(true);
+  const scores = new Map();
+  const partyScores = new Map();
+  function scoreCandidate(stats) {
+    return { ...score(stats, skillModel), unverifiedClassEffects: skillModel.unverifiedClassEffects };
   }
-
-  for (const tier2Entries of tier2Candidates) {
-    for (const fourNames of tier4Pairs) {
-      const fourLevel = 1;
-      const fixedSelection = selectionWithoutTiers(state.selected, [2, 4, 5]);
-      for (const e of tier2Entries) fixedSelection[e.name] = { level: e.level, source: 'candidate' };
-      for (const fourName of fourNames) fixedSelection[fourName] = { level: fourLevel, source: 'candidate' };
-      const spent = selectedEntries(fixedSelection).reduce((total, row) => total + getNode(row.name).costPerLevel * row.level, 0);
-      for (const fiveName of tier5Options) {
-        if (excludeCooldown && hasCooldownCandidate(tier2Entries, fourNames, fiveName)) continue;
-        const fiveNode = getNode(fiveName);
-        const levelBudget = state.evolutionPointBudget == null ? Infinity
-          : Math.floor((state.evolutionPointBudget - spent) / fiveNode.costPerLevel);
-        const fiveLevel = Math.min(fiveNode.maxLevel, levelBudget);
-        if (fiveLevel < 1) continue;
-        // 추천 계산에서 현재 2/4/5티어만 제거하고 후보 조합을 삽입. 1/3티어와 입력값은 유지.
-        const next = { ...fixedSelection, [fiveName]: { level: fiveLevel, source: 'candidate' } };
-        const calc = statsWithSelection(next);
-        const supportModel = supportMode ? supportContributionModel(state.powerSnapshot, { ...supportContext, selection: next }) : null;
-        const recValue = supportMode ? Number(supportModel?.totalBuffPower || 1) : calc.result.value;
-        if (!Number.isFinite(recValue) || recValue < 0) continue;
-        const mana = manaInput?.scenario ? evaluateManaCandidate(manaInput.scenario, calc.stats, calc.result) : null;
-        const withoutSupport = Number.isFinite(mana?.value) && manaInput?.withoutSupport
-          ? evaluateManaCandidate(manaInput.withoutSupport, calc.stats, calc.result).value : null;
-        candidates.push({
-          tier2Entries, fourNames, fourLevel, fiveName, fiveLevel, calc, recValue,
-          mana,
-          supportName: manaInput?.scenario?.environment?.profile?.label,
-          supportGain: Number.isFinite(withoutSupport) ? mana.value - withoutSupport : 0,
-          manaApiDiff: apiManaValue > 0 && Number.isFinite(mana?.value) ? (mana.value / apiManaValue - 1) * 100 : null,
-          supportModel,
-          diff: ((recValue / baseValue) - 1) * 100
-        });
+  function supportCandidate(entries, stats) {
+    const selection = Object.assign({}, fixedSelection,
+      Object.fromEntries(entries.map(({ name, level }) => [name, { level }])));
+    return supportContributionModel(state.powerSnapshot, { ...supportContext, selection, evolutionCooldown: stats });
+  }
+  function evaluate(entries) {
+    const stats = applyEvolutionEntries(entries, baseStats, excludeCooldown);
+    const result = scoreCandidate(stats);
+    const supportModel = supportMode ? supportCandidate(entries, stats) : null;
+    const recValue = supportModel ? Number(supportModel.totalBuffPower || 1) : result.value;
+    const mana = manaInput?.scenario ? evaluateManaCandidate(manaInput.scenario, stats, result) : null;
+    return { calc: { stats, result }, supportModel, recValue, mana };
+  }
+  const compactMana = mana => mana && {
+    value: mana.value, alternateValue: mana.alternateValue, quality: mana.quality, validation: mana.validation,
+    firstShortage: mana.firstShortage,
+    duration: mana.duration, eligible: mana.eligible, completed: mana.completed, shortageCount: mana.shortageCount,
+    manaDelay: mana.manaDelay, lostCasts: mana.lostCasts
+  };
+  const allocations = evolutionAllocations(nodes, fixed.map(row => ({ points: cost(row) })), pointBudget);
+  let generationMs = 0;
+  let rankingMs = 0;
+  let exhausted = false;
+  let lastUpdate = performance.now();
+  while (!exhausted) {
+    const generationStarted = performance.now();
+    const batch = [];
+    for (let i = 0; i < 256; i++) {
+      const entry = allocations.next();
+      if (entry.done) {
+        exhausted = true;
+        break;
       }
+      batch.push(entry.value);
+    }
+    generationMs += performance.now() - generationStarted;
+    const rankingStarted = performance.now();
+    for (const entries of batch) {
+      const stats = applyEvolutionEntries(entries, baseStats, excludeCooldown);
+      // With the character and skills fixed, these are the values that candidate nodes can change in score and mana.
+      const key = [stats.critRate, stats.directionalCritDamage, stats.critHitDamage, stats.additionalDamage,
+        stats.evolutionDamage, stats.attackSpeed, stats.moveSpeed, stats.critCap, stats.overCritToEvolutionDamageRate,
+        stats.sonicBreakEffect?.rate, stats.manaFurnace?.damagePerTenMana, stats.manaFurnace?.maxManaCostPercent, stats.manaSkillEvolutionDamage,
+        stats.cooldownReduction, stats.manaSkillCooldownReduction, stats.manaCostReductions].join('|');
+      let summary = scores.get(key);
+      if (!summary) {
+        const result = scoreCandidate(stats);
+        const mana = manaInput?.scenario ? evaluateManaCandidate(manaInput.scenario, stats, result) : null;
+        const fallback = Number.isFinite(mana?.value) && manaInput?.alternate
+          ? evaluateManaCandidate(manaInput.alternate, stats, result) : null;
+        const { value, manaDamageUnverified, alternateValue, critHitStackingUnverified } = result;
+        summary = {
+          recValue: value, calc: { result: { manaDamageUnverified, alternateValue, critHitStackingUnverified } },
+          mana: compactMana(mana), fallbackMana: compactMana(fallback)
+        };
+        scores.set(key, summary);
+      }
+      let recValue = summary.recValue;
+      if (supportMode) {
+        const party = entries.filter(entry => PARTY_EVOLUTION_NODES.has(entry.name))
+          .map(entry => `${entry.name}${entry.level}`).join('|');
+        const partyKey = `${party}/${stats.cooldownReduction}/${stats.manaSkillCooldownReduction}`;
+        if (!partyScores.has(partyKey)) partyScores.set(partyKey, supportCandidate(entries, stats).totalBuffPower);
+        recValue = partyScores.get(partyKey);
+      }
+      if (Number.isFinite(recValue) && recValue >= 0) ranks.add({ ...summary, entries, recValue, supportModel: supportMode });
+    }
+    rankingMs += performance.now() - rankingStarted;
+    if (!exhausted && performance.now() - lastUpdate > 35) {
+      recommendList.textContent = `진화 조합 ${formatNumber(ranks.counts.candidates)}개 비교 중…`;
+      await new Promise(resolve => setTimeout(resolve, 0));
+      if (revision !== calculationRevision) return;
+      lastUpdate = performance.now();
     }
   }
-  const mode = supportMode ? 'support' : $('manaRecommendationMode')?.value || 'auto';
-  const ranks = rankManaCandidates(candidates, Boolean(manaInput?.scenario) || mode === 'unverified');
-  const showMana = mode === 'auto' && ranks.evaluated.length > 0;
-  const automaticEstimate = manaInput?.origin === 'automatic';
-  const estimates = ranks.evaluated.filter(candidate => candidate.mana.quality === 'estimate');
-  const showEstimate = mode === 'estimate' && estimates.length > 0;
-  const shown = mode === 'support' ? candidates.sort((a, b) => b.recValue - a.recValue)
-    : mode === 'unverified' ? ranks.unverified : showMana ? ranks.evaluated : showEstimate ? estimates : ranks.theoretical;
-  const top = shown.slice(0, 5);
-  const damageRankB = showMana ? ranks.evaluatedAlternate
-    : showEstimate ? ranks.evaluatedAlternate.filter(c => c.mana.quality === 'estimate') : ranks.theoreticalAlternate;
-  const damageTopB = damageRankB.slice(0, 5);
-  const compareCritical = !supportMode && mode !== 'unverified'
-    && [...top, ...damageTopB].some(c => c.calc.result.critHitStackingUnverified);
-  const orderChanged = compareCritical && damageTopB.some((c, i) => c !== top[i]);
-  const includesEstimates = top.some(c => c.mana?.quality === 'estimate');
-  const status = $('manaRecommendationStatus');
-  if (status) {
-    const detail = [manaInput?.reason, manaInput?.detail || manaInput?.scenario?.environment?.assumption,
-      !supportMode && unverifiedPassiveEffectsCount() > 0 && '일부 패시브 발동·적용 범위 미확인 · 확인된 효과 기준',
-      manaInput?.scenario && !ranks.evaluated.length && '지속 피해 순위 산정에 필요한 피해·스킬 규칙 미검증',
-      mode === 'estimate' && !estimates.length && '가정 기반 피해 순위를 계산할 수 있는 후보 없음',
-      manaInput?.threshold && '카드에 가상 운용 유지에 필요한 최소 최대 MP 표시',
-      manualMana && ranks.evaluated.length > 0 && `수동 시나리오 평가 ${ranks.evaluated.length}개`].filter(Boolean).join(' · ');
-    const eligible = ranks.theoretical.length;
-    const excluded = eligible - ranks.evaluated.length;
-    const label = showMana ? (includesEstimates
-      ? automaticEstimate ? '가정 기반 자동 TOP5' : '가정 포함 마나 반영 순위'
-      : manaInput.origin === 'verified' ? '검증된 프로필 마나 반영 순위' : '입력 조건 마나 반영 순위')
-      : showEstimate ? '가정 기반 마나 비교' : '이론상 기대 피해 순위';
-    const criticalOrder = compareCritical ? `회심 A 첫 치명 피해 · B 전체 치명 피해 · TOP5 ${orderChanged ? '변경 (A 기준 표시)' : '동일'}` : '';
-    status.textContent = supportMode ? '' : mode === 'unverified'
-      ? `미검증 후보 ${ranks.unverified.length}개 · ${detail}`
-      : [label, detail, criticalOrder, manaInput?.scenario && excluded > 0 && `마나 순위 산정 불가 ${excluded}개`, ranks.unverified.length > 0 && `실전 미검증 ${ranks.unverified.length}개`].filter(Boolean).join(' · ');
-  }
-  const sensitivity = $('manaSensitivity');
-  if (sensitivity) {
-    const notes = [];
-    if (orderChanged) {
-      const usingMana = showMana || showEstimate;
-      const labels = damageTopB.map((c, i) => {
-        const tier2 = c.tier2Entries.map(e => `${e.name} ${e.level}`).join('·');
-        const value = usingMana ? c.mana.alternateValue : c.calc.result.alternateValue;
-        return `${i + 1}위 ${tier2} / ${tier4PairLabel(c.fourNames)} / ${c.fiveName} ${c.fiveLevel} (${value.toFixed(4)})`;
-      });
-      notes.push(`회심 B 가정 TOP5 · ${labels.join(' · ')}`);
+  scores.clear();
+  partyScores.clear();
+  recommendList.dataset.candidateCount = String(ranks.counts.candidates);
+  recommendList.dataset.generationMs = String(generationMs);
+  recommendList.dataset.rankingMs = String(rankingMs);
+  renderRecommendation = () => {
+    const mode = $('manaRecommendationMode')?.value || 'auto';
+    const defaultRecommendation = mode === 'auto';
+    const showMana = defaultRecommendation && !supportMode;
+    const estimates = supportMode ? ranks.estimatesSupport : ranks.estimates;
+    const showEstimate = mode === 'estimate' && estimates.length > 0;
+    const shown = defaultRecommendation ? (supportMode ? ranks.measuredSupport : ranks.measured)
+      : mode === 'shortage' ? ranks.shortage : mode === 'unverified' ? ranks.unverified
+        : mode === 'estimate' ? estimates : supportMode ? ranks.support : ranks.theoretical;
+    const top = shown.slice(0, 5);
+    const damageRankB = showMana ? ranks.measuredAlternate
+      : showEstimate ? ranks.estimatesAlternate : ranks.theoreticalAlternate;
+    const damageTopB = damageRankB.slice(0, 5);
+    const compareCritical = !supportMode && top.length > 0 && ['auto', 'theory', 'estimate'].includes(mode)
+      && [...top, ...damageTopB].some(c => c.calc.result.critHitStackingUnverified);
+    const orderChanged = compareCritical && damageTopB.some((c, i) => c !== top[i]);
+    const status = $('manaRecommendationStatus');
+    if (status) {
+      const detail = [!budgetKnown && '보유 진화 포인트 미조회 · API 장착 포인트 범위에서 비교', manaInput?.reason,
+        defaultRecommendation && !ranks.counts.measured && '300초 시전·마나 실측과 대조된 후보가 없습니다.',
+        mode === 'estimate' && (manaInput?.detail || manaInput?.scenario?.environment?.assumption),
+        mode === 'theory' && manaInput?.threshold && '상세에 가상 운용의 최소 최대 MP 표시'].filter(Boolean).join(' · ');
+      const { candidates, passed, shortage, measured } = ranks.counts;
+      const label = defaultRecommendation
+        ? `300초 실측 검증 ${formatNumber(measured)}개 · 추정 통과 ${formatNumber(passed - measured)}개 · 부족 ${formatNumber(shortage)}개 · 판정 보류 ${formatNumber(candidates - passed - shortage)}개`
+        : { theory: supportMode ? '파티 기여 비교' : '이론상 기대 피해 순위', estimate: `300초 추정 검증 · 마나 통과 ${formatNumber(ranks.counts.estimates)}개`,
+          shortage: '마나 부족 후보의 이론상 기대 피해', unverified: '미검증 후보' }[mode];
+      const criticalOrder = compareCritical ? `회심 A 첫 치명 피해 · B 전체 치명 피해 · TOP5 ${orderChanged ? '변경 (A 기준 표시)' : '동일'}` : '';
+      status.textContent = [label, detail, criticalOrder].filter(Boolean).join(' · ');
     }
-    if ((showEstimate || showMana) && manaInput?.alternate) {
-      const alternates = shown.map(candidate => ({ ...candidate, original: candidate,
-        mana: evaluateManaCandidate(manaInput.alternate, candidate.calc.stats, candidate.calc.result) }));
-      const alternateTop = rankManaCandidates(alternates, true).evaluated.slice(0, 5);
-      const changed = alternateTop.length !== top.length || alternateTop.some((candidate, i) => candidate.original !== top[i]);
-      notes.push(`첫 사용 분산·장착 역순 및 소모 감소 합산으로 비교하면 TOP5 ${changed ? '순위 변경' : '순위 동일'}`);
-    } else if (manaInput?.threshold) {
-      notes.push('대안 가정은 첫 사용 시각을 분산하고 장착 역순·소모 감소 합산으로 비교합니다.');
+    const sensitivity = $('manaSensitivity');
+    if (sensitivity) {
+      const notes = [];
+      if (orderChanged) {
+        const usingMana = showMana || showEstimate;
+        const labels = damageTopB.map((c, i) => {
+          const build = c.entries.map(e => `${e.tier}T ${e.name} ${e.level}`).join('·');
+          const value = usingMana ? c.mana.alternateValue : c.calc.result.alternateValue;
+          return `${i + 1}위 ${build} (${value.toFixed(4)})`;
+        });
+        notes.push(`회심 B 가정 TOP5 · ${labels.join(' · ')}`);
+      }
+      if (showEstimate && manaInput?.alternate) {
+        const alternateTop = showEstimate ? ranks.fallbackEstimates : ranks.fallback;
+        const changed = alternateTop.length !== top.length || alternateTop.some((candidate, i) => candidate !== top[i]);
+        notes.push(`첫 사용 분산·장착 역순 및 소모 감소 합산으로 비교하면 TOP5 ${changed ? '순위 변경' : '순위 동일'}`);
+      } else if (manaInput?.threshold) {
+        notes.push('대안 가정은 첫 사용 시각을 분산하고 장착 역순·소모 감소 합산으로 비교합니다.');
+      }
+      sensitivity.textContent = notes.join(' · ');
+      $('manaSensitivityPanel')?.classList.toggle('hidden', !notes.length);
     }
-    sensitivity.textContent = notes.join(' · ');
-  }
-  const recoverySource = $('manaRecoverySource');
-  if (recoverySource) {
-    recoverySource.href = AUTO_MANA_RECOVERY_SOURCE;
-    recoverySource.classList.toggle('hidden', !manaInput?.assumedRecovery);
-  }
-  const apiManaConditionNote = manaConditionNoteText(apiBase);
-  const currentManaConditionNote = manaConditionNoteText(current);
-  const apiComparable = supportMode || !apiManaConditionNote;
-  const currentComparable = supportMode || !currentManaConditionNote;
-  const currentDiffText = apiComparable && currentComparable ? pct(currentDiff) : '미검증';
-  const apiPracticalLabel = supportMode
-    ? `<small>공증 가동률 ${(Number(apiSupportModel?.detail?.overallAttackUptime || 0) * 100).toFixed(1)}%</small>`
-    : (apiManaConditionNote ? `<small>${escapeHtml(apiManaConditionNote)}</small>` : '');
-  const currentPracticalLabel = supportMode
-    ? `<small>공증 가동률 ${(Number(currentSupportModel?.detail?.overallAttackUptime || 0) * 100).toFixed(1)}%</small>`
-    : (currentManaConditionNote ? `<small>${escapeHtml(currentManaConditionNote)}</small>` : '');
-  const apiScoreLabel = supportMode ? 'API 종합 기여' : 'API 기대값';
-  const currentScoreLabel = supportMode ? '현재 종합 기여' : '현재 기대값';
-  const apiScoreValue = supportMode ? `${((apiPracticalValue - 1) * 100).toFixed(2)}%` : apiComparable ? apiBaseValue.toFixed(4) : '미검증';
-  const currentScoreValue = supportMode ? `${((currentPracticalValue - 1) * 100).toFixed(2)}%` : currentComparable ? currentValue.toFixed(4) : '미검증';
-  const supportAttackBasisNote = apiSupportModel?.detail.attackPowerBasis === 'estimated' ? ' · 기본 공격력 미조회로 추정' : '';
-  $('currentScore').innerHTML = `<div class="apiBaselineRow">
-    <div><span>${apiScoreLabel}</span><b>${apiScoreValue}</b>${apiPracticalLabel}</div>
-    <div><span>${currentScoreLabel}</span><b>${currentScoreValue}</b>${currentPracticalLabel}</div>
-    <div><span>${supportMode ? '파티 기여 API 대비' : '기대 피해 API 대비'}</span><b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>
-    <p>${supportMode ? `파티 기여 추정치 · 낙인 ${apiSupportModel?.detail?.brandUptimeModeled ? `단일 스킬 기준 ${fmt(apiSupportModel.detail.brandUptime * 100)}%` : '상시 적용 가정'}${supportAttackBasisNote}` : `<a href="${NOVEMBER_2026_PATCH_URL}" target="_blank" rel="noopener noreferrer">11월 18일 다중 치명타</a>를 반영한 레이드 추정치입니다. 스킬 지분, 버프 가동률과 조건부 효과에 따라 실제 피해는 달라질 수 있습니다.`}</p>
-  </div>`;
-  const apiManaDetail = apiManaConditionNote ? ` · ${escapeHtml(apiManaConditionNote)}` : '';
-  $('baseInfo').innerHTML = supportMode
-    ? `<b>API 기준 상세</b><span>상시 버프 ${Number(apiSupportModel?.allTimePercent || 0).toFixed(2)}% · 풀 버프 ${Number(apiSupportModel?.fullPercent || 0).toFixed(2)}% · 공증 가동률 ${(Number(apiSupportModel?.detail?.overallAttackUptime || 0) * 100).toFixed(1)}% · 아이덴티티 가동률 ${(Number(apiSupportModel?.detail?.identityUptime || 0) * 100).toFixed(1)}%</span>`
-    : `<b>API 기준 상세</b><span>치명 ${Math.round(apiBase.stats.critStat || 0)} · 최종치적 ${fmt(apiBase.result.critRate)}% · 치피 ${fmt(apiBase.result.critDamage)}% · 치적주피 ${fmt(apiBase.result.critHitDamage)}% · 진피 ${fmt(apiBase.result.evo)}% · 추피 ${fmt(apiBase.result.additionalDamage)}% · 적주피 ${fmt(apiBase.result.enemyDamage)}% · 공증 ${fmt(apiBase.result.attackPower)}%${apiManaDetail}</span>`;
-  $('recommendList').innerHTML = top.length ? `<div class="comboRows">${top.map((c, i) => {
-    const cls = c.diff >= 0 ? 'up' : 'down';
-    const memo = candidateMemo(c.tier2Entries, c.fourNames, c.fiveName, c.fiveLevel, c.calc, supportMode);
-    return `<article class="comboRow ${i === 0 && mode !== 'unverified' ? 'best' : ''}">
-      <div class="rankBadge">${mode === 'unverified' ? '-' : i + 1}</div>
-      <div class="rowBuild">
-        <div class="buildMain">
-          <div class="tierLine tier2Line"><span>2T</span><strong class="chipWrap">${tier2ChipHtml(c.tier2Entries)}</strong></div>
-          <div class="tierLine"><span>4T</span><strong>${escapeHtml(tier4PairLabel(c.fourNames))}</strong></div>
-          <div class="tierLine"><span>5T</span><strong class="nodePill">${escapeHtml(c.fiveName)} Lv.${c.fiveLevel}</strong>${candidateTag(c)}</div>
+    const recoverySource = $('manaRecoverySource');
+    if (recoverySource) {
+      recoverySource.href = AUTO_MANA_RECOVERY_SOURCE;
+      recoverySource.classList.toggle('hidden', !manaInput?.assumedRecovery);
+    }
+    const apiManaConditionNote = manaConditionNoteText(apiBase);
+    const currentManaConditionNote = manaConditionNoteText(current);
+    const apiComparable = supportMode || !apiManaConditionNote;
+    const currentComparable = supportMode || !currentManaConditionNote;
+    const currentDiffText = apiComparable && currentComparable ? pct(currentDiff) : '미검증';
+    const apiPracticalLabel = supportMode
+      ? `<small>공증 가동률 ${(Number(apiSupportModel?.detail?.overallAttackUptime || 0) * 100).toFixed(1)}%</small>`
+      : (apiManaConditionNote ? `<small>${escapeHtml(apiManaConditionNote)}</small>` : '');
+    const currentPracticalLabel = supportMode
+      ? `<small>공증 가동률 ${(Number(currentSupportModel?.detail?.overallAttackUptime || 0) * 100).toFixed(1)}%</small>`
+      : (currentManaConditionNote ? `<small>${escapeHtml(currentManaConditionNote)}</small>` : '');
+    const apiScoreLabel = supportMode ? 'API 종합 기여' : 'API 기대값';
+    const currentScoreLabel = supportMode ? '현재 종합 기여' : '현재 기대값';
+    const apiScoreValue = supportMode ? `${((apiPracticalValue - 1) * 100).toFixed(2)}%` : apiComparable ? apiBaseValue.toFixed(4) : '미검증';
+    const currentScoreValue = supportMode ? `${((currentPracticalValue - 1) * 100).toFixed(2)}%` : currentComparable ? currentValue.toFixed(4) : '미검증';
+    const supportAttackBasisNote = apiSupportModel?.detail.attackPowerBasis === 'estimated' ? ' · 기본 공격력 미조회로 추정' : '';
+    $('currentScore').innerHTML = `<div class="apiBaselineRow">
+      <div><span>${apiScoreLabel}</span><b>${apiScoreValue}</b>${apiPracticalLabel}</div>
+      <div><span>${currentScoreLabel}</span><b>${currentScoreValue}</b>${currentPracticalLabel}</div>
+      <div><span>${supportMode ? '파티 기여 API 대비' : '기대 피해 API 대비'}</span><b class="${currentDiff >= 0 ? 'up' : 'down'}">${currentDiffText}</b></div>
+      <p>${supportMode ? `파티 기여 추정치 · 낙인 ${apiSupportModel?.detail?.brandUptimeModeled ? `단일 스킬 기준 ${fmt(apiSupportModel.detail.brandUptime * 100)}%` : '상시 적용 가정'}${supportAttackBasisNote}` : `<a href="${NOVEMBER_2026_PATCH_URL}" target="_blank" rel="noopener noreferrer">11월 18일 다중 치명타</a>를 반영한 레이드 추정치입니다. 스킬 지분, 버프 가동률과 조건부 효과에 따라 실제 피해는 달라질 수 있습니다.`}</p>
+    </div>`;
+    const apiManaDetail = apiManaConditionNote ? ` · ${escapeHtml(apiManaConditionNote)}` : '';
+    $('baseInfo').innerHTML = supportMode
+      ? `<b>API 기준 상세</b><span>상시 버프 ${Number(apiSupportModel?.allTimePercent || 0).toFixed(2)}% · 풀 버프 ${Number(apiSupportModel?.fullPercent || 0).toFixed(2)}% · 공증 가동률 ${(Number(apiSupportModel?.detail?.overallAttackUptime || 0) * 100).toFixed(1)}% · 아이덴티티 가동률 ${(Number(apiSupportModel?.detail?.identityUptime || 0) * 100).toFixed(1)}%</span>`
+      : `<b>API 기준 상세</b><span>치명 ${Math.round(apiBase.stats.critStat || 0)} · 최종치적 ${fmt(apiBase.result.critRate)}% · 치피 ${fmt(apiBase.result.critDamage)}% · 치적주피 ${fmt(apiBase.result.critHitDamage)}% · 진피 ${fmt(apiBase.result.evo)}% · 추피 ${fmt(apiBase.result.additionalDamage)}% · 적주피 ${fmt(apiBase.result.enemyDamage)}% · 공증 ${fmt(apiBase.result.attackPower)}%${apiManaDetail}</span>`;
+    const usesMana = showMana || showEstimate;
+    const rankValue = c => usesMana && !supportMode ? c.mana.value : c.recValue;
+    $('recommendList').innerHTML = top.length ? `<div class="comboRows">${top.map((row, i) => {
+      const theoryRank = ranks.theoretical.indexOf(row) + 1;
+      const scenarioRank = (defaultRecommendation || showEstimate ? shown : ranks.evaluated).indexOf(row) + 1;
+      const c = { ...row, ...evaluate(row.entries), theoryRank, scenarioRank };
+      const withoutSupport = Number.isFinite(c.mana?.value) && manaInput?.withoutSupport
+        ? evaluateManaCandidate(manaInput.withoutSupport, c.calc.stats, c.calc.result).value : null;
+      c.supportName = manaInput?.scenario?.environment?.profile?.label;
+      c.supportGain = Number.isFinite(withoutSupport) ? c.mana.value - withoutSupport : 0;
+      c.manaApiDiff = apiManaValue > 0 && Number.isFinite(c.mana?.value) ? (c.mana.value / apiManaValue - 1) * 100 : null;
+      const value = rankValue(c);
+      const lead = rankValue(top[0]);
+      const diff = lead > 0 ? (value / lead - 1) * 100 : 0;
+      const manaStatus = c.mana?.eligible ? `300초 마나 안정${c.mana.validation === 'estimate' ? ' (추정)' : ''}`
+        : c.mana?.firstShortage != null ? '마나 부족' : '미검증';
+      const tiers = [2, 3, 4, 5].map(tier => {
+        const chips = c.entries.filter(entry => entry.tier === tier).map(({ name, level }) =>
+          `<b class="miniChip${tier === 5 ? ' nodePill' : ''}">${escapeHtml(name)} Lv.${level}</b>`
+        ).join('');
+        return `<div class="tierLine"><span>${tier}T</span><strong class="chipWrap">${chips || '미배분'}</strong></div>`;
+      }).join('');
+      return `<article class="comboRow ${i === 0 && mode !== 'unverified' ? 'best' : ''}">
+        <div class="rankBadge">${mode === 'unverified' ? '-' : i + 1}</div>
+        <div class="rowBuild">
+          <div class="buildMain">${tiers}</div>
+          ${usesMana ? '' : `<div class="comboMemo">${escapeHtml(candidateReason(c, usesMana))} ${candidateTag(c)}</div>`}
         </div>
-        <div class="comboMemo">${escapeHtml(memo)}</div>
-        ${practicalNoteHtml(c, manaInput)}
-      </div>
-      <div class="rowMetrics">
-        <div class="rowMetric"><span>${supportMode ? '종합 파티 기여' : '이론 기대 피해 배율'}</span><b>${supportMode ? `${((c.recValue - 1) * 100).toFixed(2)}%` : c.calc.result.manaDamageUnverified ? '미검증' : c.recValue.toFixed(4)}</b><small>${supportMode ? `상시 ${Number(c.supportModel?.allTimePercent || 0).toFixed(2)}%` : criticalOutcomeLabel(c.calc.result.critical)}</small>${Number.isFinite(c.mana?.value) ? `<small>마나 반영 <strong>${c.mana.value.toFixed(4)}</strong></small>` : ''}</div>
-        <div class="rowMetric"><span>${supportMode ? '파티 기여 API 대비' : '이론 기대 피해 API 대비'}</span><b class="${cls}">${!apiComparable || (c.calc.result.manaDamageUnverified && !supportMode) ? '-' : pct(c.diff)}</b></div>
-        <div class="rowMetric"><span>${supportMode ? '공증 가동률' : '치적'}</span><b>${supportMode ? `${(Number(c.supportModel?.detail?.overallAttackUptime || 0) * 100).toFixed(1)}%` : `${fmt(c.calc.result.critRate)}%`}</b></div>
-      </div>
-    </article>`;
-  }).join('')}</div>` : `<div class="emptyNotice">${mode === 'unverified' ? '표시할 미검증 후보가 없습니다.' : '현재 진화 포인트와 선택 조건에서 추천 가능한 2/4/5티어 조합이 없습니다.'}</div>`;
+        <div class="rowMetrics">
+          <div class="rowMetric"><span>${supportMode ? '종합 파티 기여' : usesMana ? '300초 기대 피해 배율' : '이론 기대 피해 배율'}</span><b>${supportMode ? `${((value - 1) * 100).toFixed(2)}%` : c.calc.result.manaDamageUnverified ? '미검증' : value.toFixed(4)}</b></div>
+          <div class="rowMetric"><span>1위 대비</span><b>${mode === 'unverified' ? '—' : pct(diff)}</b></div>
+          <div class="rowMetric"><span>마나</span><b>${manaStatus}</b></div>
+        </div>
+        ${candidateDetailsHtml(c, manaInput)}
+      </article>`;
+    }).join('')}</div>` : `<div class="emptyNotice">${defaultRecommendation ? '300초 실측 검증을 통과한 후보가 없습니다.'
+      : mode === 'estimate' ? '300초 추정 사이클에서 마나 조건을 충족한 후보가 없습니다.' : '이 비교에 표시할 후보가 없습니다.'}</div>`;
+  };
+  renderRecommendation();
+  recommendList.removeAttribute('aria-busy');
   const supportPanel = currentSupportModel && $('powerSnapshotView')?.querySelector('.supportPowerPanel');
   if (supportPanel) supportPanel.outerHTML = renderSupportContributionPanel(state.powerSnapshot, currentSupportModel, supportPanel.open);
   renderSpecScenarioComparison();
@@ -5225,7 +5321,7 @@ async function loadDb() {
   state.selected = defaultSelection();
   state.apiSelected = JSON.parse(JSON.stringify(state.selected));
   renderEvolutionTiers();
-  calculateAndRender();
+  return state.evolution;
 }
 
 function syncAdrenalineControlsFromEngraving() {
@@ -5281,11 +5377,20 @@ function saveStoredCharacter(name, data) {
 }
 
 async function requestCharacterData(name, { force = false, maxAttempts = 2 } = {}) {
+  const key = normalizeCharacterCacheKey(name);
+  if (characterRequests.has(key)) return characterRequests.get(key);
   if (!force) {
     const stored = getStoredCharacter(name);
     if (stored) return { ...stored, fromCache: true };
   }
 
+  const request = fetchCharacterData(name, { force, maxAttempts });
+  characterRequests.set(key, request);
+  try { return await request; }
+  finally { characterRequests.delete(key); }
+}
+
+async function fetchCharacterData(name, { force, maxAttempts }) {
   let lastError = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
@@ -5322,17 +5427,61 @@ const EXTRA_EFFECT_INPUT_IDS = [
   'extraMoveSpeed'
 ];
 
-function resetAdditionalEffects() {
-  for (const id of EXTRA_EFFECT_INPUT_IDS) {
-    const input = $(id);
-    if (input) input.value = '0';
+function characterControls() {
+  return [...document.querySelectorAll('#inputPanel input:not([type="hidden"]), #inputPanel select, #recommendPanel input:not([readonly]), #recommendPanel select, #recommendPanel textarea')];
+}
+
+function rememberCharacterWorkspace() {
+  if (!activeCharacterName) return;
+  const key = normalizeCharacterCacheKey(activeCharacterName);
+  characterWorkspaces.delete(key);
+  characterWorkspaces.set(key, {
+    controls: new Map(characterControls().map(control => [control.id, {
+      value: control.value, checked: control.checked, source: control.dataset.manaSource
+    }])),
+    supportInputs: new Map(supportManaInputs),
+    selection: JSON.stringify(state.selected) !== JSON.stringify(state.apiSelected) ? cloneSelection(state.selected) : null,
+    planner: {
+      specPlannerMode: state.specPlannerMode, specPlannerTarget: state.specPlannerTarget,
+      specPlannerBudget: state.specPlannerBudget, specScenarioSelectedKeys: new Set(state.specScenarioSelectedKeys),
+      armguardRange: { ...state.armguardRange }, armguardBreathMode: state.armguardBreathMode
+    }
+  });
+  if (characterWorkspaces.size > CHARACTER_CACHE_MAX_ENTRIES) characterWorkspaces.delete(characterWorkspaces.keys().next().value);
+}
+
+function resetCharacterControls() {
+  for (const control of characterControls()) {
+    if (control.type === 'checkbox') control.checked = control.defaultChecked;
+    else if (control.tagName === 'SELECT') control.value = [...control.options].find(option => option.defaultSelected)?.value ?? control.options[0]?.value ?? '';
+    else control.value = control.defaultValue;
+    delete control.dataset.manaSource;
   }
-  if ($('critSynergyEnabled')) $('critSynergyEnabled').checked = false;
-  if ($('critSynergyValue')) $('critSynergyValue').value = '10';
-  if ($('backAttackEnabled')) $('backAttackEnabled').checked = false;
+  supportManaInputs.clear();
+  selectedManaSupport = $('manaSupport').value;
+  $('manaScenarioPanel').open = false;
+}
+
+function restoreCharacterWorkspace(name) {
+  const workspace = characterWorkspaces.get(normalizeCharacterCacheKey(name));
+  if (!workspace) return;
+  for (const control of characterControls()) {
+    const saved = workspace.controls.get(control.id);
+    if (!saved) continue;
+    if (control.type === 'checkbox') control.checked = saved.checked;
+    else if (!saved.source) control.value = saved.value;
+  }
+  workspace.supportInputs.forEach((inputs, key) => supportManaInputs.set(key, inputs));
+  selectedManaSupport = $('manaSupport').value;
+  if (workspace.selection) state.selected = cloneSelection(workspace.selection);
+  Object.assign(state, workspace.planner, { specScenarioSelectedKeys: new Set(workspace.planner.specScenarioSelectedKeys) });
+  updateAdrenalineReplacementVisibility();
 }
 
 function resetCharacterResultState() {
+  calculationRevision++;
+  renderRecommendation = null;
+  $('recommendList')?.removeAttribute('aria-busy');
   document.body.classList.remove('calculatorReady');
   $('characterCard').classList.add('hidden');
   $('characterCard').innerHTML = '';
@@ -5362,7 +5511,7 @@ function resetCharacterResultState() {
   setCalculationDirty(false);
 }
 
-function applyCharacterData(data) {
+function applyCharacterData(data, restore) {
   state.accessory = data.accessoryEffects || { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   state.bracelet = data.braceletEffects || { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   state.abilityStone = data.abilityStoneEffects || { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
@@ -5407,24 +5556,20 @@ function applyCharacterData(data) {
   refreshPassiveSkillEffects();
   state.enlightenment = extractEnlightenmentEffects(state.foundEffects, state.passiveSkillEffects);
   renderSkillEffectControl();
-  const sharedScenario = state.pendingSharedScenario;
-  if (sharedScenario && (!sharedScenario.characterName || sharedScenario.characterName === data.profile.CharacterName)) {
-    applySpecScenarioPayload(sharedScenario, { deferRender: true });
-    state.pendingSharedScenario = null;
-  }
   applyProfileDefaults(data.profile, state.apiSelected);
+  restore?.();
   renderPowerSnapshot(state.powerSnapshot);
   renderEvolutionTiers();
   renderSummary(data.profile, data.arkPassive);
-  calculateAndRender();
-  setCalculationDirty(false);
+  return calculateAndRender();
 }
 
 function updateCharacterRefreshButton() {
   const button = $('characterRefreshButton');
   if (!button) return;
   const inputName = normalizeCharacterCacheKey($('characterName')?.value);
-  const matchesActive = activeCharacterName && inputName === normalizeCharacterCacheKey(activeCharacterName);
+  const matchesActive = activePage.name && activeCharacterName && inputName === normalizeCharacterCacheKey(activeCharacterName)
+    && normalizeCharacterCacheKey(activePage.name) === inputName;
   button.classList.toggle('hidden', !matchesActive);
   if (!matchesActive) return;
   if (characterRequestPending) {
@@ -5437,43 +5582,256 @@ function updateCharacterRefreshButton() {
   button.textContent = remaining > 0 ? `캐릭터 갱신 ${formatCooldownClock(remaining)}` : '캐릭터 갱신';
 }
 
-async function searchCharacter(name, { force = false } = {}) {
-  if (characterRequestPending) return;
-  const button = $('searchButton');
-  characterRequestPending = true;
-  button.disabled = true;
-  button.textContent = force ? '갱신...' : '검색...';
+function characterIsLoaded(name) {
+  return Boolean(name && activeCharacterName && normalizeCharacterCacheKey(name) === normalizeCharacterCacheKey(activeCharacterName));
+}
+
+function setCharacterRequestStatus(label = '') {
+  characterRequestPending = Boolean(label);
+  $('searchButton').disabled = characterRequestPending;
+  $('searchButton').textContent = label || '검색';
+  $('searchForm').setAttribute('aria-busy', String(characterRequestPending));
+  if (label) setMessage('캐릭터 정보를 불러오는 중입니다.', 'info');
   updateCharacterRefreshButton();
+}
+
+function setCharacterRetry(action = null) {
+  retryCharacter = action;
+  $('characterRetryButton').classList.toggle('hidden', !action);
+}
+
+function loadEvolutionOnce() {
+  if (state.evolution) return Promise.resolve(state.evolution);
+  evolutionPromise ??= loadDb().catch(error => {
+    evolutionPromise = null;
+    throw error;
+  });
+  return evolutionPromise;
+}
+
+async function getCharacterResult(name, force = false) {
+  const [result] = await Promise.all([requestCharacterData(name, { force }), loadEvolutionOnce(), loadCombatAnalyzer()]);
+  if (!validCharacterName(result.data.profile?.CharacterName)) throw new Error('캐릭터 프로필을 가져오지 못했습니다.');
+  return result;
+}
+
+function selectManaSupport(value) {
+  if (value === selectedManaSupport) return;
+  supportManaInputs.set(selectedManaSupport, SUPPORT_INPUT_FIELDS.map(id => $(id).value));
+  selectedManaSupport = value;
+  $('manaSupport').value = value;
+  const saved = supportManaInputs.get(value) || [];
+  SUPPORT_INPUT_FIELDS.forEach((id, index) => { $(id).value = saved[index] || ''; });
+}
+
+const CHARACTER_LINKS = {
+  character: 'characterOverviewLink', nodes: 'characterNodesLink', combat: 'characterCombatLink'
+};
+const PAGE_TITLES = {
+  home: 'LOSTARK 진화 노드 추천 계산기', character: '캐릭터 분석', nodes: '진화 노드 추천',
+  combat: '300초 전투 분석', simulator: '골드 효율 계산기', market: '시세', ratios: '배율', notFound: '페이지를 찾을 수 없습니다'
+};
+
+function renderCharacterNavigation() {
+  const onCharacter = isCharacterPage(activePage.page);
+  $('characterNav').classList.toggle('hidden', !onCharacter);
+  $('copyCharacterLink').textContent = '링크 복사';
+  $('characterShareStatus').textContent = '';
+  for (const [page, id] of Object.entries(CHARACTER_LINKS)) {
+    const link = $(id);
+    if (onCharacter) link.href = pagePath({ ...activePage, page });
+    if (page === activePage.page) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  }
+  $('siteSimulatorLink').href = pagePath({ page: 'simulator', name: activePage.name });
+}
+
+function renderPage() {
+  const { page, name } = activePage;
+  const ready = characterIsLoaded(name);
+  const simulator = page === 'simulator';
+  if (page === 'market') selectedMarketTab = activePage.category;
+  const tab = { ratios: 'ratio', market: 'market', simulator: 'simulator' }[page] || 'calculator';
+  setActiveTab(tab);
+  document.querySelectorAll('.tabButton').forEach(link => {
+    if (!isCharacterPage(page) && page !== 'notFound' && link.dataset.tab === tab) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  });
+  document.body.dataset.sitePage = page;
+  document.body.classList.toggle('calculatorReady', ready);
+  document.body.classList.toggle('simulatorMode', simulator && ready && Boolean(state.powerSnapshot));
+  const panels = {
+    character: ['characterCard', 'summaryPanel', 'keenPanel'],
+    nodes: ['characterCard', 'summaryPanel', 'inputPanel', 'evolutionPanel', 'recommendPanel', 'keenPanel'],
+    combat: ['characterCard', 'combatPanel', 'recommendPanel']
+  }[page] || [];
+  document.querySelectorAll('.calcTabPanel').forEach(panel => {
+    panel.classList.toggle('hiddenByRoute', !ready || !panels.includes(panel.id));
+  });
+  $('routeNotFound').classList.toggle('hidden', page !== 'notFound');
+  $('simulatorLanding').classList.toggle('hidden', !simulator || Boolean(name));
+  $('combatPanel').classList.toggle('hidden', page !== 'combat' || !ready);
+  if (page === 'combat' && ready) {
+    $('combatSkillCycle').innerHTML = renderSkillCyclePanel() || '<p class="hint">스킬 사이클을 계산할 데이터가 없습니다.</p>';
+    const cycle = $('combatSkillCycle').querySelector('details');
+    if (cycle) cycle.open = true;
+  }
+  $('recommendHeading').textContent = page === 'combat' ? '마나 지속 가능성과 기대 피해' : '2·3·4·5티어 조합 추천';
+  if (simulator && ready && state.powerSnapshot) {
+    if (!simulatorRendered) renderPowerSnapshot(state.powerSnapshot);
+    $('powerSnapshotPanel').classList.remove('hidden');
+  }
+  renderCharacterNavigation();
+  document.title = name ? `${name} · ${PAGE_TITLES[page]}` : PAGE_TITLES[page];
+}
+
+function pageRouteFromLocation() {
+  const route = readPageRoute(window.location);
+  if (!route.scenario) return route;
+  const payload = decodeSpecScenario(route.scenario);
+  const name = validCharacterName(payload?.characterName);
+  if (!name || (route.name && normalizeCharacterCacheKey(route.name) !== normalizeCharacterCacheKey(name))) return route;
+  return { ...route, page: 'simulator', name, payload };
+}
+
+async function showPage({ result, payload } = {}) {
+  const intent = ++characterIntent;
+  const previous = activePage;
+  activePage = pageRouteFromLocation();
+  if (activePage.payload && readPageRoute(window.location).page === 'home') {
+    // Keep links shared before /simulator was introduced.
+    history.replaceState(history.state, '', pagePath(activePage));
+  }
+  setCharacterRetry();
+  setCharacterRequestStatus();
   setMessage('');
+  renderPage();
+  const { name, page, support, mode } = activePage;
+  if (!name) return;
+  $('characterName').value = name;
+  updateCharacterRefreshButton();
+  const shared = payload || (activePage.scenario !== previous.scenario ? activePage.payload : null);
+  if (characterIsLoaded(name) && !result && !characterRequests.has(normalizeCharacterCacheKey(name))) {
+    const supportChanged = isCharacterPage(page) && support !== selectedManaSupport;
+    const modeChanged = isCharacterPage(page) && mode !== $('manaRecommendationMode').value;
+    if (isCharacterPage(page)) {
+      selectManaSupport(support);
+      $('manaRecommendationMode').value = mode;
+    }
+    if (shared) applySpecScenarioPayload(shared);
+    else if (supportChanged) calculateAndRender();
+    else if (modeChanged) renderRecommendation?.();
+    if (page === 'simulator' && !state.powerSnapshot) setMessage('이 캐릭터의 스펙업 장비 데이터를 확인할 수 없습니다.');
+    return;
+  }
   try {
-    const result = await requestCharacterData(name, { force });
-    const data = result.data;
-    if (!data.profile?.CharacterName) throw new Error('캐릭터 프로필을 가져오지 못했습니다.');
+    if (!result) setCharacterRequestStatus('검색...');
+    const { data, savedAt, fromCache } = result || await getCharacterResult(name);
+    if (intent !== characterIntent) return;
+    rememberCharacterWorkspace();
     resetCharacterResultState();
-    resetAdditionalEffects();
-    applyCharacterData(data);
+    resetCharacterControls();
     activeCharacterName = data.profile.CharacterName;
-    activeCharacterSavedAt = result.savedAt;
-    if ($('characterName')) $('characterName').value = activeCharacterName;
+    activeCharacterSavedAt = savedAt;
+    $('characterName').value = activeCharacterName;
+    if (activePage.name !== activeCharacterName) {
+      activePage.name = activeCharacterName;
+      history.replaceState(history.state, '', pagePath(activePage));
+    }
+    applyCharacterData(data, () => {
+      restoreCharacterWorkspace(activeCharacterName);
+      if (isCharacterPage(page)) {
+        selectManaSupport(support);
+        $('manaRecommendationMode').value = mode;
+      }
+      if (payload || activePage.payload) applySpecScenarioPayload(payload || activePage.payload, { deferRender: true });
+    });
+    renderPage();
     if (!Object.keys(state.selected).length) {
       setMessage('캐릭터 정보는 갱신됐지만 API에서 진화 노드를 읽지 못했습니다. 노드는 직접 선택해 주세요.');
-    } else if (result.fromCache) {
+    } else if (page === 'simulator' && !state.powerSnapshot) {
+      setMessage('이 캐릭터의 스펙업 장비 데이터를 확인할 수 없습니다.');
+    } else if (fromCache) {
       setMessage('저장된 캐릭터 정보를 불러왔습니다. 캐릭터 갱신을 눌러야 공식 API를 다시 조회합니다.', 'info');
+    } else {
+      setMessage('');
     }
-  } catch (error) { setMessage(error.message); }
-  finally {
-    characterRequestPending = false;
-    button.disabled = false;
-    button.textContent = '검색';
-    updateCharacterRefreshButton();
+  } catch (error) {
+    if (intent !== characterIntent) return;
+    setMessage(error.message);
+    setCharacterRetry(() => showPage({ payload }));
+  } finally {
+    if (intent === characterIntent) setCharacterRequestStatus();
+  }
+}
+
+function navigatePage(route, options = {}) {
+  const path = pagePath(route);
+  const current = location.pathname + location.search;
+  if (path === current && !options.result && !options.payload) return;
+  if (path !== current) {
+    history.pushState({ from: current }, '', path);
+    window.scrollTo(0, 0);
+  }
+  return showPage(options);
+}
+
+async function searchCharacter(name, { force = false } = {}) {
+  const intent = ++characterIntent;
+  setCharacterRetry();
+  setMessage('');
+  try {
+    const loaded = characterIsLoaded(name);
+    if (force || !loaded) setCharacterRequestStatus(force ? '갱신...' : '검색...');
+    const result = force || !loaded ? await getCharacterResult(name, force) : null;
+    if (intent !== characterIntent) return;
+    if (force) return showPage({ result });
+    const canonicalName = result?.data.profile.CharacterName || activeCharacterName;
+    const page = activePage.page === 'simulator' ? 'simulator' : 'character';
+    const remembered = characterWorkspaces.get(normalizeCharacterCacheKey(canonicalName))?.controls;
+    await navigatePage({ page, name: canonicalName,
+      support: loaded ? $('manaSupport').value : remembered?.get('manaSupport')?.value,
+      mode: loaded ? $('manaRecommendationMode').value : remembered?.get('manaRecommendationMode')?.value }, { result });
+  } catch (error) {
+    if (intent !== characterIntent) return;
+    setMessage(error.message);
+    setCharacterRetry(() => searchCharacter(name, { force }));
+  } finally {
+    if (intent === characterIntent) setCharacterRequestStatus();
   }
 }
 
 $('searchForm').addEventListener('submit', (event) => {
   event.preventDefault();
-  const name = $('characterName').value.trim();
-  if (!name) return setMessage('캐릭터명을 입력하세요.');
+  const name = validCharacterName($('characterName').value);
+  if (!name) {
+    setCharacterRetry();
+    return setMessage('올바른 캐릭터명을 입력하세요.');
+  }
   searchCharacter(name);
+});
+$('characterRetryButton').addEventListener('click', () => retryCharacter?.());
+document.addEventListener('click', event => {
+  const link = event.target.closest('a[data-route][href]');
+  if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const target = new URL(link.href);
+  if (target.origin !== location.origin) return;
+  event.preventDefault();
+  navigatePage(readPageRoute(target));
+});
+window.addEventListener('popstate', () => showPage());
+$('copyCharacterLink').addEventListener('click', async () => {
+  if (!isCharacterPage(activePage.page)) return;
+  const link = new URL(pagePath(activePage), location.origin).href;
+  try {
+    await navigator.clipboard.writeText(link);
+    if (new URL(pagePath(activePage), location.origin).href === link) {
+      $('copyCharacterLink').textContent = '복사 완료';
+      $('characterShareStatus').textContent = '링크를 복사했습니다.';
+    }
+  } catch {
+    window.prompt('공유 링크', link);
+  }
 });
 $('characterRefreshButton')?.addEventListener('click', () => {
   if (!activeCharacterName || characterRequestPending) return;
@@ -5481,7 +5839,13 @@ $('characterRefreshButton')?.addEventListener('click', () => {
   searchCharacter(activeCharacterName, { force: true });
 });
 $('characterName')?.addEventListener('input', updateCharacterRefreshButton);
-$('simulatorBackButton')?.addEventListener('click', closeSimulatorPage);
+$('simulatorBackButton')?.addEventListener('click', () => {
+  const from = history.state?.from;
+  const priorPage = typeof from === 'string' && readPageRoute(new URL(from, location.origin));
+  if (priorPage && isCharacterPage(priorPage.page) && characterIsLoaded(priorPage.name)) history.back();
+  else if (activePage.name) navigatePage({ page: 'character', name: activePage.name, support: $('manaSupport').value, mode: $('manaRecommendationMode').value });
+  else navigatePage({ page: 'home' });
+});
 $('evolutionRecalculateButton')?.addEventListener('click', recalculateSelectedSettings);
 EXTRA_EFFECT_INPUT_IDS.forEach(id => $(id).addEventListener('input', () => setCalculationDirty(true)));
 $('adrenalineEnabled').addEventListener('change', () => { updateAdrenalineReplacementVisibility(); setCalculationDirty(true); });
@@ -5504,18 +5868,26 @@ $('applyManaScenario')?.addEventListener('click', () => {
   $('manaShortageClass').checked = true;
   calculateAndRender();
 });
-$('manaRecommendationMode')?.addEventListener('change', () => calculateAndRender());
+function updatePageRecommendationOptions() {
+  if (!isCharacterPage(activePage.page) || !characterIsLoaded(activePage.name)) return;
+  activePage = { ...activePage, support: $('manaSupport').value, mode: $('manaRecommendationMode').value };
+  history.replaceState(history.state, '', pagePath(activePage));
+  renderCharacterNavigation();
+}
+
+$('manaRecommendationMode')?.addEventListener('change', () => {
+  updatePageRecommendationOptions();
+  renderRecommendation?.();
+});
 $('manaSupport')?.addEventListener('change', event => {
-  supportManaInputs.set(selectedManaSupport, SUPPORT_INPUT_FIELDS.map(id => $(id)?.value || ''));
-  selectedManaSupport = event.target.value;
-  const saved = supportManaInputs.get(selectedManaSupport) || [];
-  SUPPORT_INPUT_FIELDS.forEach((id, index) => { $(id).value = saved[index] || ''; });
+  selectManaSupport(event.target.value);
+  updatePageRecommendationOptions();
   calculateAndRender();
 });
 for (const id of [...SUPPORT_INPUT_FIELDS, 'manaFood', 'manaFoodTick']) {
   $(id)?.addEventListener('change', () => {
     if ($('manaShortageClass')?.checked) calculateAndRender();
-    else renderManaEnvironment(false);
+    else renderManaEnvironment();
   });
 }
 for (const id of [...Object.keys(MANA_INPUT_FIELDS), 'manaRotation', 'manaExtraRecovery']) {
@@ -5844,8 +6216,7 @@ function compactClientMarketItem(item, material = false) {
 
 function initMarketTabs() {
   document.querySelectorAll('.marketSubButton').forEach(btn => btn.addEventListener('click', () => {
-    selectedMarketTab = btn.dataset.marketTab || 'accessory';
-    renderMarketSubTab();
+    navigatePage({ page: 'market', category: btn.dataset.marketTab });
   }));
 }
 
@@ -5856,7 +6227,6 @@ let legendAvatarLoading = false;
 function initLegendAvatarTab() {
   renderAvatarJobPicker();
   initMarketTabs();
-  document.querySelectorAll('.tabButton').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
   $('avatarSearchAllButton')?.addEventListener('click', () => prepareLegendAvatarTab());
   $('avatarRefreshButton')?.addEventListener('click', () => { if (selectedAvatarJob) loadLegendAvatarSet(selectedAvatarJob, true); });
 }
@@ -6504,28 +6874,12 @@ if (!window.__lostarkCalculatorBootedV5110) {
   setInterval(preloadMarketPriceLists, MARKET_SNAPSHOT_CHECK_MS);
   document.addEventListener('visibilitychange', preloadMarketPriceLists);
   $('ratioSearchInput')?.addEventListener('input', renderRatioPanel);
-  setActiveTab('calculator');
   preloadMarketPriceLists();
   loadLostarkNoticeCard();
   loadClassBenchmarks();
   loadCombatAnalyzer();
-  const sharedScenario = decodeSpecScenario(new URLSearchParams(window.location.search).get('scenario'));
-  if (sharedScenario?.characterName) {
-    state.pendingSharedScenario = sharedScenario;
-    state.ownedMaterials = normalizeOwnedMaterials(sharedScenario.ownedMaterials || state.ownedMaterials);
-    $('characterName').value = sharedScenario.characterName;
-  }
-  const boot = loadDb().catch((error) => {
-    setMessage(error.message || '진화 노드 데이터를 불러오지 못했습니다.');
-    return null;
-  });
-  if (sharedScenario?.characterName) {
-    boot.then(async loaded => {
-      if (!loaded && !state.evolution) return;
-      await searchCharacter(sharedScenario.characterName);
-      if (state.powerSnapshot) openSimulatorPage();
-    });
-  }
+  loadEvolutionOnce().catch(() => {}); // Character search retries loading if the prefetch fails.
+  showPage();
 }
 
 function renderMaterialPriceGrid(container, data) {
