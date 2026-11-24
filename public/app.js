@@ -19,7 +19,7 @@ import { calculateHoningMaterialCost, goldEfficiency } from './honing-cost.js';
 import { materialPurchaser, materialQuote } from './material-quotes.js';
 import { MANA_RECOMMENDATION_SECONDS, createManaRanking, evaluateManaCandidate, manaFurnaceDamage, minimumSustainableMana, prepareManaScenario } from './mana-recommendation.js?v=6.1.7';
 import { AUTO_MANA_RECOVERY_SOURCE, buildAutomaticManaAnalysis } from './mana-automatic.js?v=6.1.7';
-import { buildCharacterManaProfile, findVerifiedManaProfile, MANA_PROFILE_PATCH, withManaCooldowns } from './mana-character.js';
+import { buildCharacterManaProfile, findVerifiedManaProfile, MANA_PROFILE_PATCH, withManaCooldowns } from './mana-character.js?v=6.1.8';
 import { resolveManaEnvironment, SUPPORT_MANA, SUPPORT_MANA_VERIFIED_AT, supportManaSummary } from './support-mana.js?v=6.1.7';
 import { estimateArmguardCombatPower } from './armguard-power.js?v=6.1.1';
 import { isCharacterPage, pagePath, readPageRoute, validCharacterName } from './page-route.js';
@@ -34,7 +34,7 @@ import {
   remainingCooldownMs
 } from './cache-policy.js?v=6.1.1';
 
-const VERSION = '6.1.7';
+const VERSION = '6.1.8';
 const PARTY_EVOLUTION_NODES = new Set(['정열의 춤사위', '선각자', '진군', '기원', '입식 타격가', '마나 용광로', '안정된 관리자']);
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function isNoManaMainSkillEnabled() { return Boolean(document.getElementById('noManaMainSkill')?.checked); }

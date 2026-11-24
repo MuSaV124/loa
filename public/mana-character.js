@@ -28,7 +28,7 @@ function readCostModifier(texts, source, rune = false) {
   const relevant = texts.filter(text => /마나\s*(?:소모|소비)|소모\s*(?:되는|하는)\s*마나|마나.{0,20}추가로\s*소모/.test(text));
   if (!relevant.length) return null;
   const pattern = rune
-    ? /^(?:\[집중\]\s*)?스킬\s*사용\s*시\s*마나\s*(?:소모량|소비량)(?:이|을)?\s*([\d.]+)\s*%\s*(감소|증가)\s*(?:한다|된다|시킨다)?[.!]?$/
+    ? /^(?:\[집중\]\s*)?스킬\s*사용\s*시\s*마나\s*(?:소모|소비)(?:량)?(?:이|을)?\s*([\d.]+)\s*%\s*(감소|증가)\s*(?:한다|된다|시킨다)?[.!]?$/
     : /^(?:해당\s*스킬의\s*|스킬의\s*)?마나\s*(?:소모량|소비량)(?:이|을)?\s*([\d.]+)\s*%\s*(감소|증가)\s*(?:한다|된다|시킨다)?[.!]?$/;
   const matches = relevant.map(text => text.match(pattern));
   const changes = [...new Set(matches.filter(Boolean).map(match => (match[2] === '감소' ? -1 : 1) * Number(match[1])))];

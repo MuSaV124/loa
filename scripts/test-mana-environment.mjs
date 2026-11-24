@@ -17,8 +17,13 @@ const skill = { name: raw.Name, level: 12, baseCooldownSeconds: 12, manaUsageKno
 assert.equal(skillManaCostProfile(raw).baseCost, 400);
 assert.equal(skillManaCostProfile(raw).preEvolutionCost, 280);
 assert.equal(skillManaCostProfile({ ...raw, Tripods: [{ ...reduction, IsSelected: false }], Rune: focus }).preEvolutionCost, 240);
+const liveFocusTooltip = JSON.stringify({
+  Element_003: { type: 'ItemPartBox', value: { Element_000: '<FONT>스킬 룬 효과</FONT>', Element_001: '스킬 사용 시 마나 소모 30% 감소' } }
+});
+assert.equal(skillManaCostProfile({ ...raw, Tripods: [], Rune: { ...focus, Grade: '영웅', Tooltip: liveFocusTooltip } }).preEvolutionCost, 280);
 assert.equal(skillManaCostProfile({ ...raw, Rune: focus }).preEvolutionCost, null);
 assert.equal(skillManaCostProfile({ ...raw, Tripods: [{ ...reduction, Tooltip: '폭주 중 마나 소모량이 30% 감소한다.' }] }).preEvolutionCost, null);
+assert.equal(skillManaCostProfile({ ...raw, Tripods: [{ ...reduction, Tooltip: '마나 소모량이 <FONT>67.0%</FONT> 확률로 <FONT>100.0%</FONT> 감소한다.' }] }).preEvolutionCost, null);
 assert.equal(skillManaCostProfile({ Tooltip: JSON.stringify({ Element_011: { value: '마나 999 소모' } }) }).baseCost, null);
 assert.equal(skillManaCostProfile({ Tooltip: JSON.stringify({ title: { leftText: '재사용 대기시간 12초' } }) }).preEvolutionCost, null);
 
@@ -132,7 +137,7 @@ try {
   const first = mockResponse();
   await characterHandler({ query }, first);
   assert.equal(first.statusCode, 200);
-  assert.equal(first.body.apiVersion, '6.1.7');
+  assert.equal(first.body.apiVersion, '6.1.8');
   assert.equal(first.body.manaProfile.maxMana, 3500);
   assert.equal(first.body.manaProfile.skills[0].preEvolutionCost, 280);
   assert.doesNotMatch(JSON.stringify(first.body), /test-token/);
