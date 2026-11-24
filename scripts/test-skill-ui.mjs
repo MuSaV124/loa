@@ -1001,8 +1001,14 @@ async function verifyBrowserRouting({ mobile = false } = {}) {
     assert.deepEqual([...requests], [[routingCharacterA, 1]]);
 
     if (mobile) {
+      const cycle = page.locator('#combatSkillCycle .skillCyclePanel[open]');
+      assert.ok(await cycle.locator('.skillCycleRow').count() > 1);
+      const tableDimensions = await cycle.locator('.simulatorFoldBody').evaluate(element => ({
+        width: element.clientWidth, scrollWidth: element.scrollWidth
+      }));
+      assert.ok(tableDimensions.scrollWidth > tableDimensions.width, '스킬 표는 모바일에서 패널 안에서 스크롤되어야 합니다.');
       const width = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
-      assert.ok(width[0] <= width[1] + 1);
+      assert.ok(width[0] <= width[1] + 1, `전투 분석 페이지가 화면을 넘침: ${width[0]} > ${width[1]}`);
       return;
     }
     await page.goBack();

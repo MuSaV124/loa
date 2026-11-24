@@ -31,6 +31,7 @@ body { margin: 0; background: radial-gradient(circle at top, #1e293b 0, var(--bg
 .hidden { display: none; }
 .hiddenByRoute { display: none !important; }
 .routeNotice, #characterNav, #combatPanel { grid-column: 1 / -1; }
+#combatPanel { min-width: 0; }
 .characterNav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .characterNav.hidden { display: none; }
 .characterNav a { padding: 8px 10px; border-radius: 8px; color: var(--muted); font-weight: 800; }
