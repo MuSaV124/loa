@@ -183,9 +183,14 @@ export function parseSkillManaUsage(tooltip) {
   return { usesMana: distinctCosts.length === 1, manaCost: distinctCosts.length === 1 ? distinctCosts[0] : 0, manaUsageKnown };
 }
 
-export function parseSkillAttackDirection(skill) {
+function partialAttackPrefix(text, offset) {
+  const prefix = text.slice(0, offset).split(/(?<=[.!?])\s+/).at(-1)?.trim() || '';
+  return /(?:마지막|첫\s*번째|첫|추가|후속|연속|폭발|도트|화상|출혈)\s*(?:타격|공격|피해|효과)?[가-힣\s]{0,12}$/.test(prefix) ? prefix : '';
+}
+
+export function parseSkillAttackProfile(skill) {
   const tooltip = typeof skill?.Tooltip === 'string' ? parseJsonString(skill.Tooltip) : skill?.Tooltip;
-  if (!tooltip || typeof tooltip !== 'object') return null;
+  if (!tooltip || typeof tooltip !== 'object') return { attackDirection: null, attackDirections: [], forcedAttackDirection: null };
   const current = [];
   for (const [key, box] of Object.entries(tooltip)) {
     if (box?.type === 'BlinkLineStart') break;
@@ -196,28 +201,70 @@ export function parseSkillAttackDirection(skill) {
   const directions = new Set(labels.flatMap(text => [...text.matchAll(/(?:공격\s*타입\s*:\s*|[,/]\s*)(백|헤드)\s*어택/g)].map(match => match[1])));
   const descriptionKnown = current.some(box => box === tooltip.Element_005 || (box.type === 'SingleTextBox' && /피해|타격/.test(decodeEntities(box.value))));
   const explicitNone = labels.length && labels.every(text => /공격\s*타입\s*:\s*(?:없음|비방향성)/.test(text));
-  let direction = directions.size === 1 ? [...directions][0]
-    : explicitNone || (!labels.length && descriptionKnown) ? false : null;
-  const changes = new Set((skill?.Tripods || []).filter(tripod => tripod.IsSelected === true)
-    .flatMap(tripod => collectSkillTooltipTexts(tripod.Tooltip))
-    .flatMap(text => {
-      if (/(?:백|헤드)\s*어택(?:\s*공격)?(?:이|을|은)?\s*(?:더\s*이상\s*)?(?:적용되지\s*않|적용하지\s*않|제거)/.test(text)) return [false];
-      const added = text.match(/(백|헤드)\s*어택(?:\s*공격|\s*판정)?(?:이|으로)?\s*(?:추가된다|변경된다|적용된다)/);
-      return added ? [added[1]] : [];
-    }));
-  if (changes.size) direction = changes.size === 1 ? [...changes][0] : null;
-  return direction;
+  let known = directions.size > 0 || explicitNone || (!labels.length && descriptionKnown);
+  const removals = new Set();
+  const replacements = new Set();
+  const additions = new Set();
+  const forced = new Set();
+  const partialRules = new Set();
+  const register = (text, pattern, target) => {
+    for (const match of text.matchAll(pattern)) {
+      const prefix = partialAttackPrefix(text, match.index);
+      if (prefix) partialRules.add(prefix + ' ' + match[0]);
+      else target.add(match[1]);
+    }
+  };
+  for (const tripod of skill?.Tripods || []) {
+    if (tripod.IsSelected !== true) continue;
+    for (const text of collectSkillTooltipTexts(tripod.Tooltip)) {
+      register(text, /(백|헤드)\s*어택(?:\s*(?:공격|효과|판정))?\s*(?:이|을|은|는)?\s*(?:더\s*이상\s*)?(?:적용되지\s*않|적용하지\s*않|제거)/g, removals);
+      register(text, /(백|헤드)\s*어택(?:\s*(?:공격|판정))?\s*으로\s*변경된다/g, replacements);
+      register(text, /(백|헤드)\s*어택(?:\s*(?:공격|판정))?\s*(?:이|가)?\s*(?:추가된다|적용된다)/g, additions);
+      register(text, /공격\s*방향(?:에|과)\s*상관없이\s*항상\s*(백|헤드)\s*어택(?:이|으로)\s*(?:발생|적중)/g, forced);
+    }
+  }
+  if (replacements.size === 1) {
+    directions.clear();
+    directions.add([...replacements][0]);
+    known = true;
+  }
+  if (forced.size === 1) {
+    directions.clear();
+    directions.add([...forced][0]);
+    known = true;
+  }
+  for (const direction of additions) directions.add(direction);
+  for (const direction of removals) directions.delete(direction);
+  const conflicting = replacements.size > 1 || forced.size > 1
+    || [...additions, ...replacements, ...forced].some(direction => removals.has(direction));
+  const unresolved = conflicting || partialRules.size > 0;
+  const tags = unresolved ? [] : [...directions];
+  const forcedDirection = forced.size === 1 && tags.length === 1 && forced.has(tags[0]) ? tags[0] : null;
+  return {
+    attackDirection: tags.length === 1 ? tags[0] : !tags.length && known && !unresolved ? false : null,
+    attackDirections: tags,
+    forcedAttackDirection: forcedDirection,
+    ...(partialRules.size ? { partialAttackDirectionRules: [...partialRules] } : {})
+  };
+}
+
+export function parseSkillAttackDirection(skill) {
+  return parseSkillAttackProfile(skill).attackDirection;
 }
 
 const DIRECTIONAL_TRIPOD_CLAUSE = /(?:공격이\s*)?(헤드|백)\s*어택(?:으로)?\s*(?:적중|성공|공격)\s*시,?\s*(?:적에게\s*주는\s*)?피해(?:량)?(?:이|가)?\s*(?:추가로\s*)?(\d+(?:\.\d+)?)\s*%\s*(?:추가로\s*)?증가(?:한다|합니다)?/g;
 
 export function splitDirectionalHitDamage(text, name) {
   const rules = [];
-  const remaining = String(text || '').replace(DIRECTIONAL_TRIPOD_CLAUSE, (_, side, damage) => {
-    rules.push({ name, direction: side === '헤드' ? DIRECTION.HEAD : DIRECTION.BACK, damage: Number(damage) });
+  const unverified = [];
+  const remaining = String(text || '').replace(DIRECTIONAL_TRIPOD_CLAUSE, (match, side, damage, offset, source) => {
+    const prefix = partialAttackPrefix(source, offset);
+    if (prefix) {
+      unverified.push(prefix + ' ' + match);
+    } else rules.push({ name, direction: side === '헤드' ? DIRECTION.HEAD : DIRECTION.BACK, damage: Number(damage) });
     return '';
   });
-  return { rules, remaining };
+  return { rules, remaining, unverified };
 }
 
 function signedValue(rawValue, direction) {
@@ -431,9 +478,11 @@ function parseSelectedTripod(tripod) {
   const joinedText = texts.join(' ');
   const effects = emptyEffects();
   const directional = new Map();
+  const unverifiedDirectional = new Set();
   for (const text of texts) {
-    const { rules, remaining } = splitDirectionalHitDamage(text, String(tripod?.Name || '').trim());
+    const { rules, remaining, unverified } = splitDirectionalHitDamage(text, String(tripod?.Name || '').trim());
     for (const rule of rules) directional.set(rule.direction, rule);
+    for (const clause of unverified) unverifiedDirectional.add(clause);
     mergeStrongestEffects(effects, parseOwnSkillEffectText(remaining));
   }
   // A tripod's "적에게 주는 피해" applies to that skill, not the character-wide
@@ -452,6 +501,7 @@ function parseSelectedTripod(tripod) {
     icon: String(tripod?.Icon || '').trim(),
     effects,
     ...(directional.size ? { directionalDamage: [...directional.values()] } : {}),
+    ...(unverifiedDirectional.size ? { unverifiedDirectionalDamage: [...unverifiedDirectional] } : {}),
     timedSpeedBuff: hasTimedSpeedWording(joinedText) && Boolean(effects.attackSpeed || effects.moveSpeed),
     conditional: hasConditionalWording(joinedText),
     guaranteedCrit: Boolean(effects.forcedCrit),
@@ -519,7 +569,7 @@ export function extractCombatSkillEffects(skills) {
       skillTypeKnown: skill?.SkillType != null && Number.isFinite(Number(skill.SkillType)),
       cooldownEligible: Number(skill?.SkillType || 0) === SKILL_TYPE.regular,
       ...manaUsage,
-      attackDirection: parseSkillAttackDirection(skill),
+      ...parseSkillAttackProfile(skill),
       category: skillCategory(skill),
       baseCooldownSeconds: baseCooldownSeconds(skill),
       cooldown,

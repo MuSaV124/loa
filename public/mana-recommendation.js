@@ -361,6 +361,7 @@ export function evaluateManaCandidate(scenario, stats, damage) {
   if (damage.manaDamageUnverified) return missing('일부 스킬의 마나 사용 여부 또는 기본 소모량 미확인');
   if (damage.arcanaCardExpectation) return missing('아르카나 카드 수급과 자원 회복의 연동 미검증');
   const rows = damage.skillExperiment?.items?.filter(row => row.share > 0) || [];
+  if (rows.some(row => row.attack?.source === 'SUPER_AWAKENING')) return missing('초각성기 게이지 및 관문당 사용 횟수 미검증');
   if (!rows.length || Math.abs(rows.reduce((sum, row) => sum + row.share, 0) - 1) > 1e-6) {
     return missing('전체 피해 지분을 스킬별로 연결하지 못함');
   }
@@ -369,6 +370,8 @@ export function evaluateManaCandidate(scenario, stats, damage) {
     damage.critHitStackingUnverified && '회심 범위 A/B 가정',
     rows.some(row => row.critInteractionUnverified) && '확정 치명과 뭉가 중첩 시 뭉가 규칙으로 추정',
     rows.some(row => row.partialCritRuleUnmodeled) && '별도 치명 규칙이 있는 일부 타격 효과 미반영',
+    rows.some(row => row.partialDirectionRuleUnmodeled) && '일부 타격의 방향 조건부 피해 미반영',
+    damage.shareIssues?.length && '중복 또는 유효하지 않은 피해 지분 행 제외',
     rows.some(row => row.directionalCritUnverified) && '방향 미확인 스킬의 일격 치피 미반영',
     rows.some(row => row.braceletDirectionUnverified) && '방향 미확인 스킬의 팔찌 방향성 주피 미반영'
   ].filter(Boolean);

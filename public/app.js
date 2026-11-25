@@ -1,14 +1,14 @@
 import { calculateSonicBreakEvolutionDamage, evolutionAllocations, EVOLUTION_TIER_LIMITS, shiftClickTargetLevel, maintainedEvolutionDamage } from './evolution-math.js?v=6.1.5';
-import { BASE_CRIT_DAMAGE, CRIT_RATE_PER_STAT, NOVEMBER_2026_PATCH_URL, expectedHitDamage, multiplyPercentSources } from './damage-math.js?v=6.1.3';
+import { BASE_CRIT_DAMAGE, CRIT_RATE_PER_STAT, NOVEMBER_2026_PATCH_URL, expectedHitDamage, multiplyPercentSources } from './damage-math.js?v=6.1.10';
 import { emptyCardEffects } from './card-effects.js?v=6.1.1';
 import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=6.1.1';
 import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=6.1.1';
-import { emptySkillEffectState, extractCombatSkillEffects, formatSkillEffectSummary, parseSkillAttackDirection, parseSkillEffectText, parseSkillManaUsage, skillExperimentItems, withoutCritHitDamageClauses } from './skill-effects.js?v=6.1.9';
-import { DIRECTION, attackHitModifiers, classifyAttackStyle, describeAttack, directionRate, engravingAllowedForBuild, engravingScope, isDirectional, isScopedEngraving, mixAttackOutcomes, scopedEngraving, specialAttackRecords } from './combat-attacks.js';
-import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=6.1.9';
+import { emptySkillEffectState, extractCombatSkillEffects, formatSkillEffectSummary, parseSkillAttackProfile, parseSkillEffectText, parseSkillManaUsage, skillExperimentItems, withoutCritHitDamageClauses } from './skill-effects.js?v=6.1.10';
+import { ATTACK_SOURCE, DIRECTION, attackDirections, attackHitModifiers, attackOutcomes, buildAttackUnits, classifyAttackStyle, directionRate, engravingAllowedForBuild, engravingScope, isScopedEngraving, normalizedAttackName as normalizedSkillName, scopedEngraving } from './combat-attacks.js?v=6.1.10';
+import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=6.1.10';
 import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=6.1.1';
 import { combatAnalyzerGemFactors, combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=6.1.2';
-import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency, normalizeSkillCycleName } from './skill-cycle.js?v=6.1.1';
+import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency, normalizeSkillCycleName } from './skill-cycle.js?v=6.1.10';
 import { buildSupportSkillCycle, isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=6.1.5';
 import { ADRENALINE_ENGRAVING_NAME, KEEN_BLUNT_NAME, KEEN_BLUNT_DAMAGE_FACTOR, RELIC_ENGRAVING_RULES, addEngravingEffects, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=6.1.1';
 import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=6.1.1';
@@ -19,7 +19,7 @@ import { normalHoningAttemptDistribution, normalHoningAttemptRatePercent } from 
 import { calculateHoningMaterialCost, goldEfficiency } from './honing-cost.js';
 import { materialPurchaser, materialQuote } from './material-quotes.js';
 import { marketFreshness, preservesPricedItems } from './market-freshness.js';
-import { MANA_RECOMMENDATION_SECONDS, createManaRanking, evaluateManaCandidate, manaFurnaceDamage, minimumSustainableMana, prepareManaScenario } from './mana-recommendation.js?v=6.1.7';
+import { MANA_RECOMMENDATION_SECONDS, createManaRanking, evaluateManaCandidate, manaFurnaceDamage, minimumSustainableMana, prepareManaScenario } from './mana-recommendation.js?v=6.1.10';
 import { AUTO_MANA_RECOVERY_SOURCE, buildAutomaticManaAnalysis } from './mana-automatic.js?v=6.1.7';
 import { buildCharacterManaProfile, findVerifiedManaProfile, MANA_PROFILE_PATCH, withManaCooldowns } from './mana-character.js?v=6.1.8';
 import { resolveManaEnvironment, SUPPORT_MANA, SUPPORT_MANA_VERIFIED_AT, supportManaSummary } from './support-mana.js?v=6.1.7';
@@ -36,7 +36,7 @@ import {
   remainingCooldownMs
 } from './cache-policy.js?v=6.1.1';
 
-const VERSION = '6.1.9';
+const VERSION = '6.1.10';
 const PARTY_EVOLUTION_NODES = new Set(['정열의 춤사위', '선각자', '진군', '기원', '입식 타격가', '마나 용광로', '안정된 관리자']);
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function isNoManaMainSkillEnabled() { return Boolean(document.getElementById('noManaMainSkill')?.checked); }
@@ -4069,7 +4069,7 @@ function scoreCore(stats, cooldownContext = null, model = null) {
   }
   const cooldownRatio = cooldownEvaluation.affectedSharePercent / 100;
   const ratios = cooldownEvaluation.ratiosByShareName;
-  const cooldownMultiplier = cooldownContext?.shareName && ratios
+  const cooldownMultiplier = stats.attackSource === ATTACK_SOURCE.SUPER_AWAKENING ? 1 : cooldownContext?.shareName && ratios
     ? ratios.get(normalizeSkillCycleName(cooldownContext.shareName)) ?? 1
     : cooldownEvaluation.multiplier;
   const value = hit.value * cooldownMultiplier;
@@ -4198,20 +4198,6 @@ function applyExperimentalSkillEffects(stats, item) {
   return out;
 }
 
-function normalizedSkillName(value) {
-  return String(value || '').replace(/\s+/g, '').replace(/[·:]/g, '').trim().toLowerCase();
-}
-
-function matchedSkillItem(name, targetNames = []) {
-  const candidates = [name, ...targetNames].map(normalizedSkillName).filter(Boolean);
-  const items = state.skillEffects?.items || [];
-  for (const candidate of candidates) {
-    const exact = items.find(item => normalizedSkillName(item?.name) === candidate);
-    if (exact) return exact;
-  }
-  return null;
-}
-
 function characterScopedEngravings(simulation) {
   const books = state.engraving?.items || [];
   const rules = [];
@@ -4252,48 +4238,28 @@ function characterScopedEngravings(simulation) {
 }
 
 function currentAttackStyle(units = weightedSkillUnits()) {
-  return classifyAttackStyle(units.map(unit => ({ ...unit.attack, weight: unit.weight })),
+  return classifyAttackStyle(units.filter(unit => unit.basis === 'PRESET').map(unit => ({ ...unit.attack, weight: unit.weight })),
     (state.rawEngravings || []).map(item => item.Name), Boolean(state.rawEngravings?.length));
 }
 
 function weightedSkillUnits() {
-  const profile = state.powerSnapshot?.profile || {};
-  const className = profile.className || '';
-  const build = profile.secondClass || '';
-  const specialAttacks = specialAttackRecords(className, build);
-  const addAttack = unit => ({ ...unit, attack: describeAttack({ ...unit, className, build }) });
-  const shareRows = state.skillCycle?.shareRows || [];
-  if (shareRows.length) {
-    const explicitPassiveTargets = [...new Set([...(state.passiveSkillEffects?.rules || []), ...(state.arkGridSkillEffects?.rules || [])]
-      .filter(rule => rule.scope === 'skill')
-      .flatMap(rule => rule.targets || [])
-      .filter(Boolean))];
-    const units = shareRows.map(row => {
-      const group = specialAttacks.find(attack => attack.name === row.name);
-      const names = row?.targetNames || [];
-      const item = matchedSkillItem(row.name) || (!group && names.length === 1 ? matchedSkillItem(names[0]) : null);
-      const name = item?.name || row.name || '이름 없는 스킬';
-      return addAttack({ name, shareName: row.name, targetNames: [name], category: item?.category || '', item,
-        weight: Number(row?.normalizedShare || 0) });
-    }).filter(row => row.weight > 0);
-    for (const target of [...new Set([...explicitPassiveTargets, ...specialAttacks.flatMap(attack => attack.componentNames || [])])]) {
-      if (units.some(unit => normalizedSkillName(unit.name) === normalizedSkillName(target))) continue;
-      const item = matchedSkillItem(target);
-      units.push(addAttack({ name: item?.name || target, shareName: target, targetNames: [target], category: item?.category || '', item, weight: 0 }));
-    }
-    return units;
-  }
+  return characterAttackShares().units;
+}
 
-  const items = skillExperimentItems(state.skillEffects);
-  const weight = items.length ? 1 / items.length : 0;
-  return items.map(item => addAttack({
-    name: item.name || '이름 없는 스킬',
-    shareName: item.name || '',
-    targetNames: [item.name].filter(Boolean),
-    category: item.category || '',
-    item,
-    weight
-  }));
+function characterAttackShares() {
+  const profile = state.powerSnapshot?.profile || {};
+  const shareRows = state.skillCycle?.shareRows || [];
+  const extraTargets = shareRows.length
+    ? [...(state.passiveSkillEffects?.rules || []), ...(state.arkGridSkillEffects?.rules || [])]
+      .filter(rule => rule.scope === 'skill').flatMap(rule => rule.targets || [])
+    : [];
+  const model = buildAttackUnits({
+    className: profile.className || '', build: profile.secondClass || '',
+    items: state.skillEffects?.items || [], fallbackItems: skillExperimentItems(state.skillEffects),
+    shareRows, extraTargets, shareBasis: isSupportPowerSnapshot(state.powerSnapshot) ? 'ESTIMATED_EQUAL'
+      : state.skillCycle?.shareSource === 'combat-analyzer' ? 'PRESET' : 'ESTIMATED_TREE'
+  });
+  return { ...model, issues: [...(state.skillCycle?.shareIssues || []), ...model.issues] };
 }
 
 function scoreCooldownInputs() {
@@ -4312,51 +4278,73 @@ function prepareSkillScoring() {
   const classHitRules = [...(state.passiveSkillEffects?.rules || []), ...(state.arkGridSkillEffects?.rules || [])]
     .filter(rule => rule.scope === 'direction-hit' && !rule.activationUnknown)
     .map(rule => ({ name: rule.nodeName, direction: rule.selector, damage: num(rule.effects?.enemyDamage) }));
-  const units = weightedSkillUnits().map(unit => {
+  const shares = characterAttackShares();
+  const theoryDirections = [
+    $('headAttackEnabled')?.checked && DIRECTION.HEAD,
+    $('backAttackEnabled')?.checked && DIRECTION.BACK
+  ].filter(Boolean);
+  const units = shares.units.map(unit => {
     const passive = passiveEffectsForSkill(state.passiveSkillEffects, unit);
     const arkGrid = passiveEffectsForSkill(state.arkGridSkillEffects, unit);
+    const superAwakening = unit.attack.source === ATTACK_SOURCE.SUPER_AWAKENING;
+    const rules = [...passive.rules, ...arkGrid.rules];
+    const superEffects = superAwakening ? mergeSkillEffects(...rules
+      .filter(rule => rule.scope === 'skill' || (rule.scope === 'category' && rule.selector === '초각성기'))
+      .map(rule => rule.effects)) : null;
     const streamApplies = Boolean(arcanaStream) && normalizedSkillName(unit.name) !== normalizedSkillName(arcanaStream.skillName);
     const arcanaEffects = streamApplies ? { critRate: arcanaStream.critRate } : {};
     return {
       ...unit,
-      effects: mergeSkillEffects(unit.item?.effects || {}, passive.effects, arkGrid.effects, arcanaEffects),
-      passiveRules: [...passive.rules, ...arkGrid.rules],
+      effects: superAwakening ? { skillDamage: num(superEffects.skillDamage) }
+        : mergeSkillEffects(unit.item?.effects || {}, passive.effects, arkGrid.effects, arcanaEffects),
+      passiveRules: rules,
       arcanaRules: streamApplies ? [{ category: '스킬 자버프', nodeName: `${arcanaStream.sourceSkill} · ${arcanaStream.sourceTripod}`, effects: arcanaEffects }] : [],
-      hitConditions: classHitRules.filter(rule => rule.direction === unit.attack.direction)
+      hitConditions: classHitRules.filter(rule => unit.attack.directions.includes(rule.direction))
         .concat(unit.item?.selectedTripods?.flatMap(tripod => tripod.directionalDamage || []) || []),
-      theoryLanded: unit.attack.direction === DIRECTION.BACK ? $('backAttackEnabled').checked
-        : unit.attack.direction === DIRECTION.HEAD && Boolean($('headAttackEnabled')?.checked),
+      theoryDirections: theoryDirections.filter(direction => unit.attack.directions.includes(direction)),
       emperorNormalSkill: arcanaModel?.key === 'emperor' && normalizedSkillName(unit.category) === normalizedSkillName('일반 스킬'),
       manualNonMana: noManaMain && unit.item?.manaUsageKnown !== true
     };
   });
-  return { units, noManaMain, cooldownExcluded: isCooldownExcluded(), cooldownCache: new Map(), ...scoreCooldownInputs() };
+  return { units, shareIssues: shares.issues, noManaMain, cooldownExcluded: isCooldownExcluded(), cooldownCache: new Map(), ...scoreCooldownInputs() };
 }
 
 function readAttackRates(units, supportMode) {
   const container = $('directionRateInputs');
   const panel = $('directionRatePanel');
   if (!container || !panel) return null;
-  const attacks = units.filter(unit => unit.weight > 0 && isDirectional(unit.attack.direction));
+  const attacks = units.filter(unit => unit.weight > 0 && !unit.attack.forcedDirection)
+    .flatMap(({ attack }) => attack.directions.map(direction => ({ attack, direction })));
   panel.classList.toggle('hidden', supportMode || !attacks.length);
   if (supportMode || !attacks.length) return null;
-  const previous = new Map([...container.querySelectorAll('input')].map(input => [input.dataset.attackId, input.value]));
-  container.replaceChildren(...attacks.map(({ attack }) => {
+  const key = (id, direction) => id + '/' + direction;
+  const previous = new Map([...container.querySelectorAll('input')].map(input => [key(input.dataset.attackId, input.dataset.direction), input.value]));
+  container.replaceChildren(...attacks.map(({ attack, direction }) => {
     const label = document.createElement('label');
-    label.textContent = attack.name + (attack.direction === DIRECTION.HEAD ? ' 헤드 (%)' : ' 백 (%)');
+    label.textContent = attack.name + (direction === DIRECTION.HEAD ? ' 헤드 (%)' : ' 백 (%)');
     const input = document.createElement('input');
     input.type = 'number';
     input.min = 0;
     input.max = 100;
     input.step = 'any';
     input.dataset.attackId = attack.id;
-    input.value = previous.get(attack.id) ?? '';
+    input.dataset.direction = direction;
+    input.value = previous.get(key(attack.id, direction)) ?? '';
     label.append(input);
     return label;
   }));
   const inputs = [...container.querySelectorAll('input')];
-  if (inputs.some(input => directionRate(input.value) == null)) return null;
-  return new Map(inputs.map(input => [input.dataset.attackId, directionRate(input.value)]));
+  const rates = new Map();
+  const invalid = inputs.some(input => directionRate(input.value) == null);
+  if (!invalid) for (const input of inputs) {
+    const id = input.dataset.attackId;
+    const rows = rates.get(id) || [];
+    rows.push({ direction: input.dataset.direction, rate: directionRate(input.value) });
+    rates.set(id, rows);
+  }
+  const excess = [...rates.values()].some(rows => rows.reduce((sum, row) => sum + row.rate, 0) > 1 + 1e-9);
+  $('directionRateStatus').textContent = excess ? '같은 공격의 헤드·백 적중률 합은 100% 이하여야 합니다.' : '';
+  return invalid || excess ? null : rates;
 }
 
 function score(stats, model = prepareSkillScoring(), hitRates = null) {
@@ -4379,9 +4367,14 @@ function score(stats, model = prepareSkillScoring(), hitRates = null) {
   const rows = units.map(unit => {
     const { emperorNormalSkill, manualNonMana, passiveRules, arcanaRules } = unit;
     const direction = unit.attack?.direction;
-    const effects = stats.directionalCritDamage && isDirectional(direction)
+    const directions = attackDirections(unit.attack);
+    const superAwakening = unit.attack?.source === ATTACK_SOURCE.SUPER_AWAKENING;
+    const effects = !superAwakening && stats.directionalCritDamage && directions.length
       ? mergeSkillEffects(unit.effects, { critDamage: stats.directionalCritDamage }) : unit.effects;
-    const skillStats = applyExperimentalSkillEffects(stats, {
+    const skillStats = superAwakening ? {
+      attackSource: ATTACK_SOURCE.SUPER_AWAKENING, superAwakeningDamage: num(effects.skillDamage),
+      critDamage: BASE_CRIT_DAMAGE, enemyDamageSources: [], manaFurnaceDamage: 0, appliedManaSkillEvolutionDamage: 0
+    } : applyExperimentalSkillEffects(stats, {
       name: unit.name, effects, usesMana: unit.item?.usesMana === true,
       manaCost: unit.item?.manaCost, manaUsageKnown: manualNonMana || unit.item?.manaUsageKnown === true,
       attackDirection: direction === DIRECTION.BACK ? '백' : direction === DIRECTION.HEAD ? '헤드'
@@ -4389,7 +4382,6 @@ function score(stats, model = prepareSkillScoring(), hitRates = null) {
     });
     if (unit.attack?.criticalEligible === false) skillStats.canCrit = false;
     const cooldownContext = { evaluation: baseResult.cooldownEvaluation, shareName: unit.shareName };
-    const rate = hitRates ? hitRates.get(unit.attack?.id) ?? 0 : unit.theoryLanded ? 1 : 0;
     const hitScore = landed => {
       const modifiers = attackHitModifiers(unit.attack || {}, landed, stats.scopedEngravings || [], unit.hitConditions || [], stats.backCardDamage);
       const adjusted = modifiers.critRate || modifiers.enemyDamageSources.length ? {
@@ -4397,24 +4389,25 @@ function score(stats, model = prepareSkillScoring(), hitRates = null) {
         enemyDamageSources: [...skillStats.enemyDamageSources, ...modifiers.enemyDamageSources]
       } : skillStats;
       const normal = scoreCore(adjusted, cooldownContext, model);
-      return { result: scoreCoreWithArcanaExpectation(adjusted, { emperorNormalSkill, cooldownContext, normal }), normal };
+      return { result: superAwakening ? normal : scoreCoreWithArcanaExpectation(adjusted, { emperorNormalSkill, cooldownContext, normal }), normal };
     };
-    const mainOutcome = hitScore(rate === 1);
-    const hitOutcome = rate > 0 && rate < 1 ? hitScore(true) : mainOutcome;
-    const result = mixAttackOutcomes(mainOutcome.result, hitOutcome.result, rate);
-    const resultWithoutArcana = mixAttackOutcomes(mainOutcome.normal, hitOutcome.normal, rate);
+    const { result, normal: resultWithoutArcana } = attackOutcomes(unit.attack, unit.theoryDirections,
+      hitRates ? hitRates.get(unit.attack?.id) || [] : null, hitScore);
     return {
       name: unit.name,
       shareName: unit.shareName,
       level: Number(unit.item?.level || 0),
       share: unit.weight,
+      shareBasis: unit.basis,
       attack: unit.attack,
       conditional: isConditionalSkill(unit.item) || passiveRules.some(rule => rule.scope === 'state') || arcanaRules.length > 0 || emperorNormalSkill,
       guaranteedCrit: Boolean(effects.forcedCrit) || isGuaranteedCritSkill(unit.item),
       partialCritRuleUnmodeled: unit.item?.selectedTripods?.some(tripod => tripod.partialCritRuleUnmodeled),
       critInteractionUnverified: Boolean(effects.forcedCrit && stats.critCap != null),
-      directionalCritUnverified: Boolean(stats.directionalCritDamage && !isDirectional(direction) && direction !== DIRECTION.NON_DIRECTIONAL),
-      braceletDirectionUnverified: Boolean(stats.braceletDirectionalDamage?.length && !isDirectional(direction) && direction !== DIRECTION.NON_DIRECTIONAL),
+      partialDirectionRuleUnmodeled: Boolean(unit.item?.partialAttackDirectionRules?.length
+        || unit.item?.selectedTripods?.some(tripod => tripod.unverifiedDirectionalDamage?.length)),
+      directionalCritUnverified: Boolean(!superAwakening && stats.directionalCritDamage && !directions.length && direction !== DIRECTION.NON_DIRECTIONAL),
+      braceletDirectionUnverified: Boolean(!superAwakening && stats.braceletDirectionalDamage?.length && direction === DIRECTION.UNKNOWN),
       engravingUnverified: (stats.scopedEngravings || []).some(engraving => engravingScope(unit.attack || {}, engraving) == null),
       critHitStackingUnverified: result.critHitStackingUnverified,
       manaDamageUnverified: skillStats.manaDamageUnverified,
@@ -4929,6 +4922,13 @@ function candidateReason(candidate, usesMana) {
   return '스킬별 피해 지분으로 가중한 기대 피해 배율입니다.';
 }
 
+function attackDirectionLabel(attack) {
+  const labels = { [DIRECTION.HEAD]: '헤드', [DIRECTION.BACK]: '백' };
+  const tags = attackDirections(attack);
+  if (tags.length) return tags.map(tag => labels[tag]).join('·') + (attack.forcedDirection ? ' 확정' : '');
+  return attack?.direction === DIRECTION.NON_DIRECTIONAL ? '비방향성' : '방향 미확인';
+}
+
 function candidateDetailsHtml(candidate, analysis) {
   const { entries, calc, mana, supportModel } = candidate;
   const { stats, result } = calc;
@@ -4938,15 +4938,20 @@ function candidateDetailsHtml(candidate, analysis) {
     return `<li><b>${tier}T ${escapeHtml(name)} Lv.${level}</b> · ${escapeHtml(effect)}</li>`;
   }).join('');
   const skills = (result.skillExperiment?.items || []).filter(row => row.share > 0).map(row =>
-    `<li><b>${escapeHtml(row.name)}</b> · ${row.attack?.direction === DIRECTION.HEAD ? '헤드' : row.attack?.direction === DIRECTION.BACK ? '백' : row.attack?.direction === DIRECTION.NON_DIRECTIONAL ? '비방향성' : '방향 미확인'} · 지분 ${fmt(row.share * 100)}% · 기대 배율 ${row.value.toFixed(4)} · 치적 ${fmt(row.rawCritRate)}% (적용 ${fmt(row.effectiveCritRate)}%) · 치피 ${fmt(row.critDamage)}% · ${criticalOutcomeLabel(row.critical)} · 진피 ${fmt(row.evolutionDamage)}% · 적주피 ${fmt(row.enemyDamage)}% · 추피 ${fmt(row.additionalDamage)}%</li>`
+    `<li><b>${escapeHtml(row.name)}</b> · ${attackDirectionLabel(row.attack)} · 지분 ${fmt(row.share * 100)}% · 기대 배율 ${row.value.toFixed(4)} · 치적 ${fmt(row.rawCritRate)}% (적용 ${fmt(row.effectiveCritRate)}%) · 치피 ${fmt(row.critDamage)}% · ${criticalOutcomeLabel(row.critical)} · 진피 ${fmt(row.evolutionDamage)}% · 적주피 ${fmt(row.enemyDamage)}% · 추피 ${fmt(row.additionalDamage)}%</li>`
   ).join('');
   const has = name => entries.some(entry => entry.name === name);
   const assumptions = [
-    !supportModel && (state.skillCycle?.shareRows?.length ? '전투분석 프리셋 기반 피해 지분' : '장착 스킬 균등 지분 가정'),
+    !supportModel && (result.skillExperiment?.items?.some(row => row.shareBasis === 'PRESET') ? '전투분석 프리셋 기반 피해 지분'
+      : result.skillExperiment?.items?.some(row => row.shareBasis === 'ESTIMATED_TREE') ? '장착 스킬 운용 모형으로 추정한 피해 지분'
+        : result.skillExperiment?.items?.some(row => row.shareBasis === 'ESTIMATED_EQUAL') && '장착 스킬 균등 지분 가정'),
+    result.shareIssues?.length && '중복 또는 유효하지 않은 피해 지분 행 제외',
     candidate.directionAssumption,
     stats.unresolvedEngravings?.length && ('조건부 각인 수치 미확인 · ' + stats.unresolvedEngravings.join(', ')),
     result.skillExperiment?.items?.some(row => row.share > 0 && row.engravingUnverified) && '일부 공격의 각인 적용 대상 미확인',
-    result.skillExperiment?.items?.some(row => row.attack?.parent) && '아이덴티티 개별 타격의 피해 지분·방향 판정 미확인',
+    result.skillExperiment?.items?.some(row => row.attack?.parent && !row.share) && '아이덴티티 개별 타격의 피해 지분 미확인',
+    result.skillExperiment?.items?.some(row => row.share > 0 && row.partialDirectionRuleUnmodeled) && '일부 타격의 방향 조건부 피해 미반영',
+    result.skillExperiment?.items?.some(row => row.share > 0 && row.attack?.source === ATTACK_SOURCE.SUPER_AWAKENING) && '초각성기 전용 배율을 사용하며 절대 피해 기준값은 미확인',
     has('입식 타격가') && '입식 타격 6중첩 유지',
     has('인파이팅') && '정면 승부 가동률 100%',
     has('달인') && '달인 5중첩 유지',
@@ -5264,7 +5269,8 @@ async function calculateAndRender() {
   const rates = readAttackRates(skillModel.units, supportMode);
   const directionAssumption = [
     $('headAttackEnabled')?.checked && '헤드 적중률 100% 가정',
-    $('backAttackEnabled')?.checked && '백 적중률 100% 가정'
+    $('backAttackEnabled')?.checked && '백 적중률 100% 가정',
+    $('headAttackEnabled')?.checked && $('backAttackEnabled')?.checked && '복수 방향 공격은 피해가 높은 한 방향만 적용'
   ].filter(Boolean).join(' · ') || '헤드·백 적중 추가 효과 미적용';
   if (!supportMode && recommendDescription) recommendDescription.textContent =
     '공격 성향 ' + style + ' · 이론 피해 비교에서 시전 횟수와 마나 지속성은 별도로 계산합니다.';
@@ -5272,7 +5278,7 @@ async function calculateAndRender() {
   const scores = new Map();
   const partyScores = new Map();
   function scoreCandidate(stats) {
-    return { ...score(stats, theoryModel), unverifiedClassEffects };
+    return { ...score(stats, theoryModel), unverifiedClassEffects, shareIssues: skillModel.shareIssues };
   }
   function supportCandidate(entries, stats) {
     const selection = Object.assign({}, fixedSelection,
@@ -5704,15 +5710,15 @@ function applyCharacterData(data, restore) {
   if (Array.isArray(data.skills) && data.skills.length) {
     const currentTripods = new Map(extractCombatSkillEffects(data.skills).items.map(item => [item.name, item]));
     const metadataBySkill = new Map(data.skills.map(skill => [String(skill.Name || '').trim(), {
-      ...parseSkillManaUsage(skill.Tooltip), attackDirection: parseSkillAttackDirection(skill)
+      ...parseSkillManaUsage(skill.Tooltip), ...parseSkillAttackProfile(skill)
     }]));
     // Older cached API responses still include the raw current-level skill tooltips.
     state.skillEffects = { ...state.skillEffects };
     for (const field of ['items', 'cycleItems', 'calculableItems']) {
       state.skillEffects[field] = (state.skillEffects[field] || []).map(item => {
         const parsed = currentTripods.get(item.name);
-        const hasDirectionalClause = parsed?.selectedTripods.some(tripod => tripod.directionalDamage?.length)
-          || item.selectedTripods?.some(tripod => tripod.directionalDamage?.length);
+        const scoped = tripod => tripod.directionalDamage?.length || tripod.unverifiedDirectionalDamage?.length;
+        const hasDirectionalClause = parsed?.selectedTripods.some(scoped) || item.selectedTripods?.some(scoped);
         return { ...item, ...metadataBySkill.get(item.name),
           ...(hasDirectionalClause && parsed ? { selectedTripods: parsed.selectedTripods, effects: parsed.effects } : {}) };
       });

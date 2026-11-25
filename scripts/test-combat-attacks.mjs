@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { ATTACK_SOURCE, ATTACK_STYLE, DIRECTION, attackHitModifiers, classifyAttackStyle, describeAttack, directionRate, engravingAllowedForBuild, engravingScope, isDirectional, mixAttackOutcomes, scopedEngraving } from '../public/combat-attacks.js';
+import { ATTACK_SOURCE, ATTACK_STYLE, DIRECTION, attackHitModifiers, attackOutcomes, buildAttackUnits, classifyAttackStyle, describeAttack, directionRate, engravingAllowedForBuild, engravingScope, isDirectional, mixAttackOutcomes, scopedEngraving } from '../public/combat-attacks.js';
 import { expectedHitDamage } from '../public/damage-math.js';
-import { extractCombatSkillEffects, parseSkillAttackDirection } from '../public/skill-effects.js';
+import { extractCombatSkillEffects, parseSkillAttackDirection, parseSkillAttackProfile } from '../public/skill-effects.js';
 import { extractArkGridSkillEffects, passiveEffectsForSkill } from '../public/passive-skill-effects.js';
 
 const { HEAD, BACK, NON_DIRECTIONAL, UNKNOWN } = DIRECTION;
@@ -50,12 +50,67 @@ const sura = name => describeAttack({ className: '브레이커', build: '수라�
 assert.equal(sura('수라결 기본 공격').source, IDENTITY);
 assert.equal(sura('수라결 기본 공격').direction, HEAD);
 assert.equal(sura('수라결 기본 공격의 연타 공격').parent, '수라결 기본 공격');
-assert.equal(sura('수라결 기본 공격의 마지막 타격').direction, UNKNOWN);
+assert.equal(sura('수라결 기본 공격의 연타 공격').direction, HEAD);
+assert.equal(sura('수라결 기본 공격의 마지막 타격').direction, HEAD);
 assert.equal(describeAttack({ name: '수라결 기본 공격', className: '브레이커', build: '권왕파천무' }).direction, UNKNOWN);
 assert.equal(describeAttack({ name: '루인 러쉬', item: { category: '악마 스킬', attackDirection: false } }).source, ATTACK_SOURCE.TRANSFORM);
 assert.equal(describeAttack({ name: '코멧 스트라이크', item: { category: '하이퍼 싱크 스킬', attackDirection: false } }).source, ATTACK_SOURCE.TRANSFORM);
 assert.equal(describeAttack({ className: '호크아이', name: '실버호크 스킬' }).source, ATTACK_SOURCE.SUMMON);
 assert.equal(describeAttack({ className: '블래스터', build: '포격 강화', name: '포격 스킬' }).direction, UNKNOWN);
+assert.equal(sura('화상').source, ATTACK_SOURCE.DOT);
+assert.equal(sura('화상').direction, UNKNOWN);
+
+const suraBuild = { className: '브레이커', build: '수라의 길' };
+const main = '수라결 기본 공격';
+const combo = '수라결 기본 공격의 연타 공격';
+const final = '수라결 기본 공격의 마지막 타격';
+const zeroWeightChildren = buildAttackUnits({ ...suraBuild, shareRows: [
+  { name: main, share: 71.35 }, { name: combo, share: 10 }, { name: final, share: 7 },
+  { name: '다른 스킬', share: 28.65 }, { name: ' 다른 스킬 ', share: 28.65 }, { name: '잘못된 행', share: -5 }
+] });
+near(zeroWeightChildren.units.reduce((sum, row) => sum + row.weight, 0), 1);
+near(zeroWeightChildren.units.find(row => row.name === main).weight, 0.7135);
+assert.deepEqual(zeroWeightChildren.units.filter(row => row.attack.parent).map(row => row.weight), [0, 0]);
+assert.equal(zeroWeightChildren.issues.filter(issue => issue.kind === 'COMPONENT_ALREADY_IN_AGGREGATE').length, 2);
+assert.ok(zeroWeightChildren.issues.some(issue => issue.kind === 'DUPLICATE_LABEL'));
+assert.ok(zeroWeightChildren.issues.some(issue => issue.kind === 'INVALID_SHARE_ROWS'));
+const exactWeightChildren = buildAttackUnits({ ...suraBuild, shareRows: [{ name: combo, share: 40 }, { name: final, share: 60 }] });
+assert.deepEqual(exactWeightChildren.units.filter(row => row.attack.parent).map(row => [row.weight, row.targetNames]), [[0.4, [combo, main]], [0.6, [final, main]]]);
+assert.equal(exactWeightChildren.units.find(row => row.name === main).weight, 0);
+
+const rawDual = { Name: '퍼펙트 스윙', SkillType: 0, Tooltip: { Element_005: { value: '공격 타입 : 헤드 어택, 백 어택' } } };
+const dualProfile = parseSkillAttackProfile(rawDual);
+assert.deepEqual(dualProfile.attackDirections, ['헤드', '백']);
+const dual = describeAttack({ name: rawDual.Name, item: { ...dualProfile, skillType: 0, skillTypeKnown: true } });
+assert.deepEqual(dual.directions, [HEAD, BACK]);
+assert.equal(dual.confidence, 'TOOLTIP');
+const byDirection = direction => {
+  const modifiers = attackHitModifiers(dual, direction, [], [], 0);
+  const result = expectedHitDamage({ critRate: 50 + modifiers.critRate, enemyDamageSources: modifiers.enemyDamageSources });
+  return { result, normal: result };
+};
+near(attackOutcomes(dual, [BACK, HEAD], null, byDirection).result.value, 1.8);
+near(attackOutcomes(dual, [], [{ direction: HEAD, rate: 0.25 }, { direction: BACK, rate: 0.5 }], byDirection).result.value, 1.665);
+const selected = Tooltip => ({ IsSelected: true, Tooltip });
+assert.deepEqual(parseSkillAttackProfile({ ...rawDual,
+  Tripods: [selected('더 이상 백어택 효과는 적용되지 않지만 스킬 피해가 증가한다.')]
+}).attackDirections, ['헤드']);
+assert.equal(parseSkillAttackDirection({ ...rawHead, Tripods: [selected('공격이 헤드 어택 으로 변경된다.')] }), '헤드');
+const forced = parseSkillAttackProfile({ ...rawHead, Tripods: [selected('공격 방향에 상관없이 항상 백 어택이 발생하고, 적에게 주는 피해가 60% 증가한다.')] });
+assert.equal(forced.forcedAttackDirection, '백');
+assert.equal(describeAttack({ name: '건너 찌르기', item: forced }).forcedDirection, BACK);
+assert.equal(attackHitModifiers(describeAttack({ name: '건너 찌르기', item: forced }), null, [], [], 0).critRate, 10);
+const partialChange = parseSkillAttackProfile({ ...rawHead,
+  Tripods: [selected('마지막 타격만 백 어택으로 변경된다.')] });
+assert.equal(partialChange.attackDirection, null);
+assert.deepEqual(partialChange.attackDirections, []);
+assert.equal(partialChange.partialAttackDirectionRules.length, 1);
+const partial = extractCombatSkillEffects([{ ...rawHead, Tripods: [{ Name: '개별 타격 표본',
+  ...selected('마지막 공격이 헤드어택으로 적중 시 적에게 주는 피해가 30.0% 증가한다.')
+}] }]).items[0];
+assert.equal(partial.effects.skillDamage, 0);
+assert.equal(partial.selectedTripods[0].directionalDamage, undefined);
+assert.equal(partial.selectedTripods[0].unverifiedDirectionalDamage.length, 1);
 
 const headBook = scopedEngraving('결투의 대가', 22.6, '적에게 주는 피해가 <FONT>7.60%</FONT> 증가하며, 헤드어택 성공 시 피해량이 추가로 <FONT>15.00%</FONT> 증가한다.');
 const backBook = scopedEngraving('기습의 대가', 22.6, '적에게 주는 피해가 7.60% 증가하며, 백어택 성공 시 피해량이 추가로 15.00% 증가한다.');
@@ -72,7 +127,19 @@ near(engravingDamage(NON_DIRECTIONAL, false, hitMaster), 1.17);
 assert.equal(engravingDamage(BACK, false, hitMaster), 1);
 assert.equal(engravingScope(attack(NON_DIRECTIONAL, AWAKENING), hitMaster), false);
 assert.equal(engravingScope(attack(NON_DIRECTIONAL, SUPER_AWAKENING), hitMaster), false);
+assert.equal(engravingScope(attack(HEAD, SUPER_AWAKENING), headBook), false);
+assert.deepEqual(hit(HEAD, true, [headBook], condition, SUPER_AWAKENING), { critRate: 0, enemyDamageSources: [] });
+const superAttack = expectedHitDamage({ attackSource: SUPER_AWAKENING, basicAttackPowerChange: 10, superAwakeningDamage: 20,
+  critRate: 240, critDamage: 460, critCap: 80, evolutionDamage: 42, attackPower: 35, enemyDamage: 17, skillDamage: 65 });
+near(superAttack.value, 1.32);
+assert.equal(superAttack.critical.critHitChance, 0);
+assert.equal(superAttack.convertedEvolutionDamage, 0);
 assert.equal(engravingScope(attack(NON_DIRECTIONAL, IDENTITY), hitMaster), null);
+assert.equal(engravingScope(dual, hitMaster), false);
+assert.equal(engravingScope(dual, headBook), true);
+assert.equal(engravingScope(dual, backBook), true);
+assert.equal(engravingScope(sura('화상'), hitMaster), null);
+assert.equal(engravingScope(describeAttack({ className: '호크아이', name: '실버호크 스킬' }), hitMaster), null);
 assert.equal(scopedEngraving('결투의 대가', 22.6), null);
 
 const awakening = { name: '천하섬멸옥', item: { skillType: 100, skillTypeKnown: true, attackDirection: false } };

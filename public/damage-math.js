@@ -1,4 +1,5 @@
 import { calculateBluntSpike } from './evolution-math.js?v=6.1.3';
+import { ATTACK_SOURCE } from './combat-attacks.js';
 
 export const BASE_CRIT_DAMAGE = 200;
 export const CRIT_RATE_PER_STAT = 0.03579; // 기존 Lv.70 환산값. 공식 반올림 정밀도는 미검증.
@@ -46,6 +47,15 @@ export function expectedCriticalDamage({
 }
 
 export function expectedHitDamage(stats = {}) {
+  // Official Hyper Awakening guide: base attack power and explicitly scoped
+  // Hyper Awakening damage are the only applicable damage inputs.
+  if (stats.attackSource === ATTACK_SOURCE.SUPER_AWAKENING) {
+    stats = {
+      canCrit: false,
+      attackPower: stats.basicAttackPowerChange,
+      skillDamage: stats.superAwakeningDamage
+    };
+  }
   const rawCritRate = finite(stats.critRate) + finite(stats.skillCritBonus) + finite(stats.adrenalineCritRate);
   const blunt = stats.critCap != null;
   const conversion = calculateBluntSpike(rawCritRate, stats);

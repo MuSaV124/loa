@@ -4,6 +4,8 @@
 
 ## 계산 경로
 
+2026-11-25 전 직업의 API 표본, 방향 판정 파서 및 피해 적용 변경은 [공격 판정·피해 적용 감사](combat-attack-audit-v2.md)를 참고한다.
+
 | 기능 | 입력과 계산 파일 | 출력 및 검증 범위 |
 | --- | --- | --- |
 | 캐릭터 조회 | `api/character.js` → 공식 프로필, 아크 패시브·그리드, 스킬·트라이포드, 장비, 각인, 보석, 카드·아바타 정규화 | API 전투력은 원래 값. 스킬·툴팁 파싱은 `skill-effects.js`, `passive-skill-effects.js`, `card-effects.js`, `avatar-effects.js`에 연결 |

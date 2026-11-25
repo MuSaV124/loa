@@ -1,3 +1,5 @@
+import { inspectAttackShares, specialAttackRecords } from './combat-attacks.js';
+
 const TIER4_COOLDOWN = [0, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24];
 const LEGACY_COOLDOWN = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20];
 const DEFAULT_WINDOW_SECONDS = 60;
@@ -357,13 +359,11 @@ function allocateAnalyzerShares(items, skillShares) {
     let targets = items.filter(item => normalizeSkillCycleName(item?.name) === normalizedShare);
     if (!targets.length) targets = items.filter(item => shareGroupMatchesItem(item, shareName));
     if (!targets.length) continue;
-    allocatedShareNames.add(normalizedShare);
     shareTargets.set(normalizedShare, targets.map(item => normalizeSkillCycleName(item?.name)));
-    const portion = share / targets.length;
-    for (const item of targets) {
-      const key = normalizeSkillCycleName(item?.name);
-      allocations.set(key, number(allocations.get(key)) + portion);
-    }
+    if (targets.length !== 1) continue;
+    allocatedShareNames.add(normalizedShare);
+    const key = normalizeSkillCycleName(targets[0]?.name);
+    allocations.set(key, number(allocations.get(key)) + share);
   }
   return { allocations, allocatedShareNames, shareTargets };
 }
@@ -393,13 +393,17 @@ export function buildSkillCycleModel({ skillEffects, snapshot, shares, identityS
   let skillShares = positiveShares(shares);
   let shareSource = Object.keys(skillShares).length ? 'combat-analyzer' : 'equipped-tree-estimate';
   if (!Object.keys(skillShares).length) skillShares = derivedShares(rawItems, snapshot);
-  const totalShare = Object.values(skillShares).reduce((sum, value) => sum + number(value), 0);
+  const profile = snapshot?.profile;
+  const audited = inspectAttackShares(Object.entries(skillShares).map(([name, share]) => ({ name, share })),
+    specialAttackRecords(profile?.className, profile?.secondClass));
+  skillShares = Object.fromEntries([...audited.retained.values()].map(({ name, share }) => [name, share]));
+  const totalShare = audited.retainedTotal;
   const specialSkillSet = new Set(identitySkills.map(normalizeSkillCycleName).filter(Boolean));
   const catalogNameSet = new Set((skillEffects?.items || []).map(item => normalizeSkillCycleName(item?.name)).filter(Boolean));
   const secondClass = normalizeSkillCycleName(snapshot?.profile?.secondClass);
   const shareAllocation = allocateAnalyzerShares(rawItems, skillShares);
   const identityDriverShareNames = Object.keys(skillShares)
-    .filter(name => !shareAllocation.allocatedShareNames.has(normalizeSkillCycleName(name)))
+    .filter(name => !shareAllocation.shareTargets.has(normalizeSkillCycleName(name)))
     .filter(name => isIdentityDrivenShare(name, { specialSkillSet, catalogNameSet, secondClass }));
   const identityDriverSet = new Set(identityDriverShareNames.map(normalizeSkillCycleName));
   const unmodeledShareNames = Object.keys(skillShares)
@@ -444,6 +448,8 @@ export function buildSkillCycleModel({ skillEffects, snapshot, shares, identityS
     analyzerTag,
     analyzerMatch,
     totalShare,
+    rawShareTotal: audited.rawTotal,
+    shareIssues: audited.issues,
     mappedShare,
     mappedSharePercent: round3(mappedShare * 100),
     modeledSharePercent: round3(Math.min(100, mappedShare * 100 + (totalShare > 0 ? identityDriverShareNames.reduce((sum, name) => sum + number(skillShares[name]) / totalShare, 0) * 100 : 0))),
@@ -610,13 +616,16 @@ function compareOpportunityMaps(model, before, after) {
   const multiplier = (model?.shareRows || []).reduce((factor, shareRow) => {
     const key = normalizeSkillCycleName(shareRow?.name);
     const targetNames = Array.isArray(shareRow?.targetNames) ? shareRow.targetNames : [];
-    const beforeCount = targetNames.reduce((sum, target) => sum + number(before.direct.get(target)?.count), 0);
-    const afterCount = targetNames.reduce((sum, target) => sum + number(after.direct.get(target)?.count), 0);
-    const beforeRow = targetNames.length ? { count: beforeCount } : before.direct.get(key);
-    const afterRow = targetNames.length ? { count: afterCount } : after.direct.get(key);
+    const targets = targetNames.length ? targetNames : [key];
+    const ratios = targets.map(target => {
+      const prior = number(before.direct.get(target)?.count);
+      const next = number(after.direct.get(target)?.count);
+      return prior > 0 && next > 0 ? next / prior : null;
+    });
     let ratio = 1;
-    if (beforeRow?.count > 0 && afterRow?.count > 0) ratio = afterRow.count / beforeRow.count;
-    else {
+    // A group without child damage shares can use a common cast ratio only.
+    if (ratios[0] != null && ratios.every(value => value != null && Math.abs(value - ratios[0]) < 1e-9)) ratio = ratios[0];
+    else if (!targetNames.length) {
       const beforeVirtual = number(before.virtualRatios.get(key));
       const afterVirtual = number(after.virtualRatios.get(key));
       if (beforeVirtual > 0 && afterVirtual > 0) ratio = afterVirtual / beforeVirtual;
