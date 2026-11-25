@@ -3,29 +3,78 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>LOSTARK 진화 노드 추천 계산기</title>
+  <title>XXAPICK (엑스엑스에이픽) · 로스트아크 전투 효율 분석</title>
+  <meta name="description" content="로스트아크 전투 효율 분석 및 최적화 플랫폼. 기대 피해량, 캐릭터, 골드 효율 및 시세를 분석하는 독립 팬메이드 서비스입니다." />
+  <meta name="theme-color" content="#101426" />
+  <meta name="application-name" content="XXAPICK" />
+  <meta name="apple-mobile-web-app-title" content="XXAPICK" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="XXAPICK" />
+  <meta property="og:locale" content="ko_KR" />
+  <meta property="og:title" content="XXAPICK · YOUR BUILD. YOUR POWER." />
+  <meta property="og:description" content="로스트아크 전투 효율 분석 및 최적화 플랫폼. 독립 팬메이드 서비스." />
+  <meta property="og:image" content="/brand/share.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="XXAPICK · YOUR BUILD. YOUR POWER." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="/brand/share.png" />
+  <link rel="icon" type="image/svg+xml" href="/brand/icon.svg" />
+  <link rel="apple-touch-icon" href="/brand/icon-180.png" />
+  <link rel="manifest" href="/brand/site.webmanifest" />
   <link rel="stylesheet" href="/style.css?v=routes-3" />
+  <link rel="stylesheet" href="/brand/site.css?v=1" />
 </head>
-<body>
-  <main class="wrap">
-    <section class="panel hero">
-      <div class="topline">
-        <div>
-          <h1>LOSTARK 진화 노드 추천 계산기</h1>
-          <p>API 값과 선택한 진화 노드·추가 효과를 재계산해 비교합니다.</p>
-        </div>
-        <span class="badge">v6.1.8 · 300초 마나 검증</span>
+<body data-site-page="home">
+  <main id="siteContent" class="wrap">
+    <section id="homePanel" class="pickHome" aria-labelledby="homeHeading">
+      <header class="pickHeader">
+        <a class="pickBrand" href="/" data-route aria-label="XXAPICK 메인">
+          <img src="/brand/icon.svg" width="36" height="36" alt="" />
+          <span>XXAPICK</span>
+        </a>
+        <span class="pickBeta">BETA</span>
+      </header>
+      <h1 id="homeHeading" class="pickSlogan"><span>YOUR BUILD.</span> <span>YOUR POWER.</span></h1>
+      <p class="pickDescription">로스트아크 전투 효율 분석 및 최적화 플랫폼</p>
+      <div class="pickTools">
+        <button class="pickTool" type="button" data-home-search="nodes" aria-controls="searchWorkspace" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 7h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15v3M8 18h.01M12 18h.01"/></svg>
+          <strong>전투 효율 계산기</strong><span>세팅별 기대 피해량</span>
+        </button>
+        <a class="pickTool" href="/simulator" data-route>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 13 6-6 5 4 7-8M4 21v-4m5 4V12m5 9v-5m5 5V10"/></svg>
+          <strong>골드 효율 분석</strong><span>투자 대비 전투력</span>
+        </a>
+        <a class="pickTool" href="/market" data-route>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8 7 3h10l4 5-9 13L3 8Zm0 0h18M10 3 8 8l4 13 4-13-2-5"/></svg>
+          <strong>시세 정보</strong><span>재료 및 보석 가격</span>
+        </a>
+        <button class="pickTool" type="button" data-home-search="character" aria-controls="searchWorkspace" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 12-9-9H2v3l9 9m5-2 5-7V3h-3l-5 5M2 21l4-4m-2-2 5 5m10 1-4-4m-2 3 5-5M7 17l10-10m-4 8 4 4"/></svg>
+          <strong>캐릭터 분석</strong><span>클래스별 전투 분석</span>
+        </button>
       </div>
+    </section>
+
+    <section id="searchWorkspace" class="panel hero pickSearch" aria-labelledby="searchHeading">
+      <h2 id="searchHeading">캐릭터 검색</h2>
       <form id="searchForm" class="search">
-        <input id="characterName" value="" autocomplete="off" placeholder="캐릭터명 입력" />
+        <label class="srOnly" for="characterName">캐릭터명</label>
+        <input id="characterName" value="" autocomplete="off" enterkeyhint="search" placeholder="캐릭터명 입력" />
         <button id="searchButton" type="submit">검색</button>
         <button id="characterRefreshButton" class="characterRefreshButton hidden" type="button">캐릭터 갱신</button>
       </form>
       <div id="message" class="message hidden" role="status"></div>
       <button id="characterRetryButton" class="secondary hidden" type="button">다시 시도</button>
+      <a class="pickClassLink" href="/ratios" data-route>직업별 아크그리드·전투분석 보기</a>
     </section>
 
-    <nav class="tabNav" aria-label="사이트 메뉴">
+    <nav class="tabNav pickNav" aria-label="사이트 메뉴">
+      <a class="pickBrand" href="/" data-route aria-label="XXAPICK 메인">
+        <img src="/brand/icon.svg" width="36" height="36" alt="" />
+        <span>XXAPICK</span>
+      </a>
       <div class="tabButtonGroup">
         <a class="tabButton active" data-tab="calculator" data-route href="/">메인</a>
         <a class="tabButton" id="siteSimulatorLink" data-tab="simulator" data-route href="/simulator">골드 효율</a>
@@ -42,8 +91,8 @@
     </nav>
 
     <section id="routeNotFound" class="panel routeNotice hidden">
-      <h2>페이지를 찾을 수 없습니다</h2>
-      <a href="/" data-route>메인으로 이동</a>
+      <h1>페이지를 찾을 수 없습니다</h1>
+      <a class="pickTextLink" href="/" data-route>메인으로 이동</a>
     </section>
 
     <section id="simulatorLanding" class="panel routeNotice hidden">
@@ -344,10 +393,13 @@
       <div id="avatarResult" class="avatarResult"></div>
     </section>
 
+    <footer class="pickFooter">
+      <span>XXAPICK.APP · LOST ARK FAN-MADE SERVICE</span>
+      <span class="version">Version 6.1.8</span>
+    </footer>
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <div class="version">Version 6.1.8</div>
-  <script type="module" src="/app.js?v=6.1.8-routes.3"></script>
+  <script type="module" src="/app.js?v=6.1.8-xxapick.1"></script>
 </body>
 </html>

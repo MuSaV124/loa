@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vercel dev",
+    "build": "node scripts/build-site.mjs",
     "test": "node scripts/run-tests.mjs",
     "test:ui": "npm run test:skill-ui && npm run test:simulator-ui",
     "generate:inven": "node scripts/generate-inven-db.js",

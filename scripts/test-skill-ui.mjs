@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { access, readFile, unlink } from 'node:fs/promises';
+import { access, mkdir, readFile, unlink } from 'node:fs/promises';
 import { extname, join, relative, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
@@ -27,6 +27,7 @@ const contentTypes = {
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
+  '.webmanifest': 'application/manifest+json',
   '.webp': 'image/webp'
 };
 const { routes: vercelRoutes, error: routeError } = getTransformedRoutes(vercelConfig);
@@ -133,12 +134,20 @@ const characterResponse = {
   }
 };
 
+async function fillCharacterSearch(page, name) {
+  const input = page.getByPlaceholder('캐릭터명 입력');
+  if (!(await input.isVisible())) await page.locator('[data-home-search="character"]').click();
+  await input.fill(name);
+}
+
+const marketNavigation = page => page.locator('[data-tab="market"]:visible, .pickTool[href="/market"]:visible');
+
 async function verifyViewport(viewport) {
   const page = await browser.newPage({ viewport });
   await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(characterResponse) }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
   assert.equal(await page.locator('.version').textContent(), 'Version 6.1.8');
-  await page.getByPlaceholder('캐릭터명 입력').fill('스킬표본');
+  await fillCharacterSearch(page, '스킬표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /스킬표본/ }).waitFor();
   await openNodeRecommendation(page);
@@ -239,7 +248,7 @@ async function verifySupportRecommendation() {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
-  await page.getByPlaceholder('캐릭터명 입력').fill('서폿표본');
+  await fillCharacterSearch(page, '서폿표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /서폿표본/ }).waitFor();
   await openNodeRecommendation(page);
@@ -309,7 +318,7 @@ async function verifyScopedBreakerCrit() {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
-  await page.getByPlaceholder('캐릭터명 입력').fill('권왕표본');
+  await fillCharacterSearch(page, '권왕표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /권왕표본/ }).waitFor();
   await openNodeRecommendation(page);
@@ -357,7 +366,7 @@ async function verifyBaseSkillSelfBuff() {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
-  await page.getByPlaceholder('캐릭터명 입력').fill('창술표본');
+  await fillCharacterSearch(page, '창술표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /창술표본/ }).waitFor();
   await openNodeRecommendation(page);
@@ -406,7 +415,7 @@ async function verifyArcanaCardExpectation() {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
-  await page.getByPlaceholder('캐릭터명 입력').fill('아르카나표본');
+  await fillCharacterSearch(page, '아르카나표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /아르카나표본/ }).waitFor();
   await openNodeRecommendation(page);
@@ -515,7 +524,7 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
     json: { ok: true, items: [{ name: '표본 시세', price: 1000 }], lowest: { price: 1000 }, rows: [] }
   }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
-  await page.getByPlaceholder('캐릭터명 입력').fill('다중치명표본');
+  await fillCharacterSearch(page, '다중치명표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /다중치명표본/ }).waitFor();
   await openNodeRecommendation(page);
@@ -723,7 +732,7 @@ async function verifyHoningMarketRefresh(viewport) {
   });
   try {
     await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
-    await page.getByPlaceholder('캐릭터명 입력').fill('스킬표본');
+    await fillCharacterSearch(page, '스킬표본');
     await page.getByRole('button', { name: '검색', exact: true }).click();
     await page.locator('#simulatorJumpButton').click();
     const costs = page.locator('.powerCostPrep');
@@ -767,7 +776,7 @@ async function verifyHoningMarketRefresh(viewport) {
     }
     const panel = await costs.evaluate(el => ({ width: el.clientWidth, scroll: el.scrollWidth }));
     assert.ok(panel.scroll <= panel.width + 1);
-    await page.locator('[data-tab="market"]').click();
+    await marketNavigation(page).click();
     await page.locator('[data-market-tab="material"]').click();
     assert.match(await page.locator('#marketFreshnessStatus').innerText(), /강화 재료·젬.*마지막 정상 갱신.*KST.*경과.*정상/);
   } finally {
@@ -807,7 +816,7 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
   await page.route('**/api/character**', route => route.fulfill({ json: fixture }));
   try {
     await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
-    await page.getByPlaceholder('캐릭터명 입력').fill('마나표본');
+    await fillCharacterSearch(page, '마나표본');
     await page.getByRole('button', { name: '검색', exact: true }).click();
     await page.getByRole('heading', { name: /마나표본/ }).waitFor();
     await openNodeRecommendation(page);
@@ -931,8 +940,77 @@ async function expectCharacter(page, name) {
 }
 
 async function submitRouteSearch(page, name) {
-  await page.locator('#characterName').fill(name);
+  await fillCharacterSearch(page, name);
   await page.locator('#searchButton').click();
+}
+
+async function verifyBrandLanding() {
+  const screenshotDir = process.env.XXAPICK_SCREENSHOT_DIR;
+  if (screenshotDir) await mkdir(screenshotDir, { recursive: true });
+  for (const width of [1440, 789, 768, 390, 320]) {
+    const page = await browser.newPage({ viewport: { width, height: 800 } });
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.route('**/api/**', route => route.fulfill({ json: { ok: true } }));
+    await page.route('**/api/character**', route => route.fulfill({ json: characterResponse }));
+    try {
+      await page.goto(routingOrigin);
+      await page.getByRole('heading', { name: 'YOUR BUILD. YOUR POWER.' }).waitFor();
+      assert.match(await page.title(), /^XXAPICK/);
+      assert.equal(await page.locator('.pickTool').count(), 4);
+      assert.equal(await page.locator('#searchWorkspace').isVisible(), false);
+      const layout = await page.locator('.pickTool').evaluateAll(cards => cards.map(card => {
+        const { x, y } = card.getBoundingClientRect();
+        return { x, y, background: getComputedStyle(card).backgroundColor };
+      }));
+      assert.equal(layout[0].background, 'rgb(29, 37, 64)');
+      assert.equal(new Set(layout.map(card => card.x)).size, width <= 360 ? 1 : 2);
+      assert.equal(new Set(layout.map(card => card.y)).size, width <= 360 ? 4 : 2);
+      if (width >= 768) {
+        const [first, second] = await page.locator('.pickSlogan span').evaluateAll(spans => spans.map(span => span.getBoundingClientRect().y));
+        assert.equal(first, second, 'Desktop and tablet slogan fits on one line');
+      }
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      if (screenshotDir) await page.locator('#siteContent').screenshot({ path: join(screenshotDir, `xxapick-${width}.png`) });
+
+      if (width === 1440) {
+        const manifest = await (await page.request.get(routingOrigin + '/brand/site.webmanifest')).json();
+        assert.equal(manifest.name, 'XXAPICK');
+        const og = await page.locator('meta[property="og:image"]').getAttribute('content');
+        const image = await page.request.get(new URL(og, routingOrigin).href);
+        const png = await image.body();
+        assert.equal(image.status(), 200);
+        assert.equal(png.readUInt32BE(16), 1200);
+        assert.equal(png.readUInt32BE(20), 630);
+        assert.equal((await page.goto(routingOrigin + '/xxapick-missing')).status(), 404);
+        assert.match(await page.title(), /XXAPICK/);
+        await page.getByRole('link', { name: '메인으로 이동' }).click();
+        await expectPath(page, '/');
+        await page.getByRole('link', { name: /골드 효율 분석/ }).click();
+        await expectPath(page, '/simulator');
+        await page.goBack();
+        await page.getByRole('link', { name: /시세 정보/ }).click();
+        await expectPath(page, '/market');
+      }
+
+      if (width === 390) {
+        const nodeSearch = page.getByRole('button', { name: /전투 효율 계산기/ });
+        await nodeSearch.click();
+        assert.equal(await nodeSearch.getAttribute('aria-expanded'), 'true');
+        assert.equal(await page.evaluate(() => document.activeElement.id), 'characterName');
+        await page.keyboard.press('Escape');
+        assert.equal(await nodeSearch.getAttribute('aria-expanded'), 'false');
+        await nodeSearch.click();
+        await submitRouteSearch(page, characterResponse.profile.CharacterName);
+        await expectPath(page, pagePath({ page: 'nodes', name: characterResponse.profile.CharacterName }));
+        await expectCharacter(page, characterResponse.profile.CharacterName);
+      }
+      assert.deepEqual(errors, []);
+    } finally {
+      await page.close();
+    }
+  }
+  console.log('XXAPICK brand, responsive landing, tool cards and metadata passed');
 }
 
 async function verifyBrowserRouting({ mobile = false } = {}) {
@@ -1124,7 +1202,7 @@ async function verifyDirectRoutesAndRequestRace() {
     assert.equal(requests.get(routingCharacterSlow), 1);
     assert.equal(requests.get(routingCharacterB), 1);
 
-    await page.locator('[data-tab="market"]').click();
+    await marketNavigation(page).click();
     await expectPath(page, '/market');
     await page.locator('[data-market-tab="gem"]').click();
     await expectPath(page, '/market?category=gem');
@@ -1140,7 +1218,9 @@ async function verifyDirectRoutesAndRequestRace() {
 }
 
 try {
-  if (!process.argv.includes('--routing-only')) {
+  const brandOnly = process.argv.includes('--branding-only');
+  await verifyBrandLanding();
+  if (!brandOnly && !process.argv.includes('--routing-only')) {
     await verifyViewport({ width: 1440, height: 1000 });
     await verifyViewport({ width: 390, height: 844 });
     await verifyScopedBreakerCrit();
@@ -1157,10 +1237,12 @@ try {
     await verifyManaRecommendation({ width: 390, height: 844 }, 150, true);
     console.log('skill effect UI tests passed');
   }
-  await verifyBrowserRouting();
-  await verifyBrowserRouting({ mobile: true });
-  await verifyDirectRoutesAndRequestRace();
-  console.log('desktop and mobile URL routing, sharing, history and request races passed');
+  if (!brandOnly) {
+    await verifyBrowserRouting();
+    await verifyBrowserRouting({ mobile: true });
+    await verifyDirectRoutesAndRequestRace();
+    console.log('desktop and mobile URL routing, sharing, history and request races passed');
+  }
 } finally {
   await browser.close();
   await new Promise(resolve => server.close(resolve));

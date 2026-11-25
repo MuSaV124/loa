@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "XXAPICK",
+  "short_name": "XXAPICK",
+  "description": "엑스엑스에이픽 · 로스트아크 전투 효율 분석 및 최적화 플랫폼",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101426",
+  "theme_color": "#101426",
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

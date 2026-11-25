@@ -5683,9 +5683,21 @@ const CHARACTER_LINKS = {
   character: 'characterOverviewLink', nodes: 'characterNodesLink', combat: 'characterCombatLink'
 };
 const PAGE_TITLES = {
-  home: 'LOSTARK 진화 노드 추천 계산기', character: '캐릭터 분석', nodes: '진화 노드 추천',
+  home: 'XXAPICK (엑스엑스에이픽) · 로스트아크 전투 효율 분석', character: '캐릭터 분석', nodes: '진화 노드 추천',
   combat: '300초 전투 분석', simulator: '골드 효율 계산기', market: '시세', ratios: '배율', notFound: '페이지를 찾을 수 없습니다'
 };
+
+let homeSearchPage = null;
+const homeSearchButtons = document.querySelectorAll('[data-home-search]');
+
+function setHomeSearchPage(page) {
+  homeSearchPage = page;
+  $('searchWorkspace').classList.toggle('pickSearchOpen', Boolean(page));
+  $('searchHeading').textContent = page === 'nodes' ? '전투 효율 계산기 · 캐릭터 검색' : '캐릭터 검색';
+  for (const button of homeSearchButtons) {
+    button.setAttribute('aria-expanded', String(button.dataset.homeSearch === page));
+  }
+}
 
 function renderCharacterNavigation() {
   const onCharacter = isCharacterPage(activePage.page);
@@ -5713,6 +5725,7 @@ function renderPage() {
     else link.removeAttribute('aria-current');
   });
   document.body.dataset.sitePage = page;
+  if (page !== 'home' && homeSearchPage) setHomeSearchPage(null);
   document.body.classList.toggle('calculatorReady', ready);
   document.body.classList.toggle('simulatorMode', simulator && ready && Boolean(state.powerSnapshot));
   const panels = {
@@ -5737,7 +5750,7 @@ function renderPage() {
     $('powerSnapshotPanel').classList.remove('hidden');
   }
   renderCharacterNavigation();
-  document.title = name ? `${name} · ${PAGE_TITLES[page]}` : PAGE_TITLES[page];
+  document.title = page === 'home' ? PAGE_TITLES.home : [name, PAGE_TITLES[page], 'XXAPICK'].filter(Boolean).join(' · ');
 }
 
 function pageRouteFromLocation() {
@@ -5833,6 +5846,7 @@ function navigatePage(route, options = {}) {
 
 async function searchCharacter(name, { force = false } = {}) {
   const intent = ++characterIntent;
+  const opensNodes = activePage.page === 'home' && homeSearchPage === 'nodes';
   setCharacterRetry();
   setMessage('');
   try {
@@ -5842,7 +5856,7 @@ async function searchCharacter(name, { force = false } = {}) {
     if (intent !== characterIntent) return;
     if (force) return showPage({ result });
     const canonicalName = result?.data.profile.CharacterName || activeCharacterName;
-    const page = activePage.page === 'simulator' ? 'simulator' : 'character';
+    const page = activePage.page === 'simulator' ? 'simulator' : opensNodes ? 'nodes' : 'character';
     const remembered = characterWorkspaces.get(normalizeCharacterCacheKey(canonicalName))?.controls;
     await navigatePage({ page, name: canonicalName,
       support: loaded ? $('manaSupport').value : remembered?.get('manaSupport')?.value,
@@ -5864,6 +5878,19 @@ $('searchForm').addEventListener('submit', (event) => {
     return setMessage('올바른 캐릭터명을 입력하세요.');
   }
   searchCharacter(name);
+});
+for (const button of homeSearchButtons) {
+  button.addEventListener('click', () => {
+    if (homeSearchPage === button.dataset.homeSearch) return setHomeSearchPage(null);
+    setHomeSearchPage(button.dataset.homeSearch);
+    $('characterName').focus();
+  });
+}
+$('searchWorkspace').addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || !homeSearchPage) return;
+  const expanded = [...homeSearchButtons].find(button => button.dataset.homeSearch === homeSearchPage);
+  setHomeSearchPage(null);
+  expanded?.focus();
 });
 $('characterRetryButton').addEventListener('click', () => retryCharacter?.());
 document.addEventListener('click', event => {
