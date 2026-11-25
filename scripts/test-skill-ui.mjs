@@ -1013,6 +1013,89 @@ async function verifyBrandLanding() {
   console.log('XXAPICK brand, responsive landing, tool cards and metadata passed');
 }
 
+async function verifyEvolutionWorkspace() {
+  for (const width of [1920, 1181, 1180, 768, 390, 320]) {
+    const page = await browser.newPage({ viewport: { width, height: 980 } });
+    await page.route('**/api/**', route => route.fulfill({ json: { ok: true } }));
+    await page.route('**/api/character**', route => route.fulfill({ json: characterResponse }));
+    try {
+      const path = pagePath({ page: 'nodes', name: characterResponse.profile.CharacterName, mode: 'theory' });
+      await page.goto(routingOrigin + path);
+      await page.locator('#evolutionTiers .nodeCard').first().waitFor();
+      await page.locator('#recommendList .comboRow').first().waitFor({ timeout: 60_000 });
+      const geometry = () => page.evaluate(() => {
+        const rect = id => document.getElementById(id).getBoundingClientRect().toJSON();
+        return {
+          card: rect('characterCard'), tabs: rect('characterNav'), inputs: rect('inputPanel'), nodes: rect('evolutionPanel'),
+          recommend: rect('recommendPanel'), top5: rect('recommendList'), summary: rect('summaryPanel'), keen: rect('keenPanel'),
+          position: getComputedStyle(document.getElementById('summaryPanel')).position,
+          overflow: document.documentElement.scrollWidth > innerWidth
+        };
+      });
+      const before = await geometry();
+      assert.equal(before.overflow, false);
+      assert.ok(before.tabs.top - before.card.bottom <= 16, `Character tabs must follow the profile at ${width}px`);
+      for (const item of [before.inputs, before.nodes, before.recommend]) {
+        assert.equal(item.left, before.tabs.left);
+        assert.equal(item.width, before.tabs.width);
+      }
+      for (const [top, bottom] of [[before.tabs, before.inputs], [before.inputs, before.nodes], [before.nodes, before.recommend]]) {
+        assert.ok(bottom.top >= top.bottom && bottom.top - top.bottom <= 16, `Main panels must be consecutive at ${width}px`);
+      }
+      assert.ok(before.top5.left >= before.recommend.left && before.top5.right <= before.recommend.right);
+
+      if (width > 1180) {
+        assert.equal(before.position, 'sticky');
+        assert.equal(before.summary.top, before.tabs.top);
+        assert.ok(before.summary.left > before.tabs.right);
+        // A size change in the summary must never move the main column or its final panel.
+        await page.locator('#sourceSummary').evaluate(element => {
+          const content = document.createElement('div');
+          content.style.height = '1800px';
+          element.append(content);
+        });
+        const tall = await geometry();
+        for (const id of ['tabs', 'inputs', 'nodes', 'recommend', 'keen']) assert.deepEqual(tall[id], before[id]);
+        assert.ok(tall.summary.height <= 980 - 28);
+        await page.evaluate(top => window.scrollTo(0, top + 40), before.summary.top);
+        assert.ok(Math.abs((await geometry()).summary.top - 14) <= 1);
+      } else {
+        assert.equal(before.position, 'static');
+        assert.equal(before.summary.left, before.tabs.left);
+        assert.equal(before.summary.width, before.tabs.width);
+        assert.ok(before.summary.top >= before.recommend.bottom);
+      }
+
+      const rows = await page.locator('#evolutionTiers .nodeGrid').evaluateAll(grids => grids.map(grid => ({
+        cards: grid.children.length, columns: getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+        clipped: [...grid.children].some(card => card.scrollWidth > card.clientWidth + 1)
+      })));
+      assert.deepEqual(rows, Array.from({ length: 5 }, () => ({ cards: 6, columns: width <= 540 ? 2 : width <= 760 ? 3 : 6, clipped: false })));
+
+      if (width === 1920 || width === 390) {
+        for (let tier = 1; tier <= 5; tier += 1) {
+          const cards = page.locator(`.nodeCard[data-tier="${tier}"]`);
+          const card = tier % 2 === 0 ? cards.first() : cards.last();
+          await card.focus();
+          const tooltip = page.locator('#nodeTooltip[aria-hidden="false"]');
+          await tooltip.waitFor();
+          const fits = await tooltip.evaluate(element => {
+            const box = element.getBoundingClientRect();
+            return box.left >= 0 && box.right <= innerWidth && box.top >= 0 && box.bottom <= innerHeight;
+          });
+          assert.equal(fits, true, `Tier ${tier} tooltip must fit at ${width}px`);
+        }
+        await page.locator('#characterOverviewLink').click();
+        await page.locator('#characterNav').waitFor();
+        assert.equal(await page.locator('.evolutionWorkspace').evaluate(element => getComputedStyle(element).display), 'contents');
+      }
+    } finally {
+      await page.close();
+    }
+  }
+  console.log('Evolution workspace alignment, sticky summary, card breakpoints and tooltip bounds passed');
+}
+
 async function verifyBrowserRouting({ mobile = false } = {}) {
   const context = await browser.newContext(mobile
     ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true }
@@ -1219,8 +1302,10 @@ async function verifyDirectRoutesAndRequestRace() {
 
 try {
   const brandOnly = process.argv.includes('--branding-only');
-  await verifyBrandLanding();
-  if (!brandOnly && !process.argv.includes('--routing-only')) {
+  const evolutionOnly = process.argv.includes('--evolution-layout-only');
+  if (!evolutionOnly) await verifyBrandLanding();
+  if (!brandOnly) await verifyEvolutionWorkspace();
+  if (!brandOnly && !evolutionOnly && !process.argv.includes('--routing-only')) {
     await verifyViewport({ width: 1440, height: 1000 });
     await verifyViewport({ width: 390, height: 844 });
     await verifyScopedBreakerCrit();
@@ -1237,7 +1322,7 @@ try {
     await verifyManaRecommendation({ width: 390, height: 844 }, 150, true);
     console.log('skill effect UI tests passed');
   }
-  if (!brandOnly) {
+  if (!brandOnly && !evolutionOnly) {
     await verifyBrowserRouting();
     await verifyBrowserRouting({ mobile: true });
     await verifyDirectRoutesAndRequestRace();

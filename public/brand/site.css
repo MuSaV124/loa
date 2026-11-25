@@ -218,3 +218,73 @@ body[data-site-page="home"] .pickClassLink { display: inline-block; margin-top: 
   .pickTools { grid-template-columns: minmax(0, 1fr); }
   .pickTool { min-height: 80px; }
 }
+
+.evolutionWorkspace,
+.evolutionMain,
+.evolutionSidebar { display: contents; }
+
+body[data-site-page="nodes"] #evolutionTiers .nodeGrid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: clamp(8px, .75vw, 12px);
+}
+
+body[data-site-page="nodes"] #evolutionTiers .nodeCard {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  place-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 112px;
+}
+
+body[data-site-page="nodes"] #evolutionTiers :is(.nodeIcon, .nodeName, .nodeControls) { margin: 0; }
+body[data-site-page="nodes"] #evolutionTiers :is(.nodeIcon, .nodeIcon img) { width: 46px; height: 46px; }
+body[data-site-page="nodes"] #evolutionTiers .nodeName { min-width: 0; overflow-wrap: anywhere; }
+
+@media (min-width: 1181px) {
+  body[data-site-page="nodes"].calculatorReady #siteContent { grid-template-columns: minmax(0, 1fr); }
+
+  body[data-site-page="nodes"].calculatorReady .evolutionWorkspace {
+    display: grid;
+    grid-template-areas: 'main sidebar' 'keen sidebar';
+    grid-template-columns: minmax(0, 1fr) clamp(300px, 25vw, 360px);
+    gap: inherit;
+    align-items: start;
+  }
+
+  body[data-site-page="nodes"].calculatorReady .evolutionMain {
+    display: grid;
+    grid-area: main;
+    grid-template-columns: minmax(0, 1fr);
+    gap: inherit;
+  }
+
+  body[data-site-page="nodes"].calculatorReady .evolutionSidebar {
+    display: block;
+    grid-area: sidebar;
+    align-self: stretch;
+    /* The summary can scroll without sizing either row of the main column. */
+    contain: size;
+  }
+
+  body[data-site-page="nodes"].calculatorReady #summaryPanel {
+    position: sticky;
+    top: 14px;
+    max-height: calc(100dvh - 28px);
+    overflow: auto;
+  }
+
+  body[data-site-page="nodes"].calculatorReady #keenPanel { grid-area: keen; }
+
+  body[data-site-page="nodes"] #recommendPanel .comboRow {
+    grid-template-columns: 38px minmax(0, 1fr) clamp(270px, 38%, 370px) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  body[data-site-page="nodes"] #evolutionTiers .nodeGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 540px) {
+  body[data-site-page="nodes"] #evolutionTiers .nodeGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

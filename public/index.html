@@ -23,7 +23,7 @@
   <link rel="apple-touch-icon" href="/brand/icon-180.png" />
   <link rel="manifest" href="/brand/site.webmanifest" />
   <link rel="stylesheet" href="/style.css?v=routes-3" />
-  <link rel="stylesheet" href="/brand/site.css?v=1" />
+  <link rel="stylesheet" href="/brand/site.css?v=2" />
 </head>
 <body data-site-page="home">
   <main id="siteContent" class="wrap">
@@ -102,182 +102,188 @@
 
     <section id="characterCard" class="panel character hidden calcTabPanel"></section>
 
-    <nav id="characterNav" class="panel characterNav hidden" aria-label="캐릭터 메뉴">
-      <a id="characterOverviewLink" data-route>캐릭터 분석</a>
-      <a id="characterNodesLink" data-route>진화 노드 추천</a>
-      <a id="characterCombatLink" data-route>300초 전투 분석</a>
-      <button id="copyCharacterLink" type="button" class="secondary">링크 복사</button>
-      <span id="characterShareStatus" class="srOnly" role="status"></span>
-    </nav>
+    <div class="evolutionWorkspace">
+      <div class="evolutionMain">
+        <nav id="characterNav" class="panel characterNav hidden" aria-label="캐릭터 메뉴">
+          <a id="characterOverviewLink" data-route>캐릭터 분석</a>
+          <a id="characterNodesLink" data-route>진화 노드 추천</a>
+          <a id="characterCombatLink" data-route>300초 전투 분석</a>
+          <button id="copyCharacterLink" type="button" class="secondary">링크 복사</button>
+          <span id="characterShareStatus" class="srOnly" role="status"></span>
+        </nav>
 
-    <section id="combatPanel" class="panel calcTabPanel hidden">
-      <h2>300초 전투 분석</h2>
-      <div id="combatSkillCycle"></div>
-    </section>
+        <section id="combatPanel" class="panel calcTabPanel hidden">
+          <h2>300초 전투 분석</h2>
+          <div id="combatSkillCycle"></div>
+        </section>
 
-    <section id="powerSnapshotPanel" class="panel powerSnapshotPanel hidden simulatorPanel">
-      <div class="sectionHead">
-        <div><h2>스펙업 효율 시뮬레이터</h2><p class="hint">현재 직업각인·아크그리드·스킬별 딜 지분과 시세 기준 비용을 비교합니다.</p></div>
-        <button id="simulatorBackButton" class="simulatorBackButton" type="button">계산기로 돌아가기</button>
-      </div>
-      <p id="simulatorMarketFreshness" class="marketFreshness" role="status">시세 갱신 시각 확인 중</p>
-      <div id="powerSnapshotView" class="powerSnapshotView"></div>
-    </section>
-
-    <section id="summaryPanel" class="calcTabPanel panel hidden sourceOnlyPanel">
-      <div id="sourceSummary" class="sourceSummary"></div>
-    </section>
-
-    <section id="inputPanel" class="calcTabPanel panel compactPanel advancedInputPanel">
-      <details class="advancedInputDetails">
-        <summary>
-          <span><b>추가 효과</b><small>API가 못 읽는 버프와 시너지</small></span>
-          <em>고급 설정</em>
-        </summary>
-        <div class="advancedInputBody">
-          <input id="baseCritStat" type="hidden" value="0" />
-          <input id="baseSwiftStat" type="hidden" value="0" />
-          <div class="skillEffectPicker">
-            <div id="skillEffectPreview" class="skillEffectPreview muted"><b>사용 스킬 자동 반영</b><span>캐릭터 검색 후 표시</span></div>
+        <section id="powerSnapshotPanel" class="panel powerSnapshotPanel hidden simulatorPanel">
+          <div class="sectionHead">
+            <div><h2>스펙업 효율 시뮬레이터</h2><p class="hint">현재 직업각인·아크그리드·스킬별 딜 지분과 시세 기준 비용을 비교합니다.</p></div>
+            <button id="simulatorBackButton" class="simulatorBackButton" type="button">계산기로 돌아가기</button>
           </div>
-          <div class="manualGrid">
-        <label>추가 치명타 확률(%)<input id="extraCritRate" type="number" step="0.01" value="0" /></label>
-        <label>추가 치명타 피해(%)<input id="extraCritDamage" type="number" step="0.01" value="0" /></label>
-        <label>추가 진화형 피해, 진피(%)<input id="extraEvolutionDamage" type="number" step="0.01" value="0" /></label>
-        <label>추가 피해, 자동 조회 외 추피(%)<input id="extraAdditionalDamage" type="number" step="0.01" value="0" /></label>
-        <label>적에게 주는 피해, 적주피(%)<input id="extraEnemyDamage" type="number" step="0.01" value="0" /></label>
-        <label>추가 공격 속도(%)<input id="extraAttackSpeed" type="number" step="0.01" value="0" /></label>
-        <label>추가 이동 속도(%)<input id="extraMoveSpeed" type="number" step="0.01" value="0" /></label>
-        <div class="adrenalineSetting critSynergySetting">
-          <label class="checkLabel"><span>치적 시너지 적용</span><input id="critSynergyEnabled" type="checkbox" /></label>
-          <label class="engravingLevelLabel"><span>시너지 수치</span>
-            <select id="critSynergyValue" aria-label="치적 시너지 수치">
-              <option value="10" selected>치적 +10%</option>
-              <option value="20">치적 +20%</option>
-            </select>
-          </label>
-        </div>
-        <label class="checkLabel"><span>백어택 적용</span><input id="backAttackEnabled" type="checkbox" /></label>
-        <div class="adrenalineSetting">
-          <label class="checkLabel"><span>아드레날린 적용</span><input id="adrenalineEnabled" type="checkbox" checked /></label>
-          <label class="engravingLevelLabel"><span>유물 각인서</span>
-            <select id="adrenalineBookLevel" aria-label="아드레날린 유물 각인서 레벨">
-              <option value="0">유물 Lv.0</option><option value="1">유물 Lv.1</option><option value="2">유물 Lv.2</option><option value="3">유물 Lv.3</option><option value="4" selected>유물 Lv.4</option>
-            </select>
-          </label>
-        </div>
-        <div id="adrenalineReplacementWrap" class="adrenalineReplacement hidden">
-          <label><span>대체 각인</span><select id="adrenalineReplacementName" aria-label="아드레날린 대체 각인"></select></label>
-          <label><span>유물 각인서</span>
-            <select id="adrenalineReplacementBookLevel" aria-label="대체 각인 유물 각인서 레벨">
-              <option value="0">유물 Lv.0</option><option value="1">유물 Lv.1</option><option value="2">유물 Lv.2</option><option value="3">유물 Lv.3</option><option value="4">유물 Lv.4</option>
-            </select>
-          </label>
-        </div>
-        <div class="staticInfo"><b>기본 공이속</b></div>
-        <div class="staticInfo"><b>신속 공이속</b></div>
-          </div>
-        </div>
-      </details>
-    </section>
+          <p id="simulatorMarketFreshness" class="marketFreshness" role="status">시세 갱신 시각 확인 중</p>
+          <div id="powerSnapshotView" class="powerSnapshotView"></div>
+        </section>
 
-    <section id="evolutionPanel" class="calcTabPanel panel">
-      <div class="sectionHead evolutionSectionHead">
-        <div><h2>진화 노드</h2><p class="hint">노드와 추가 효과를 변경한 뒤 재계산을 눌러 결과에 적용하세요.</p></div>
-        <div class="evolutionRecalculateArea">
-          <span id="evolutionRecalculateNotice" class="evolutionRecalculateNotice hidden" aria-live="polite">설정이 변경되었습니다. 재계산을 눌러주세요.</span>
-          <button id="evolutionRecalculateButton" class="evolutionRecalculateButton" type="button">재계산</button>
-        </div>
-      </div>
-      <div id="evolutionTiers" class="tierGroups"></div>
-    </section>
-
-    <section id="recommendPanel" class="calcTabPanel panel">
-      <div class="sectionHead recommendHead">
-        <div><h2 id="recommendHeading">2·3·4·5티어 조합 추천</h2><p id="recommendDescription" class="hint">레이드 기대 피해 추정치 기준으로 조합을 비교합니다.</p></div>
-        <details id="recommendAdvanced" class="advancedInputDetails">
-          <summary>추천 세부 설정</summary>
-          <div class="recommendChecks">
-            <div class="recommendCheckRow">
-              <label class="miniCheck" title="기준 스킬이 치명타로 적중하지 않을 확률을 표시합니다."><span>단타 주력기</span><input id="singleHitMainSkill" type="checkbox" /></label>
-              <label class="miniCheck"><span>쿨감 효과 제외</span><input id="excludeCooldown" type="checkbox" /></label>
-              <label class="miniCheck" title="스킬 툴팁이 없을 때 주력기를 비마나 스킬로 취급합니다."><span>주력기 마나 사용 안함</span><input id="noManaMainSkill" type="checkbox" /></label>
+        <section id="inputPanel" class="calcTabPanel panel compactPanel advancedInputPanel">
+          <details class="advancedInputDetails">
+            <summary>
+              <span><b>추가 효과</b><small>API가 못 읽는 버프와 시너지</small></span>
+              <em>고급 설정</em>
+            </summary>
+            <div class="advancedInputBody">
+              <input id="baseCritStat" type="hidden" value="0" />
+              <input id="baseSwiftStat" type="hidden" value="0" />
+              <div class="skillEffectPicker">
+                <div id="skillEffectPreview" class="skillEffectPreview muted"><b>사용 스킬 자동 반영</b><span>캐릭터 검색 후 표시</span></div>
+              </div>
+              <div class="manualGrid">
+            <label>추가 치명타 확률(%)<input id="extraCritRate" type="number" step="0.01" value="0" /></label>
+            <label>추가 치명타 피해(%)<input id="extraCritDamage" type="number" step="0.01" value="0" /></label>
+            <label>추가 진화형 피해, 진피(%)<input id="extraEvolutionDamage" type="number" step="0.01" value="0" /></label>
+            <label>추가 피해, 자동 조회 외 추피(%)<input id="extraAdditionalDamage" type="number" step="0.01" value="0" /></label>
+            <label>적에게 주는 피해, 적주피(%)<input id="extraEnemyDamage" type="number" step="0.01" value="0" /></label>
+            <label>추가 공격 속도(%)<input id="extraAttackSpeed" type="number" step="0.01" value="0" /></label>
+            <label>추가 이동 속도(%)<input id="extraMoveSpeed" type="number" step="0.01" value="0" /></label>
+            <div class="adrenalineSetting critSynergySetting">
+              <label class="checkLabel"><span>치적 시너지 적용</span><input id="critSynergyEnabled" type="checkbox" /></label>
+              <label class="engravingLevelLabel"><span>시너지 수치</span>
+                <select id="critSynergyValue" aria-label="치적 시너지 수치">
+                  <option value="10" selected>치적 +10%</option>
+                  <option value="20">치적 +20%</option>
+                </select>
+              </label>
             </div>
-            <label class="shareControl" title="쿨감이 실제 딜 사이클을 줄이는 주력기 딜 지분입니다. 쿨감 효과 제외 체크 시 0%로 처리됩니다.">
-              <span>주력기 딜 지분 <em>쿨감 환산용</em></span>
-              <input id="mainSkillDamageShare" type="number" min="0" max="100" step="1" value="60" />
-              <b>%</b>
-            </label>
-          </div>
-        </details>
-      </div>
-      <p id="skillCycleRecommendationHint" class="skillCycleRecommendationHint">캐릭터 검색 후 현재 스킬트리의 초단위 주기와 전투분석 딜 지분을 자동 반영합니다.</p>
-      <div class="manaEnvironment" id="manaEnvironment">
-        <label>레이드 서포터
-          <select id="manaSupport"><option value="none">서포터 없음</option><option value="bard">바드</option><option value="artist">도화가</option><option value="paladin">홀리나이트</option><option value="valkyrie">발키리</option></select>
-        </label>
-        <p id="manaSupportSummary" class="hint" aria-live="polite"></p>
-        <p id="manaAutoStatus" class="hint">캐릭터 조회 후 공식 스킬 데이터를 표시합니다.</p>
-      </div>
-      <details id="manaScenarioPanel" class="advancedInputDetails manaScenarioPanel">
-        <summary><span><b>고급 마나 설정</b><small>측정한 스킬 사용과 회복으로 자동 조건을 수정할 수 있습니다.</small></span></summary>
-        <div class="advancedInputBody">
-          <label class="manaManualToggle"><input id="manaShortageClass" type="checkbox" /> 수동 마나 환경 사용</label>
-          <div class="manaScenarioGrid">
-            <label>전투 시간(초)<input id="manaDuration" type="number" value="300" readonly /></label>
-            <label>최대 마나<input id="manaMax" type="number" min="1" step="any" /></label>
-            <label>시작 마나<input id="manaStart" type="number" min="0" step="any" /></label>
-            <label>음식·서포터 적용 전 회복 1회량<input id="manaRecovery" type="number" min="0" step="any" /></label>
-            <label>첫 회복(초)<input id="manaFirstRecovery" type="number" min="0" step="any" /></label>
-            <label>회복 간격(초)<input id="manaRecoveryInterval" type="number" min="0.1" step="any" /></label>
-            <label>소모 감소 중첩<select id="manaCostReductions"><option value="">미확인</option><option value="sum">합산으로 실측</option><option value="product">개별 곱으로 실측</option></select></label>
-            <label>마나 회복 음식<select id="manaFood"><option value="none">미사용</option><option value="used">사용</option></select></label>
-            <label id="manaFoodTickLabel" class="hidden">음식 사용 중 회복 1회량<input id="manaFoodTick" type="number" min="0" step="any" /></label>
-          </div>
-          <div id="manaSupportSettings" class="manaScenarioGrid hidden">
-            <label>서포터 효과 가동률(%)<input id="manaSupportUptime" type="number" min="0" max="100" step="any" /></label>
-            <label>회복 효과를 받은 시각(초, 쉼표 구분)<input id="manaSupportTimes" type="text" /></label>
-            <label><span id="manaSupportRestoreLabel">실측 회복량</span><input id="manaSupportRestore" type="number" min="0" step="any" aria-labelledby="manaSupportRestoreLabel" /></label>
-          </div>
-          <p id="manaSupportTimingHint" class="hint hidden"></p>
-          <details id="manaAutoSkills" class="manaAutoSkills hidden">
-            <summary>조회한 스킬 소모량과 쿨타임</summary>
-            <ul id="manaAutoSkillList"></ul>
+            <label class="checkLabel"><span>백어택 적용</span><input id="backAttackEnabled" type="checkbox" /></label>
+            <div class="adrenalineSetting">
+              <label class="checkLabel"><span>아드레날린 적용</span><input id="adrenalineEnabled" type="checkbox" checked /></label>
+              <label class="engravingLevelLabel"><span>유물 각인서</span>
+                <select id="adrenalineBookLevel" aria-label="아드레날린 유물 각인서 레벨">
+                  <option value="0">유물 Lv.0</option><option value="1">유물 Lv.1</option><option value="2">유물 Lv.2</option><option value="3">유물 Lv.3</option><option value="4" selected>유물 Lv.4</option>
+                </select>
+              </label>
+            </div>
+            <div id="adrenalineReplacementWrap" class="adrenalineReplacement hidden">
+              <label><span>대체 각인</span><select id="adrenalineReplacementName" aria-label="아드레날린 대체 각인"></select></label>
+              <label><span>유물 각인서</span>
+                <select id="adrenalineReplacementBookLevel" aria-label="대체 각인 유물 각인서 레벨">
+                  <option value="0">유물 Lv.0</option><option value="1">유물 Lv.1</option><option value="2">유물 Lv.2</option><option value="3">유물 Lv.3</option><option value="4">유물 Lv.4</option>
+                </select>
+              </label>
+            </div>
+            <div class="staticInfo"><b>기본 공이속</b></div>
+            <div class="staticInfo"><b>신속 공이속</b></div>
+              </div>
+            </div>
           </details>
-          <label>스킬명 | 첫 사용(초) | 재사용 대기(초) | 마나 소모량 | 시전(초, 선택) | 후딜(초, 선택)
-            <textarea id="manaRotation" rows="4" aria-describedby="manaRotationHint"></textarea>
-          </label>
-          <p id="manaRotationHint" class="hint">진화 적용 전 재사용 대기와 비용을 우선순위대로 입력하세요. 시전·후딜 시간을 비우면 0초를 가정합니다. 사용한 유틸 스킬과 추가 회복도 포함하세요.</p>
-          <label>추가 회복 시각(초) | 회복량 (선택)
-            <textarea id="manaExtraRecovery" rows="2" aria-label="추가 회복 시각과 회복량"></textarea>
-          </label>
-          <button id="applyManaScenario" type="button">마나 조건 적용</button>
-        </div>
-      </details>
-      <p id="arcanaIdentityNote" class="arcanaIdentityNote hidden"></p>
-      <div class="resultLayout recommendLayout468">
-        <div class="recommendMain468">
-          <h3>추천 TOP5</h3>
-          <label id="manaRecommendationModeLabel" class="manaRecommendationMode">추천 기준
-            <select id="manaRecommendationMode"><option value="auto">300초 실측 검증</option><option value="estimate">300초 추정 검증</option><option value="theory">이론상 기대 피해</option><option value="shortage">마나 부족 비교</option><option value="unverified">판정 보류</option></select>
-          </label>
-          <p id="manaRecommendationStatus" class="hint" aria-live="polite"></p>
-          <details id="manaSensitivityPanel" class="comboDetails hidden"><summary>순위 가정 비교</summary><p id="manaSensitivity" class="hint"></p></details>
-          <a id="manaRecoverySource" class="hint hidden" target="_blank" rel="noopener noreferrer">자연 회복 가정에 사용한 2024년 관찰 자료</a>
-          <div id="recommendList" class="recommendList"></div>
-        </div>
-        <div class="apiBaseline468">
-          <h3>API 원본 기준</h3>
-          <div id="currentScore" class="scoreBox"></div>
-          <div id="baseInfo" class="baseInfo"></div>
-        </div>
-      </div>
-    </section>
+        </section>
 
-    <section id="keenPanel" class="calcTabPanel panel">
-      <div class="sectionHead"><div><h2>예리한 둔기 효율</h2><p class="hint">스킬별 치적·치피와 조건부 효과를 반영해 전설·유물 예둔 효율을 계산합니다.</p></div></div>
-      <div id="keenEfficiency" class="keenGrid"></div>
-    </section>
+        <section id="evolutionPanel" class="calcTabPanel panel">
+          <div class="sectionHead evolutionSectionHead">
+            <div><h2>진화 노드</h2><p class="hint">노드와 추가 효과를 변경한 뒤 재계산을 눌러 결과에 적용하세요.</p></div>
+            <div class="evolutionRecalculateArea">
+              <span id="evolutionRecalculateNotice" class="evolutionRecalculateNotice hidden" aria-live="polite">설정이 변경되었습니다. 재계산을 눌러주세요.</span>
+              <button id="evolutionRecalculateButton" class="evolutionRecalculateButton" type="button">재계산</button>
+            </div>
+          </div>
+          <div id="evolutionTiers" class="tierGroups"></div>
+        </section>
+
+        <section id="recommendPanel" class="calcTabPanel panel">
+          <div class="sectionHead recommendHead">
+            <div><h2 id="recommendHeading">2·3·4·5티어 조합 추천</h2><p id="recommendDescription" class="hint">레이드 기대 피해 추정치 기준으로 조합을 비교합니다.</p></div>
+            <details id="recommendAdvanced" class="advancedInputDetails">
+              <summary>추천 세부 설정</summary>
+              <div class="recommendChecks">
+                <div class="recommendCheckRow">
+                  <label class="miniCheck" title="기준 스킬이 치명타로 적중하지 않을 확률을 표시합니다."><span>단타 주력기</span><input id="singleHitMainSkill" type="checkbox" /></label>
+                  <label class="miniCheck"><span>쿨감 효과 제외</span><input id="excludeCooldown" type="checkbox" /></label>
+                  <label class="miniCheck" title="스킬 툴팁이 없을 때 주력기를 비마나 스킬로 취급합니다."><span>주력기 마나 사용 안함</span><input id="noManaMainSkill" type="checkbox" /></label>
+                </div>
+                <label class="shareControl" title="쿨감이 실제 딜 사이클을 줄이는 주력기 딜 지분입니다. 쿨감 효과 제외 체크 시 0%로 처리됩니다.">
+                  <span>주력기 딜 지분 <em>쿨감 환산용</em></span>
+                  <input id="mainSkillDamageShare" type="number" min="0" max="100" step="1" value="60" />
+                  <b>%</b>
+                </label>
+              </div>
+            </details>
+          </div>
+          <p id="skillCycleRecommendationHint" class="skillCycleRecommendationHint">캐릭터 검색 후 현재 스킬트리의 초단위 주기와 전투분석 딜 지분을 자동 반영합니다.</p>
+          <div class="manaEnvironment" id="manaEnvironment">
+            <label>레이드 서포터
+              <select id="manaSupport"><option value="none">서포터 없음</option><option value="bard">바드</option><option value="artist">도화가</option><option value="paladin">홀리나이트</option><option value="valkyrie">발키리</option></select>
+            </label>
+            <p id="manaSupportSummary" class="hint" aria-live="polite"></p>
+            <p id="manaAutoStatus" class="hint">캐릭터 조회 후 공식 스킬 데이터를 표시합니다.</p>
+          </div>
+          <details id="manaScenarioPanel" class="advancedInputDetails manaScenarioPanel">
+            <summary><span><b>고급 마나 설정</b><small>측정한 스킬 사용과 회복으로 자동 조건을 수정할 수 있습니다.</small></span></summary>
+            <div class="advancedInputBody">
+              <label class="manaManualToggle"><input id="manaShortageClass" type="checkbox" /> 수동 마나 환경 사용</label>
+              <div class="manaScenarioGrid">
+                <label>전투 시간(초)<input id="manaDuration" type="number" value="300" readonly /></label>
+                <label>최대 마나<input id="manaMax" type="number" min="1" step="any" /></label>
+                <label>시작 마나<input id="manaStart" type="number" min="0" step="any" /></label>
+                <label>음식·서포터 적용 전 회복 1회량<input id="manaRecovery" type="number" min="0" step="any" /></label>
+                <label>첫 회복(초)<input id="manaFirstRecovery" type="number" min="0" step="any" /></label>
+                <label>회복 간격(초)<input id="manaRecoveryInterval" type="number" min="0.1" step="any" /></label>
+                <label>소모 감소 중첩<select id="manaCostReductions"><option value="">미확인</option><option value="sum">합산으로 실측</option><option value="product">개별 곱으로 실측</option></select></label>
+                <label>마나 회복 음식<select id="manaFood"><option value="none">미사용</option><option value="used">사용</option></select></label>
+                <label id="manaFoodTickLabel" class="hidden">음식 사용 중 회복 1회량<input id="manaFoodTick" type="number" min="0" step="any" /></label>
+              </div>
+              <div id="manaSupportSettings" class="manaScenarioGrid hidden">
+                <label>서포터 효과 가동률(%)<input id="manaSupportUptime" type="number" min="0" max="100" step="any" /></label>
+                <label>회복 효과를 받은 시각(초, 쉼표 구분)<input id="manaSupportTimes" type="text" /></label>
+                <label><span id="manaSupportRestoreLabel">실측 회복량</span><input id="manaSupportRestore" type="number" min="0" step="any" aria-labelledby="manaSupportRestoreLabel" /></label>
+              </div>
+              <p id="manaSupportTimingHint" class="hint hidden"></p>
+              <details id="manaAutoSkills" class="manaAutoSkills hidden">
+                <summary>조회한 스킬 소모량과 쿨타임</summary>
+                <ul id="manaAutoSkillList"></ul>
+              </details>
+              <label>스킬명 | 첫 사용(초) | 재사용 대기(초) | 마나 소모량 | 시전(초, 선택) | 후딜(초, 선택)
+                <textarea id="manaRotation" rows="4" aria-describedby="manaRotationHint"></textarea>
+              </label>
+              <p id="manaRotationHint" class="hint">진화 적용 전 재사용 대기와 비용을 우선순위대로 입력하세요. 시전·후딜 시간을 비우면 0초를 가정합니다. 사용한 유틸 스킬과 추가 회복도 포함하세요.</p>
+              <label>추가 회복 시각(초) | 회복량 (선택)
+                <textarea id="manaExtraRecovery" rows="2" aria-label="추가 회복 시각과 회복량"></textarea>
+              </label>
+              <button id="applyManaScenario" type="button">마나 조건 적용</button>
+            </div>
+          </details>
+          <p id="arcanaIdentityNote" class="arcanaIdentityNote hidden"></p>
+          <div class="resultLayout recommendLayout468">
+            <div class="recommendMain468">
+              <h3>추천 TOP5</h3>
+              <label id="manaRecommendationModeLabel" class="manaRecommendationMode">추천 기준
+                <select id="manaRecommendationMode"><option value="auto">300초 실측 검증</option><option value="estimate">300초 추정 검증</option><option value="theory">이론상 기대 피해</option><option value="shortage">마나 부족 비교</option><option value="unverified">판정 보류</option></select>
+              </label>
+              <p id="manaRecommendationStatus" class="hint" aria-live="polite"></p>
+              <details id="manaSensitivityPanel" class="comboDetails hidden"><summary>순위 가정 비교</summary><p id="manaSensitivity" class="hint"></p></details>
+              <a id="manaRecoverySource" class="hint hidden" target="_blank" rel="noopener noreferrer">자연 회복 가정에 사용한 2024년 관찰 자료</a>
+              <div id="recommendList" class="recommendList"></div>
+            </div>
+            <div class="apiBaseline468">
+              <h3>API 원본 기준</h3>
+              <div id="currentScore" class="scoreBox"></div>
+              <div id="baseInfo" class="baseInfo"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="evolutionSidebar">
+        <section id="summaryPanel" class="calcTabPanel panel hidden sourceOnlyPanel">
+          <div id="sourceSummary" class="sourceSummary"></div>
+        </section>
+      </div>
+
+      <section id="keenPanel" class="calcTabPanel panel">
+        <div class="sectionHead"><div><h2>예리한 둔기 효율</h2><p class="hint">스킬별 치적·치피와 조건부 효과를 반영해 전설·유물 예둔 효율을 계산합니다.</p></div></div>
+        <div id="keenEfficiency" class="keenGrid"></div>
+      </section>
+    </div>
 
     <section id="ratioPanel" class="panel ratioPanel tabContent hidden">
       <div class="ratioHero">
