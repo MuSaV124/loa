@@ -106,6 +106,8 @@ assert.throws(() => createNextMarketSnapshot(null, {
 const require = createRequire(import.meta.url);
 const blobRequire = createRequire(require.resolve('@vercel/blob'));
 const { MockAgent, getGlobalDispatcher, setGlobalDispatcher } = blobRequire('undici');
+// Initialize Node's lazy fetch globals before replacing Undici's shared dispatcher.
+const { fetch: originalFetch, Response: FetchResponse } = globalThis;
 const originalDispatcher = getGlobalDispatcher();
 const mockBlob = new MockAgent();
 mockBlob.disableNetConnect();
@@ -116,7 +118,6 @@ const env = {
   LOSTARK_API_KEY: 'test-only-key'
 };
 const originalEnv = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
-const originalFetch = globalThis.fetch;
 Object.assign(process.env, env);
 
 async function callRefresh(method, token) {
@@ -137,11 +138,11 @@ try {
     upstreamCalls++;
     const endpoint = new URL(url);
     if (endpoint.hostname === 'loatool.taeu.kr' && crystalAvailable) {
-      return Response.json([{ dt: now.toISOString(), close: 4250 }]);
+      return FetchResponse.json([{ dt: now.toISOString(), close: 4250 }]);
     }
-    if (endpoint.hostname === 'loatool.taeu.kr') return Response.json({}, { status: 403 });
+    if (endpoint.hostname === 'loatool.taeu.kr') return FetchResponse.json({}, { status: 403 });
     assert.equal(endpoint.hostname, 'developer-lostark.game.onstove.com');
-    return Response.json({}, { status: 400 });
+    return FetchResponse.json({}, { status: 400 });
   };
 
   assert.equal((await callRefresh('GET')).statusCode, 405);
