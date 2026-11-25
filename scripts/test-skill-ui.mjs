@@ -98,7 +98,7 @@ const baselineSkillItem = {
 };
 const characterResponse = {
   ok: true,
-  apiVersion: '6.1.8',
+  apiVersion: '6.1.9',
   profile: {
     CharacterName: '스킬표본', CharacterClassName: '브레이커', ServerName: '아브렐슈드',
     ItemAvgLevel: '1,700.00', CombatPower: '5,000.00', CharacterImage: '',
@@ -146,7 +146,7 @@ async function verifyViewport(viewport) {
   const page = await browser.newPage({ viewport });
   await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(characterResponse) }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
-  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.8');
+  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.9');
   await fillCharacterSearch(page, '스킬표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /스킬표본/ }).waitFor();
@@ -477,7 +477,8 @@ async function verifyArcanaCardExpectation() {
       value: row.querySelector('.rowMetric b').textContent
     }))), null, 2));
   }
-  assert.match(bestRecommendation, /끝없는 마나|무한한 마력/);
+  assert.match(bestRecommendation, /혼신의 강타/);
+  assert.match(await page.locator('#recommendDescription').textContent(), /시전 횟수와 마나 지속성은 별도로/);
   const skillScope = await page.locator('.skillCritScope').innerText();
   assert.match(skillScope, /다크 리저렉션/);
   assert.match(skillScope, /치적 \+27\.6%/);
@@ -500,7 +501,7 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   };
   const fixture = {
     ok: true,
-    apiVersion: '6.1.8',
+    apiVersion: '6.1.9',
     profile: { ...characterResponse.profile, CharacterName: '다중치명표본', Stats: [] },
     arkPassive: { Points: evolutionPoints(140), Effects: [...fixedTier1, { Name: '입식 타격가', Level: 2 }] },
     accessoryEffects: accessory,
@@ -1300,6 +1301,40 @@ async function verifyDirectRoutesAndRequestRace() {
   }
 }
 
+async function verifyAttackDirectionInRecommendation() {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const names = ['헤드 표본', '백 표본', '비방향 표본'];
+  const types = ['헤드 어택', '백 어택', '없음'];
+  const items = names.map(name => ({ ...baselineSkillItem, name, skillType: 0, skillTypeKnown: true }));
+  const payload = {
+    ...characterResponse,
+    profile: { ...characterResponse.profile, CharacterName: '공격표본' },
+    arkGridEffects: { items: [] },
+    skills: names.map((Name, index) => ({ Name, SkillType: 0, Tooltip: JSON.stringify({
+      Element_007: { type: 'SingleTextBox', value: '공격 타입 : ' + types[index] }
+    }) })),
+    skillEffects: { items, cycleItems: items, calculableItems: [] }
+  };
+  await page.route('**/api/character**', route => route.fulfill({ json: payload }));
+  await page.goto('http://127.0.0.1:' + port + pagePath({ page: 'nodes', name: '공격표본', mode: 'theory' }));
+  await waitForRecommendations(page);
+  await page.locator('#manaRecommendationMode').selectOption('theory');
+  const top = page.locator('#recommendList .comboRow').first();
+  await top.waitFor();
+  const attackDetails = top.locator('.comboDetails');
+  await attackDetails.locator('summary').first().click();
+  assert.match(await attackDetails.innerText(), /헤드 표본 · 헤드.*백 표본 · 백.*비방향 표본 · 비방향성/s);
+  await page.locator('#directionRatePanel > summary').click();
+  await page.getByLabel('헤드 표본 헤드 (%)').fill('60');
+  await page.getByLabel('백 표본 백 (%)').fill('30');
+  const theorized = await top.locator('.rowMetric:first-child b').textContent();
+  await page.locator('#evolutionRecalculateButton').click();
+  await waitForRecommendations(page);
+  assert.equal(await top.locator('.rowMetric:first-child b').textContent(), theorized);
+  assert.match(await top.textContent(), /입력한 방향 적중률 기준 기대 피해 배율/);
+  await page.close();
+}
+
 try {
   const brandOnly = process.argv.includes('--branding-only');
   const evolutionOnly = process.argv.includes('--evolution-layout-only');
@@ -1313,6 +1348,7 @@ try {
     await verifyArcanaCardExpectation();
     await verifyHighCritRecommendation();
     await verifyHighCritRecommendation({ width: 390, height: 844 });
+    await verifyAttackDirectionInRecommendation();
     await verifySupportRecommendation();
     await verifyHoningMarketRefresh({ width: 1440, height: 1000 });
     await verifyHoningMarketRefresh({ width: 390, height: 844 });

@@ -3,8 +3,9 @@ import { BASE_CRIT_DAMAGE, CRIT_RATE_PER_STAT, NOVEMBER_2026_PATCH_URL, expected
 import { emptyCardEffects } from './card-effects.js?v=6.1.1';
 import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=6.1.1';
 import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=6.1.1';
-import { emptySkillEffectState, formatSkillEffectSummary, parseSkillAttackDirection, parseSkillEffectText, parseSkillManaUsage, skillExperimentItems, withoutCritHitDamageClauses } from './skill-effects.js?v=6.1.4';
-import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=6.1.4';
+import { emptySkillEffectState, extractCombatSkillEffects, formatSkillEffectSummary, parseSkillAttackDirection, parseSkillEffectText, parseSkillManaUsage, skillExperimentItems, withoutCritHitDamageClauses } from './skill-effects.js?v=6.1.9';
+import { DIRECTION, attackHitModifiers, classifyAttackStyle, describeAttack, directionRate, engravingAllowedForBuild, engravingScope, isDirectional, isScopedEngraving, mixAttackOutcomes, scopedEngraving, specialAttackRecords } from './combat-attacks.js';
+import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=6.1.9';
 import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=6.1.1';
 import { combatAnalyzerGemFactors, combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=6.1.2';
 import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency, normalizeSkillCycleName } from './skill-cycle.js?v=6.1.1';
@@ -35,7 +36,7 @@ import {
   remainingCooldownMs
 } from './cache-policy.js?v=6.1.1';
 
-const VERSION = '6.1.8';
+const VERSION = '6.1.9';
 const PARTY_EVOLUTION_NODES = new Set(['정열의 춤사위', '선각자', '진군', '기원', '입식 타격가', '마나 용광로', '안정된 관리자']);
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function isNoManaMainSkillEnabled() { return Boolean(document.getElementById('noManaMainSkill')?.checked); }
@@ -205,6 +206,7 @@ function renderSkillEffectControl() {
   const globalBuffRows = globalBuffItems.map(item => `<div class="skillEffectRow"><b>${escapeHtml(item.name || '스킬 자버프')}</b><span>전역 자버프 · ${escapeHtml(formatSkillEffectSummary(item.effects))}</span></div>`).join('');
   const passiveRows = scopedRules.map(rule => {
     const target = rule.activationUnknown ? '발동 시점 미확인'
+      : rule.scope === 'direction-hit' ? (rule.selector === DIRECTION.HEAD ? '헤드 적중' : '백 적중')
       : rule.scope === 'non-awakening' ? rule.selector : rule.scope === 'skill'
       ? rule.targets.join(', ')
       : rule.scope === 'category' ? `${rule.selector} 스킬` : '상태 조건 주력기';
@@ -229,7 +231,9 @@ function populateAdrenalineReplacementOptions(syncLevel = false) {
   const candidates = originalHasAdrenaline
     ? Object.keys(RELIC_ENGRAVING_RULES).filter(name => name !== ADRENALINE_ENGRAVING_NAME && !equippedNames.has(name))
     : supportedEquipped;
-  const names = candidates.length ? candidates : Object.keys(RELIC_ENGRAVING_RULES).filter(name => name !== ADRENALINE_ENGRAVING_NAME);
+  const style = currentAttackStyle();
+  const names = (candidates.length ? candidates : Object.keys(RELIC_ENGRAVING_RULES).filter(name => name !== ADRENALINE_ENGRAVING_NAME))
+    .filter(name => engravingAllowedForBuild(name, style));
   const previous = select.value;
   select.innerHTML = names.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
   if (names.includes(previous)) select.value = previous;
@@ -250,6 +254,7 @@ function getEngravingSimulation(upgrades = []) {
   const originalHasAdrenaline = Boolean(state.engraving?.adrenaline?.adopted);
   const appliedUpgrades = new Set();
   const equippedDeltas = [];
+  const scopedDeltas = new Map();
   let keenBluntBookDelta = 0;
   for (const book of upgrades) {
     if (!engravingItemByName(book.name) || !book.deltaEffects) continue;
@@ -260,8 +265,10 @@ function getEngravingSimulation(upgrades = []) {
       if (adrenalineEnabled || replacementBookLevel !== Number(book.bookLevel)) continue;
       replacementBookLevel = clampRelicBookLevel(book.nextBookLevel);
     } else {
-      if (Number(book.deltaEffects.conditionalDamage)) continue;
-      equippedDeltas.push(book.deltaEffects);
+      if (Number(book.deltaEffects.conditionalDamage)) {
+        if (!isScopedEngraving(book.name)) continue;
+        scopedDeltas.set(book.name, (scopedDeltas.get(book.name) || 0) + Number(book.deltaEffects.conditionalDamage));
+      } else equippedDeltas.push(book.deltaEffects);
       if (book.name === KEEN_BLUNT_NAME) keenBluntBookDelta += num(book.deltaEffects.critDamage);
     }
     appliedUpgrades.add(book);
@@ -282,6 +289,8 @@ function getEngravingSimulation(upgrades = []) {
     replacementName,
     replacementBookLevel,
     originalReplacement,
+    originalHasAdrenaline,
+    scopedDeltas,
     keenBluntBookDelta,
     appliedUpgrades
   };
@@ -2310,7 +2319,9 @@ async function calculateGemSpecEstimates(snapshot) {
 }
 async function calculateEngravingSpecEstimates(snapshot) {
   const books = Array.isArray(snapshot?.effects?.engraving?.items) ? snapshot.effects.engraving.items : [];
-  const candidates = books.filter(item => item?.grade === '유물' && Number(item.bookLevel || 0) < 4 && item?.deltaEffects && Object.keys(item.deltaEffects).length);
+  const style = currentAttackStyle();
+  const candidates = books.filter(item => item?.grade === '유물' && Number(item.bookLevel || 0) < 4 && item?.deltaEffects && Object.keys(item.deltaEffects).length
+    && engravingAllowedForBuild(item.name, style));
   if (!candidates.length) return [{ category: 'engraving', item: { type: '각인서', name: '다음 각인서 후보' }, available: false, reason: '유물 각인서 Lv.0~3 업그레이드 후보 없음', powerDelta: 0, cost: {}, expectedCost: {} }];
   const rows = await Promise.all(candidates.map(async book => {
     try {
@@ -3859,8 +3870,6 @@ function getBaseStats(selection = state.selected, {
   const extraAttackSpeed = num($('extraAttackSpeed').value);
   const extraMoveSpeed = num($('extraMoveSpeed').value);
   const critSynergy = $('critSynergyEnabled').checked ? num($('critSynergyValue').value) : 0;
-  const backAttackCritRate = $('backAttackEnabled').checked ? 10 : 0;
-  const backAttackEnemyDamage = $('backAttackEnabled').checked ? 5 : 0;
   const supportMode = isSupportPowerSnapshot(state.powerSnapshot);
   const partyBlessing = supportMode ? 0 : getLevelEffect('축복의 여신', 3).speedBonus || 0;
   const baseSpeed = 105 + partyBlessing;
@@ -3908,16 +3917,13 @@ function getBaseStats(selection = state.selected, {
   pushDamageSource(enemyDamageSources, '깨달음', state.enlightenment.enemyDamage);
   pushDamageSource(enemyDamageSources, '아크그리드', state.arkGrid.enemyDamage);
   pushDamageSource(enemyDamageSources, '각인서/API', engravingEffects.enemyDamage);
-  if (!engravingSimulation.adrenalineEnabled) pushDamageSource(enemyDamageSources, `${engravingSimulation.replacementName} · 조건 충족`, replacementEffects.conditionalDamage);
+  if (!engravingSimulation.adrenalineEnabled && !isScopedEngraving(engravingSimulation.replacementName)) {
+    pushDamageSource(enemyDamageSources, `${engravingSimulation.replacementName} · 조건 충족`, replacementEffects.conditionalDamage);
+  }
   pushDamageSource(enemyDamageSources, '어빌리티 스톤 각인 보너스', state.abilityStone?.effects?.enemyDamage);
   pushDamageSource(enemyDamageSources, '추가 입력', extraEnemyDamage);
-  pushDamageSource(enemyDamageSources, '백어택', backAttackEnemyDamage);
   pushDamageSource(enemyDamageSources, '카드 세트', num(state.card?.buckets?.enemyDamage));
   pushDamageSource(enemyDamageSources, '스킬 기본 자버프', num(skillBuffEffects.enemyDamage));
-  // 세 우마르가 오리라처럼 백어택 조건이 붙은 카드 효과는 백어택을 켰을 때만 넣는다.
-  if ($('backAttackEnabled').checked) {
-    pushDamageSource(enemyDamageSources, '카드 세트 · 백어택', num(state.card?.conditional?.backAttackEnemyDamage));
-  }
   const critHitDamageSources = [
     ...collectItemDamageSources(accessory, 'critHitDamage', '악세'),
     ...collectItemDamageSources(state.bracelet, 'critHitDamage', '팔찌')
@@ -3927,11 +3933,12 @@ function getBaseStats(selection = state.selected, {
   pushDamageSource(critHitDamageSources, '어빌리티 스톤 각인 보너스', state.abilityStone?.effects?.critHitDamage);
   pushDamageSource(critHitDamageSources, '스킬 기본 자버프', skillBuffEffects.critHitDamage);
   const weaponQualityAdditionalDamage = num(state.powerSnapshot?.equipment?.combat?.find(item => item.type === '무기')?.qualityAdditionalDamage);
+  const scoped = characterScopedEngravings(engravingSimulation);
   return {
     critStat,
     swiftStat,
     statCritRate,
-    critRate: statCritRate + num(accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.arkGrid.critRate) + num(engravingEffects.critRate) + num(state.abilityStone?.effects?.critRate) + num(skillBuffEffects.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + backAttackCritRate + num(state.card?.buckets?.critRate),
+    critRate: statCritRate + num(accessory.critRate) + num(state.bracelet.critRate) + num(state.enlightenment.critRate) + num(state.arkGrid.critRate) + num(engravingEffects.critRate) + num(state.abilityStone?.effects?.critRate) + num(skillBuffEffects.critRate) + dynamicEnlightenmentCritRate + extraCritRate + critSynergy + num(state.card?.buckets?.critRate),
     critDamage: BASE_CRIT_DAMAGE + num(accessory.critDamage) + num(state.bracelet.critDamage) + num(state.enlightenment.critDamage) + num(state.arkGrid.critDamage) + num(engravingEffects.critDamage) + num(state.abilityStone?.effects?.critDamage) + num(skillBuffEffects.critDamage) + dynamicEnlightenmentCritDamage + extraCritDamage + num(state.card?.buckets?.critDamage),
     critHitDamage: num(accessory.critHitDamage) + num(state.bracelet.critHitDamage) + num(state.enlightenment.critHitDamage) + num(engravingEffects.critHitDamage) + num(state.abilityStone?.effects?.critHitDamage) + num(skillBuffEffects.critHitDamage),
     critHitDamageSources,
@@ -3948,8 +3955,9 @@ function getBaseStats(selection = state.selected, {
     skillCritBonus: 0,
     skillDamage: num(skillBuffEffects.skillDamage),
     critSynergy,
-    backAttackCritRate,
-    backAttackEnemyDamage,
+    scopedEngravings: scoped.rules,
+    unresolvedEngravings: scoped.unresolved,
+    backCardDamage: num(state.card?.conditional?.backAttackEnemyDamage),
     adrenalineCritRate: num(adrenalineEffect.critRate),
     adrenalineAttackPower: num(adrenalineEffect.attackPower),
     attackPower: num(adrenalineEffect.attackPower) + num(state.abilityStone?.attackPower) + num(state.abilityStone?.effects?.attackPower) + num(engravingEffects.attackPower) + num(skillBuffEffects.attackPower),
@@ -4201,51 +4209,84 @@ function matchedSkillItem(name, targetNames = []) {
     const exact = items.find(item => normalizedSkillName(item?.name) === candidate);
     if (exact) return exact;
   }
-  return items.find(item => candidates.some(candidate => {
-    const itemName = normalizedSkillName(item?.name);
-    return itemName && (itemName.includes(candidate) || candidate.includes(itemName));
-  })) || null;
+  return null;
+}
+
+function characterScopedEngravings(simulation) {
+  const books = state.engraving?.items || [];
+  const rules = [];
+  const unresolved = [];
+  const raw = state.rawEngravings || [];
+  const replaced = !simulation.originalHasAdrenaline && simulation.originalReplacement
+    ? simulation.originalReplacement.name : null;
+  for (const book of books) {
+    if (book.name === replaced) continue;
+    if (!isScopedEngraving(book.name)) {
+      if (Number(book.effects?.conditionalDamage)) unresolved.push(book.name);
+      continue;
+    }
+    const description = raw.find(entry => entry.Name === book.name)?.Description;
+    const rule = scopedEngraving(book.name, num(book.effects?.conditionalDamage), description);
+    if (!rule) {
+      unresolved.push(book.name);
+      continue;
+    }
+    const delta = simulation.scopedDeltas?.get(book.name) || 0;
+    if (rule.direction === DIRECTION.NON_DIRECTIONAL) rule.bonus += delta;
+    else rule.base += delta;
+    rules.push(rule);
+  }
+  if (!simulation.adrenalineEnabled && isScopedEngraving(simulation.replacementName)
+    && (simulation.originalHasAdrenaline || replaced)) {
+    const name = simulation.replacementName;
+    const oldBook = books.find(book => book.name === name);
+    const rawRule = oldBook && scopedEngraving(name, num(oldBook.effects?.conditionalDamage), raw.find(entry => entry.Name === name)?.Description);
+    const percent = num(simulation.replacementEffect.conditionalDamage);
+    const rule = rawRule && rawRule.direction !== DIRECTION.NON_DIRECTIONAL
+      ? { ...rawRule, base: percent - rawRule.bonus }
+      : scopedEngraving(name, percent);
+    if (rule && rule.base >= 0) rules.push(rule);
+    else unresolved.push(name);
+  }
+  return { rules, unresolved };
+}
+
+function currentAttackStyle(units = weightedSkillUnits()) {
+  return classifyAttackStyle(units.map(unit => ({ ...unit.attack, weight: unit.weight })),
+    (state.rawEngravings || []).map(item => item.Name), Boolean(state.rawEngravings?.length));
 }
 
 function weightedSkillUnits() {
+  const profile = state.powerSnapshot?.profile || {};
+  const className = profile.className || '';
+  const build = profile.secondClass || '';
+  const specialAttacks = specialAttackRecords(className, build);
+  const addAttack = unit => ({ ...unit, attack: describeAttack({ ...unit, className, build }) });
   const shareRows = state.skillCycle?.shareRows || [];
   if (shareRows.length) {
     const explicitPassiveTargets = [...new Set([...(state.passiveSkillEffects?.rules || []), ...(state.arkGridSkillEffects?.rules || [])]
       .filter(rule => rule.scope === 'skill')
       .flatMap(rule => rule.targets || [])
       .filter(Boolean))];
-    const units = shareRows.flatMap(row => {
-      let targetNames = Array.isArray(row?.targetNames) && row.targetNames.length ? row.targetNames : [row?.name];
-      const groupName = normalizedSkillName(row?.name);
-      const groupedPassiveTargets = explicitPassiveTargets.filter(target => {
-        const key = normalizedSkillName(target);
-        return groupName && key && key !== groupName && key.includes(groupName);
-      });
-      if (groupedPassiveTargets.length && !matchedSkillItem(row?.name)) targetNames = groupedPassiveTargets;
-      const weight = Number(row?.normalizedShare || 0) / Math.max(1, targetNames.length);
-      return targetNames.map(name => {
-        const item = matchedSkillItem(name, [row?.name]);
-        return {
-          name: item?.name || name || row?.name || '이름 없는 스킬',
-          shareName: row?.name || name,
-          targetNames: [name],
-          category: item?.category || '',
-          item,
-          weight
-        };
-      });
+    const units = shareRows.map(row => {
+      const group = specialAttacks.find(attack => attack.name === row.name);
+      const names = row?.targetNames || [];
+      const item = matchedSkillItem(row.name) || (!group && names.length === 1 ? matchedSkillItem(names[0]) : null);
+      const name = item?.name || row.name || '이름 없는 스킬';
+      return addAttack({ name, shareName: row.name, targetNames: [name], category: item?.category || '', item,
+        weight: Number(row?.normalizedShare || 0) });
     }).filter(row => row.weight > 0);
-    for (const target of explicitPassiveTargets) {
+    for (const target of [...new Set([...explicitPassiveTargets, ...specialAttacks.flatMap(attack => attack.componentNames || [])])]) {
       if (units.some(unit => normalizedSkillName(unit.name) === normalizedSkillName(target))) continue;
       const item = matchedSkillItem(target);
-      units.push({ name: item?.name || target, shareName: target, targetNames: [target], category: item?.category || '', item, weight: 0 });
+      units.push(addAttack({ name: item?.name || target, shareName: target, targetNames: [target], category: item?.category || '', item, weight: 0 }));
     }
     return units;
   }
 
   const items = skillExperimentItems(state.skillEffects);
   const weight = items.length ? 1 / items.length : 0;
-  return items.map(item => ({
+  return items.map(item => addAttack({
     name: item.name || '이름 없는 스킬',
     shareName: item.name || '',
     targetNames: [item.name].filter(Boolean),
@@ -4268,6 +4309,9 @@ function prepareSkillScoring() {
   const arcanaStream = currentArcanaStreamEffect();
   const arcanaModel = currentArcanaCardExpectation();
   const noManaMain = isNoManaMainSkillEnabled();
+  const classHitRules = [...(state.passiveSkillEffects?.rules || []), ...(state.arkGridSkillEffects?.rules || [])]
+    .filter(rule => rule.scope === 'direction-hit' && !rule.activationUnknown)
+    .map(rule => ({ name: rule.nodeName, direction: rule.selector, damage: num(rule.effects?.enemyDamage) }));
   const units = weightedSkillUnits().map(unit => {
     const passive = passiveEffectsForSkill(state.passiveSkillEffects, unit);
     const arkGrid = passiveEffectsForSkill(state.arkGridSkillEffects, unit);
@@ -4278,6 +4322,10 @@ function prepareSkillScoring() {
       effects: mergeSkillEffects(unit.item?.effects || {}, passive.effects, arkGrid.effects, arcanaEffects),
       passiveRules: [...passive.rules, ...arkGrid.rules],
       arcanaRules: streamApplies ? [{ category: '스킬 자버프', nodeName: `${arcanaStream.sourceSkill} · ${arcanaStream.sourceTripod}`, effects: arcanaEffects }] : [],
+      hitConditions: classHitRules.filter(rule => rule.direction === unit.attack.direction)
+        .concat(unit.item?.selectedTripods?.flatMap(tripod => tripod.directionalDamage || []) || []),
+      theoryLanded: unit.attack.direction === DIRECTION.BACK ? $('backAttackEnabled').checked
+        : unit.attack.direction === DIRECTION.HEAD && Boolean($('headAttackEnabled')?.checked),
       emperorNormalSkill: arcanaModel?.key === 'emperor' && normalizedSkillName(unit.category) === normalizedSkillName('일반 스킬'),
       manualNonMana: noManaMain && unit.item?.manaUsageKnown !== true
     };
@@ -4285,9 +4333,38 @@ function prepareSkillScoring() {
   return { units, noManaMain, cooldownExcluded: isCooldownExcluded(), cooldownCache: new Map(), ...scoreCooldownInputs() };
 }
 
-function score(stats, model = prepareSkillScoring()) {
+function readAttackRates(units, supportMode) {
+  const container = $('directionRateInputs');
+  const panel = $('directionRatePanel');
+  if (!container || !panel) return null;
+  const attacks = units.filter(unit => unit.weight > 0 && isDirectional(unit.attack.direction));
+  panel.classList.toggle('hidden', supportMode || !attacks.length);
+  if (supportMode || !attacks.length) return null;
+  const previous = new Map([...container.querySelectorAll('input')].map(input => [input.dataset.attackId, input.value]));
+  container.replaceChildren(...attacks.map(({ attack }) => {
+    const label = document.createElement('label');
+    label.textContent = attack.name + (attack.direction === DIRECTION.HEAD ? ' 헤드 (%)' : ' 백 (%)');
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = 0;
+    input.max = 100;
+    input.step = 'any';
+    input.dataset.attackId = attack.id;
+    input.value = previous.get(attack.id) ?? '';
+    label.append(input);
+    return label;
+  }));
+  const inputs = [...container.querySelectorAll('input')];
+  if (inputs.some(input => directionRate(input.value) == null)) return null;
+  return new Map(inputs.map(input => [input.dataset.attackId, directionRate(input.value)]));
+}
+
+function score(stats, model = prepareSkillScoring(), hitRates = null) {
   const { units } = model;
-  const fallbackStats = stats;
+  const baseEngravings = (stats.scopedEngravings || []).filter(engraving => engraving.base);
+  const fallbackStats = baseEngravings.length ? {
+    ...stats, enemyDamageSources: [...stats.enemyDamageSources, ...baseEngravings.map(engraving => ({ label: engraving.name, value: engraving.base }))]
+  } : stats;
   const baseResult = scoreCoreWithArcanaExpectation(fallbackStats, { normal: scoreCore(fallbackStats, null, model) });
   if (!units.length || !baseResult.value) {
     return {
@@ -4301,27 +4378,44 @@ function score(stats, model = prepareSkillScoring()) {
 
   const rows = units.map(unit => {
     const { emperorNormalSkill, manualNonMana, passiveRules, arcanaRules } = unit;
-    const effects = stats.directionalCritDamage && unit.item?.attackDirection
+    const direction = unit.attack?.direction;
+    const effects = stats.directionalCritDamage && isDirectional(direction)
       ? mergeSkillEffects(unit.effects, { critDamage: stats.directionalCritDamage }) : unit.effects;
     const skillStats = applyExperimentalSkillEffects(stats, {
       name: unit.name, effects, usesMana: unit.item?.usesMana === true,
       manaCost: unit.item?.manaCost, manaUsageKnown: manualNonMana || unit.item?.manaUsageKnown === true,
-      attackDirection: unit.item?.attackDirection
+      attackDirection: direction === DIRECTION.BACK ? '백' : direction === DIRECTION.HEAD ? '헤드'
+        : direction === DIRECTION.NON_DIRECTIONAL ? false : null
     });
+    if (unit.attack?.criticalEligible === false) skillStats.canCrit = false;
     const cooldownContext = { evaluation: baseResult.cooldownEvaluation, shareName: unit.shareName };
-    const resultWithoutArcana = scoreCore(skillStats, cooldownContext, model);
-    const result = scoreCoreWithArcanaExpectation(skillStats, { emperorNormalSkill, cooldownContext, normal: resultWithoutArcana });
+    const rate = hitRates ? hitRates.get(unit.attack?.id) ?? 0 : unit.theoryLanded ? 1 : 0;
+    const hitScore = landed => {
+      const modifiers = attackHitModifiers(unit.attack || {}, landed, stats.scopedEngravings || [], unit.hitConditions || [], stats.backCardDamage);
+      const adjusted = modifiers.critRate || modifiers.enemyDamageSources.length ? {
+        ...skillStats, skillCritBonus: skillStats.skillCritBonus + modifiers.critRate,
+        enemyDamageSources: [...skillStats.enemyDamageSources, ...modifiers.enemyDamageSources]
+      } : skillStats;
+      const normal = scoreCore(adjusted, cooldownContext, model);
+      return { result: scoreCoreWithArcanaExpectation(adjusted, { emperorNormalSkill, cooldownContext, normal }), normal };
+    };
+    const mainOutcome = hitScore(rate === 1);
+    const hitOutcome = rate > 0 && rate < 1 ? hitScore(true) : mainOutcome;
+    const result = mixAttackOutcomes(mainOutcome.result, hitOutcome.result, rate);
+    const resultWithoutArcana = mixAttackOutcomes(mainOutcome.normal, hitOutcome.normal, rate);
     return {
       name: unit.name,
       shareName: unit.shareName,
       level: Number(unit.item?.level || 0),
       share: unit.weight,
+      attack: unit.attack,
       conditional: isConditionalSkill(unit.item) || passiveRules.some(rule => rule.scope === 'state') || arcanaRules.length > 0 || emperorNormalSkill,
       guaranteedCrit: Boolean(effects.forcedCrit) || isGuaranteedCritSkill(unit.item),
       partialCritRuleUnmodeled: unit.item?.selectedTripods?.some(tripod => tripod.partialCritRuleUnmodeled),
       critInteractionUnverified: Boolean(effects.forcedCrit && stats.critCap != null),
-      directionalCritUnverified: Boolean(stats.directionalCritDamage && unit.item?.attackDirection == null),
-      braceletDirectionUnverified: Boolean(stats.braceletDirectionalDamage?.length && unit.item?.attackDirection == null),
+      directionalCritUnverified: Boolean(stats.directionalCritDamage && !isDirectional(direction) && direction !== DIRECTION.NON_DIRECTIONAL),
+      braceletDirectionUnverified: Boolean(stats.braceletDirectionalDamage?.length && !isDirectional(direction) && direction !== DIRECTION.NON_DIRECTIONAL),
+      engravingUnverified: (stats.scopedEngravings || []).some(engraving => engravingScope(unit.attack || {}, engraving) == null),
       critHitStackingUnverified: result.critHitStackingUnverified,
       manaDamageUnverified: skillStats.manaDamageUnverified,
       manaFurnaceDamage: skillStats.manaFurnaceDamage,
@@ -4439,10 +4533,10 @@ function applyEvolutionEntries(entries, baseStats, cooldownExcluded) {
   return s;
 }
 
-function statsWithSelection(selection = state.selected, scenarioInputs) {
+function statsWithSelection(selection = state.selected, scenarioInputs, model) {
   const entries = selectedEntries(selection).sort((a, b) => a.tier - b.tier);
   const stats = applyEvolutionEntries(entries, getBaseStats(selection, scenarioInputs), isCooldownExcluded());
-  return { stats, result: { ...score(stats), unverifiedClassEffects: unverifiedPassiveEffectsCount() > 0 } };
+  return { stats, result: { ...score(stats, model), unverifiedClassEffects: unverifiedPassiveEffectsCount() > 0 } };
 }
 
 function sourceLine(label, value, detail = '') {
@@ -4585,7 +4679,6 @@ function buildSourceSummary(current) {
   const critLines = [sourceLine('치명 스탯', current.stats.statCritRate || 0, `치명 ${Math.round(current.stats.critStat || 0)}${getStatNodeLine('치명') ? ' · ' + getStatNodeLine('치명') : ''}`)];
   if (base.adrenalineCritRate) critLines.push(sourceLine('아드레날린', base.adrenalineCritRate));
   if (base.critSynergy) critLines.push(sourceLine('치적 시너지', base.critSynergy));
-  if (base.backAttackCritRate) critLines.push(sourceLine('백어택', base.backAttackCritRate));
   if (state.accessory.critRate) critLines.push(sourceLine('악세', state.accessory.critRate));
   if (state.bracelet.critRate) critLines.push(sourceLine('팔찌', state.bracelet.critRate));
   if (state.enlightenment.critRate) critLines.push(sourceLine('깨달음', state.enlightenment.critRate));
@@ -4695,10 +4788,11 @@ function buildSourceSummary(current) {
   if (state.enlightenment.enemyDamage) enemyLines.push(sourceLine('깨달음', state.enlightenment.enemyDamage));
   if (state.arkGrid.enemyDamage) enemyLines.push(sourceLine('아크그리드', state.arkGrid.enemyDamage));
   if (base.engravingEffects?.enemyDamage) enemyLines.push(sourceLine('각인서/시뮬레이션', base.engravingEffects.enemyDamage));
-  if (base.replacementEngraving?.effects?.conditionalDamage) enemyLines.push(sourceLine(`${base.replacementEngraving.name} · 조건 충족`, base.replacementEngraving.effects.conditionalDamage));
+  if (base.replacementEngraving?.effects?.conditionalDamage && !isScopedEngraving(base.replacementEngraving.name)) {
+    enemyLines.push(sourceLine(`${base.replacementEngraving.name} · 조건 충족`, base.replacementEngraving.effects.conditionalDamage));
+  }
   if (state.abilityStone?.effects?.enemyDamage) enemyLines.push(sourceLine('어빌리티 스톤 각인 보너스', state.abilityStone.effects.enemyDamage));
   if (base.extraEnemyDamage) enemyLines.push(sourceLine('추가 입력', base.extraEnemyDamage));
-  if (base.backAttackEnemyDamage) enemyLines.push(sourceLine('백어택', base.backAttackEnemyDamage));
   if (base.skillBuffEffects?.enemyDamage) enemyLines.push(sourceLine('스킬 기본 자버프', base.skillBuffEffects.enemyDamage));
   if (appliedSkillEffects.enemyDamage) enemyLines.push(sourceLine('기준 스킬 효과', appliedSkillEffects.enemyDamage));
   enemyLines.push(...enemyEvolution);
@@ -4844,10 +4938,15 @@ function candidateDetailsHtml(candidate, analysis) {
     return `<li><b>${tier}T ${escapeHtml(name)} Lv.${level}</b> · ${escapeHtml(effect)}</li>`;
   }).join('');
   const skills = (result.skillExperiment?.items || []).filter(row => row.share > 0).map(row =>
-    `<li><b>${escapeHtml(row.name)}</b> · 기대 배율 ${row.value.toFixed(4)} · 치적 ${fmt(row.rawCritRate)}% (적용 ${fmt(row.effectiveCritRate)}%) · 치피 ${fmt(row.critDamage)}% · ${criticalOutcomeLabel(row.critical)} · 진피 ${fmt(row.evolutionDamage)}% · 적주피 ${fmt(row.enemyDamage)}% · 추피 ${fmt(row.additionalDamage)}%</li>`
+    `<li><b>${escapeHtml(row.name)}</b> · ${row.attack?.direction === DIRECTION.HEAD ? '헤드' : row.attack?.direction === DIRECTION.BACK ? '백' : row.attack?.direction === DIRECTION.NON_DIRECTIONAL ? '비방향성' : '방향 미확인'} · 지분 ${fmt(row.share * 100)}% · 기대 배율 ${row.value.toFixed(4)} · 치적 ${fmt(row.rawCritRate)}% (적용 ${fmt(row.effectiveCritRate)}%) · 치피 ${fmt(row.critDamage)}% · ${criticalOutcomeLabel(row.critical)} · 진피 ${fmt(row.evolutionDamage)}% · 적주피 ${fmt(row.enemyDamage)}% · 추피 ${fmt(row.additionalDamage)}%</li>`
   ).join('');
   const has = name => entries.some(entry => entry.name === name);
   const assumptions = [
+    !supportModel && (state.skillCycle?.shareRows?.length ? '전투분석 프리셋 기반 피해 지분' : '장착 스킬 균등 지분 가정'),
+    candidate.directionAssumption,
+    stats.unresolvedEngravings?.length && ('조건부 각인 수치 미확인 · ' + stats.unresolvedEngravings.join(', ')),
+    result.skillExperiment?.items?.some(row => row.share > 0 && row.engravingUnverified) && '일부 공격의 각인 적용 대상 미확인',
+    result.skillExperiment?.items?.some(row => row.attack?.parent) && '아이덴티티 개별 타격의 피해 지분·방향 판정 미확인',
     has('입식 타격가') && '입식 타격 6중첩 유지',
     has('인파이팅') && '정면 승부 가동률 100%',
     has('달인') && '달인 5중첩 유지',
@@ -4871,6 +4970,7 @@ function candidateDetailsHtml(candidate, analysis) {
   return `<details class="comboDetails">
     <summary>상세 계산 보기</summary>
     <div class="comboDetailsBody">
+      ${Number.isFinite(candidate.conditionedValue) ? `<p>입력한 방향 적중률 기준 기대 피해 배율 <b>${candidate.conditionedValue.toFixed(4)}</b></p>` : ''}
       <ul>${nodes}</ul>
       <p class="comboCritical">${criticalOutcomeLabel(result.critical)} · 진피 ${fmt(result.evo)}% · 적주피 ${fmt(result.displayEnemyDamage)}% · 추피 ${fmt(result.additionalDamage)}% · 공속 ${fmt(result.attackSpeed)}% · 이속 ${fmt(result.moveSpeed)}%</p>
       <p>공통 쿨감 ${fmt(stats.cooldownReduction || 0)}% · 마나 스킬 쿨감 ${fmt(stats.manaSkillCooldownReduction || 0)}% · 마나 소모 감소 ${manaReductions}${reductionMethod ? ` (${reductionMethod})` : ''}</p>
@@ -4982,6 +5082,10 @@ function fillManaProfileInputs() {
   }
 }
 
+function manaNotUsed(character) {
+  return character?.kind === 'special' && character.observedNonMana && !character.observedMana;
+}
+
 function renderManaEnvironment() {
   const profile = SUPPORT_MANA[$('manaSupport')?.value] || SUPPORT_MANA.none;
   const supportSummary = $('manaSupportSummary');
@@ -5008,7 +5112,9 @@ function renderManaEnvironment() {
     const verified = findVerifiedManaProfile(character);
     const costs = skills.filter(skill => skill.baseCost != null && skill.source === 'official-api').length;
     const max = character.maxMana ? `공식 API 최대 마나 ${formatNumber(character.maxMana)}` : '최대 마나 미확인';
-    autoStatus.textContent = `${character.className || '직업 미확인'} · ${character.resource} · 공식 스킬 비용 ${costs}/${skills.length} · ${max} · ${verified ? '검증된 운용 프로필 적용 가능' : '자연 회복·실전 운용 주기 미확인'}`;
+    autoStatus.textContent = manaNotUsed(character)
+      ? `${character.className} · ${character.resource} · 마나 검증 해당 없음`
+      : `${character.className || '직업 미확인'} · ${character.resource} · 공식 스킬 비용 ${costs}/${skills.length} · ${max} · ${verified ? '검증된 운용 프로필 적용 가능' : '자연 회복·실전 운용 주기 미확인'}`;
   } else if (autoStatus) autoStatus.textContent = '캐릭터 조회 후 공식 스킬 데이터를 표시합니다.';
   $('manaAutoSkills')?.classList.toggle('hidden', !skills.length);
   const list = $('manaAutoSkillList');
@@ -5091,9 +5197,11 @@ async function calculateAndRender() {
   const recommendList = $('recommendList');
   recommendList.setAttribute('aria-busy', 'true');
   recommendList.textContent = '진화 조합을 비교하는 중…';
-  const current = statsWithSelection(state.selected);
+  const skillModel = prepareSkillScoring();
+  const theoryModel = { ...skillModel, cooldownExcluded: true, cooldownCache: new Map() };
+  const current = statsWithSelection(state.selected, undefined, theoryModel);
   const apiSelection = Object.keys(state.apiSelected || {}).length ? state.apiSelected : state.selected;
-  const apiBase = statsWithSelection(apiSelection);
+  const apiBase = statsWithSelection(apiSelection, undefined, theoryModel);
   const supportMode = isSupportPowerSnapshot(state.powerSnapshot);
   const recommendDescription = $('recommendDescription');
   if (recommendDescription) recommendDescription.textContent = supportMode
@@ -5103,13 +5211,15 @@ async function calculateAndRender() {
     const label = $(id)?.closest('label');
     if (label) label.classList.toggle('hidden', supportMode);
   }
-  renderCombatStats(current);
-  renderKeenEfficiency(current);
+  const equipped = statsWithSelection(state.selected, undefined, skillModel);
+  renderCombatStats(equipped);
+  renderKeenEfficiency(equipped);
   const apiBaseValue = Number(apiBase.result.value || 0);
   const currentValue = Number(current.result.value || 0);
   const manualMana = Boolean($('manaShortageClass')?.checked);
   renderManaEnvironment();
-  const manaInput = manualMana
+  const manaNotApplicable = manaNotUsed(state.manaCharacter);
+  const manaInput = manaNotApplicable ? { reason: '마나 검증 해당 없음 · 별도 직업 자원' } : manualMana
     ? state.skillCycle?.appliedCycleLinkCount > 0
       ? { reason: '연동 스킬의 재사용 대기시간과 마나 부족의 상호작용 미검증' }
       : manaScenarioForRecommendation()
@@ -5149,13 +5259,20 @@ async function calculateAndRender() {
   const nodes = (state.evolution?.nodes || []).filter(node => !excludeCooldown || !hasCooldownEffect(node.name));
   const fixedSelection = selectionWithoutTiers(state.selected, [2, 3, 4, 5]);
   const baseStats = getBaseStats(fixedSelection);
-  const skillModel = prepareSkillScoring();
-  skillModel.unverifiedClassEffects = unverifiedPassiveEffectsCount() > 0;
+  const unverifiedClassEffects = unverifiedPassiveEffectsCount() > 0;
+  const style = currentAttackStyle(skillModel.units);
+  const rates = readAttackRates(skillModel.units, supportMode);
+  const directionAssumption = [
+    $('headAttackEnabled')?.checked && '헤드 적중률 100% 가정',
+    $('backAttackEnabled')?.checked && '백 적중률 100% 가정'
+  ].filter(Boolean).join(' · ') || '헤드·백 적중 추가 효과 미적용';
+  if (!supportMode && recommendDescription) recommendDescription.textContent =
+    '공격 성향 ' + style + ' · 이론 피해 비교에서 시전 횟수와 마나 지속성은 별도로 계산합니다.';
   const ranks = createManaRanking(true);
   const scores = new Map();
   const partyScores = new Map();
   function scoreCandidate(stats) {
-    return { ...score(stats, skillModel), unverifiedClassEffects: skillModel.unverifiedClassEffects };
+    return { ...score(stats, theoryModel), unverifiedClassEffects };
   }
   function supportCandidate(entries, stats) {
     const selection = Object.assign({}, fixedSelection,
@@ -5168,7 +5285,8 @@ async function calculateAndRender() {
     const supportModel = supportMode ? supportCandidate(entries, stats) : null;
     const recValue = supportModel ? Number(supportModel.totalBuffPower || 1) : result.value;
     const mana = manaInput?.scenario ? evaluateManaCandidate(manaInput.scenario, stats, result) : null;
-    return { calc: { stats, result }, supportModel, recValue, mana };
+    const conditionedValue = rates ? score(stats, theoryModel, rates).value : null;
+    return { calc: { stats, result }, supportModel, recValue, mana, directionAssumption, conditionedValue };
   }
   const compactMana = mana => mana && {
     value: mana.value, alternateValue: mana.alternateValue, quality: mana.quality, validation: mana.validation,
@@ -5238,7 +5356,13 @@ async function calculateAndRender() {
   recommendList.dataset.generationMs = String(generationMs);
   recommendList.dataset.rankingMs = String(rankingMs);
   renderRecommendation = () => {
-    const mode = $('manaRecommendationMode')?.value || 'auto';
+    const selector = $('manaRecommendationMode');
+    if (selector) {
+      selector.disabled = Boolean(manaNotApplicable);
+      if (manaNotApplicable) selector.value = 'theory';
+    }
+    const selectedMode = selector?.value || 'auto';
+    const mode = manaNotApplicable ? 'theory' : selectedMode;
     const defaultRecommendation = mode === 'auto';
     const showMana = defaultRecommendation && !supportMode;
     const estimates = supportMode ? ranks.estimatesSupport : ranks.estimates;
@@ -5337,7 +5461,7 @@ async function calculateAndRender() {
       const value = rankValue(c);
       const lead = rankValue(top[0]);
       const diff = lead > 0 ? (value / lead - 1) * 100 : 0;
-      const manaStatus = c.mana?.eligible ? `300초 마나 안정${c.mana.validation === 'estimate' ? ' (추정)' : ''}`
+      const manaStatus = manaNotApplicable ? '해당 없음' : c.mana?.eligible ? `300초 마나 안정${c.mana.validation === 'estimate' ? ' (추정)' : ''}`
         : c.mana?.firstShortage != null ? '마나 부족' : '미검증';
       const tiers = [2, 3, 4, 5].map(tier => {
         const chips = c.entries.filter(entry => entry.tier === tier).map(({ name, level }) =>
@@ -5552,6 +5676,7 @@ function resetCharacterResultState() {
   state.specScenarioSelectedKeys = new Set();
   state.abilityStone = { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
   state.engraving = emptyEngravingState();
+  state.rawEngravings = [];
   state.arkGrid = { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   state.enlightenment = { critRate: 0, critDamage: 0, critHitDamage: 0, evolutionDamage: 0, enemyDamage: 0, additionalDamage: 0, attackSpeed: 0, moveSpeed: 0, items: [] };
   state.card = emptyCardEffects();
@@ -5571,18 +5696,26 @@ function applyCharacterData(data, restore) {
   state.bracelet = data.braceletEffects || { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   state.abilityStone = data.abilityStoneEffects || { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
   state.engraving = data.engravingEffects || emptyEngravingState();
+  state.rawEngravings = data.raw?.ArmoryEngraving?.ArkPassiveEffects || [];
   state.arkGrid = data.arkGridEffects || { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   state.arkGridSkillEffects = data.arkGridSkillEffects || emptyPassiveSkillEffectState();
   state.card = data.cardEffects || emptyCardEffects();
   state.skillEffects = data.skillEffects || emptySkillEffectState();
   if (Array.isArray(data.skills) && data.skills.length) {
+    const currentTripods = new Map(extractCombatSkillEffects(data.skills).items.map(item => [item.name, item]));
     const metadataBySkill = new Map(data.skills.map(skill => [String(skill.Name || '').trim(), {
       ...parseSkillManaUsage(skill.Tooltip), attackDirection: parseSkillAttackDirection(skill)
     }]));
     // Older cached API responses still include the raw current-level skill tooltips.
     state.skillEffects = { ...state.skillEffects };
     for (const field of ['items', 'cycleItems', 'calculableItems']) {
-      state.skillEffects[field] = (state.skillEffects[field] || []).map(item => ({ ...item, ...metadataBySkill.get(item.name) }));
+      state.skillEffects[field] = (state.skillEffects[field] || []).map(item => {
+        const parsed = currentTripods.get(item.name);
+        const hasDirectionalClause = parsed?.selectedTripods.some(tripod => tripod.directionalDamage?.length)
+          || item.selectedTripods?.some(tripod => tripod.directionalDamage?.length);
+        return { ...item, ...metadataBySkill.get(item.name),
+          ...(hasDirectionalClause && parsed ? { selectedTripods: parsed.selectedTripods, effects: parsed.effects } : {}) };
+      });
     }
   }
   state.powerSnapshot = data.powerSnapshot || null;
@@ -5595,6 +5728,7 @@ function applyCharacterData(data, restore) {
   if (previousManaCharacter && characterKey !== previousManaCharacter) {
     $('manaShortageClass').checked = false;
     $('manaScenarioPanel').open = false;
+    $('directionRateInputs')?.replaceChildren();
   }
   previousManaCharacter = characterKey;
   fillManaProfileInputs();
@@ -5609,6 +5743,7 @@ function applyCharacterData(data, restore) {
   state.apiSelected = JSON.parse(JSON.stringify(state.selected));
   refreshSkillCycleModel();
   refreshPassiveSkillEffects();
+  populateAdrenalineReplacementOptions();
   state.enlightenment = extractEnlightenmentEffects(state.foundEffects, state.passiveSkillEffects);
   renderSkillEffectControl();
   applyProfileDefaults(data.profile, state.apiSelected);
@@ -5942,6 +6077,8 @@ $('adrenalineReplacementBookLevel')?.addEventListener('change', () => { updateEn
 $('critSynergyEnabled').addEventListener('change', () => setCalculationDirty(true));
 $('critSynergyValue').addEventListener('change', () => setCalculationDirty(true));
 $('backAttackEnabled').addEventListener('change', () => setCalculationDirty(true));
+$('headAttackEnabled')?.addEventListener('change', () => setCalculationDirty(true));
+$('directionRateInputs')?.addEventListener('input', () => setCalculationDirty(true));
 $('excludeCooldown')?.addEventListener('change', () => setCalculationDirty(true));
 $('noManaMainSkill')?.addEventListener('change', () => setCalculationDirty(true));
 $('singleHitMainSkill')?.addEventListener('change', () => setCalculationDirty(true));

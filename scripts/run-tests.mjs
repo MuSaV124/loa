@@ -29,6 +29,7 @@ const SUITES = [
   'test-honing-market.mjs',
   'test-spec-planner.mjs',
   'test-skill-effects.mjs',
+  'test-combat-attacks.mjs',
   'test-mana-recommendation.mjs',
   'test-mana-environment.mjs',
   'test-mana-automatic.mjs',

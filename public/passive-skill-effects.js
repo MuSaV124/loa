@@ -1,4 +1,4 @@
-import { SKILL_EFFECT_KEYS, hasSkillEffects, parseSkillEffectText, withoutCritRateDamageClause } from './skill-effects.js';
+import { SKILL_EFFECT_KEYS, hasSkillEffects, parseSkillEffectText, splitDirectionalHitDamage, withoutCritRateDamageClause } from './skill-effects.js';
 import { classCoreClauseAvailable, classScopedDamageTargets, SKILL_TYPE } from './class-damage-rules.js';
 
 const EFFECT_KEYS = [...SKILL_EFFECT_KEYS];
@@ -72,7 +72,9 @@ function removePerUnitDamage(value) {
 }
 
 function removeNonCombatDamage(value) {
-  return String(value || '').replace(/무력화\s*피해량(?:이|가)?\s*\d+(?:\.\d+)?\s*%\s*(?:증가|상승)(?:한다|합니다)?/gi, ' ');
+  return String(value || '')
+    .replace(/무력화\s*피해량(?:이|가)?\s*\d+(?:\.\d+)?\s*%\s*(?:증가|상승)(?:한다|합니다)?/gi, ' ')
+    .replace(/(?:시전\s*중|자신(?:이|은)?)\s*받는\s*(?:모든\s*)?피해(?:량)?(?:이|가)?\s*\d+(?:\.\d+)?\s*%\s*(?:증가|감소)/gi, ' ');
 }
 
 function mergeEffects(target, source) {
@@ -215,6 +217,10 @@ function augmentPassiveEffects(parsed, clause, classification) {
 }
 
 function classifyClause(clause, { knownSkills, knownCategories }) {
+  if (/^(?:공격이\s*)?(?:헤드|백)\s*어택(?:으로)?\s*(?:적중|공격|성공)\s*시/.test(clause)) {
+    const { rules } = splitDirectionalHitDamage(clause, '');
+    if (rules.length === 1) return { scope: 'direction-hit', targets: [], selector: rules[0].direction };
+  }
   if (/각성기\s*(?:를|을)?\s*제외한\s*모든\s*스킬/i.test(clause)) {
     return { scope: 'non-awakening', targets: [], selector: '각성기 제외' };
   }
@@ -275,6 +281,7 @@ function extractScopedSkillEffects(effects, { skillItems = [], shareNames = [], 
       let classification = classTargets ? { scope: 'skill', targets: classTargets, selector: '' }
         : classifyClause(clause, { knownSkills, knownCategories });
       const activationUnknown = classification.scope === 'state'
+        || /^(?:['"“”‘’]운명[^'"“”‘’]+['"“”‘’]\s*:\s*)?[가-힣A-Za-z0-9 ·]{1,28}\s*(?:상태|태세)\s*(?:에서|일\s*때|인\s*동안)\s/i.test(clause)
         || /폭주\s*(?:중|상태\s*돌입\s*시)|여우비가\s*활성화되어\s*있는\s*동안|카드\s*사용\s*시\s*\d+(?:\.\d+)?\s*초|효과를\s*보유하는\s*동안|중첩\s*수에\s*따라/i.test(clause);
       if (classification.scope === 'global' && activationUnknown) {
         classification = { scope: 'state', targets: [], selector: '상태 조건' };
@@ -292,7 +299,7 @@ function extractScopedSkillEffects(effects, { skillItems = [], shareNames = [], 
         continue;
       }
       pendingTargets = [];
-      const effectsForRule = classification.scope === 'global' ? parsed : normalizeScopedDamage(parsed);
+      const effectsForRule = classification.scope === 'global' || classification.scope === 'direction-hit' ? parsed : normalizeScopedDamage(parsed);
       const signature = [category, payload.nodeName, classification.scope, classification.targets.map(normalize).join(','), normalize(classification.selector), normalize(clause), JSON.stringify(effectsForRule)].join('|');
       if (seen.has(signature)) continue;
       seen.add(signature);

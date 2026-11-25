@@ -155,7 +155,8 @@
                 </select>
               </label>
             </div>
-            <label class="checkLabel"><span>백어택 적용</span><input id="backAttackEnabled" type="checkbox" /></label>
+            <label class="checkLabel"><span>이론 백어택 100% 가정</span><input id="backAttackEnabled" type="checkbox" /></label>
+            <label class="checkLabel"><span>이론 헤드어택 100% 가정</span><input id="headAttackEnabled" type="checkbox" /></label>
             <div class="adrenalineSetting">
               <label class="checkLabel"><span>아드레날린 적용</span><input id="adrenalineEnabled" type="checkbox" checked /></label>
               <label class="engravingLevelLabel"><span>유물 각인서</span>
@@ -260,6 +261,11 @@
                 <select id="manaRecommendationMode"><option value="auto">300초 실측 검증</option><option value="estimate">300초 추정 검증</option><option value="theory">이론상 기대 피해</option><option value="shortage">마나 부족 비교</option><option value="unverified">판정 보류</option></select>
               </label>
               <p id="manaRecommendationStatus" class="hint" aria-live="polite"></p>
+              <details id="directionRatePanel" class="comboDetails hidden">
+                <summary>스킬별 방향 적중률로 비교</summary>
+                <p class="hint">아래 공격의 적중률(0~100%)을 모두 입력한 뒤 재계산하세요. 조건부 기대 피해는 추천 상세에 표시합니다.</p>
+                <div id="directionRateInputs" class="inputGrid"></div>
+              </details>
               <details id="manaSensitivityPanel" class="comboDetails hidden"><summary>순위 가정 비교</summary><p id="manaSensitivity" class="hint"></p></details>
               <a id="manaRecoverySource" class="hint hidden" target="_blank" rel="noopener noreferrer">자연 회복 가정에 사용한 2024년 관찰 자료</a>
               <div id="recommendList" class="recommendList"></div>
@@ -401,11 +407,11 @@
 
     <footer class="pickFooter">
       <span>XXAPICK.APP · LOST ARK FAN-MADE SERVICE</span>
-      <span class="version">Version 6.1.8</span>
+      <span class="version">Version 6.1.9</span>
     </footer>
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <script type="module" src="/app.js?v=6.1.8-xxapick.1"></script>
+  <script type="module" src="/app.js?v=6.1.9"></script>
 </body>
 </html>

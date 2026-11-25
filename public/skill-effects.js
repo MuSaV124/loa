@@ -1,4 +1,5 @@
 import { SKILL_TYPE, tripodCritCoversPartialHits } from './class-damage-rules.js';
+import { DIRECTION } from './combat-attacks.js';
 
 export const SKILL_EFFECT_KEYS = [
   'critRate',
@@ -184,13 +185,39 @@ export function parseSkillManaUsage(tooltip) {
 
 export function parseSkillAttackDirection(skill) {
   const tooltip = typeof skill?.Tooltip === 'string' ? parseJsonString(skill.Tooltip) : skill?.Tooltip;
-  const description = tooltip?.Element_005?.value;
-  if (typeof description !== 'string') return null;
-  const direction = decodeEntities(description).match(/공격\s*타입\s*:\s*(백|헤드)\s*어택/)?.[1];
-  if (!direction) return false;
-  const removed = (skill?.Tripods || []).some(tripod => tripod.IsSelected === true
-    && /더\s*이상\s*(?:백|헤드)\s*어택(?:\s*공격)?이\s*적용되지/.test(collectSkillTooltipTexts(tripod.Tooltip).join(' ')));
-  return removed ? false : direction;
+  if (!tooltip || typeof tooltip !== 'object') return null;
+  const current = [];
+  for (const [key, box] of Object.entries(tooltip)) {
+    if (box?.type === 'BlinkLineStart') break;
+    if (/^Element_\d+$/.test(key) && typeof box?.value === 'string'
+      && (!box.type || box.type === 'SingleTextBox' || box.type === 'MultiTextBox')) current.push(box);
+  }
+  const labels = current.map(box => decodeEntities(box.value)).filter(text => /공격\s*타입\s*:/.test(text));
+  const directions = new Set(labels.flatMap(text => [...text.matchAll(/(?:공격\s*타입\s*:\s*|[,/]\s*)(백|헤드)\s*어택/g)].map(match => match[1])));
+  const descriptionKnown = current.some(box => box === tooltip.Element_005 || (box.type === 'SingleTextBox' && /피해|타격/.test(decodeEntities(box.value))));
+  const explicitNone = labels.length && labels.every(text => /공격\s*타입\s*:\s*(?:없음|비방향성)/.test(text));
+  let direction = directions.size === 1 ? [...directions][0]
+    : explicitNone || (!labels.length && descriptionKnown) ? false : null;
+  const changes = new Set((skill?.Tripods || []).filter(tripod => tripod.IsSelected === true)
+    .flatMap(tripod => collectSkillTooltipTexts(tripod.Tooltip))
+    .flatMap(text => {
+      if (/(?:백|헤드)\s*어택(?:\s*공격)?(?:이|을|은)?\s*(?:더\s*이상\s*)?(?:적용되지\s*않|적용하지\s*않|제거)/.test(text)) return [false];
+      const added = text.match(/(백|헤드)\s*어택(?:\s*공격|\s*판정)?(?:이|으로)?\s*(?:추가된다|변경된다|적용된다)/);
+      return added ? [added[1]] : [];
+    }));
+  if (changes.size) direction = changes.size === 1 ? [...changes][0] : null;
+  return direction;
+}
+
+const DIRECTIONAL_TRIPOD_CLAUSE = /(?:공격이\s*)?(헤드|백)\s*어택(?:으로)?\s*(?:적중|성공|공격)\s*시,?\s*(?:적에게\s*주는\s*)?피해(?:량)?(?:이|가)?\s*(?:추가로\s*)?(\d+(?:\.\d+)?)\s*%\s*(?:추가로\s*)?증가(?:한다|합니다)?/g;
+
+export function splitDirectionalHitDamage(text, name) {
+  const rules = [];
+  const remaining = String(text || '').replace(DIRECTIONAL_TRIPOD_CLAUSE, (_, side, damage) => {
+    rules.push({ name, direction: side === '헤드' ? DIRECTION.HEAD : DIRECTION.BACK, damage: Number(damage) });
+    return '';
+  });
+  return { rules, remaining };
 }
 
 function signedValue(rawValue, direction) {
@@ -403,8 +430,11 @@ function parseSelectedTripod(tripod) {
   const texts = collectSkillTooltipTexts(tripod?.Tooltip);
   const joinedText = texts.join(' ');
   const effects = emptyEffects();
+  const directional = new Map();
   for (const text of texts) {
-    mergeStrongestEffects(effects, parseOwnSkillEffectText(text));
+    const { rules, remaining } = splitDirectionalHitDamage(text, String(tripod?.Name || '').trim());
+    for (const rule of rules) directional.set(rule.direction, rule);
+    mergeStrongestEffects(effects, parseOwnSkillEffectText(remaining));
   }
   // A tripod's "적에게 주는 피해" applies to that skill, not the character-wide
   // enemy-damage bucket. Keep the exported text parser generic, then normalize it
@@ -421,6 +451,7 @@ function parseSelectedTripod(tripod) {
     name: String(tripod?.Name || '').trim(),
     icon: String(tripod?.Icon || '').trim(),
     effects,
+    ...(directional.size ? { directionalDamage: [...directional.values()] } : {}),
     timedSpeedBuff: hasTimedSpeedWording(joinedText) && Boolean(effects.attackSpeed || effects.moveSpeed),
     conditional: hasConditionalWording(joinedText),
     guaranteedCrit: Boolean(effects.forcedCrit),
