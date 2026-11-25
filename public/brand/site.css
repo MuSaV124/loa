@@ -147,7 +147,21 @@ body[data-site-page="home"] .calcTabPanel { display: none !important; }
 body[data-site-page="home"] .pickFooter .version { display: none; }
 
 .pickNav { flex-wrap: wrap; }
-.pickNav .tabButtonGroup { width: auto; }
+.pickNav .tabButtonGroup {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  width: min(100%, 342px);
+}
+
+.pickNav .tabButton {
+  display: grid;
+  place-items: center;
+  padding-inline: 2px;
+  text-align: center;
+  white-space: nowrap;
+}
+
 .pickNav .tabNoticeCard { flex-basis: 17rem; }
 .pickNav .tabButton.active { background: #483c96; border-color: #6656bd; color: #fff; box-shadow: none; }
 
@@ -194,7 +208,12 @@ body[data-site-page="home"] .pickClassLink { display: inline-block; margin-top: 
   .pickNav .tabNoticeCard { flex-basis: auto; }
 }
 
+@media (max-width: 480px) {
+  .pickNav .tabButton { min-height: 44px; }
+}
+
 @media (max-width: 360px) {
+  .pickNav .tabButton { font-size: .875rem; }
   body[data-site-page="home"] #siteContent, body.pickErrorPage #siteContent { padding: 12px; }
   .pickTools { grid-template-columns: minmax(0, 1fr); }
   .pickTool { min-height: 80px; }
