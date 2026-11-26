@@ -98,7 +98,7 @@ const baselineSkillItem = {
 };
 const characterResponse = {
   ok: true,
-  apiVersion: '6.1.13',
+  apiVersion: '6.1.14',
   profile: {
     CharacterName: '스킬표본', CharacterClassName: '브레이커', ServerName: '아브렐슈드',
     ItemAvgLevel: '1,700.00', CombatPower: '5,000.00', CharacterImage: '',
@@ -146,7 +146,7 @@ async function verifyViewport(viewport) {
   const page = await browser.newPage({ viewport });
   await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(characterResponse) }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
-  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.13');
+  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.14');
   await fillCharacterSearch(page, '스킬표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /스킬표본/ }).waitFor();
@@ -501,7 +501,7 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   };
   const fixture = {
     ok: true,
-    apiVersion: '6.1.13',
+    apiVersion: '6.1.14',
     profile: { ...characterResponse.profile, CharacterName: '다중치명표본', Stats: [] },
     arkPassive: { Points: evolutionPoints(140), Effects: [...fixedTier1, { Name: '입식 타격가', Level: 2 }] },
     accessoryEffects: accessory,
@@ -929,6 +929,8 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
       await output.getByText('스킬 비용 산출과 입력 비교').click();
       assert.ok(await output.getByRole('region', { name: '스킬별 마나 산출 근거' }).isVisible());
       assert.match(await output.getByRole('region', { name: '스킬별 마나 산출 근거' }).textContent(), /사용자 입력.*용광로 추가 MP|용광로 추가 MP.*사용자 입력/s);
+      assert.match(await output.getByRole('region', { name: '마나 용광로 순서 가정 비교' }).textContent(), /A 감소 후 추가.*B 추가 후 감소.*C 단계별 반올림/s);
+      assert.match(await page.locator('#manaOverview').textContent(), /최대 마나.*계획 소모.*예정 회복.*마나 수지.*마나 지속력/s);
       await output.getByText(/마나 부족 구간 \d+개/).click();
       assert.ok(await output.getByText(/부족 .* MP/).first().isVisible());
       await set('manaTimelineDuration', 61.5);
@@ -943,6 +945,17 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
         assert.ok(fits, `mana chart overflows at ${width}px`);
         if (screenshotDir) await output.screenshot({ path: join(screenshotDir, `mana-${width}.png`) });
       }
+      await page.locator('#manaShortageClass').uncheck();
+      await waitForRecommendations(page);
+      await page.locator('#manaSupportTimingMode').selectOption('cooldown');
+      await set('manaSupportTimes', '');
+      await set('manaSupportCastInterval', 20);
+      await page.locator('#manaFood').selectOption('chewySkewer');
+      await set('manaFoodTick', '');
+      assert.match(await page.locator('#manaSupportSummary').textContent(), /이론 간격 20\.00초.*분당 3\.00회/);
+      await simulate();
+      assert.match(await statusLine.textContent(), /조우부터 계산 간격마다 수신한다고 가정/);
+      assert.match(await statusLine.textContent(), /쫄깃한 꼬치구이/);
       await set('manaDowntime', '20 | 10');
       await simulate();
       assert.match(await statusLine.textContent(), /딜 중지 구간/);

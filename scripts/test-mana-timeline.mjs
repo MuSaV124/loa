@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { prepareManaScenario, evaluateManaRotation, forecastManaDamage, manaFurnaceDamage } from '../public/mana-recommendation.js';
-import { skillManaCostProfile } from '../public/mana-character.js';
+import { compareManaFurnaceCosts, prepareManaScenario, evaluateManaRotation, forecastManaDamage, manaFurnaceDamage } from '../public/mana-recommendation.js';
+import { manaSkillScope, skillManaCostProfile } from '../public/mana-character.js';
 import { parseSkillManaUsage } from '../public/skill-effects.js';
-import { resolveManaEnvironment } from '../public/support-mana.js';
+import { resolveManaEnvironment, supportManaCycle, supportManaProfile } from '../public/support-mana.js';
 
 const actors = [
   { name: 'A', first: 0, interval: 4, cost: 40, fixedInterval: true },
@@ -72,6 +72,38 @@ const artist = { support: 'artist', duration: 12, maxMana: 1000, naturalMana: 0,
 assert.equal(resolveManaEnvironment({ ...artist, variant: 'level-7' }).instant[0].amount, 220);
 assert.deepEqual(resolveManaEnvironment({ ...artist, variant: 'level-14-tripod' }).instant, [{ time: 1, amount: 370 }]);
 assert.equal(resolveManaEnvironment({ ...artist, variant: 'level-14-tripod', manualRestore: 300 }).instant[0].amount, 300);
+assert.deepEqual([479, 480, 481].map(manaCost => manaFurnaceDamage(furnace, { manaUsageKnown: true, usesMana: true, manaCost }).damage), [23.95, 24, 24]);
+const orders = compareManaFurnaceCosts({ base: 485, beforeEvolution: 291, reduced: 209.52, extra: 61.5, reductions: [20, 10], stacking: 'product' });
+assert.ok(Math.abs(orders.a - 271.02) < 1e-9 && Math.abs(orders.b - 236.088) < 1e-9);
+assert.equal(orders.c, 272);
+assert.equal(compareManaFurnaceCosts({ base: null, beforeEvolution: 291, reduced: 209.52, extra: 61.5 }).b, null);
+assert.equal(manaSkillScope({ name: '데스 클로', category: '악마 스킬', currentTree: true }).automatic, false);
+assert.equal(manaSkillScope({ name: '포격 : 에너지 포', currentTree: true }).phase, '변신·포격');
+assert.equal(manaSkillScope({ name: '리벤지 블로우', category: '발현 스킬', currentTree: true }).automatic, true);
+assert.equal(manaSkillScope({ name: '리벤지 블로우', category: '발현 스킬', currentTree: true }).phase, '발현 스킬');
+assert.equal(manaSkillScope({ name: '마리포사', skillType: 1, currentTree: false }).phase, '초각성 스킬');
+const conditional = [{ name: '데스 클로', first: 0, interval: 4, cost: 90,
+  metadata: { manaUsageKnown: false, manaClassConditional: true } }];
+assert.match(evaluateManaRotation(prepare({}, conditional), effects).reason, /자원 유형 미확인/);
+const orbTooltip = { Element_004: { type: 'MultiTextBox', value: '<FONT>정령의 구슬 1 소모</FONT>|' } };
+assert.equal(parseSkillManaUsage(orbTooltip).manaUsageKnown, true);
+assert.equal(parseSkillManaUsage(orbTooltip).usesMana, false);
+assert.deepEqual(manaFurnaceDamage(furnace, parseSkillManaUsage(orbTooltip)), { damage: 0, known: true });
+const supportPlan = { swiftReduction: 25, gem: 20, tripodSeconds: 5, tripodPercent: 10 };
+const theory = supportManaCycle(supportManaProfile('bard'), supportPlan);
+assert.equal(theory.cooldown, 13.5);
+assert.ok(Math.abs(theory.coverage - 100 * 8 / 13.5) < 1e-9);
+const supportInput = { support: 'bard', duration: 30, maxMana: 1000, naturalMana: 100, cooldownPlan: supportPlan };
+const modelSupport = resolveManaEnvironment(supportInput);
+assert.deepEqual(modelSupport.windows.map(window => window.start), [0, 13.5, 27]);
+assert.equal(modelSupport.quality, 'estimate');
+assert.deepEqual(resolveManaEnvironment({ ...supportInput, receivedTimes: [2], manualRestore: 140 }).windows.map(window => window.start), [2]);
+assert.deepEqual(resolveManaEnvironment({ ...artist, receivedTimes: [], cooldownPlan: { interval: 5 } }).instant.map(event => event.time), [0, 5, 10]);
+assert.equal(resolveManaEnvironment({ ...supportInput, support: 'none', food: true, foodPreset: 'chewySkewer' }).baseline, 124);
+assert.equal(resolveManaEnvironment({ ...supportInput, support: 'none', food: true, foodPreset: 'chewySkewer', foodTick: 127 }).baseline, 127);
+const overlapping = prepare({ recoveryMana: 100, firstRecovery: 1, recoveryInterval: 1,
+  environment: { baseline: 100, windows: [{ start: 0, end: 5, amount: 130 }, { start: 0, end: 4, amount: 150 }] } }, single);
+assert.equal(overlapping.recovery[0].amount, 150);
 
 for (const duration of [60, 120, 180, 300, 111.5, 600]) {
   const forecast = evaluateManaRotation(prepare({ duration, startMana: 100, recoveryInterval: 1, firstRecovery: 1, recoveryMana: 30 },

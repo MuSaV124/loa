@@ -22,7 +22,7 @@
   <link rel="icon" type="image/svg+xml" href="/brand/icon.svg" />
   <link rel="apple-touch-icon" href="/brand/icon-180.png" />
   <link rel="manifest" href="/brand/site.webmanifest" />
-  <link rel="stylesheet" href="/style.css?v=mana-timeline-1" />
+  <link rel="stylesheet" href="/style.css?v=mana-timeline-3" />
   <link rel="stylesheet" href="/brand/site.css?v=4" />
 </head>
 <body data-site-page="home">
@@ -216,8 +216,8 @@
             <label>레이드 서포터
               <select id="manaSupport"><option value="none">서포터 없음</option><option value="bard">바드</option><option value="artist">도화가</option><option value="paladin">홀리나이트</option><option value="valkyrie">발키리</option></select>
             </label>
-            <p id="manaSupportSummary" class="hint" aria-live="polite"></p>
-            <p id="manaAutoStatus" class="hint">캐릭터 조회 후 공식 스킬 데이터를 표시합니다.</p>
+            <label>마나 회복 음식<select id="manaFood"><option value="none">미사용</option><option value="used">직접 입력 · 음식/만찬</option></select></label>
+            <div id="manaOverview" class="manaTimelineMetrics manaOverview"></div>
           </div>
           <details id="manaScenarioPanel" class="advancedInputDetails manaScenarioPanel">
             <summary><span><b>고급 마나 설정</b><small>전투 시작 MP, 회복 틱과 실제 시전 조건을 입력할 수 있습니다.</small></span></summary>
@@ -231,16 +231,27 @@
                 <label>첫 회복(초)<input id="manaFirstRecovery" type="number" min="0" step="any" /></label>
                 <label>회복 간격(초)<input id="manaRecoveryInterval" type="number" min="0.1" step="any" /></label>
                 <label>소모 감소 중첩<select id="manaCostReductions"><option value="">미확인</option><option value="sum">합산으로 실측</option><option value="product">개별 곱으로 실측</option></select></label>
-                <label>마나 회복 음식<select id="manaFood"><option value="none">미사용</option><option value="used">사용</option></select></label>
                 <label id="manaFoodTickLabel" class="hidden">음식 사용 중 회복 1회량<input id="manaFoodTick" type="number" min="0" step="any" /></label>
               </div>
+              <p id="manaFoodSummary" class="hint hidden"></p>
               <div id="manaSupportSettings" class="manaScenarioGrid hidden">
                 <label id="manaArtistVariantLabel" class="hidden">해우물 스킬·트라이포드<select id="manaArtistVariant"><option value="">Lv.14 기본 (25%)</option><option value="level-7">Lv.7 기본 (22%)</option><option value="level-14-tripod">Lv.14 + 마나 회복 (25% + 12%)</option></select></label>
                 <label>서포터 효과 가동률(%)<input id="manaSupportUptime" type="number" min="0" max="100" step="any" /></label>
                 <label>회복 효과를 받은 시각(초, 쉼표 구분)<input id="manaSupportTimes" type="text" /></label>
                 <label><span id="manaSupportRestoreLabel">실측 회복량</span><input id="manaSupportRestore" type="number" min="0" step="any" aria-labelledby="manaSupportRestoreLabel" /></label>
+                <label>서포터 회복 시각 기준<select id="manaSupportTimingMode"><option value="">실제 수신 시각·가동률</option><option value="cooldown">쿨타임 기준 가정</option></select></label>
+                <div id="manaSupportCooldownFields" class="manaScenarioGrid manaSupportCooldownFields hidden">
+                  <label>서포터 신속<input id="manaSupportSwift" type="number" min="0" max="4000" step="any" /></label>
+                  <label>신속 쿨 감소율(%, 선택)<input id="manaSupportSwiftRate" type="number" min="0" max="80" step="any" /></label>
+                  <label>보석 쿨 감소율(%)<input id="manaSupportGem" type="number" min="0" max="95" step="any" /></label>
+                  <label>트라이포드 쿨 감소(초)<input id="manaSupportTripodSeconds" type="number" min="0" step="any" /></label>
+                  <label>트라이포드 쿨 감소율(%)<input id="manaSupportTripodRate" type="number" min="0" max="95" step="any" /></label>
+                  <label>직접 지정 사용 간격(초)<input id="manaSupportCastInterval" type="number" min="0.1" max="600" step="any" /></label>
+                </div>
               </div>
+              <p id="manaSupportSummary" class="hint" aria-live="polite"></p>
               <p id="manaSupportTimingHint" class="hint hidden"></p>
+              <p id="manaAutoStatus" class="hint">캐릭터 조회 후 공식 스킬 데이터를 표시합니다.</p>
               <details class="manaAutoSkills">
                 <summary>입력 출처 및 게임 내 측정</summary>
                 <p id="manaInputEvidence" class="hint"></p>
@@ -442,11 +453,11 @@
 
     <footer class="pickFooter">
       <span>XXAPICK.APP · LOST ARK FAN-MADE SERVICE</span>
-      <span class="version">Version 6.1.13</span>
+      <span class="version">Version 6.1.14</span>
     </footer>
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <script type="module" src="/app.js?v=6.1.13"></script>
+  <script type="module" src="/app.js?v=6.1.14"></script>
 </body>
 </html>

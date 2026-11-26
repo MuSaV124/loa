@@ -1,18 +1,22 @@
 import { collectSkillTooltipTexts, parseSkillManaUsage } from './skill-effects.js';
 import { normalizeSkillCycleName, skillCooldownSeconds } from './skill-cycle.js';
+import { SKILL_TYPE } from './class-damage-rules.js';
 
 export const MANA_PROFILE_PATCH = '2026-11-19';
 // Add measured records only after matching the character signature and reviewing the source.
 export const VERIFIED_MANA_PROFILES = Object.freeze([]);
+// Korean item tooltip records 65107051, 65107002, 65107003 and 65107004.
+const FOCUS_RUNE_REDUCTION = Object.freeze({ 고급: 10, 희귀: 20, 영웅: 30, 전설: 40 });
 
 const SPECIAL_RESOURCES = {
-  가디언나이트: ['state-dependent', '엠버레스의 기운·소켓'],
+  가디언나이트: ['state-dependent', '엠버레스의 기운·소켓·엠버레스 오브 게이지'],
   인파이터: ['special', '기력·충격'],
   기공사: ['special', '내공·금강선공'],
   브레이커: ['special', '기력·충격·투기'],
   리퍼: ['unknown', '어둠·혼돈 게이지 · 마나 비용 표기 없음'],
   스카우터: ['state-dependent', '배터리·하이퍼 싱크'],
   데모닉: ['state-dependent', '마나·잠식 게이지·악마화'],
+  블래스터: ['state-dependent', '마나·포격 게이지·포격 모드'],
   아르카나: ['mixed', '마나·카드 수급'],
   배틀마스터: ['mixed', '마나·버블'],
   블레이드: ['mixed', '마나·블레이드 오브'],
@@ -42,18 +46,29 @@ export function readMaximumMana(profile) {
 function currentManaTooltip(raw, skill) {
   if (raw?.Tooltip == null) return { usage: skill, reason: '툴팁 누락' };
   const usage = parseSkillManaUsage(raw.Tooltip);
-  if (usage.manaUsageKnown) return { usage };
+  if (usage.manaUsageKnown) return { usage, alternativeResource: usage.alternativeResource };
   let tooltip = raw.Tooltip;
   if (typeof tooltip === 'string') {
     try { tooltip = JSON.parse(tooltip); } catch { return { usage, reason: '현재 레벨 비용 문구 미확인' }; }
   }
   const box = tooltip?.Element_004;
-  // The current Korean Armory gives this skill an Ancient Orb cost in the resource row.
-  if (box?.type === 'MultiTextBox' && typeof box.value === 'string' &&
-      /^정령의 구슬\s+[1-9]\d*\s*소모$/.test(collectSkillTooltipTexts(box.value.split('|')[0])[0] || '')) {
-    return { usage: { manaUsageKnown: true, usesMana: false, manaCost: 0 }, alternativeResource: '정령의 구슬' };
-  }
   return { usage, reason: box?.type === 'SingleTextBox' ? '설명 시작 · 별도 비용 행 생략' : '현재 레벨 비용 문구 미확인' };
+}
+
+export function manaSkillScope(skill) {
+  const category = String(skill.category || '');
+  const state = /(?:하이퍼 싱크|악마|화신)\s*스킬/.test(category) || /^포격\s*:/.test(skill.name);
+  const identity = /아이덴티티/.test(category);
+  const manifestation = /^발현\s*스킬/.test(category);
+  const basic = /^기본\s*공격$/.test(skill.name);
+  const phase = skill.skillType === SKILL_TYPE.hyperAwakening ? '초각성기'
+    : skill.skillType === SKILL_TYPE.awakening ? '각성기'
+      : state ? '변신·포격' : identity ? '아이덴티티' : manifestation ? '발현 스킬' : basic ? '기본 공격'
+        : skill.skillType === SKILL_TYPE.hyperSkill ? '초각성 스킬' : '일반 스킬';
+  const conditional = state || identity || basic || [SKILL_TYPE.awakening, SKILL_TYPE.hyperAwakening].includes(skill.skillType);
+  const equippedEvidence = skill.currentTree === true ? '장착 추정' : '미장착 또는 미확인';
+  return { phase, conditional, equippedEvidence, automatic: !conditional && skill.currentTree === true,
+    linked: /체인|콤보/.test(skill.type || '') };
 }
 
 function readCostModifier(texts, source, rune = false) {
@@ -82,7 +97,13 @@ export function skillManaCostProfile(raw, skill) {
   const modifiers = (Array.isArray(raw?.Tripods) ? raw.Tripods : []).filter(tripod => tripod?.IsSelected === true)
     .map(tripod => readCostModifier(collectSkillTooltipTexts(tripod.Tooltip), tripod.Name || '트라이포드')).filter(Boolean);
   if (raw?.Rune?.Name === '집중') {
-    modifiers.push(readCostModifier(collectSkillTooltipTexts(raw.Rune.Tooltip), '집중 룬', true) || { source: '집중 룬', percent: null });
+    const { Grade: grade, Tooltip: tooltip } = raw.Rune;
+    const knownGrade = Object.hasOwn(FOCUS_RUNE_REDUCTION, grade);
+    const hasTooltip = tooltip != null && (typeof tooltip !== 'string' || Boolean(tooltip.trim()));
+    const observed = readCostModifier(collectSkillTooltipTexts(tooltip), '집중 룬', true);
+    modifiers.push(observed || (!hasTooltip && knownGrade
+      ? { source: '집중 룬 · 아이템 DB', percent: -FOCUS_RUNE_REDUCTION[grade] }
+      : { source: '집중 룬', percent: null }));
   }
   const valid = baseCost != null && modifiers.length <= 1 && modifiers.every(entry => entry.percent != null);
   return {
@@ -96,11 +117,17 @@ export function skillManaCostProfile(raw, skill) {
 export function buildCharacterManaProfile(profile, snapshot, rawSkills = [], skillItems = []) {
   const className = profile?.CharacterClassName || snapshot?.profile?.className || '';
   const build = snapshot?.profile?.secondClass || '';
-  const rawByName = new Map(rawSkills.map(skill => [normalizeSkillCycleName(skill.Name), skill]));
+  const key = (name, type) => `${normalizeSkillCycleName(name)}/${type ?? 0}`;
+  const rawByName = new Map(rawSkills.filter(skill => skill.SkillType != null).map(skill => [key(skill.Name, skill.SkillType), skill]));
+  const untypedByName = new Map();
+  for (const skill of rawSkills.filter(row => row.SkillType == null)) {
+    const name = normalizeSkillCycleName(skill.Name);
+    untypedByName.set(name, untypedByName.has(name) ? null : skill);
+  }
   const skills = skillItems.map(skill => ({
-    name: skill.name, level: skill.level,
+    name: skill.name, level: skill.level, skillType: skill.skillType, ...manaSkillScope(skill),
     baseCooldown: positiveNumber(skill.baseCooldownSeconds),
-    ...skillManaCostProfile(rawByName.get(normalizeSkillCycleName(skill.name)), skill)
+    ...skillManaCostProfile(rawByName.get(key(skill.name, skill.skillType)) ?? untypedByName.get(normalizeSkillCycleName(skill.name)), skill)
   }));
   const stats = Array.isArray(profile?.Stats) ? profile.Stats : [];
   const maximumMana = readMaximumMana(profile);
@@ -109,7 +136,7 @@ export function buildCharacterManaProfile(profile, snapshot, rawSkills = [], ski
   const observedNonMana = skills.some(skill => skill.baseCost === 0);
   const special = Object.hasOwn(SPECIAL_RESOURCES, className) ? SPECIAL_RESOURCES[className] : null;
   const kind = special?.[0] || (observedMana ? 'mana-observed' : 'unknown');
-  const resource = special?.[1] || (observedMana ? '장착 스킬에서 마나 사용 확인' : '자원 미확인');
+  const resource = special?.[1] || (observedMana ? '공식 스킬에서 마나 사용 확인' : '자원 미확인');
   const signature = JSON.stringify([
     profile?.CharacterName || snapshot?.profile?.name || '', className, build, maxMana, profile?.CharacterLevel ?? null,
     stats,

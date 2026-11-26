@@ -21,6 +21,12 @@ const liveFocusTooltip = JSON.stringify({
   Element_003: { type: 'ItemPartBox', value: { Element_000: '<FONT>스킬 룬 효과</FONT>', Element_001: '스킬 사용 시 마나 소모 30% 감소' } }
 });
 assert.equal(skillManaCostProfile({ ...raw, Tripods: [], Rune: { ...focus, Grade: '영웅', Tooltip: liveFocusTooltip } }).preEvolutionCost, 280);
+for (const [Grade, cost] of [['고급', 360], ['희귀', 320], ['영웅', 280], ['전설', 240]]) {
+  const result = skillManaCostProfile({ ...raw, Tripods: [], Rune: { Name: '집중', Grade } });
+  assert.equal(result.preEvolutionCost, cost);
+  assert.match(result.modifiers[0].source, /아이템 DB/);
+}
+assert.equal(skillManaCostProfile({ ...raw, Tripods: [], Rune: { Name: '집중', Grade: '전설', Tooltip: '효과 미확인' } }).preEvolutionCost, null);
 assert.equal(skillManaCostProfile({ ...raw, Rune: focus }).preEvolutionCost, null);
 assert.equal(skillManaCostProfile({ ...raw, Tripods: [{ ...reduction, Tooltip: '폭주 중 마나 소모량이 30% 감소한다.' }] }).preEvolutionCost, null);
 assert.equal(skillManaCostProfile({ ...raw, Tripods: [{ ...reduction, Tooltip: '마나 소모량이 <FONT>67.0%</FONT> 확률로 <FONT>100.0%</FONT> 감소한다.' }] }).preEvolutionCost, null);
@@ -147,7 +153,7 @@ try {
   const first = mockResponse();
   await characterHandler({ query }, first);
   assert.equal(first.statusCode, 200);
-  assert.equal(first.body.apiVersion, '6.1.13');
+  assert.equal(first.body.apiVersion, '6.1.14');
   assert.equal(first.body.manaProfile.maxMana, 3500);
   assert.equal(first.body.manaProfile.skills[0].preEvolutionCost, 280);
   assert.doesNotMatch(JSON.stringify(first.body), /test-token/);

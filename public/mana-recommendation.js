@@ -13,6 +13,20 @@ export function manaFurnaceDamage(effect, skill) {
   return { damage: Math.min(effect.maxEvolutionDamage, effect.damagePerTenMana * cost / 10), known: true };
 }
 
+export function compareManaFurnaceCosts({ base, beforeEvolution, reduced, extra, reductions = [], stacking } = {}) {
+  const a = reduced + extra;
+  if (!(base > 0) || !(beforeEvolution > 0) || !Number.isFinite(a)) return { a, b: null, c: null };
+  const factors = stacking === 'product'
+    ? reductions.map(percent => 1 - percent / 100)
+    : [Math.max(0, 1 - reductions.reduce((sum, percent) => sum + percent, 0) / 100)];
+  const combined = (base + extra) * (beforeEvolution / base);
+  return {
+    a,
+    b: factors.reduce((cost, factor) => cost * factor, combined),
+    c: factors.reduce((cost, factor) => Math.round(cost * factor), Math.round(beforeEvolution)) + Math.round(extra)
+  };
+}
+
 function validNumber(value, min, max = Infinity) {
   return Number.isFinite(value) && value >= min && value <= max;
 }
@@ -61,7 +75,7 @@ export function prepareManaScenario(input, damageSkills, cycleSkills = []) {
       return { reason: '스킬 이름, 첫 사용 시각, 재사용 간격과 마나 소모량을 확인해 주세요.' };
     }
     // Zero recorded cost can also be a mana skill made free by another effect.
-    const usesMana = known.manaUsageKnown === true ? known.usesMana : skill.cost > 0 ? true : null;
+    const usesMana = known.manaUsageKnown === true ? known.usesMana : !known.manaClassConditional && skill.cost > 0 ? true : null;
     byName.set(key, { ...skill, key, usesMana, cooldownEligible: known.cooldownEligible !== false,
       ...(analysisOnly && { baseManaCost: known.baseManaCost, tooltipPreEvolutionCost: known.tooltipPreEvolutionCost }),
       ...(strict && { castOnCompletion: /^(?:캐스팅|지점|casting|target)(?:\s*스킬)?$/i.test(known.type || '') }) });
@@ -350,6 +364,8 @@ function forecastManaRotation(scenario, stats) {
     baseManaCost: skill.baseManaCost, tooltipPreEvolutionCost: skill.tooltipPreEvolutionCost,
     costBeforeEvolution: skill.costBeforeEvolution, reduction: skill.costBeforeEvolution - skill.cost,
     furnaceExtra: maxMana * skill.maxManaCost, costSource: skill.costSource, intervalSource: skill.intervalSource,
+    ...(stats.manaFurnace && skill.usesMana && { furnaceOrder: compareManaFurnaceCosts({ base: skill.baseManaCost,
+      beforeEvolution: skill.costBeforeEvolution, reduced: skill.cost, extra: maxMana * skill.maxManaCost, reductions, stacking: scenario.reductions }) }),
     plannedCasts: counts[index], times: [], delayed: 0, ready: scenario.replay ? 0 : skill.first }));
   const tolerance = Number.EPSILON * maxMana * 32;
   const trace = [{ time: 0, mana: startMana, kind: 'start' }];

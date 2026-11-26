@@ -78,6 +78,8 @@ export function renderManaTimeline(output, result, damage, comparisons, unschedu
       <td>${format(skill.costBeforeEvolution)}<small>${escape(skill.costSource || 'UNKNOWN')}</small></td>
       <td>${format(difference)}</td><td>${format(skill.reduction)}</td><td>${format(skill.furnaceExtra)}</td><td>${format(skill.cost)}</td></tr>`;
   }).join('');
+  const furnaceRows = result.skillCasts.filter(skill => skill.furnaceOrder).map(({ name, furnaceOrder }) =>
+    `<tr><th scope="row">${escape(name)}</th><td>${format(furnaceOrder.a)}</td><td>${format(furnaceOrder.b)}</td><td>${format(furnaceOrder.c)}</td></tr>`).join('');
   const comparisonRows = comparisons.filter(comparison => comparison && (comparison.result || comparison.detail)).map(comparison => {
     const compared = comparison.result;
     const detail = [comparison.detail, compared?.reason].filter(Boolean).join(' · ');
@@ -110,11 +112,14 @@ export function renderManaTimeline(output, result, damage, comparisons, unschedu
     ${result.shortages.length ? `<details><summary>마나 부족 구간 ${result.shortages.length}개</summary><ul>
       ${result.shortages.map(row => `<li>${time(row.start)} ~ ${time(row.end)} · ${escape(row.skill)} · 부족 ${format(row.deficit)} MP</li>`).join('')}</ul></details>` : ''}
     <details><summary>스킬 비용 산출과 입력 비교</summary>
-      ${furnaceSelected ? '<p class="hint">용광로 추가 MP는 소모 감소 뒤에 합산하는 가정값입니다. 게임의 중첩 순서와 반올림은 UNKNOWN입니다.</p>' : ''}
+      ${furnaceSelected ? '<p class="hint">기존 시간 모델은 감소 뒤 추가하는 A 가정입니다. 게임의 중첩 순서와 반올림은 UNKNOWN입니다.</p>' : ''}
       <div class="manaTimelineTable" tabindex="0" role="region" aria-label="스킬별 마나 산출 근거"><table><thead><tr>
       <th scope="col">스킬 / 간격 근거</th><th scope="col">툴팁 기본 MP</th><th scope="col">툴팁 진화 전 산출</th>
       <th scope="col">사용한 진화 전 MP</th><th scope="col">입력 − 툴팁 산출</th><th scope="col">진화 절감 MP</th>
       <th scope="col">용광로 추가 MP</th><th scope="col">최종 모델 MP</th></tr></thead><tbody>${costs}</tbody></table></div>
+      ${furnaceRows ? `<div class="manaTimelineTable" tabindex="0" role="region" aria-label="마나 용광로 순서 가정 비교"><table><thead><tr>
+        <th scope="col">용광로 비교 (1회 MP)</th><th scope="col">A 감소 후 추가</th><th scope="col">B 추가 후 감소</th><th scope="col">C 단계별 반올림</th>
+      </tr></thead><tbody>${furnaceRows}</tbody></table></div><p class="hint">B는 현재 기본 MP 대비 입력한 비용의 비율이 추가량에도 적용된다고 가정합니다. C는 진화 전 비용과 각 적용 단계, 별도 추가량을 가장 가까운 정수로 반올림하는 가정입니다.</p>` : ''}
     </details>
     ${comparisonRows ? `<div class="manaTimelineTable" tabindex="0" role="region" aria-label="마나 효과 비교"><table><thead><tr>
     <th scope="col">시나리오 변경</th><th scope="col">소모/초</th><th scope="col">회복/초</th><th scope="col">첫 부족</th>

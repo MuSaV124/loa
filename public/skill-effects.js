@@ -174,14 +174,17 @@ export function parseSkillManaUsage(tooltip) {
     }
   }
   const distinctCosts = [...new Set(costs)];
+  const ancientOrb = parsed?.Element_004?.type === 'MultiTextBox' && distinctCosts.length === 0
+    && texts.some(text => !text.includes('마나') && /^정령의 구슬\s+[1-9]\d*\s*소모\s*(?:\||$)/.test(text));
   // A cooldown-only header or an unrecognized resource description does not prove a zero MP cost.
   const explicitNonMana = texts.some(text => !text.includes('마나') && (
     /(?:기력|충격|배터리|내공)(?:\s*에너지)?\s*[\d,]+\s*(?:소모|생성|획득)/.test(text)
     || /^(?:버블|엠버레스의 기운)\s+[\d,]+\s*소모(?:\s*,\s*소켓\s+[\d,]+\s*잠금)?\s*(?:\||$)/.test(text)
     || /^(?:자원\s*)?(?:소모(?:량)?\s*없음|무료)(?:[\s|.]*)$/.test(text)
   ));
-  const manaUsageKnown = distinctCosts.length === 1 || (distinctCosts.length === 0 && explicitNonMana);
-  return { usesMana: distinctCosts.length === 1, manaCost: distinctCosts.length === 1 ? distinctCosts[0] : 0, manaUsageKnown };
+  const manaUsageKnown = distinctCosts.length === 1 || (distinctCosts.length === 0 && explicitNonMana) || ancientOrb;
+  return { usesMana: distinctCosts.length === 1, manaCost: distinctCosts.length === 1 ? distinctCosts[0] : 0, manaUsageKnown,
+    ...(ancientOrb && { alternativeResource: '정령의 구슬' }) };
 }
 
 function partialAttackPrefix(text, offset) {

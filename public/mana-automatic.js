@@ -1,6 +1,6 @@
 import { findVerifiedManaProfile } from './mana-character.js';
-import { MANA_RECOMMENDATION_SECONDS, prepareManaScenario } from './mana-recommendation.js?v=6.1.13';
-import { resolveManaEnvironment, supportManaProfile } from './support-mana.js?v=6.1.13';
+import { MANA_RECOMMENDATION_SECONDS, prepareManaScenario } from './mana-recommendation.js?v=6.1.14';
+import { resolveManaEnvironment, supportManaProfile } from './support-mana.js?v=6.1.14';
 
 export function buildAutomaticManaAnalysis({ character, cycle, knownSkills = [], damageSkills = [], support = 'none', supportVariant = '',
   duration, verified = findVerifiedManaProfile(character) } = {}) {

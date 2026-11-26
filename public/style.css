@@ -4240,6 +4240,10 @@ select {
 .manaEnvironment { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px 12px; margin: 0 0 14px; }
 .manaEnvironment label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .manaEnvironment p { margin: 0; }
+.manaOverview { grid-column: 1 / -1; margin: 0; }
+.manaOverview small { color: var(--muted); }
+.manaEnvironment select { max-width: 100%; }
+.manaSupportCooldownFields { grid-column: 1 / -1; }
 #manaAutoStatus { grid-column: 1 / -1; }
 .manaAutoSkills ul { padding-inline-start: 18px; }
 .manaTimelinePanel { min-width: 0; border-top: 1px solid var(--softLine); }
@@ -4255,7 +4259,7 @@ select {
 .manaTimelineTable :is(th, td) { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--softLine); }
 .manaTimelineTable th:first-child { text-align: left; }
 .manaTimelineTable small { display: block; white-space: normal; min-width: 120px; }
-#manaSupportSettings.hidden, #manaArtistVariantLabel.hidden, .manaEnvironment.hidden { display: none; }
+#manaSupportSettings.hidden, #manaSupportCooldownFields.hidden, #manaArtistVariantLabel.hidden, .manaEnvironment.hidden { display: none; }
 @media (max-width: 560px) { .manaEnvironment { grid-template-columns: minmax(0, 1fr); } }
 .skillCycleTable {
   display: grid;
