@@ -8,8 +8,8 @@ import { parseCharacterArmory } from '../api/character.js';
 import { pagePath } from '../public/page-route.js';
 
 const [armoryFile, marketFile, output, mode = 'both'] = process.argv.slice(2);
-assert.ok(armoryFile && marketFile && output, 'Usage: node scripts/audit-xxapick-v3.mjs <armories> <market> <output> [both|ui|builds]');
-assert.ok(['both', 'ui', 'builds'].includes(mode), 'Unknown audit mode');
+assert.ok(armoryFile && marketFile && output, 'Usage: node scripts/audit-xxapick-v3.mjs <armories> <market> <output> [both|ui|builds|armory]');
+assert.ok(['both', 'ui', 'builds', 'armory'].includes(mode), 'Unknown audit mode');
 const readJson = async file => JSON.parse(await readFile(file, 'utf8'));
 const archive = await readJson(armoryFile);
 const market = await readJson(marketFile);
@@ -29,6 +29,17 @@ const catalog = await readJson(new URL('../docs/class-damage-audit-results.json'
 assert.deepEqual([...new Set([...fixtures.values()].map(row => row.build))].sort(), catalog.cases.map(row =>
   `${row.className} / ${row.className === '데빌헌터' && row.build === '강화 무기' ? '전술 탄환' : row.build}`).sort());
 assert.equal(fixtures.size, 99);
+
+const armoryChecks = [...fixtures.values()].map(({ data, build }) => {
+  auditArmoryData(data);
+  return { build, skills: data.skills.length, gems: data.powerSnapshot.gems.items.length,
+    gridSlots: data.powerSnapshot.arkGrid.slots?.length ?? 0, worn: data.powerSnapshot.coverage };
+});
+if (mode === 'armory') {
+  await writeFile(output, JSON.stringify({ sampleCount: fixtures.size, excluded, armoryChecks }, null, 2) + '\n');
+  console.log(JSON.stringify({ samples: fixtures.size, builds: new Set(armoryChecks.map(row => row.build)).size }));
+  process.exit(0);
+}
 
 const source = new URL('../public/', import.meta.url);
 const { routes, error } = getTransformedRoutes(await readJson(new URL('../vercel.json', import.meta.url)));
@@ -81,7 +92,7 @@ const executablePath = process.env.PLAYWRIGHT_CHROME_PATH || await access(instal
 const browser = await chromium.launch({ executablePath, headless: true });
 
 async function instrument(page, { traces = false } = {}) {
-  const log = { requests: {}, errors: [], consoleErrors: [], network: [], characterFailures: new Map(), marketFailures: new Set() };
+  const log = { requests: {}, errors: [], consoleErrors: [], network: [], characterFailures: new Map(), marketFailures: new Set(), avatarFailedParts: new Set() };
   page.on('pageerror', failure => log.errors.push(failure.message));
   page.on('console', message => { if (message.type() === 'error') log.consoleErrors.push(message.text()); });
   page.on('response', response => {
@@ -115,7 +126,9 @@ async function instrument(page, { traces = false } = {}) {
     if (url.pathname === '/api/market-snapshot') return route.fulfill({ json: market });
     if (url.pathname === '/api/crystal-price') return route.fulfill({ json: market.sections.crystal });
     if (url.pathname === '/api/legend-avatars') {
-      return route.fulfill({ json: { ok: true, scanned: 1, item: { name: url.searchParams.get('part'), price: 12000, tradeRemainCount: 3 } } });
+      const part = url.searchParams.get('part');
+      if (forced && log.avatarFailedParts.has(part)) return route.fulfill({ status: 503, json: { error: '격리 아바타 시세 API 오류' } });
+      return route.fulfill({ json: { ok: true, scanned: 1, item: { name: part, price: 12000, tradeRemainCount: 3 } } });
     }
     const section = { gemList: 'gem', engravingList: 'engraving', t4Materials: 'material' }[modeName];
     if (section) return route.fulfill({ json: market.sections[section] });
@@ -132,7 +145,7 @@ async function instrument(page, { traces = false } = {}) {
 }
 
 const near = (actual, expected, delta = 1e-8) => assert.ok(Math.abs(actual - expected) <= delta, `${actual} vs ${expected}`);
-const waitRanks = page => page.locator('#recommendList:not([aria-busy])').waitFor({ state: 'attached', timeout: 120000 });
+const waitRanks = page => page.locator('#recommendList:not([aria-busy])').waitFor({ state: 'attached', timeout: 240000 });
 const byId = (page, id) => page.locator(`#${id}`);
 const simulatorPath = name => pagePath({ page: 'simulator', name });
 const powerRow = page => page.locator('#specEfficiencyTable .specEfficiencyRow');
@@ -141,22 +154,32 @@ const goto = (page, path) => page.goto(origin + path, { waitUntil: 'domcontentlo
 const scopedName = [...fixtures].find(([, { data }]) => data.raw.ArmoryEngraving?.ArkPassiveEffects?.some(item => item.Name === '기습의 대가' || item.Name === '결투의 대가'))[0];
 const supportName = [...fixtures].find(([, row]) => /절실한 구원|만개|축복의 오라|해방자/.test(row.build))[0];
 
-function auditBuildData(fixture, payload) {
-  const { data } = fixture;
+function auditArmoryData(data) {
+  const parsedNumber = value => Number(String(value).replaceAll(',', ''));
   const snapshot = data.powerSnapshot;
   const rawProfile = data.raw.ArmoryProfile;
-  assert.equal(payload.name, rawProfile.CharacterName);
+  assert.equal(snapshot.profile.name, rawProfile.CharacterName);
   assert.equal(snapshot.profile.server, rawProfile.ServerName);
   assert.equal(snapshot.profile.className, rawProfile.CharacterClassName);
   assert.equal(snapshot.profile.secondClass, data.raw.ArkPassive.Title);
-  near(snapshot.profile.itemAvgLevel, Number(rawProfile.ItemAvgLevel.replaceAll(',', '')));
-  if (rawProfile.CombatPower) near(snapshot.accuracyTarget.officialCombatPower, Number(rawProfile.CombatPower.replaceAll(',', '')));
+  assert.equal(snapshot.profile.itemAvgLevel, parsedNumber(rawProfile.ItemAvgLevel));
+  if (rawProfile.CombatPower) assert.equal(snapshot.accuracyTarget.officialCombatPower, parsedNumber(rawProfile.CombatPower));
+  assert.deepEqual(snapshot.profile.stats.map(row => [row.type, row.value]), rawProfile.Stats.map(row => [row.Type, parsedNumber(row.Value)]));
   const wornTypes = new Set(['무기', '투구', '상의', '하의', '장갑', '어깨', '완갑']);
   assert.deepEqual(snapshot.equipment.combat.map(row => row.type).sort(), data.raw.ArmoryEquipment.filter(row => wornTypes.has(row.Type)).map(row => row.Type).sort());
   assert.deepEqual(snapshot.equipment.accessories.map(row => row.type).sort(), data.raw.ArmoryEquipment.filter(row => /목걸이|귀걸이|반지/.test(row.Type)).map(row => row.Type).sort());
   assert.equal(snapshot.gems.items.length, data.raw.ArmoryGem?.Gems?.length ?? 0);
   assert.equal(Boolean(snapshot.equipment.bracelet), data.raw.ArmoryEquipment.some(row => row.Type === '팔찌'));
   assert.equal(Boolean(snapshot.equipment.abilityStone), data.raw.ArmoryEquipment.some(row => row.Type === '어빌리티 스톤'));
+  for (const gem of data.raw.ArmoryGem?.Gems || []) {
+    const slot = snapshot.gems.items.find(row => row.slot === gem.Slot);
+    assert.ok(slot, `Missing gem slot ${gem.Slot}`);
+    if (gem.Level != null) assert.equal(slot.level, Number(gem.Level));
+  }
+}
+
+function auditBuildData(fixture, payload) {
+  assert.equal(payload.name, fixture.data.profile.CharacterName);
   assert.ok(payload.theory > 0 && Number.isFinite(payload.theory));
   assert.ok(payload.equipped > 0 && Number.isFinite(payload.equipped));
   const shares = payload.skillRows.reduce((sum, row) => sum + row[1], 0);
@@ -175,10 +198,12 @@ async function runBuilds() {
   const firstPerBuild = [...new Map(jobs.map(entry => [entry[1].build, entry])).values()];
   const firstNames = new Set(firstPerBuild.map(([name]) => name));
   jobs.splice(0, jobs.length, ...firstPerBuild, ...jobs.filter(([name]) => !firstNames.has(name)));
+  if (process.env.XXAPICK_AUDIT_CHARACTER) jobs.splice(0, jobs.length, ...jobs.filter(([name]) => name === process.env.XXAPICK_AUDIT_CHARACTER));
+  assert.ok(jobs.length > 0, 'No armory matched XXAPICK_AUDIT_CHARACTER');
   const checkpointFile = `${output}.ndjson`;
   await writeFile(checkpointFile, '');
   let checkpoint = Promise.resolve();
-  const concurrency = Math.max(1, Math.min(6, Number(process.env.XXAPICK_AUDIT_WORKERS) || 3));
+  const concurrency = Math.max(1, Math.min(jobs.length, 6, Number(process.env.XXAPICK_AUDIT_WORKERS) || 3));
   await Promise.all(Array.from({ length: concurrency }, async () => {
     const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
     page.setDefaultTimeout(60000);
@@ -271,7 +296,7 @@ async function viewportAudit(width) {
     const details = page.locator(selector).first();
     const summary = details.locator(':scope > summary');
     if (await details.getAttribute('open') === null) await summary.click();
-    await details.locator(':scope[open]').or(page.locator(`${selector}:visible[open]`).first()).first().waitFor({ state: 'attached' });
+    await page.locator(`${selector}:visible[open]`).first().waitFor({ state: 'attached' });
     return summary;
   };
   let initialCharacter;
@@ -373,8 +398,11 @@ async function viewportAudit(width) {
       await page.locator('[data-planner-mode="target"]').click();
       await byId(page, 'specPlannerTargetInput').fill('8500');
       await open('.specScenarioPanel');
-      const candidate = page.locator('[data-spec-scenario-key]:visible').first();
-      if (await candidate.isVisible()) await candidate.check();
+      const candidate = page.locator('label.specScenarioPick:visible').first();
+      if (await candidate.isVisible()) {
+        await candidate.click();
+        assert.match(await text(page, 'specScenarioOutput'), /B 적용:/);
+      }
       await click('specScenarioSaveButton');
       await click('specScenarioShareButton');
       assert.match(await page.evaluate(() => navigator.clipboard.readText()), /\/simulator\?scenario=/);
@@ -392,7 +420,8 @@ async function viewportAudit(width) {
       await owned.press('Tab');
       await option('armguardFromStage', '16');
       await option('armguardToStage', '17');
-      await page.locator('[name="armguardBreathMode"][value="none"]').check();
+      await page.locator('label:has([name="armguardBreathMode"][value="none"])').click();
+      assert.equal(await page.locator('[name="armguardBreathMode"][value="none"]').isChecked(), true);
       await page.locator('#armguardCostResult .armguardCostSummary').waitFor({ timeout: 40000 });
       assert.match(await text(page, 'armguardCostResult'), /16\s*→\s*\+?17/);
       await open('.simulatorMethodNote');
@@ -420,8 +449,10 @@ async function viewportAudit(width) {
           await page.locator('[data-avatar-job]').first().click();
           await page.getByText('머리/상의/하의/무기 모두 확인됨').waitFor();
           assert.match(await text(page, result), /48,000/);
+          log.avatarFailedParts.add('무기');
           await click('avatarRefreshButton');
-          await page.getByText('머리/상의/하의/무기 모두 확인됨').waitFor();
+          await page.getByText(/이전 가격 무기/).waitFor();
+          assert.match(await text(page, result), /48,000/);
           await click('avatarSearchAllButton');
         }
       }
@@ -504,7 +535,7 @@ async function viewportAudit(width) {
 
 try {
   const widths = process.env.XXAPICK_AUDIT_WIDTH ? [Number(process.env.XXAPICK_AUDIT_WIDTH)] : [1920, 1366, 820, 390, 360];
-  const result = { origin: 'local Vercel routes, isolated archived Armory and market responses', sampleCount: fixtures.size, excluded, marketAt: market.sectionUpdatedAt };
+  const result = { origin: 'local Vercel routes, isolated archived Armory and market responses', sampleCount: fixtures.size, excluded, marketAt: market.sectionUpdatedAt, armoryChecks };
   if (mode !== 'builds') result.ui = await Promise.all(widths.map(async width => {
     const evidence = await viewportAudit(width);
     console.log(JSON.stringify({ width, checks: Object.fromEntries(Object.entries(evidence.checks).map(([key, value]) => [key, value.split('\n')[0]])), errors: evidence.errors }));

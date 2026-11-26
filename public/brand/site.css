@@ -242,6 +242,19 @@ body[data-site-page="nodes"] #evolutionTiers :is(.nodeIcon, .nodeIcon img) { wid
 body[data-site-page="nodes"] #evolutionTiers .nodeName { min-width: 0; overflow-wrap: anywhere; }
 
 @media (min-width: 1181px) {
+  body[data-site-page="character"].calculatorReady .evolutionWorkspace {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-areas: 'main main' 'keen sidebar';
+    grid-template-columns: minmax(0, 1fr) 390px;
+    gap: inherit;
+    align-items: start;
+  }
+
+  body[data-site-page="character"] .evolutionMain { grid-area: main; }
+  body[data-site-page="character"] .evolutionSidebar { display: block; grid-area: sidebar; }
+  body[data-site-page="character"] #keenPanel { grid-area: keen; }
+
   body[data-site-page="nodes"].calculatorReady #siteContent { grid-template-columns: minmax(0, 1fr); }
 
   body[data-site-page="nodes"].calculatorReady .evolutionWorkspace {

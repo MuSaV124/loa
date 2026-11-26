@@ -4,7 +4,7 @@
 
 ## 자료와 검증 방법
 
-- 기존 감사의 103개 응답 중 클래스·빌드·스킬이 있는 99개를 격리 재생한다. 실제 장착 빌드 기준 30직업·60빌드다. 원본 응답과 시세 파일은 `tmp`에서 사용하며 저장소에 추가하지 않는다. 시세 표본은 공개 GET으로 내려받은 응답이며 미리보기용 입력으로만 사용한다. [OpenAPI 명세](https://developer-lostark.game.onstove.com/api-docs) · [공격 판정 감사 v2](combat-attack-audit-v2.md)
+- 기존 감사의 103개 응답 중 클래스·빌드·스킬이 있는 99개에서 프로필·전투력·특성·장비 부위·팔찌·돌·보석 슬롯을 원본과 대조했다. 이 검사는 실제 장착 기준 30직업·60빌드 전체에서 통과했다. 원본 응답과 시세 파일은 `tmp`에서 사용하며 저장소에 추가하지 않는다. 시세 표본은 공개 GET으로 내려받은 응답이며 미리보기용 입력으로만 사용한다. [OpenAPI 명세](https://developer-lostark.game.onstove.com/api-docs) · [공격 판정 감사 v2](combat-attack-audit-v2.md)
 - 11월 18일 다중 치명과 밸런스, 11월 19일·20일 핫픽스, 11월 25일 점검 및 11월 26일 알려진 이슈를 확인했다. 11월 25일 장신구 변경은 게임 UI에 이전 연마 단계가 남는 현상 수정이다. 새 시즌 장비 이관 공지는 사전 안내다. [11월 18일](https://lostark.game.onstove.com/News/Notice/Views/13598) · [11월 19일](https://lostark.game.onstove.com/News/Notice/Views/13601) · [11월 20일](https://lostark.game.onstove.com/News/Notice/Views/13603) · [11월 25일](https://lostark.game.onstove.com/News/Notice/Views/13606) · [11월 26일](https://lostark.game.onstove.com/News/Notice/Views/13605) · [2부 사전 안내](https://lostark.game.onstove.com/News/Notice/Views/13608)
 - 공식 전투력은 장착 상태의 `ArmoryProfile.CombatPower`와 대조한다. 변경 후 공식 전투력은 게임 내 같은 직업·세팅·강화 구간의 전후 표본 또는 공개 산식이 필요하다. 계산기의 기대 피해 및 환산 전투력은 표본 모델로만 검산한다. [OpenAPI 변경 이력](https://developer-lostark.game.onstove.com/changelog)
 - 재련 범위는 일반·상급 및 완갑이다. 완갑 15→16의 공식 기본 확률 3%, 성장 파편 328,000개, 재련 1회 9,280G를 공식 표와 교차 확인했다. 장인의 기운 계수와 숨결 부분 배분은 구현상의 전제다. 완갑 중간 단계 능력치와 전투력은 공식 공개 능력치 기준점 사이의 보간 및 변환이다. [완갑 공식 재련 표](https://lostark.game.onstove.com/News/Notice/Views/13508#anchor-1785742364253) · [공식 아이템 사전](https://lostark.game.onstove.com/ItemDictionary?key=134301106)
@@ -33,7 +33,7 @@
 | H02 | 공통 · 검색/갱신 | `getCharacterResult`의 프로필·캐시, 502·503 경로 | 오류 재시도와 이름 정규화, 원본 프로필 누락 처리 추가 | PARTIAL |
 | H03 | 공통 · 공식 공지 | `renderLostarkNoticeCard`, 공홈 링크 및 제목 | 격리 공지 응답, 원격 카드 확인 대기 | PARTIAL |
 | H04 | 공통 · 라우팅 | `pagePath`/`readPageRoute`, 공유 URL·404 | 뒤로/앞으로·새로고침·404 케이스, Preview 확인 대기 | PARTIAL |
-| C01 | 캐릭터 · 프로필 | `parseCharacterArmory`와 `renderCharacter`, 공식 프로필 필드 대조 | 검색된 캐릭터와 링크 복사, 원격 재조회 대기 | PARTIAL |
+| C01 | 캐릭터 · 프로필 | `parseCharacterArmory`와 `renderCharacter`, 공식 프로필 필드 대조 | 1366/1920px에서 펼친 요약이 링크 복사 클릭을 가리는 문제 수정, 원격 재조회 대기 | PARTIAL |
 | C02 | 캐릭터 · 계산 요약 | `score` → `expectedHitDamage`, 스킬별 가중 및 숫자 포맷 | 출처 펼치기·노드 초기화, 실전 적용률 미확인 | PARTIAL |
 | C03 | 캐릭터 · 깨달음·도약 | `extractEnlightenmentEffects`, 중복 문구 제외와 스킬 범위 | 상세 기본 경로, 조건부 효과 전수 실측 미확인 | PARTIAL |
 | C04 | 캐릭터 · 장착 효과 | `getBaseStats`, 돌·각인·악세·그리드·팔찌·카드 API 툴팁 | 각인 원문 캐시 보존 추가, 방향 각인별 실측 미확인 | PARTIAL |
@@ -66,11 +66,11 @@
 | S17 | 시뮬레이터 · 방법 안내 | `simulatorMethodNote`, 엔진·가격·주기 설명 | 접기/펼치기 및 모델 설명, Preview 확인 대기 | PARTIAL |
 | M01 | 시세 · 분류/신선도 | `marketFreshness`와 적용된 스냅샷 시각 | 보존된 가격과 갱신 시간 맞춤, Preview 확인 대기 | PARTIAL |
 | M02 | 시세 · 악세 | `/markets`·`/auctions`, 부위·옵션과 최저 등록가 | 성공·빈 결과의 디버그 펼침, 실제 판매 거래가 미확보 | PARTIAL |
-| M03 | 시세 · 아바타 | `loadLegendAvatarSet`, 4개 부위 최저 등록가 합산 | 직업 선택 경합 방지, 실 API 매물 교차 검산 대기 | PARTIAL |
+| M03 | 시세 · 아바타 | `loadLegendAvatarSet`, 4개 부위 최저 등록가 합산 | 직업 선택 경합 방지, 갱신 실패 부위의 기존 가격 보존과 최초 누락 상태 표시, 실 API 교차 검산 대기 | PARTIAL |
 | M04 | 시세 · 유각 | `renderEngravingPriceGrid`, 가격 내림차순 | 503에서도 가격표 보존, 실 API 매물 교차 검산 대기 | PARTIAL |
 | M05 | 시세 · 보석 | `renderGemPriceGrid`, 5~10레벨별 겁화·작열 가격 | 503에서도 가격표 보존, 실 API 매물 교차 검산 대기 | PARTIAL |
 | M06 | 시세 · 재료·젬 | `renderMaterialPriceGrid`, 최저 등록가와 묶음 단가 | 503에도 가격·갱신 상태를 유지, 실 API 매물 교차 검산 대기 | PARTIAL |
-| M07 | 시세 · 크리스탈 | `renderCrystalMarketPrice`, LOSPI 1시간 종가 | 503에서도 가격카드 보존, 공개 응답은 LOSPI 403으로 이전 값 사용 | PARTIAL |
+| M07 | 시세 · 크리스탈 | `renderCrystalMarketPrice`, LOSPI 1시간 종가 | 503에서도 가격카드 보존, 캔들 시각에 KST를 명시, 공개 응답은 LOSPI 403으로 이전 값 사용 | PARTIAL |
 | R01 | 배율 · 직업 데이터 | `renderRatioPanel`, 직업·빌드·코어별 대표 전투분석 | 필터와 빈 상태, 게시된 배율의 게임 내 최신 실측 미확인 | PARTIAL |
 
 ## 재현
@@ -83,4 +83,4 @@ git diff --check
 node scripts/audit-xxapick-v3.mjs tmp/attack-audit-v2-armories.json tmp/xxapick-v3-market-input.json tmp/xxapick-v3-audit.json
 ```
 
-`ui` 또는 `builds` 인수를 추가하면 별도로 실행한다. 테스트에서 사용한 서버는 Vercel의 페이지 rewrite와 앱 소스를 제공하고, API별 격리 응답을 공급한다. 운영 `/api/refresh-market-cache`는 호출하지 않는다. 현재 Preview 전체 검증과 게임 내 전후 실측은 완료 근거가 없다.
+`ui`, `builds` 또는 `armory` 인수를 추가하면 별도로 실행한다. 테스트에서 사용한 서버는 Vercel의 페이지 rewrite와 앱 소스를 제공하고, API별 격리 응답을 공급한다. 운영 `/api/refresh-market-cache`는 호출하지 않는다. 현재 Preview 전체 검증과 게임 내 전후 실측은 완료 근거가 없다.

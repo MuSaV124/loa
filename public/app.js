@@ -3356,11 +3356,18 @@ function marketSectionData(section) {
   return marketResponseCache.get(MARKET_SECTION_ROUTES[section])?.data;
 }
 
+function crystalMarketTimestamp(data) {
+  const candleTime = data?.latest?.dt;
+  // LOSPI candle labels omit the offset when expressed in Korean local time.
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(candleTime || '')
+    ? `${candleTime}+09:00` : candleTime || data?.updatedAt;
+}
+
 function renderMarketFreshness() {
   const now = Date.now();
   const statuses = Object.fromEntries(Object.keys(MARKET_SECTION_LABELS).map(section => {
     const data = marketSectionData(section);
-    return [section, marketFreshness(section === 'crystal' ? data?.latest?.dt || data?.updatedAt : data?.updatedAt, now)];
+    return [section, marketFreshness(section === 'crystal' ? crystalMarketTimestamp(data) : data?.updatedAt, now)];
   }));
   const marketStatus = $('marketFreshnessStatus');
   const selected = statuses[selectedMarketTab];
@@ -6518,9 +6525,9 @@ async function readJsonSafely(res) {
   }
 }
 
-function avatarPartCard(part, item) {
+function avatarPartCard(part, item, loading) {
   if (!item) {
-    return `<article class="avatarPart missing"><div class="avatarThumb empty">?</div><div><b>${escapeHtml(part)}</b><span>매물 없음</span><small>현재 조회 범위에서 ${escapeHtml(part)} 부위를 찾지 못했습니다.</small></div></article>`;
+    return `<article class="avatarPart missing"><div class="avatarThumb empty">?</div><div><b>${escapeHtml(part)}</b><span>${loading ? '조회 중' : '시세 미확인'}</span><small>${loading ? '부위별 최저가를 조회하고 있습니다.' : '현재 조회 범위에서 가격을 확인하지 못했습니다.'}</small></div></article>`;
   }
   const icon = item.icon ? `<img src="${escapeHtml(item.icon)}" alt="" loading="lazy" />` : `<span>${escapeHtml(part.slice(0, 1))}</span>`;
   const pheonText = Number(item.pheonCost || 0) > 0 ? ` · ${Number(item.pheonCost).toLocaleString('ko-KR')}페온` : '';
@@ -6539,22 +6546,25 @@ function renderLegendAvatarResult(data) {
   const parts = data.parts || {};
   const order = ['머리', '상의', '하의', '무기'];
   const missing = order.filter(part => !parts[part]);
+  const priceLabel = data.complete ? '한 벌 최저가' : '확인된 부위 합계';
+  const priceText = data.totalPrice > 0 ? formatGold(data.totalPrice) : data.loading ? '조회 중' : '시세 미확인';
   $('avatarResult').innerHTML = `<div class="avatarTotalBox">
     <div>
-      <span>${escapeHtml(data.job)} 전설 아바타 한 벌 최저가</span>
-      <strong>${formatGold(data.totalPrice)}</strong>
-      <small>${data.complete ? '머리/상의/하의/무기 모두 확인됨' : `미확인 부위: ${escapeHtml(missing.join(', '))}`}</small>
+      <span>${escapeHtml(data.job)} 전설 아바타 ${priceLabel}</span>
+      <strong>${priceText}</strong>
+      <small>${data.complete ? '머리/상의/하의/무기 모두 확인됨' : `미확인 부위: ${escapeHtml(missing.join(', '))}`}${data.preservedParts?.length ? ` · 이전 가격 ${escapeHtml(data.preservedParts.join(', '))}` : ''}</small>
     </div>
     <div class="avatarScanInfo">조회 매물 ${Number(data.scanned || 0).toLocaleString('ko-KR')}개 · 상세 확인 ${Number(data.detailScanned || 0).toLocaleString('ko-KR')}개${data.cached ? ' · 캐시' : ''}</div>
   </div>
-  <div class="avatarPartGrid">${order.map(part => avatarPartCard(part, parts[part])).join('')}</div>
+  <div class="avatarPartGrid">${order.map(part => avatarPartCard(part, parts[part], data.loading)).join('')}</div>
   <p class="avatarNotice">현재 거래소 등록 매물의 최저가 기준입니다. 세트명은 섞일 수 있고, 각 부위별 최저가만 합산합니다.</p>`;
 }
 
 async function loadLegendAvatarSet(job, force = false) {
   if (!job) return prepareLegendAvatarTab();
-  if (!force && legendAvatarCache.has(job)) {
-    renderLegendAvatarResult(legendAvatarCache.get(job));
+  const previous = legendAvatarCache.get(job);
+  if (!force && previous) {
+    renderLegendAvatarResult(previous);
     setAvatarMessage(`${job} 전설 아바타 시세를 캐시에서 표시했습니다.`);
     return;
   }
@@ -6582,7 +6592,7 @@ async function loadLegendAvatarSet(job, force = false) {
     matchedCount: 0,
     matched: []
   };
-  renderLegendAvatarResult(partial);
+  renderLegendAvatarResult(previous || { ...partial, loading: true });
 
   try {
     const settled = await Promise.allSettled(order.map(async (part) => {
@@ -6593,15 +6603,30 @@ async function loadLegendAvatarSet(job, force = false) {
       return { part, data };
     }));
 
-    for (const row of settled) {
-      if (row.status !== 'fulfilled') continue;
+    const preservedParts = [];
+    for (const [index, row] of settled.entries()) {
+      if (row.status !== 'fulfilled') {
+        const part = order[index];
+        if (previous?.parts?.[part]) {
+          partial.parts[part] = previous.parts[part];
+          preservedParts.push(part);
+        }
+        continue;
+      }
       const { part, data } = row.value;
-      partial.parts[part] = data.item || data.parts?.[part] || null;
+      const item = data.item || data.parts?.[part];
+      const price = Number(item?.price);
+      if (Number.isFinite(price) && price > 0) partial.parts[part] = item;
+      else if (previous?.parts?.[part]) {
+        partial.parts[part] = previous.parts[part];
+        preservedParts.push(part);
+      }
       partial.scanned += Number(data.scanned || 0);
       partial.detailScanned += Number(data.detailScanned || 0);
     }
     partial.totalPrice = Object.values(partial.parts).reduce((sum, item) => sum + Number(item?.price || 0), 0);
     partial.complete = order.every(part => !!partial.parts[part]);
+    partial.preservedParts = preservedParts;
     partial.matched = Object.values(partial.parts).filter(Boolean);
     partial.matchedCount = partial.matched.length;
     legendAvatarCache.set(job, partial);
@@ -6923,10 +6948,10 @@ function cleanEngravingName(name) {
 }
 
 function formatMarketUpdatedAt(value) {
-  if (!value) return '방금 갱신';
+  if (!value) return '갱신 시각 미확인';
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '방금 갱신';
-  return `마지막 갱신 ${d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+  if (Number.isNaN(d.getTime())) return '갱신 시각 미확인';
+  return `마지막 갱신 ${d.toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', second: '2-digit' })} KST`;
 }
 
 function renderMarketResults(container, data, title, subtitle) {
@@ -7102,7 +7127,7 @@ function renderCrystalMarketPrice(container, data) {
   if (!container) return;
   const gold = Number(data?.crystalGoldPer100 || 0);
   if (gold <= 0) return renderMarketError(container, '현재 크리스탈 시세를 확인할 수 없습니다.');
-  const latestTime = data?.latest?.dt || data?.updatedAt || '';
+  const latestTime = crystalMarketTimestamp(data);
   container.innerHTML = `
     <div class="crystalExchangeCard">
       <div class="crystalCurrency crystalCurrencyBlue">
