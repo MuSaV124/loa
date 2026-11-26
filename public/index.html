@@ -22,7 +22,7 @@
   <link rel="icon" type="image/svg+xml" href="/brand/icon.svg" />
   <link rel="apple-touch-icon" href="/brand/icon-180.png" />
   <link rel="manifest" href="/brand/site.webmanifest" />
-  <link rel="stylesheet" href="/style.css?v=routes-3" />
+  <link rel="stylesheet" href="/style.css?v=mana-timeline-1" />
   <link rel="stylesheet" href="/brand/site.css?v=4" />
 </head>
 <body data-site-page="home">
@@ -235,6 +235,7 @@
                 <label id="manaFoodTickLabel" class="hidden">음식 사용 중 회복 1회량<input id="manaFoodTick" type="number" min="0" step="any" /></label>
               </div>
               <div id="manaSupportSettings" class="manaScenarioGrid hidden">
+                <label id="manaArtistVariantLabel" class="hidden">해우물 스킬·트라이포드<select id="manaArtistVariant"><option value="">Lv.14 기본 (25%)</option><option value="level-7">Lv.7 기본 (22%)</option><option value="level-14-tripod">Lv.14 + 마나 회복 (25% + 12%)</option></select></label>
                 <label>서포터 효과 가동률(%)<input id="manaSupportUptime" type="number" min="0" max="100" step="any" /></label>
                 <label>회복 효과를 받은 시각(초, 쉼표 구분)<input id="manaSupportTimes" type="text" /></label>
                 <label><span id="manaSupportRestoreLabel">실측 회복량</span><input id="manaSupportRestore" type="number" min="0" step="any" aria-labelledby="manaSupportRestoreLabel" /></label>
@@ -252,6 +253,29 @@
                 <textarea id="manaExtraRecovery" rows="2" aria-label="추가 회복 시각과 회복량"></textarea>
               </label>
               <button id="applyManaScenario" type="button">마나 조건 적용</button>
+              <details id="manaTimelinePanel" class="manaTimelinePanel">
+                <summary>시간별 마나 지속력</summary>
+                <div class="manaScenarioGrid">
+                  <label>분석 시간(초)<input id="manaTimelineDuration" type="number" min="1" max="600" step="any" value="300" list="manaTimelinePresets" /></label>
+                  <datalist id="manaTimelinePresets"><option value="60"></option><option value="120"></option><option value="180"></option><option value="300"></option></datalist>
+                  <label>스킬 사용 간격<select id="manaTimelineBasis"><option value="fixed">사용자 지정 간격</option><option value="base">입력한 진화 적용 전 간격</option><option value="cooldown">쿨타임 기준 최대 사용</option></select></label>
+                  <label>동시각 처리<select id="manaTimelineOrder"><option value="before-cast">회복 후 시전</option><option value="after-cast">시전 후 회복</option></select></label>
+                </div>
+                <p class="hint">쿨타임 기준은 조회한 스킬로 첫 시전을 0초에 계획합니다. 사용자 지정 간격은 진화 쿨감을 다시 적용하지 않습니다. 두 방식 모두 위의 최대·시작 마나와 회복 입력을 사용합니다.</p>
+                <label>딜 중지 시작(초) | 종료(초) (선택)<textarea id="manaDowntime" rows="2"></textarea></label>
+                <label>스킬명 | 사용 가능 시작(초) | 종료(초) (선택)<textarea id="manaSkillWindows" rows="2"></textarea></label>
+                <label>스킬명 | 시전 시작 시각(초, 쉼표 구분) (선택)<textarea id="manaCastStarts" rows="2"></textarea></label>
+                <p class="hint">시전 시작 시각을 입력하는 경우, 비교할 스킬의 시각을 모두 입력하세요. 각성기와 초각성기는 시전 시각을 직접 입력한 경우에만 분석합니다.</p>
+                <label>회복 버프 시작(초) | 종료(초) | 효과 중 총 회복 1회량 (선택)<textarea id="manaBuffWindows" rows="2"></textarea></label>
+                <p class="hint">회복 버프가 겹치면 회복 1회량 중 가장 큰 값을 사용합니다. 겹친 상태의 실측값이 있다면 해당 구간에 입력하세요.</p>
+                <div class="manaScenarioGrid">
+                  <label>집중 룬 비교 스킬명 (선택)<input id="manaFocusSkill" type="text" /></label>
+                  <label>변경 후 진화 적용 전 비용<input id="manaFocusCost" type="number" min="0" step="any" /></label>
+                </div>
+                <button id="simulateManaTimeline" type="button">지속력 분석</button>
+                <p id="manaTimelineStatus" class="hint" role="status"></p>
+                <div id="manaTimelineResult" class="manaTimelineResult hidden"></div>
+              </details>
             </div>
           </details>
           <p id="arcanaIdentityNote" class="arcanaIdentityNote hidden"></p>
@@ -409,11 +433,11 @@
 
     <footer class="pickFooter">
       <span>XXAPICK.APP · LOST ARK FAN-MADE SERVICE</span>
-      <span class="version">Version 6.1.11</span>
+      <span class="version">Version 6.1.12</span>
     </footer>
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <script type="module" src="/app.js?v=6.1.11"></script>
+  <script type="module" src="/app.js?v=6.1.12"></script>
 </body>
 </html>

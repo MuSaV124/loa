@@ -19,6 +19,19 @@ export const SUPPORT_MANA = Object.freeze({
   }
 });
 
+// Current-level Korean Armory tooltips captured on 2026-11-25, with the selected tripod when specified.
+const ARTIST_VARIANTS = Object.freeze({
+  'level-7': { level: 7, percent: 22 },
+  'level-14-tripod': { level: 14, percent: 37, tripod: '마나 회복 (+12% 즉시)' }
+});
+
+export function supportManaProfile(support, variant = '') {
+  if (!Object.hasOwn(SUPPORT_MANA, support)) return null;
+  if (!variant) return SUPPORT_MANA[support];
+  if (support !== 'artist' || !Object.hasOwn(ARTIST_VARIANTS, variant)) return null;
+  return { ...SUPPORT_MANA.artist, ...ARTIST_VARIANTS[variant] };
+}
+
 export function supportManaSummary(profile) {
   if (!profile.skill) return '';
   const scope = [profile.skill, profile.tripod, profile.level && `Lv.${profile.level}`].filter(Boolean).join(' · ');
@@ -28,9 +41,9 @@ export function supportManaSummary(profile) {
 
 export function resolveManaEnvironment({
   support = 'none', duration, maxMana, naturalMana, uptime, receivedTimes = [], manualRestore,
-  food = false, foodTick, patch = SUPPORT_MANA_VERIFIED_AT, inclusiveEnd = false
+  food = false, foodTick, patch = SUPPORT_MANA_VERIFIED_AT, inclusiveEnd = false, variant = ''
 }) {
-  const profile = Object.hasOwn(SUPPORT_MANA, support) ? SUPPORT_MANA[support] : null;
+  const profile = supportManaProfile(support, variant);
   if (!profile) return { reason: '서포터 종류 미확인' };
   if (!Number.isFinite(naturalMana) || naturalMana < 0) return { reason: '기본 마나 회복량 미확인' };
   if (food && (!Number.isFinite(foodTick) || foodTick < naturalMana)) return { reason: '음식 사용 상태의 회복 1회량 미확인' };

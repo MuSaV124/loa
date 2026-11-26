@@ -3,12 +3,12 @@ import { BASE_CRIT_DAMAGE, CRIT_RATE_PER_STAT, NOVEMBER_2026_PATCH_URL, expected
 import { emptyCardEffects } from './card-effects.js?v=6.1.1';
 import { advancedHoningStageForLevel, optimizeAdvancedHoning, summarizeAdvancedHoningStrategy } from './advanced-honing-math.js?v=6.1.1';
 import { gemFusionPurchaseCount, isBoundGem } from './gem-math.js?v=6.1.1';
-import { emptySkillEffectState, extractCombatSkillEffects, formatSkillEffectSummary, parseSkillAttackProfile, parseSkillEffectText, parseSkillManaUsage, skillExperimentItems, withoutCritHitDamageClauses } from './skill-effects.js?v=6.1.10';
+import { emptySkillEffectState, extractCombatSkillEffects, formatSkillEffectSummary, parseSkillAttackProfile, parseSkillEffectText, parseSkillManaUsage, skillExperimentItems, withoutCritHitDamageClauses } from './skill-effects.js?v=6.1.12';
 import { ATTACK_SOURCE, DIRECTION, attackDirections, attackHitModifiers, attackOutcomes, buildAttackUnits, classifyAttackStyle, directionRate, engravingAllowedForBuild, engravingScope, isScopedEngraving, normalizedAttackName as normalizedSkillName, scopedEngraving } from './combat-attacks.js?v=6.1.10';
 import { emptyPassiveSkillEffectState, extractArkGridSkillEffects, extractArkPassiveSkillEffects, mergeSkillEffects, passiveEffectsForSkill } from './passive-skill-effects.js?v=6.1.10';
 import { calibrationScopeMatches, confidenceTier, findClassHoningSample } from './combat-power-calibration.js?v=6.1.1';
 import { combatAnalyzerGemFactors, combatAnalyzerSkillShares, findCombatAnalyzerProfile, gemUpgradeEfficiency } from './combat-analyzer.js?v=6.1.2';
-import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency, normalizeSkillCycleName } from './skill-cycle.js?v=6.1.10';
+import { buildSkillCycleModel, evaluateEvolutionCooldown, evaluateSkillCastFrequency, normalizeSkillCycleName, skillCooldownSeconds } from './skill-cycle.js?v=6.1.10';
 import { buildSupportSkillCycle, isSupportSnapshot, snapshotWithAccessoryCandidate, snapshotWithGemLevel, supportContributionModel, supportOfficialAccessoryTransition, supportUpgradeImpact } from './support-power.js?v=6.1.5';
 import { ADRENALINE_ENGRAVING_NAME, KEEN_BLUNT_NAME, KEEN_BLUNT_DAMAGE_FACTOR, RELIC_ENGRAVING_RULES, addEngravingEffects, adjustedEngravingEffects, clampRelicBookLevel, describeEngravingEffect, relicEngravingEffect } from './engraving-math.js?v=6.1.1';
 import { formatBenchmarkRange, sortedBenchmarkCores } from './class-benchmark.js?v=6.1.1';
@@ -19,10 +19,11 @@ import { normalHoningAttemptDistribution, normalHoningAttemptRatePercent } from 
 import { calculateHoningMaterialCost, goldEfficiency } from './honing-cost.js';
 import { materialPurchaser, materialQuote } from './material-quotes.js';
 import { marketFreshness, preservesPricedItems } from './market-freshness.js';
-import { MANA_RECOMMENDATION_SECONDS, createManaRanking, evaluateManaCandidate, manaFurnaceDamage, minimumSustainableMana, prepareManaScenario } from './mana-recommendation.js?v=6.1.10';
-import { AUTO_MANA_RECOVERY_SOURCE, buildAutomaticManaAnalysis } from './mana-automatic.js?v=6.1.7';
-import { buildCharacterManaProfile, findVerifiedManaProfile, MANA_PROFILE_PATCH, withManaCooldowns } from './mana-character.js?v=6.1.8';
-import { resolveManaEnvironment, SUPPORT_MANA, SUPPORT_MANA_VERIFIED_AT, supportManaSummary } from './support-mana.js?v=6.1.7';
+import { MANA_RECOMMENDATION_SECONDS, createManaRanking, evaluateManaCandidate, evaluateManaRotation, forecastManaDamage, manaFurnaceDamage, minimumSustainableMana, prepareManaScenario } from './mana-recommendation.js?v=6.1.12';
+import { clearManaTimelineGraph, renderManaTimeline } from './mana-timeline-ui.js?v=6.1.12';
+import { AUTO_MANA_RECOVERY_SOURCE, buildAutomaticManaAnalysis } from './mana-automatic.js?v=6.1.12';
+import { buildCharacterManaProfile, findVerifiedManaProfile, MANA_PROFILE_PATCH, withManaCooldowns } from './mana-character.js?v=6.1.12';
+import { resolveManaEnvironment, SUPPORT_MANA, SUPPORT_MANA_VERIFIED_AT, supportManaProfile, supportManaSummary } from './support-mana.js?v=6.1.12';
 import { estimateArmguardCombatPower } from './armguard-power.js?v=6.1.1';
 import { isCharacterPage, pagePath, readPageRoute, validCharacterName } from './page-route.js';
 import { ARCANA_CHANCELLOR_EFFECT, ARCANA_CULL_EFFECT, arcanaChancellorExpectationWeight, arcanaCombatExpectation, arcanaCullExpectationWeight, arcanaSovereignExpectationWeight, findArcanaCardExpectation, findArcanaStreamEffect, formatArcanaCardExpectation, scaleArcanaCardDraw, weightedArcanaCardValue, weightedEmperorNormalSkillCardValue } from './arcana-card-expectation.js?v=6.1.1';
@@ -36,7 +37,7 @@ import {
   remainingCooldownMs
 } from './cache-policy.js?v=6.1.1';
 
-const VERSION = '6.1.11';
+const VERSION = '6.1.12';
 const PARTY_EVOLUTION_NODES = new Set(['정열의 춤사위', '선각자', '진군', '기원', '입식 타격가', '마나 용광로', '안정된 관리자']);
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function isNoManaMainSkillEnabled() { return Boolean(document.getElementById('noManaMainSkill')?.checked); }
@@ -92,6 +93,7 @@ let renderRecommendation = null;
 function setCalculationDirty(dirty = true) {
   calculationDirty = Boolean(dirty);
   if (calculationDirty) {
+    clearManaTimeline();
     calculationRevision++;
     renderRecommendation = null;
     const recommendations = $('recommendList');
@@ -4314,6 +4316,8 @@ function prepareSkillScoring() {
     $('headAttackEnabled')?.checked && DIRECTION.HEAD,
     $('backAttackEnabled')?.checked && DIRECTION.BACK
   ].filter(Boolean);
+  const freeManaSkills = new Set((state.manaCharacter?.skills || []).filter(skill => skill.baseCost > 0 && skill.preEvolutionCost === 0)
+    .map(skill => normalizeSkillCycleName(skill.name)));
   const units = shares.units.map(unit => {
     const passive = passiveEffectsForSkill(state.passiveSkillEffects, unit);
     const arkGrid = passiveEffectsForSkill(state.arkGridSkillEffects, unit);
@@ -4326,6 +4330,7 @@ function prepareSkillScoring() {
     const arcanaEffects = streamApplies ? { critRate: arcanaStream.critRate } : {};
     return {
       ...unit,
+      freeManaSkill: freeManaSkills.has(normalizeSkillCycleName(unit.name)),
       effects: superAwakening ? { skillDamage: num(superEffects.skillDamage) }
         : mergeSkillEffects(unit.item?.effects || {}, passive.effects, arkGrid.effects, arcanaEffects),
       passiveRules: rules,
@@ -4407,6 +4412,7 @@ function score(stats, model = prepareSkillScoring(), hitRates = null) {
       critDamage: BASE_CRIT_DAMAGE, enemyDamageSources: [], manaFurnaceDamage: 0, appliedManaSkillEvolutionDamage: 0
     } : applyExperimentalSkillEffects(stats, {
       name: unit.name, effects, usesMana: unit.item?.usesMana === true,
+      freeManaSkill: unit.freeManaSkill,
       manaCost: unit.item?.manaCost, manaUsageKnown: manualNonMana || unit.item?.manaUsageKnown === true,
       attackDirection: direction === DIRECTION.BACK ? '백' : direction === DIRECTION.HEAD ? '헤드'
         : direction === DIRECTION.NON_DIRECTIONAL ? false : null
@@ -5084,7 +5090,7 @@ const MANA_INPUT_FIELDS = {
   manaMax: 'maxMana', manaStart: 'startMana', manaRecovery: 'recoveryMana',
   manaFirstRecovery: 'firstRecovery', manaRecoveryInterval: 'recoveryInterval', manaCostReductions: 'reductions'
 };
-const SUPPORT_INPUT_FIELDS = ['manaSupportUptime', 'manaSupportTimes', 'manaSupportRestore'];
+const SUPPORT_INPUT_FIELDS = ['manaSupportUptime', 'manaSupportTimes', 'manaSupportRestore', 'manaArtistVariant'];
 const supportManaInputs = new Map();
 let selectedManaSupport = 'none';
 let previousManaCharacter = '';
@@ -5123,7 +5129,9 @@ function manaNotUsed(character) {
 }
 
 function renderManaEnvironment() {
-  const profile = SUPPORT_MANA[$('manaSupport')?.value] || SUPPORT_MANA.none;
+  const support = $('manaSupport')?.value || 'none';
+  const variant = support === 'artist' ? $('manaArtistVariant')?.value : '';
+  const profile = supportManaProfile(support, variant) || SUPPORT_MANA.none;
   const supportSummary = $('manaSupportSummary');
   if (supportSummary) {
     supportSummary.innerHTML = profile.source
@@ -5131,6 +5139,7 @@ function renderManaEnvironment() {
       : '추가 서포터 회복 없음';
   }
   $('manaSupportSettings')?.classList.toggle('hidden', !profile.skill);
+  $('manaArtistVariantLabel')?.classList.toggle('hidden', support !== 'artist');
   $('manaFoodTickLabel')?.classList.toggle('hidden', $('manaFood')?.value !== 'used');
   const timingHint = $('manaSupportTimingHint');
   if (timingHint) {
@@ -5156,28 +5165,38 @@ function renderManaEnvironment() {
   const list = $('manaAutoSkillList');
   if (list) list.innerHTML = skills.map(skill => {
     const base = skill.baseCost == null ? '기본 비용 미확인' : skill.baseCost === 0 ? '비마나 스킬' : `기본 MP ${fmt(skill.baseCost)}`;
-    const effective = skill.preEvolutionCost > 0 ? ` · 진화 적용 전 ${fmt(skill.preEvolutionCost)}` : '';
+    const effective = skill.baseCost > 0 && skill.preEvolutionCost != null ? ` · 진화 적용 전 ${fmt(skill.preEvolutionCost)}` : '';
     const modifier = skill.modifiers.length ? ` · ${skill.modifiers.map(row => row.percent == null ? `${row.source} 미확인` : `${row.source} ${pct(row.percent)}`).join(' · ')}` : '';
     const cooldown = skill.effectiveCooldown ? ` · 쿨타임 모델 ${fmt(skill.effectiveCooldown)}초` : skill.baseCooldown ? ` · 기본 쿨 ${fmt(skill.baseCooldown)}초` : '';
     return `<li>${escapeHtml(`${skill.name} Lv.${skill.level} · ${base}${effective}${modifier}${cooldown}`)}</li>`;
   }).join('');
 }
 
-function manaScenarioForRecommendation() {
+function manaScenarioForRecommendation({ timeline = false } = {}) {
   const decimal = value => !String(value ?? '').trim() ? NaN : Number(value);
   const field = id => decimal($(id)?.value);
   const lines = id => String($(id)?.value || '').split(/\r?\n/).filter(line => line.trim())
     .map(line => line.split('|').map(value => value.trim()));
   const skillLines = lines('manaRotation');
   const recoveryLines = lines('manaExtraRecovery');
-  if (skillLines.some(line => line.length < 4 || line.length > 6) || recoveryLines.some(line => line.length !== 2)) {
+  const downtimeLines = timeline ? lines('manaDowntime') : [];
+  const windowLines = timeline ? lines('manaSkillWindows') : [];
+  const castLines = timeline ? lines('manaCastStarts') : [];
+  const buffLines = timeline ? lines('manaBuffWindows') : [];
+  const basis = timeline ? $('manaTimelineBasis').value : 'base';
+  if ((basis !== 'cooldown' && skillLines.some(line => line.length < 4 || line.length > 6))
+      || [...recoveryLines, ...downtimeLines, ...castLines].some(line => line.length !== 2)
+      || [...windowLines, ...buffLines].some(line => line.length !== 3)) {
     return { reason: '스킬과 추가 회복 행의 | 구분 형식을 확인해 주세요.' };
   }
   const knownSkills = (state.skillEffects?.items || []).filter(skill => Number(skill.level) > 0);
   const damageSkills = weightedSkillUnits().filter(unit => unit.weight > 0).map(unit => unit.name);
   const input = {
-    duration: field('manaDuration'),
-    strict: field('manaDuration') === MANA_RECOMMENDATION_SECONDS,
+    duration: field(timeline ? 'manaTimelineDuration' : 'manaDuration'),
+    strict: timeline || field('manaDuration') === MANA_RECOMMENDATION_SECONDS,
+    analysisOnly: timeline,
+    recoveryOrder: timeline ? $('manaTimelineOrder').value : undefined,
+    downtime: downtimeLines.map(([start, end]) => ({ start: decimal(start), end: decimal(end) })),
     maxMana: field('manaMax'),
     startMana: field('manaStart'),
     recoveryMana: field('manaRecovery'),
@@ -5186,14 +5205,41 @@ function manaScenarioForRecommendation() {
     reductions: $('manaCostReductions')?.value,
     skills: skillLines.map(([name, first, interval, cost, castTime, aftercast]) => ({
       name, first: decimal(first), interval: decimal(interval), cost: decimal(cost),
-      castTime: castTime ? decimal(castTime) : undefined, aftercast: aftercast ? decimal(aftercast) : undefined
+      castTime: castTime ? decimal(castTime) : undefined, aftercast: aftercast ? decimal(aftercast) : undefined,
+      fixedInterval: basis === 'fixed'
     })),
     extraRecovery: recoveryLines.map(([time, amount]) => ({ time: decimal(time), amount: decimal(amount) }))
   };
+  if (basis === 'cooldown') {
+    const cooldowns = new Map((state.skillCycle?.items || []).map(item => [normalizeSkillCycleName(item.name), item]));
+    const costs = new Map((state.manaCharacter?.skills || []).map(item => [normalizeSkillCycleName(item.name), item.preEvolutionCost]));
+    input.skills = knownSkills.filter(skill => skill.currentTree).map(skill => {
+      const key = normalizeSkillCycleName(skill.name);
+      const cooldownItem = cooldowns.get(key);
+      return { name: skill.name, first: 0, interval: cooldownItem ? skillCooldownSeconds(cooldownItem) : null,
+        cost: costs.get(key), cooldownItem, castTime: skill.castTime };
+    });
+    const unknown = input.skills.filter(skill => !Number.isFinite(skill.cost) || !Number.isFinite(skill.interval));
+    if (unknown.length) return { reason: `조회한 비용·쿨타임 미확인 (${unknown.map(skill => skill.name).join(', ')}). 사용자 지정 간격을 사용할 수 있습니다.` };
+  }
+  if (timeline) {
+    const skills = new Map(input.skills.map(skill => [normalizeSkillCycleName(skill.name), skill]));
+    for (const [name, start, end] of windowLines) {
+      const skill = skills.get(normalizeSkillCycleName(name));
+      if (!skill) return { reason: `사용 가능 구간에 지정한 스킬이 시전 목록에 없습니다. (${name})` };
+      (skill.activeWindows ??= []).push({ start: decimal(start), end: decimal(end) });
+    }
+    for (const [name, times] of castLines) {
+      const skill = skills.get(normalizeSkillCycleName(name));
+      if (!skill || skill.castStarts || basis === 'cooldown') return { reason: '시전 시각은 사용자 입력 스킬에 한 행씩 지정해 주세요.' };
+      skill.castStarts = times.split(',').map(decimal);
+    }
+  }
   const support = $('manaSupport')?.value || 'none';
   const times = $('manaSupportTimes')?.value.trim();
   const envInput = {
     support, duration: input.duration, maxMana: input.maxMana, naturalMana: input.recoveryMana,
+    variant: support === 'artist' ? $('manaArtistVariant')?.value : '',
     uptime: field('manaSupportUptime'), receivedTimes: times ? times.split(',').map(decimal) : [],
     manualRestore: field('manaSupportRestore'), food: $('manaFood')?.value === 'used', foodTick: field('manaFoodTick'),
     patch: MANA_PROFILE_PATCH, inclusiveEnd: input.strict
@@ -5207,6 +5253,12 @@ function manaScenarioForRecommendation() {
   }
   const environment = resolveManaEnvironment(envInput);
   if (environment.reason) return environment;
+  const measuredWindows = buffLines.map(([start, end, amount]) => ({ start: decimal(start), end: decimal(end), amount: decimal(amount) }));
+  if (measuredWindows.some(window => !Number.isFinite(window.start) || window.start < 0 || !Number.isFinite(window.end)
+    || window.end <= window.start || window.end > input.duration || !Number.isFinite(window.amount) || window.amount < input.recoveryMana)) {
+    return { reason: '회복 버프 구간과 총 회복 1회량을 확인해 주세요.' };
+  }
+  environment.windows.push(...measuredWindows);
   if (resourceKind === 'state-dependent' && !verified) {
     environment.quality = 'estimate';
     environment.assumption = [environment.assumption, '변신·자원 전환 타이밍 미검증'].filter(Boolean).join(' · ');
@@ -5218,15 +5270,85 @@ function manaScenarioForRecommendation() {
   const prepared = prepareManaScenario({ ...input, environment }, damageSkills, knownSkills);
   if (prepared.scenario?.strict) {
     prepared.detail = [environment.assumption, '입력한 시작 MP·회복 틱과 스킬 행 순서의 우선순위 적용',
-      '동시각에는 회복을 먼저 적용한다고 가정',
+      input.recoveryOrder === 'after-cast' ? '동시각에는 시전 우선' : '동시각에는 회복 우선',
       input.skills.some(skill => skill.castTime == null || skill.aftercast == null) && '누락된 시전·후딜 시간은 0초로 가정'].filter(Boolean).join(' · ');
   }
   if (prepared.scenario && support !== 'none') {
-    const withoutSupport = resolveManaEnvironment({ ...envInput, support: 'none' });
-    prepared.withoutSupport = prepareManaScenario({ ...input, environment: withoutSupport }, damageSkills, knownSkills).scenario;
+    const withoutSupport = resolveManaEnvironment({ ...envInput, support: 'none', variant: '' });
+    if (!measuredWindows.length) prepared.withoutSupport = prepareManaScenario({ ...input, environment: withoutSupport }, damageSkills, knownSkills).scenario;
+    else prepared.supportComparisonReason = '별도 회복 버프에 서포터 효과가 포함됐는지 미확인';
+  }
+  if (timeline && prepared.scenario) {
+    const withoutFood = resolveManaEnvironment({ ...envInput, food: false,
+      // A measured support tick with food cannot safely be substituted for the food-free tick.
+      manualRestore: SUPPORT_MANA[support]?.kind === 'window' ? NaN : envInput.manualRestore });
+    if (envInput.food) {
+      prepared.withoutFood = measuredWindows.length ? { reason: '별도 회복 버프에 음식 효과가 포함됐는지 미확인' }
+        : withoutFood.reason ? withoutFood
+        : { ...prepareManaScenario({ ...input, environment: withoutFood }, damageSkills, knownSkills), detail: withoutFood.assumption };
+    }
+    const focusName = normalizeSkillCycleName($('manaFocusSkill').value);
+    const focusCost = field('manaFocusCost');
+    if (focusName || Number.isFinite(focusCost)) {
+      const skill = prepared.scenario.skills.find(row => row.key === focusName);
+      prepared.focus = skill?.usesMana === true && Number.isFinite(focusCost) && focusCost >= 0
+        ? prepareManaScenario({ ...input, environment, skills: input.skills.map(row => normalizeSkillCycleName(row.name) === focusName
+          ? { ...row, cost: focusCost } : row) }, damageSkills, knownSkills)
+        : { reason: '현재 시전 목록의 마나 스킬과 변경 후 비용을 입력해 주세요.' };
+    }
+    prepared.detail = [prepared.detail, basis === 'cooldown' && '툴팁 비용·계산 쿨타임 기반 최대 사용 가정',
+      basis === 'fixed' && '사용자 지정 간격 고정', basis === 'base' && '사용자 입력 간격에 진화 쿨타임 적용',
+      (state.skillCycle?.appliedCycleLinkCount || state.skillCycle?.unresolvedCycleLinkCount || state.skillCycle?.stochasticCycleLinkCount)
+        && '확률 발동·연동 쿨타임 미반영',
+      ['mixed', 'state-dependent'].includes(resourceKind) && '직업 자원 상태 전환은 스킬 입력·추가 회복으로만 반영',
+      '마나 부족 시 시전 순서 유지 · 딜 중지 중 회복 유지'].filter(Boolean).join(' · ');
+    prepared.basis = basis;
   }
   return prepared;
 }
+
+function updateManaTimeline() {
+  const status = $('manaTimelineStatus');
+  const output = $('manaTimelineResult');
+  clearManaTimeline();
+  const prepared = manaScenarioForRecommendation({ timeline: true });
+  if (!prepared.scenario) { status.textContent = prepared.reason; return; }
+  const model = { ...prepareSkillScoring(), cooldownExcluded: true };
+  const entries = selectedEntries(state.selected).sort((a, b) => a.tier - b.tier);
+  const stats = applyEvolutionEntries(entries, getBaseStats(state.selected), false);
+  const damage = score(stats, model);
+  const result = evaluateManaRotation(prepared.scenario, stats);
+  if (!result || result.reason) { status.textContent = result?.reason || '시전 조건 미확인'; return; }
+  const sharesVerified = state.skillCycle?.shareSource === 'combat-analyzer' && ['ark-grid', 'second-class'].includes(state.skillCycle.analyzerMatch)
+    && state.skillCycle.shareRows?.length > 0 && state.skillCycle.shareRows.every(row => row.targetNames?.length === 1);
+  const damageForecast = sharesVerified && prepared.basis !== 'cooldown' && !isSupportPowerSnapshot(state.powerSnapshot)
+    ? forecastManaDamage(prepared.scenario, result, damage) : { reason: '이 시전 계획에 연결할 피해 지분 미확인' };
+  const run = (label, scenario, detail, effects = stats) => {
+    const compared = scenario ? evaluateManaRotation(scenario, effects) : null;
+    const comparedDamage = !damageForecast.reason && compared && !compared.reason
+      ? forecastManaDamage(scenario, compared, effects === stats ? damage : score(effects, model)) : null;
+    return { label, result: compared, detail, damage: comparedDamage };
+  };
+  const comparisons = [
+    stats.manaFurnace && run('마나 용광로 미적용', prepared.scenario, '', { ...stats, manaFurnace: null }),
+    run('서포터 미적용', prepared.withoutSupport, prepared.supportComparisonReason),
+    run('음식 미적용', prepared.withoutFood?.scenario, prepared.withoutFood?.detail || prepared.withoutFood?.reason),
+    run('집중 룬 변경', prepared.focus?.scenario, prepared.focus?.reason)
+  ];
+  status.textContent = `입력·가정 기반 추정 · ${prepared.detail}`;
+  renderManaTimeline(output, result, damageForecast, comparisons, prepared.scenario.unscheduled);
+  output.classList.remove('hidden');
+}
+
+function clearManaTimeline() {
+  const status = $('manaTimelineStatus');
+  const result = $('manaTimelineResult');
+  if (status) status.textContent = '';
+  if (result) clearManaTimelineGraph(result);
+  result?.replaceChildren();
+  result?.classList.add('hidden');
+}
+
 async function calculateAndRender() {
   const revision = ++calculationRevision;
   renderRecommendation = null;
@@ -5261,7 +5383,8 @@ async function calculateAndRender() {
       : manaScenarioForRecommendation()
     : buildAutomaticManaAnalysis({ character: state.manaCharacter, cycle: state.skillCycle,
       knownSkills: skillExperimentItems(state.skillEffects), damageSkills: weightedSkillUnits().filter(unit => unit.weight > 0).map(unit => unit.name),
-      duration: MANA_RECOMMENDATION_SECONDS, support: $('manaSupport')?.value || 'none' });
+      duration: MANA_RECOMMENDATION_SECONDS, support: $('manaSupport')?.value || 'none',
+      supportVariant: $('manaSupport')?.value === 'artist' ? $('manaArtistVariant')?.value : '' });
   const supportContext = supportMode ? { ...supportModelContext(), supportSkillCycle: buildSupportSkillCycle(state.powerSnapshot, state.skillEffects) } : null;
   const apiSupportModel = supportMode ? supportContributionModel(state.powerSnapshot, { ...supportContext, selection: apiSelection, evolutionCooldown: apiBase.stats }) : null;
   const currentSupportModel = supportMode ? supportContributionModel(state.powerSnapshot, { ...supportContext, evolutionCooldown: current.stats }) : null;
@@ -5681,6 +5804,8 @@ function resetCharacterControls() {
   supportManaInputs.clear();
   selectedManaSupport = $('manaSupport').value;
   $('manaScenarioPanel').open = false;
+  $('manaTimelinePanel').open = false;
+  clearManaTimeline();
 }
 
 function restoreCharacterWorkspace(name) {
@@ -6130,6 +6255,8 @@ $('applyManaScenario')?.addEventListener('click', () => {
   $('manaShortageClass').checked = true;
   calculateAndRender();
 });
+$('simulateManaTimeline')?.addEventListener('click', updateManaTimeline);
+$('manaScenarioPanel')?.addEventListener('input', clearManaTimeline);
 function updatePageRecommendationOptions() {
   if (!isCharacterPage(activePage.page) || !characterIsLoaded(activePage.name)) return;
   activePage = { ...activePage, support: $('manaSupport').value, mode: $('manaRecommendationMode').value };
@@ -6143,12 +6270,13 @@ $('manaRecommendationMode')?.addEventListener('change', () => {
 });
 $('manaSupport')?.addEventListener('change', event => {
   selectManaSupport(event.target.value);
+  clearManaTimeline();
   updatePageRecommendationOptions();
   calculateAndRender();
 });
 for (const id of [...SUPPORT_INPUT_FIELDS, 'manaFood', 'manaFoodTick']) {
   $(id)?.addEventListener('change', () => {
-    if ($('manaShortageClass')?.checked) calculateAndRender();
+    if (id === 'manaArtistVariant' || $('manaShortageClass')?.checked) calculateAndRender();
     else renderManaEnvironment();
   });
 }

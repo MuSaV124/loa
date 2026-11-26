@@ -19,6 +19,7 @@
 | 진화 추천의 마나 제약 | `mana-recommendation.js`, `skill-effects.js`, `app.js` | 현재 레벨 스킬 기본 마나, 마나 용광로와 실측 입력 구간의 마나 소모·회복·사용 지연. [검증 범위와 TOP5](mana-recommendation-audit.md) |
 | v6.1.0 캐릭터·서포터 마나 환경 | `api/character.js`, `mana-character.js`, `support-mana.js` | 스킬 비용 자동 입력, 직업 자원 분류, 회복 이벤트, 공식·입력·가정 출처. [자료와 비교표](mana-environment-v6.1.0.md) |
 | v6.1.1 자동 마나 환경과 진화 TOP5 | `mana-automatic.js`, `mana-recommendation.js`, `app.js` | 검증 프로필, 가정 기반 피해 순위, 이론 순위와 가상 운용 최소 최대 마나. [자동 계산 데이터와 순위 비교](mana-auto-v6.1.1.md) |
+| v6.1.12 마나 시간 분석 | `mana-recommendation.js`, `mana-character.js`, `support-mana.js`, `mana-timeline-ui.js` | 수동·쿨 기준 시전, 부족 지연, 딜 중지, 회복·비용 비교. 11월 18일 공식 규칙과 11월 25일 Armory 99개 재검산. [마나 엔진 감사와 실측 절차](mana-engine-audit-2026-11-26.md) |
 | 상급 재련 | `advanced-honing-math.js` 및 `app.js` 재료표 | 선조 효과·경험치·무료 턴을 상태별로 계산. 전투력 상승과 별도 |
 | 스펙업·A/B 장비 비교 | `combat-power-calibration.js`, `combat-power-model.json`, `armguard-power.js`, `gem-math.js`, `combat-analyzer.js/.json`, `spec-planner.js`, `app.js` | 재련 표본 매칭, 완갑 능력치 역산, 악세·각인 전투력 추정, 보석 지분·쿨감, 비용/효율. 목표·예산 경로는 단계별 탐욕 탐색으로 전역 골드 최적을 보장하지 않음 |
 | 시세·경매·참고 통계 | `api/market-*.js`, `api/refresh-market-cache.js`, `api/crystal-price.js`, `server/market-cache.js`, `cache-policy.js`, `class-benchmark.js/.json` | 거래소·경매장·크리스탈 시세와 2026-07-30 대표 빌드. `scripts/update-*.mjs`와 보정 자료 생성 스크립트가 표본을 갱신 |

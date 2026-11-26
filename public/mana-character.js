@@ -6,15 +6,18 @@ export const MANA_PROFILE_PATCH = '2026-11-19';
 export const VERIFIED_MANA_PROFILES = Object.freeze([]);
 
 const SPECIAL_RESOURCES = {
+  가디언나이트: ['state-dependent', '엠버레스의 기운·소켓'],
   인파이터: ['special', '기력·충격'],
   기공사: ['special', '내공·금강선공'],
   브레이커: ['special', '기력·충격·투기'],
   스카우터: ['state-dependent', '배터리·하이퍼 싱크'],
   데모닉: ['state-dependent', '마나·잠식 게이지·악마화'],
   아르카나: ['mixed', '마나·카드 수급'],
+  배틀마스터: ['mixed', '마나·버블'],
   블레이드: ['mixed', '마나·블레이드 오브'],
   워로드: ['mixed', '마나·실드 게이지'],
   소울이터: ['state-dependent', '마나·영혼석·빙의'],
+  스트라이커: ['mixed', '마나·버블'],
   소서리스: ['mixed', '마나·마력 게이지']
 };
 
@@ -25,14 +28,19 @@ function positiveNumber(value) {
 }
 
 function readCostModifier(texts, source, rune = false) {
-  const relevant = texts.filter(text => /마나\s*(?:소모|소비)|소모\s*(?:되는|하는)\s*마나|마나.{0,20}추가로\s*소모/.test(text));
+  const noCost = /^(?:스킬\s*)?(?:발동|시전|사용)\s*시\s*마나를\s*소모하지\s*않는다[.!]?$/;
+  const relevant = texts.filter(text => /마나\s*(?:소모|소비)|소모\s*(?:되는|하는)\s*마나|마나.{0,20}추가로\s*소모|마나를\s*소모/.test(text));
   if (!relevant.length) return null;
   const pattern = rune
     ? /^(?:\[집중\]\s*)?스킬\s*사용\s*시\s*마나\s*(?:소모|소비)(?:량)?(?:이|을)?\s*([\d.]+)\s*%\s*(감소|증가)\s*(?:한다|된다|시킨다)?[.!]?$/
-    : /^(?:해당\s*스킬의\s*|스킬의\s*)?마나\s*(?:소모량|소비량)(?:이|을)?\s*([\d.]+)\s*%\s*(감소|증가)\s*(?:한다|된다|시킨다)?[.!]?$/;
-  const matches = relevant.map(text => text.match(pattern));
-  const changes = [...new Set(matches.filter(Boolean).map(match => (match[2] === '감소' ? -1 : 1) * Number(match[1])))];
-  const percent = changes.length === 1 && matches.every(Boolean) && changes[0] >= -100 && Number.isFinite(changes[0]) ? changes[0] : null;
+    : /^(?:(?:해당\s*)?스킬의\s*|시전\s*시\s*)?마나\s*(?:소모|소비)(?:량)?(?:가|이|을)?\s*([\d.]+)\s*%\s*(감소|증가)(?:\s*한다|\s*된다|\s*시킨다|하고\s*,\s*스킬 사용 시 재사용 대기시간이 [\d.]+\s*초 감소한다|하지만\s*,\s*적에게 주는 피해가 [\d.]+\s*% 증가한다)?[.!]?$/;
+  const changes = new Set(relevant.map(text => {
+    if (!rune && noCost.test(text)) return -100;
+    const match = text.match(pattern);
+    return match ? (match[2] === '감소' ? -1 : 1) * Number(match[1]) : null;
+  }));
+  const [change] = changes;
+  const percent = changes.size === 1 && Number.isFinite(change) && change >= -100 ? change : null;
   return { source, percent };
 }
 

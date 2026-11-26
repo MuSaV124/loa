@@ -4242,7 +4242,20 @@ select {
 .manaEnvironment p { margin: 0; }
 #manaAutoStatus { grid-column: 1 / -1; }
 .manaAutoSkills ul { padding-inline-start: 18px; }
-#manaSupportSettings.hidden, .manaEnvironment.hidden { display: none; }
+.manaTimelinePanel { min-width: 0; border-top: 1px solid var(--softLine); }
+.manaTimelinePanel > summary { padding-block: 10px; }
+.manaTimelinePanel > :is(.manaScenarioGrid, label, button) { margin-bottom: 8px; }
+.manaTimelineResult { min-width: 0; }
+.manaTimelineResult canvas { display: block; width: 100%; height: clamp(144px, 24vw, 240px); background: #0a111a; border: 1px solid var(--softLine); border-radius: 6px; }
+.manaTimelineMetrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(132px, 100%), 1fr)); gap: 8px; margin-bottom: 10px; }
+.manaTimelineMetrics > div { display: grid; gap: 4px; padding: 8px; border: 1px solid var(--softLine); border-radius: 6px; word-break: keep-all; overflow-wrap: anywhere; }
+.manaTimelineMetrics b, .manaTimelineTable td { font-variant-numeric: tabular-nums; }
+.manaTimelineTable { max-width: 100%; overflow-x: auto; margin-block: 10px; }
+.manaTimelineTable table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+.manaTimelineTable :is(th, td) { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--softLine); }
+.manaTimelineTable th:first-child { text-align: left; }
+.manaTimelineTable small { display: block; white-space: normal; min-width: 120px; }
+#manaSupportSettings.hidden, #manaArtistVariantLabel.hidden, .manaEnvironment.hidden { display: none; }
 @media (max-width: 560px) { .manaEnvironment { grid-template-columns: minmax(0, 1fr); } }
 .skillCycleTable {
   display: grid;

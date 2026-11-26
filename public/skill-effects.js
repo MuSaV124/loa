@@ -177,6 +177,7 @@ export function parseSkillManaUsage(tooltip) {
   // A cooldown-only header or an unrecognized resource description does not prove a zero MP cost.
   const explicitNonMana = texts.some(text => !text.includes('마나') && (
     /(?:기력|충격|배터리|내공)(?:\s*에너지)?\s*[\d,]+\s*(?:소모|생성|획득)/.test(text)
+    || /^(?:버블|엠버레스의 기운)\s+[\d,]+\s*소모(?:\s*,\s*소켓\s+[\d,]+\s*잠금)?\s*(?:\||$)/.test(text)
     || /^(?:자원\s*)?(?:소모(?:량)?\s*없음|무료)(?:[\s|.]*)$/.test(text)
   ));
   const manaUsageKnown = distinctCosts.length === 1 || (distinctCosts.length === 0 && explicitNonMana);

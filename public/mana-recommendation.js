@@ -1,9 +1,11 @@
 import { normalizeSkillCycleName, skillCooldownSeconds } from './skill-cycle.js';
+import { SKILL_TYPE } from './class-damage-rules.js';
 
 export const MANA_RECOMMENDATION_SECONDS = 300;
 
 export function manaFurnaceDamage(effect, skill) {
   if (!effect) return { damage: 0, known: true };
+  if (skill?.freeManaSkill) return { damage: 0, known: false };
   if (skill?.manaUsageKnown !== true) return { damage: 0, known: false };
   if (skill.usesMana === false) return { damage: 0, known: true };
   const cost = Number(skill.manaCost);
@@ -18,25 +20,35 @@ function validNumber(value, min, max = Infinity) {
 export function prepareManaScenario(input, damageSkills, cycleSkills = []) {
   const { duration, maxMana, startMana, recoveryInterval, recoveryMana, firstRecovery, reductions, skills = [], extraRecovery = [] } = input;
   const strict = input.strict === true;
+  const analysisOnly = strict && input.analysisOnly === true;
+  const downtime = analysisOnly ? input.downtime ?? [] : [];
   const recoveryOrder = input.recoveryOrder ?? 'before-cast';
-  if (strict && duration !== MANA_RECOMMENDATION_SECONDS) return { reason: '300초 시전 조건이 필요합니다.' };
+  if (strict && !analysisOnly && duration !== MANA_RECOMMENDATION_SECONDS) return { reason: '300초 시전 조건이 필요합니다.' };
   if (!validNumber(duration, 1, 600) || !validNumber(maxMana, 1) || !validNumber(startMana, 0, maxMana)
       || !validNumber(recoveryMana, 0) || (recoveryMana > 0
         && (!validNumber(recoveryInterval, 0.1) || !validNumber(firstRecovery, 0)))) {
     return { reason: '전투 시간, 시작·최대 마나, 회복량과 회복 시각을 확인해 주세요.' };
   }
-  if (!skills.length || !damageSkills.length) return { reason: '장착 스킬 정보와 측정한 스킬별 사용 조건이 필요합니다.' };
+  if (!skills.length || (!analysisOnly && !damageSkills.length)) return { reason: '장착 스킬 정보와 측정한 스킬별 사용 조건이 필요합니다.' };
+  if (!Array.isArray(downtime) || !downtime.every(window => window && validNumber(window.start, 0, duration)
+      && validNumber(window.end, window.start, duration) && window.end > window.start)) {
+    return { reason: '딜 중지 구간은 전투 시간 안에서 시작·종료 순서로 입력해 주세요.' };
+  }
   const knownSkills = new Map(cycleSkills.map(skill => [normalizeSkillCycleName(skill.name), skill]));
   const byName = new Map();
   const replay = strict && skills.some(skill => skill.castStarts != null);
   for (const skill of skills) {
     const key = normalizeSkillCycleName(skill.name);
     const known = knownSkills.get(key);
+    if (analysisOnly && [SKILL_TYPE.awakening, SKILL_TYPE.hyperAwakening].includes(known?.skillType) && !replay) {
+      return { reason: `각성기·초각성기는 사용 기록을 입력해 주세요. (${known.name})` };
+    }
     if (!key || !known || byName.has(key) || !validNumber(skill.first, 0, duration) || !validNumber(skill.interval, 0.1)
         || !validNumber(skill.cost, 0) || (skill.castTime != null && !validNumber(skill.castTime, 0, duration))
         || (skill.aftercast != null && !validNumber(skill.aftercast, 0, duration))
         || (skill.activeWindows != null && (!Array.isArray(skill.activeWindows) || !skill.activeWindows.every(window =>
-          window && validNumber(window.start, 0, duration) && validNumber(window.end, window.start) && window.end > window.start)))
+          window && validNumber(window.start, 0, duration) && validNumber(window.end, window.start, analysisOnly ? duration : Infinity)
+          && window.end > window.start)))
         || (replay && (!Array.isArray(skill.castStarts) || !skill.castStarts.every((time, i, times) =>
           validNumber(time, 0, duration) && (i === 0 || time > times[i - 1]))))
         || (known.manaUsageKnown === true && known.usesMana === false && skill.cost > 0)) {
@@ -49,9 +61,9 @@ export function prepareManaScenario(input, damageSkills, cycleSkills = []) {
   }
   const damageKeys = damageSkills.map(name => normalizeSkillCycleName(name));
   const missing = [...new Set(damageKeys)].filter(key => !byName.has(key));
-  if (missing.length) return { reason: `피해 지분에 있는 스킬의 사용 조건 누락: ${missing.join(', ')}` };
-  if (strict) {
-    const unscheduled = cycleSkills.filter(skill => skill.currentTree === true && !byName.has(normalizeSkillCycleName(skill.name)));
+  if (!analysisOnly && missing.length) return { reason: `피해 지분에 있는 스킬의 사용 조건 누락: ${missing.join(', ')}` };
+  const unscheduled = strict ? cycleSkills.filter(skill => skill.currentTree === true && !byName.has(normalizeSkillCycleName(skill.name))) : [];
+  if (strict && !analysisOnly) {
     if (unscheduled.length) return { reason: `장착 스킬의 사용 조건 누락: ${unscheduled.map(skill => skill.name).join(', ')}` };
     if ([...byName.values()].some(skill => skill.usesMana == null)) return { reason: '일부 스킬의 마나 사용 여부 미확인' };
   }
@@ -76,6 +88,8 @@ export function prepareManaScenario(input, damageSkills, cycleSkills = []) {
   const scenario = { duration, maxMana, startMana, recovery, reductions, skills: [...byName.values()], castResults: new Map(), environment };
   if (strict) Object.assign(scenario, { strict, replay, recoveryOrder, schedules: new Map(),
     observation: replay && input.recoveryOrder && environment?.quality !== 'estimate' ? input.observation : null });
+  if (analysisOnly) Object.assign(scenario, { analysisOnly, downtime: [...downtime].sort((a, b) => a.start - b.start),
+    missingDamage: missing, unscheduled: unscheduled.map(skill => skill.name) });
   return { scenario };
 }
 
@@ -157,7 +171,8 @@ function manaCastSkills(scenario, reductions, { generalCooldown, manaCooldown, f
     const cooldown = Math.min(95, generalCooldown + (skill.usesMana ? manaCooldown : 0));
     return {
       ...skill,
-      interval: skill.cooldownItem ? skillCooldownSeconds(skill.cooldownItem, cooldown)
+      interval: scenario.analysisOnly && skill.fixedInterval ? skill.interval
+        : skill.cooldownItem ? skillCooldownSeconds(skill.cooldownItem, cooldown)
         : skill.cooldownEligible ? Math.max(0.1, skill.interval * (1 - cooldown / 100)) : skill.interval,
       cost: skill.usesMana ? skill.cost * factor : skill.cost,
       maxManaCost: skill.usesMana ? furnaceCost : 0
@@ -165,33 +180,41 @@ function manaCastSkills(scenario, reductions, { generalCooldown, manaCooldown, f
   });
 }
 
+function nextCastStart(scenario, skill, time) {
+  if (!Number.isFinite(time)) return Infinity;
+  const duration = scenario.analysisOnly ? skill.castTime || 0 : 0;
+  let earliest = Infinity;
+  for (const { start, end } of skill.activeWindows ?? [{ start: 0, end: Infinity }]) {
+    let candidate = Math.max(time, start);
+    for (const stop of scenario.downtime ?? []) {
+      if (candidate < stop.end - EPSILON && (candidate >= stop.start - EPSILON || candidate + duration > stop.start + EPSILON)) {
+        candidate = stop.end;
+      }
+    }
+    if (candidate < end - EPSILON && candidate + duration <= end + EPSILON) earliest = Math.min(earliest, candidate);
+  }
+  return earliest;
+}
+
 function plannedRotation(scenario, skills, cache = true) {
   const key = skills.map(skill => skill.interval).join('|');
   if (cache && scenario.schedules.has(key)) return scenario.schedules.get(key);
-  const ready = skills.map(skill => skill.first);
+  const ready = skills.map(skill => scenario.analysisOnly && scenario.replay ? 0 : skill.first);
   const planned = [];
   const unavailable = [];
   const counts = Array(skills.length).fill(0);
   let unlocked = 0;
-  function nextAvailable(skill, time) {
-    if (!skill.activeWindows) return time;
-    let next = Infinity;
-    for (const { start, end } of skill.activeWindows) {
-      const candidate = Math.max(time, start);
-      if (candidate < end - EPSILON) next = Math.min(next, candidate);
-    }
-    return next;
-  }
   function planCast(index, time) {
     const skill = skills[index];
     const end = time + (skill.castTime || 0);
     const activation = skill.castOnCompletion ? end : time;
     unlocked = end + (skill.aftercast || 0);
-    if (activation <= scenario.duration + EPSILON) {
-      planned.push({ index, time: Math.min(activation, scenario.duration) });
+    if ((!scenario.analysisOnly || time < scenario.duration - EPSILON)
+        && (scenario.analysisOnly ? end : activation) <= scenario.duration + EPSILON) {
+      planned.push({ index, time: Math.min(activation, scenario.duration), ...(scenario.analysisOnly && { start: time }) });
       counts[index]++;
     } else if (scenario.replay) {
-      unavailable.push({ time, skill: skill.name, reason: '300초 이내 발동 기록 없음' });
+      unavailable.push({ time, skill: skill.name, reason: '전투 시간 이내 발동 기록 없음' });
     }
     ready[index] = activation + skill.interval;
   }
@@ -200,7 +223,7 @@ function plannedRotation(scenario, skills, cache = true) {
       .sort((a, b) => a.time - b.time);
     for (const { index, time } of starts) {
       const skill = skills[index];
-      if (time + EPSILON < Math.max(ready[index], unlocked) || nextAvailable(skill, time) > time + EPSILON) {
+      if (time + EPSILON < Math.max(ready[index], unlocked) || nextCastStart(scenario, skill, time) > time + EPSILON) {
         unavailable.push({ time, skill: skill.name, reason: '재사용 대기·시전 잠금 또는 사용 가능 조건 불충족' });
         continue;
       }
@@ -208,9 +231,9 @@ function plannedRotation(scenario, skills, cache = true) {
     }
   } else {
     while (true) {
-      const available = skills.map((skill, index) => nextAvailable(skill, Math.max(unlocked, ready[index])));
+      const available = skills.map((skill, index) => nextCastStart(scenario, skill, Math.max(unlocked, ready[index])));
       const time = Math.min(...available);
-      if (time > scenario.duration + EPSILON) break;
+      if (scenario.analysisOnly ? time >= scenario.duration - EPSILON : time > scenario.duration + EPSILON) break;
       // Input order is the priority among skills ready when the cast lock ends.
       planCast(available.findIndex(at => at <= time + EPSILON), time);
     }
@@ -223,7 +246,9 @@ function plannedRotation(scenario, skills, cache = true) {
 // Preserve the intended rotation even after a failed cast. Later recovery cannot erase a miss.
 export function evaluateManaRotation(scenario, stats = {}, { cache = true } = {}) {
   if (!scenario?.strict) return null;
+  if (scenario.analysisOnly) return forecastManaRotation(scenario, stats);
   const reductions = stats.manaCostReductions || [];
+  if (usesFreeManaSkill(scenario, stats)) return null;
   if (reductions.length > 1 && !['sum', 'product'].includes(scenario.reductions) && scenario.skills.some(skill => skill.cost > 0)) return null;
   const parameters = manaCastParameters(stats, reductions);
   if (cache && scenario.castResults.has(parameters.key)) return scenario.castResults.get(parameters.key);
@@ -295,6 +320,136 @@ export function evaluateManaRotation(scenario, stats = {}, { cache = true } = {}
   return result;
 }
 
+function usesFreeManaSkill(scenario, stats) {
+  return Boolean(stats.manaFurnace) && scenario.skills.some(skill => skill.usesMana === true && skill.cost === 0);
+}
+
+function forecastManaRotation(scenario, stats) {
+  const reductions = stats.manaCostReductions || [];
+  const manaDependent = reductions.length || stats.manaFurnace || stats.manaSkillCooldownReduction;
+  if (manaDependent && scenario.skills.some(skill => skill.usesMana == null)) {
+    return { reason: '마나 효과를 적용할 스킬의 자원 유형 미확인' };
+  }
+  if (usesFreeManaSkill(scenario, stats)) return { reason: '마나 무료 효과가 적용된 스킬의 마나 용광로 비용 미확인' };
+  if (reductions.length > 1 && !['sum', 'product'].includes(scenario.reductions) && scenario.skills.some(skill => skill.cost > 0)) {
+    return { reason: '마나 소모 감소 효과가 둘 이상입니다. 중첩 방식을 확인해 주세요.' };
+  }
+  const { duration, maxMana, startMana, recovery, downtime } = scenario;
+  const skills = manaCastSkills(scenario, reductions, manaCastParameters(stats, reductions));
+  const { planned, counts, unavailable } = plannedRotation(scenario, skills);
+  const actors = skills.map((skill, index) => ({ key: skill.key, name: skill.name, interval: skill.interval,
+    fixedInterval: Boolean(skill.fixedInterval), cost: skill.cost + maxMana * skill.maxManaCost,
+    plannedCasts: counts[index], times: [], delayed: 0, ready: scenario.replay ? 0 : skill.first }));
+  const tolerance = Number.EPSILON * maxMana * 32;
+  const trace = [{ time: 0, mana: startMana, kind: 'start' }];
+  const shortages = [];
+  let mana = startMana;
+  let unlocked = 0;
+  let recoveryIndex = 0;
+  let effectiveRecovery = 0;
+  let effectiveNatural = 0;
+  let consumedMana = 0;
+  const recoverNext = () => {
+    const event = recovery[recoveryIndex++];
+    const gain = Math.min(maxMana - mana, event.amount);
+    effectiveRecovery += gain;
+    effectiveNatural += Math.min(gain, event.natural || 0);
+    mana += gain;
+    trace.push({ time: event.time, mana, kind: event.natural != null ? 'tick' : 'restore' });
+    return event.time;
+  };
+  const recoverBeforeCharge = time => {
+    while (recovery[recoveryIndex] && (scenario.recoveryOrder === 'before-cast'
+      ? recovery[recoveryIndex].time <= time + EPSILON : recovery[recoveryIndex].time < time - EPSILON)) recoverNext();
+  };
+  for (const intent of planned) {
+    const skill = skills[intent.index];
+    const actor = actors[intent.index];
+    const castTime = skill.castTime || 0;
+    const activationOffset = skill.castOnCompletion ? castTime : 0;
+    let start = nextCastStart(scenario, skill, Math.max(intent.start, actor.ready, unlocked));
+    let activation = start + activationOffset;
+    if (start >= duration - EPSILON || start + castTime > duration + EPSILON) break;
+    recoverBeforeCharge(activation);
+    if (mana + tolerance < actor.cost) {
+      const shortage = { start: activation, end: duration, skill: actor.name, deficit: actor.cost - mana };
+      shortages.push(shortage);
+      let affordableAt = activation;
+      while (mana + tolerance < actor.cost && recoveryIndex < recovery.length) affordableAt = recoverNext();
+      if (mana + tolerance < actor.cost) break;
+      shortage.end = Math.max(activation, affordableAt);
+      // A cast charged on completion keeps its start if the charge can still occur there, otherwise it is attempted again.
+      if (affordableAt > activation + EPSILON) {
+        start = nextCastStart(scenario, skill, affordableAt);
+        activation = start + activationOffset;
+        if (start >= duration - EPSILON || start + castTime > duration + EPSILON) break;
+        recoverBeforeCharge(activation);
+      }
+    }
+    if (activation > intent.time + EPSILON) actor.delayed++;
+    mana = Math.max(0, mana - actor.cost);
+    trace.push({ time: activation, mana, kind: 'cast', skill: actor.name });
+    actor.times.push(activation);
+    consumedMana += actor.cost;
+    actor.ready = activation + actor.interval;
+    unlocked = start + castTime + (skill.aftercast || 0);
+  }
+  while (recoveryIndex < recovery.length) recoverNext();
+  trace.push({ time: duration, mana, kind: 'end' });
+  const demandPerSecond = actors.reduce((total, actor) => total + actor.cost * actor.plannedCasts, 0) / duration;
+  const scheduledRecovery = recovery.reduce((total, event) => total + event.amount, 0);
+  const naturalRecovery = recovery.reduce((total, event) => total + (event.natural || 0), 0);
+  const periodicRecovery = recovery.filter(event => event.natural != null);
+  const recoveryPerSecond = scheduledRecovery / duration;
+  const netPerSecond = recoveryPerSecond - demandPerSecond;
+  return {
+    duration, maxMana, startMana, endMana: mana, trace, downtime, shortages, unavailable, demandPerSecond, recoveryPerSecond, netPerSecond,
+    naturalRecovery, scheduledRecovery, effectiveRecovery, effectiveNatural, consumedMana,
+    recoverySummary: {
+      ticks: periodicRecovery.length, boostedTicks: periodicRecovery.filter(event => event.amount > event.natural).length,
+      instantEvents: recovery.length - periodicRecovery.length,
+      instantAmount: recovery.filter(event => event.natural == null).reduce((total, event) => total + event.amount, 0),
+      windows: scenario.environment?.windows ?? []
+    },
+    averageDepletion: netPerSecond < 0 ? startMana / -netPerSecond : null,
+    firstShortage: shortages[0]?.start ?? null, shortageTime: shortages.reduce((sum, event) => sum + event.end - event.start, 0),
+    lostCasts: actors.reduce((sum, actor) => sum + actor.plannedCasts - actor.times.length, 0),
+    skillCasts: actors.map(({ ready, times, ...actor }) => ({ ...actor, casts: times.length,
+      spentPerSecond: actor.cost * actor.plannedCasts / duration,
+      actualInterval: times.length > 1 ? (times.at(-1) - times[0]) / (times.length - 1) : null }))
+  };
+}
+
+export function forecastManaDamage(scenario, rotation, damage) {
+  if (!rotation || rotation.reason) return { reason: '마나 시뮬레이션 결과 없음' };
+  if (scenario.missingDamage.length || scenario.unscheduled.length || rotation.unavailable.length || damage.manaDamageUnverified || damage.arcanaCardExpectation) {
+    return { reason: '전체 스킬 시전 정보 또는 마나·직업 효과 적용 범위 미확인' };
+  }
+  const rows = damage.skillExperiment?.items?.filter(row => row.share > 0) || [];
+  if (!rows.length || Math.abs(rows.reduce((sum, row) => sum + row.share, 0) - 1) > 1e-6
+      || rows.some(row => row.attack?.source === 'SUPER_AWAKENING') || damage.shareIssues?.length) {
+    return { reason: '전체 피해 지분 또는 초각성기 사용 조건 미확인' };
+  }
+  const counts = new Map(rotation.skillCasts.map(actor => [actor.key, actor]));
+  let ideal = 0;
+  let actual = 0;
+  let idealAlternate = 0;
+  let actualAlternate = 0;
+  for (const row of rows) {
+    const actor = counts.get(normalizeSkillCycleName(row.name));
+    if (!actor?.plannedCasts || !validNumber(row.value, 0)) return { reason: '피해 지분을 가진 스킬의 사용 기회 또는 피해 모델 미확인' };
+    // The supplied damage shares describe the intended schedule, not attack frequency.
+    const share = row.share / (row.cooldownMultiplier || 1);
+    const completion = actor.casts / actor.plannedCasts;
+    ideal += share * row.value;
+    actual += share * row.value * completion;
+    idealAlternate += share * (row.alternateValue ?? row.value);
+    actualAlternate += share * (row.alternateValue ?? row.value) * completion;
+  }
+  return { ideal, actual, idealAlternate, actualAlternate, lossPercent: ideal > 0 ? 100 * (1 - actual / ideal) : null,
+    lossPercentAlternate: idealAlternate > 0 ? 100 * (1 - actualAlternate / idealAlternate) : null };
+}
+
 function manaCastResults(scenario, stats, reductions) {
   const parameters = manaCastParameters(stats, reductions);
   if (scenario.castResults.has(parameters.key)) return scenario.castResults.get(parameters.key);
@@ -316,6 +471,7 @@ function manaCastResults(scenario, stats, reductions) {
 // In a full-start scenario whose recovery scales with max mana, every cast segment must fit one capacity plus its intervening recovery.
 export function minimumSustainableMana(scenario, stats = {}) {
   if (!scenario?.normalizedCapacity) return null;
+  if (usesFreeManaSkill(scenario, stats)) return null;
   const reductions = stats.manaCostReductions || [];
   const parameters = manaCastParameters(stats, reductions);
   const key = `capacity:${parameters.key}`;
@@ -355,6 +511,7 @@ export function minimumSustainableMana(scenario, stats = {}) {
 
 export function evaluateManaCandidate(scenario, stats, damage) {
   if (!scenario) return { reason: '마나 실전 조건 미입력' };
+  if (usesFreeManaSkill(scenario, stats)) return { reason: '마나 무료 효과가 적용된 스킬의 마나 용광로 적용 여부 미확인' };
   const rotation = scenario.strict ? evaluateManaRotation(scenario, stats) : null;
   const missing = reason => rotation ? { ...rotation, reason, eligible: false } : { reason };
   if (scenario.strict && !rotation) return missing('마나 소모 감소 중첩 방식 미확인');

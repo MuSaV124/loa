@@ -33,6 +33,7 @@ const SUITES = [
   'test-mana-recommendation.mjs',
   'test-mana-environment.mjs',
   'test-mana-automatic.mjs',
+  'test-mana-timeline.mjs',
   'test-passive-skill-effects.mjs',
   'test-arcana-card-expectation.mjs',
   'test-skill-cycle.mjs',

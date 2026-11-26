@@ -98,7 +98,7 @@ const baselineSkillItem = {
 };
 const characterResponse = {
   ok: true,
-  apiVersion: '6.1.11',
+  apiVersion: '6.1.12',
   profile: {
     CharacterName: '스킬표본', CharacterClassName: '브레이커', ServerName: '아브렐슈드',
     ItemAvgLevel: '1,700.00', CombatPower: '5,000.00', CharacterImage: '',
@@ -146,7 +146,7 @@ async function verifyViewport(viewport) {
   const page = await browser.newPage({ viewport });
   await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(characterResponse) }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
-  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.11');
+  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.12');
   await fillCharacterSearch(page, '스킬표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /스킬표본/ }).waitFor();
@@ -501,7 +501,7 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   };
   const fixture = {
     ok: true,
-    apiVersion: '6.1.11',
+    apiVersion: '6.1.12',
     profile: { ...characterResponse.profile, CharacterName: '다중치명표본', Stats: [] },
     arkPassive: { Points: evolutionPoints(140), Effects: [...fixedTier1, { Name: '입식 타격가', Level: 2 }] },
     accessoryEffects: accessory,
@@ -902,6 +902,48 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
     assert.match(await rows.first().textContent(), /추가 회복 [1-9].*도화가/s);
     await mode.selectOption('auto');
     assert.equal(await rows.count(), 0);
+    if (viewport.width === 1440) {
+      const pageErrors = [];
+      page.on('pageerror', error => pageErrors.push(error.message));
+      const timeline = page.locator('#manaTimelinePanel');
+      await timeline.locator('summary').first().click();
+      await set('manaTimelineDuration', 60);
+      await set('manaSupportTimes', '3,33');
+      await page.locator('#manaArtistVariant').selectOption('level-14-tripod');
+      assert.match(await page.locator('#manaSupportSummary').textContent(), /즉시 37%/);
+      await page.locator('#manaFood').selectOption('used');
+      await set('manaFoodTick', 1);
+      await set('manaDowntime', '12 | 18');
+      await set('manaFocusSkill', '마나 기술 A');
+      await set('manaFocusCost', 20);
+      const simulate = () => page.locator('#simulateManaTimeline').click();
+      const output = page.locator('#manaTimelineResult');
+      const canvas = output.getByRole('img');
+      const statusLine = page.locator('#manaTimelineStatus');
+      await simulate();
+      assert.match(await statusLine.textContent(), /입력·가정 기반 추정.*사용자 지정 간격 고정/);
+      assert.match(await canvas.getAttribute('aria-label'), /60초 마나 잔량/);
+      assert.match(await output.textContent(), /마나 부족 구간.*서포터 미적용.*음식 미적용.*집중 룬 변경/s);
+      await output.getByText(/마나 부족 구간 \d+개/).click();
+      assert.ok(await output.getByText(/부족 .* MP/).first().isVisible());
+      await set('manaTimelineDuration', 61.5);
+      assert.equal(await output.isVisible(), false);
+      await simulate();
+      assert.match(await canvas.getAttribute('aria-label'), /61.5초 마나 잔량/);
+      const screenshotDir = process.env.MANA_QA_SCREENSHOTS;
+      if (screenshotDir) await mkdir(screenshotDir, { recursive: true });
+      for (const width of [1920, 1366, 820, 390, 360]) {
+        await page.setViewportSize({ width, height: 950 });
+        const fits = await canvas.evaluate(el => el.getBoundingClientRect().right <= document.documentElement.clientWidth + 1);
+        assert.ok(fits, `mana chart overflows at ${width}px`);
+        if (screenshotDir) await output.screenshot({ path: join(screenshotDir, `mana-${width}.png`) });
+      }
+      await set('manaDowntime', '20 | 10');
+      await simulate();
+      assert.match(await statusLine.textContent(), /딜 중지 구간/);
+      assert.equal(await output.isVisible(), false);
+      assert.deepEqual(pageErrors, []);
+    }
   } finally {
     await page.close();
   }

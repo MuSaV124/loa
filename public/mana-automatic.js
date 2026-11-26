@@ -1,16 +1,16 @@
 import { findVerifiedManaProfile } from './mana-character.js';
-import { MANA_RECOMMENDATION_SECONDS, prepareManaScenario } from './mana-recommendation.js?v=6.1.7';
+import { MANA_RECOMMENDATION_SECONDS, prepareManaScenario } from './mana-recommendation.js?v=6.1.12';
 import { normalizeSkillCycleName, skillCooldownSeconds } from './skill-cycle.js';
-import { resolveManaEnvironment, SUPPORT_MANA } from './support-mana.js?v=6.1.7';
+import { resolveManaEnvironment, supportManaProfile } from './support-mana.js?v=6.1.12';
 
 // Historical in-game observation used only for the explicitly hypothetical scenario.
 export const AUTO_MANA_RECOVERY_SOURCE = 'https://www.inven.co.kr/board/lostark/4821/100754';
 const RECOVERY_FRACTION = 0.0444;
 
-export function buildAutomaticManaAnalysis({ character, cycle, knownSkills = [], damageSkills = [], support = 'none',
+export function buildAutomaticManaAnalysis({ character, cycle, knownSkills = [], damageSkills = [], support = 'none', supportVariant = '',
   duration: requestedDuration, verified = findVerifiedManaProfile(character) } = {}) {
   const strict = requestedDuration === MANA_RECOMMENDATION_SECONDS;
-  const supporter = Object.hasOwn(SUPPORT_MANA, support) ? SUPPORT_MANA[support] : null;
+  const supporter = supportManaProfile(support, supportVariant);
   if (!character?.className || !supporter) return { reason: '캐릭터를 조회하면 마나 추정 근거를 확인할 수 있습니다.' };
   if (cycle?.appliedCycleLinkCount || cycle?.unresolvedCycleLinkCount || cycle?.stochasticCycleLinkCount) {
     return { reason: '스킬 연동 쿨타임과 마나 지연의 상호작용 미검증' };
@@ -23,8 +23,8 @@ export function buildAutomaticManaAnalysis({ character, cycle, knownSkills = [],
   const timing = supporter.skill && `${supporter.label} 조우 시 및 기본 쿨(${supporter.baseCooldown}초)마다 적용 가정`;
   if (verified && hasAnalyzerShares && (!strict || verified.inputs.duration === requestedDuration)) {
     const input = { ...verified.inputs, strict };
-    const params = { support, duration: input.duration, maxMana: input.maxMana, naturalMana: input.recoveryMana, inclusiveEnd: strict };
-    const measuredSupport = verified.support?.[support];
+    const params = { support, variant: supportVariant, duration: input.duration, maxMana: input.maxMana, naturalMana: input.recoveryMana, inclusiveEnd: strict };
+    const measuredSupport = verified.support?.[supportVariant ? `${support}/${supportVariant}` : support];
     const measured = resolveManaEnvironment({ ...params, ...measuredSupport });
     const measuredTiming = measured.quality === 'input';
     const environment = measuredTiming ? measured : resolveManaEnvironment({ ...params, receivedTimes: assumedTimes(input.duration) });
@@ -68,7 +68,7 @@ export function buildAutomaticManaAnalysis({ character, cycle, knownSkills = [],
   if (!Number.isFinite(duration) || duration < 1 || duration > 600) return { reason: '자동 비교 구간 미확인' };
   const capacity = canRank ? maxMana : 1;
   const recoveryMana = capacity * RECOVERY_FRACTION;
-  const environment = resolveManaEnvironment({ support, duration, maxMana: capacity, naturalMana: recoveryMana,
+  const environment = resolveManaEnvironment({ support, variant: supportVariant, duration, maxMana: capacity, naturalMana: recoveryMana,
     receivedTimes: assumedTimes(duration), inclusiveEnd: strict });
   if (environment.reason) return environment;
   const input = { duration, strict, maxMana: capacity, startMana: capacity, recoveryMana,
