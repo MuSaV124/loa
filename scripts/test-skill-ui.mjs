@@ -98,7 +98,7 @@ const baselineSkillItem = {
 };
 const characterResponse = {
   ok: true,
-  apiVersion: '6.1.14',
+  apiVersion: '6.1.15',
   profile: {
     CharacterName: '스킬표본', CharacterClassName: '브레이커', ServerName: '아브렐슈드',
     ItemAvgLevel: '1,700.00', CombatPower: '5,000.00', CharacterImage: '',
@@ -146,7 +146,7 @@ async function verifyViewport(viewport) {
   const page = await browser.newPage({ viewport });
   await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(characterResponse) }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
-  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.14');
+  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.15');
   await fillCharacterSearch(page, '스킬표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /스킬표본/ }).waitFor();
@@ -501,7 +501,7 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   };
   const fixture = {
     ok: true,
-    apiVersion: '6.1.14',
+    apiVersion: '6.1.15',
     profile: { ...characterResponse.profile, CharacterName: '다중치명표본', Stats: [] },
     arkPassive: { Points: evolutionPoints(140), Effects: [...fixedTier1, { Name: '입식 타격가', Level: 2 }] },
     accessoryEffects: accessory,
@@ -920,6 +920,15 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
       await simulate();
       assert.match(await statusLine.textContent(), /필수 마나 입력 미확인.*자연 회복 1회량/);
       assert.equal(await output.isVisible(), false);
+      assert.match(await page.locator('#manaDemandResult').textContent(), /스킬 소모량과 회복 필요량.*MP\/분/s);
+      await page.locator('#manaRecoveryBasis').selectOption('public-rate');
+      await page.locator('#manaFood').selectOption('none');
+      await simulate();
+      assert.match(await statusLine.textContent(), /공개 추정 회복 4\.44%/);
+      await output.getByText('최대 MP·자연 회복률 민감도').click();
+      assert.equal(await output.getByRole('region', { name: '마나 지속력 민감도' }).locator('tbody tr').count(), 9);
+      await page.locator('#manaRecoveryBasis').selectOption('tick');
+      await page.locator('#manaFood').selectOption('used');
       await set('manaRecovery', 0);
       assert.match(await page.locator('#manaInputEvidence').textContent(), /자연 회복 1회량 · 사용자 입력/);
       await simulate();

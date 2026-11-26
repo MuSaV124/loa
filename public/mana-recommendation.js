@@ -35,18 +35,19 @@ export function prepareManaScenario(input, damageSkills, cycleSkills = []) {
   const { duration, maxMana, startMana, recoveryInterval, recoveryMana, firstRecovery, reductions, skills = [], extraRecovery = [] } = input;
   const strict = input.strict === true;
   const analysisOnly = strict && input.analysisOnly === true;
+  const demandOnly = analysisOnly && input.demandOnly === true;
   const downtime = analysisOnly ? input.downtime ?? [] : [];
   const recoveryOrder = input.recoveryOrder ?? 'before-cast';
   if (strict && !analysisOnly && duration !== MANA_RECOMMENDATION_SECONDS) return { reason: '300초 시전 조건이 필요합니다.' };
-  if (analysisOnly) {
+  if (analysisOnly && !demandOnly) {
     const missing = [!validNumber(maxMana, 1) && '최대 마나', !validNumber(startMana, 0, validNumber(maxMana, 1) ? maxMana : Infinity) && '시작 마나',
       !validNumber(recoveryMana, 0) && '자연 회복 1회량', recoveryMana > 0 && !validNumber(recoveryInterval, 0.1) && '회복 틱 간격',
       recoveryMana > 0 && !validNumber(firstRecovery, 0) && '첫 회복 시각'].filter(Boolean);
     if (missing.length) return { reason: `필수 마나 입력 미확인 · ${missing.join(' · ')}` };
   }
-  if (!validNumber(duration, 1, 600) || !validNumber(maxMana, 1) || !validNumber(startMana, 0, maxMana)
+  if (!validNumber(duration, 1, 600) || (!demandOnly && (!validNumber(maxMana, 1) || !validNumber(startMana, 0, maxMana)
       || !validNumber(recoveryMana, 0) || (recoveryMana > 0
-        && (!validNumber(recoveryInterval, 0.1) || !validNumber(firstRecovery, 0)))) {
+        && (!validNumber(recoveryInterval, 0.1) || !validNumber(firstRecovery, 0)))))) {
     return { reason: '전투 시간, 시작·최대 마나, 회복량과 회복 시각을 확인해 주세요.' };
   }
   if (!skills.length || (!analysisOnly && !damageSkills.length)) return { reason: '장착 스킬 정보와 측정한 스킬별 사용 조건이 필요합니다.' };
@@ -64,7 +65,7 @@ export function prepareManaScenario(input, damageSkills, cycleSkills = []) {
       return { reason: `각성기·초각성기는 사용 기록을 입력해 주세요. (${known.name})` };
     }
     if (!key || !known || byName.has(key) || !validNumber(skill.first, 0, duration) || !validNumber(skill.interval, 0.1)
-        || !validNumber(skill.cost, 0) || (skill.castTime != null && !validNumber(skill.castTime, 0, duration))
+        || (!validNumber(skill.cost, 0) && !(demandOnly && skill.cost == null)) || (skill.castTime != null && !validNumber(skill.castTime, 0, duration))
         || (skill.aftercast != null && !validNumber(skill.aftercast, 0, duration))
         || (skill.activeWindows != null && (!Array.isArray(skill.activeWindows) || !skill.activeWindows.every(window =>
           window && validNumber(window.start, 0, duration) && validNumber(window.end, window.start, analysisOnly ? duration : Infinity)
@@ -93,9 +94,24 @@ export function prepareManaScenario(input, damageSkills, cycleSkills = []) {
   }
   if (!['before-cast', 'after-cast'].includes(recoveryOrder)) return { reason: '같은 시각의 회복 처리 순서를 확인해 주세요.' };
   const environment = input.environment;
+  const events = demandOnly ? { recovery: [] } : buildManaRecovery(input, environment);
+  if (events.reason) return events;
+  const scenario = { duration, maxMana, startMana, recovery: events.recovery, reductions, skills: [...byName.values()], castResults: new Map(), environment };
+  if (strict) Object.assign(scenario, { strict, replay, recoveryOrder, schedules: new Map(),
+    observation: replay && input.recoveryOrder && environment?.quality !== 'estimate' ? input.observation : null });
+  if (analysisOnly) Object.assign(scenario, { analysisOnly, downtime: [...downtime].sort((a, b) => a.start - b.start),
+    missingDamage: missing, unscheduled: unscheduled.map(skill => skill.name) });
+  return { scenario };
+}
+
+export function buildManaRecovery(input, environment = input.environment) {
+  const { duration, recoveryMana, recoveryInterval, firstRecovery, strict, extraRecovery = [] } = input;
+  if (!validNumber(duration, 1, 600) || !validNumber(recoveryMana, 0) || !extraRecovery.every(event =>
+    validNumber(event.time, 0, duration) && validNumber(event.amount, 0))) return { reason: '회복량 또는 회복 시각 미확인' };
   const baseline = environment?.baseline ?? recoveryMana;
   const windows = environment?.windows ?? [];
   const recovery = [...extraRecovery, ...(environment?.instant || [])];
+  if (!recovery.every(event => validNumber(event.time, 0, duration) && validNumber(event.amount, 0))) return { reason: '즉시 회복량 미확인' };
   if (baseline > 0 || windows.some(window => window.amount > 0)) {
     if (!validNumber(recoveryInterval, 0.1) || !validNumber(firstRecovery, 0)) {
       return { reason: '회복 효과를 적용할 기본 회복 틱의 시각과 간격이 필요합니다.' };
@@ -106,12 +122,7 @@ export function prepareManaScenario(input, damageSkills, cycleSkills = []) {
     }
   }
   recovery.sort((a, b) => a.time - b.time);
-  const scenario = { duration, maxMana, startMana, recovery, reductions, skills: [...byName.values()], castResults: new Map(), environment };
-  if (strict) Object.assign(scenario, { strict, replay, recoveryOrder, schedules: new Map(),
-    observation: replay && input.recoveryOrder && environment?.quality !== 'estimate' ? input.observation : null });
-  if (analysisOnly) Object.assign(scenario, { analysisOnly, downtime: [...downtime].sort((a, b) => a.start - b.start),
-    missingDamage: missing, unscheduled: unscheduled.map(skill => skill.name) });
-  return { scenario };
+  return { recovery, perSecond: recovery.reduce((sum, event) => sum + event.amount, 0) / duration };
 }
 
 const EPSILON = 1e-8;
@@ -196,7 +207,7 @@ function manaCastSkills(scenario, reductions, { generalCooldown, manaCooldown, f
       interval: scenario.analysisOnly && skill.fixedInterval ? skill.interval
         : skill.cooldownItem ? skillCooldownSeconds(skill.cooldownItem, cooldown)
         : skill.cooldownEligible ? Math.max(0.1, skill.interval * (1 - cooldown / 100)) : skill.interval,
-      cost: skill.usesMana ? skill.cost * factor : skill.cost,
+    cost: skill.usesMana && skill.cost != null ? skill.cost * factor : skill.cost,
       maxManaCost: skill.usesMana ? furnaceCost : 0
     };
   });
@@ -263,6 +274,45 @@ function plannedRotation(scenario, skills, cache = true) {
   const rotation = { planned, counts, unavailable };
   if (cache) scenario.schedules.set(key, rotation);
   return rotation;
+}
+
+export function evaluateManaDemand(scenario, stats = {}) {
+  if (!scenario?.analysisOnly) return null;
+  const reductions = stats.manaCostReductions || [];
+  const stackingUnknown = reductions.length > 1 && !['sum', 'product'].includes(scenario.reductions);
+  const parameters = manaCastParameters(stats, reductions);
+  const skills = manaCastSkills(scenario, reductions, parameters);
+  const { counts, unavailable } = plannedRotation(scenario, skills);
+  const rows = skills.map((skill, index) => {
+    const before = ((stackingUnknown && skill.usesMana && skill.cost > 0) || (skill.usesMana == null && reductions.length)) ? null : skill.cost;
+    const percent = !parameters.furnaceCost || skill.usesMana === false ? 0
+      : skill.usesMana == null || skill.costBeforeEvolution === 0 ? null : skill.maxManaCost;
+    const extra = percent === 0 ? 0 : percent != null && validNumber(scenario.maxMana, 1) ? scenario.maxMana * percent : null;
+    const final = before != null && extra != null ? before + extra : null;
+    const casts = counts[index];
+    return { name: skill.name, before, extra, final, casts, interval: skill.interval,
+      furnacePercentPerSecond: percent == null ? null : percent * casts / scenario.duration * 100 };
+  });
+  const active = rows.filter(row => row.casts > 0);
+  const sum = field => active.reduce((total, row) => total + (row[field] ?? 0) * row.casts, 0) / scenario.duration;
+  const partial = Boolean(scenario.unscheduled.length || unavailable.length
+    || (parameters.manaCooldown && skills.some(skill => skill.usesMana == null)));
+  return { rows, duration: scenario.duration, unscheduled: scenario.unscheduled, unavailable,
+    knownPerSecond: sum('final'), beforePerSecond: sum('before'),
+    beforeComplete: !partial && active.every(row => row.before != null), complete: !partial && active.every(row => row.final != null),
+    furnacePercentPerSecond: active.every(row => row.furnacePercentPerSecond != null)
+      ? active.reduce((total, row) => total + row.furnacePercentPerSecond, 0) : null };
+}
+
+export const PUBLIC_MANA_RECOVERY_RATE = 4.44;
+
+export function manaRateInputs(input, percentage) {
+  if (!validNumber(input.maxMana, 1) || !validNumber(percentage, 0, 100)) return null;
+  const recoveryInterval = input.recoveryInterval == null || Number.isNaN(input.recoveryInterval) ? 1 : input.recoveryInterval;
+  const firstRecovery = input.firstRecovery == null || Number.isNaN(input.firstRecovery) ? recoveryInterval : input.firstRecovery;
+  if (!validNumber(recoveryInterval, 0.1) || !validNumber(firstRecovery, 0)) return null;
+  return { ...input, recoveryInterval, firstRecovery,
+    recoveryMana: input.maxMana * percentage / 100 * recoveryInterval };
 }
 
 // Preserve the intended rotation even after a failed cast. Later recovery cannot erase a miss.

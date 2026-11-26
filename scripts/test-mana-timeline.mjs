@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { compareManaFurnaceCosts, prepareManaScenario, evaluateManaRotation, forecastManaDamage, manaFurnaceDamage } from '../public/mana-recommendation.js';
+import { PUBLIC_MANA_RECOVERY_RATE, buildManaRecovery, compareManaFurnaceCosts, prepareManaScenario, evaluateManaDemand, evaluateManaRotation, forecastManaDamage, manaFurnaceDamage, manaRateInputs } from '../public/mana-recommendation.js';
 import { manaSkillScope, skillManaCostProfile } from '../public/mana-character.js';
 import { parseSkillManaUsage } from '../public/skill-effects.js';
 import { resolveManaEnvironment, supportManaCycle, supportManaProfile } from '../public/support-mana.js';
+import { checkManaObservations } from './check-mana-observations.mjs';
 
 const actors = [
   { name: 'A', first: 0, interval: 4, cost: 40, fixedInterval: true },
@@ -54,6 +55,27 @@ assert.equal(replay.unavailable.length, 1);
 const furnace = { maxManaCostPercent: 2, damagePerTenMana: 0.5, maxEvolutionDamage: 24 };
 const costCheck = [{ ...single[0], cost: 16 }];
 const effects = { manaFurnace: furnace, manaCostReductions: [20, 10] };
+const noCapacity = prepare({ demandOnly: true, maxMana: undefined, startMana: undefined, recoveryMana: undefined, reductions: 'product' });
+const withoutFurnace = evaluateManaDemand(noCapacity, { manaCostReductions: [20, 10] });
+assert.equal(withoutFurnace.complete, true);
+assert.ok(Math.abs(withoutFurnace.knownPerSecond - 9.6) < 1e-9);
+const furnaceDemand = evaluateManaDemand(noCapacity, effects);
+assert.equal(furnaceDemand.complete, false);
+assert.equal(furnaceDemand.beforeComplete, true);
+assert.ok(Math.abs(furnaceDemand.furnacePercentPerSecond - 5 / 6) < 1e-9);
+const unknown = evaluateManaDemand(prepare({ demandOnly: true }, [actors[0], { ...actors[1], cost: null }]), {});
+assert.deepEqual([unknown.complete, unknown.knownPerSecond, unknown.rows[1].casts, unknown.rows[1].final], [false, 10, 2, null]);
+const rateModel = manaRateInputs({ maxMana: 1500, duration: 12, strict: true, recoveryInterval: NaN, firstRecovery: NaN }, PUBLIC_MANA_RECOVERY_RATE);
+assert.deepEqual([rateModel.recoveryInterval, rateModel.firstRecovery], [1, 1]);
+assert.ok(Math.abs(buildManaRecovery(rateModel).perSecond - 66.6) < 1e-9);
+assert.equal(manaRateInputs({ maxMana: NaN }, PUBLIC_MANA_RECOVERY_RATE), null);
+const observation = { className: '테스트', level: 70, equipmentFingerprint: 'same-set', patch: 'test', combat: true,
+  contributor: 'tester-a', source: 'synthetic', maxMana: 1000,
+  ticks: [{ time: 1, before: 100, after: 144 }, { time: 2, before: 144, after: 188 }, { time: 3, before: 988, after: 1000 }],
+  casts: [{ name: 'A', level: 14, before: 500, after: 408, base: 100, beforeEvolution: 80, reduced: 72,
+    reductions: [10], furnacePercent: 2, setup: { focus: '희귀' } }] };
+const [audit] = checkManaObservations({ version: 1, observations: [observation, { ...observation, contributor: 'tester-b' }] });
+assert.deepEqual([audit.independentContributors, audit.status, audit.ticks.length, audit.casts[0].error.a], [2, 'PENDING_REVIEW', 2, 0]);
 assert.equal(evaluateManaRotation(prepare({}, costCheck), effects).reason.includes('중첩'), true);
 assert.ok(Math.abs(evaluateManaRotation(prepare({ reductions: 'product' }, costCheck), effects).consumedMana - 13.52) < 1e-9);
 assert.ok(Math.abs(evaluateManaRotation(prepare({ reductions: 'sum' }, costCheck), effects).consumedMana - 13.2) < 1e-9);

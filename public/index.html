@@ -22,7 +22,7 @@
   <link rel="icon" type="image/svg+xml" href="/brand/icon.svg" />
   <link rel="apple-touch-icon" href="/brand/icon-180.png" />
   <link rel="manifest" href="/brand/site.webmanifest" />
-  <link rel="stylesheet" href="/style.css?v=mana-timeline-3" />
+  <link rel="stylesheet" href="/style.css?v=mana-timeline-4" />
   <link rel="stylesheet" href="/brand/site.css?v=4" />
 </head>
 <body data-site-page="home">
@@ -217,6 +217,7 @@
               <select id="manaSupport"><option value="none">서포터 없음</option><option value="bard">바드</option><option value="artist">도화가</option><option value="paladin">홀리나이트</option><option value="valkyrie">발키리</option></select>
             </label>
             <label>마나 회복 음식<select id="manaFood"><option value="none">미사용</option><option value="used">직접 입력 · 음식/만찬</option></select></label>
+            <button id="estimateManaDemand" type="button">쿨타임 기준 소모량 확인</button>
             <div id="manaOverview" class="manaTimelineMetrics manaOverview"></div>
           </div>
           <details id="manaScenarioPanel" class="advancedInputDetails manaScenarioPanel">
@@ -227,12 +228,15 @@
                 <label>전투 시간(초)<input id="manaDuration" type="number" value="300" readonly /></label>
                 <label>최대 마나<input id="manaMax" type="number" min="1" step="any" /></label>
                 <label>시작 마나<input id="manaStart" type="number" min="0" step="any" /></label>
+                <label>시간 분석의 자연 회복<select id="manaRecoveryBasis"><option value="tick">직접 입력한 회복 틱</option><option value="public-rate">공개 추정 4.44%/초</option></select></label>
+                <label id="manaRecoveryRateLabel" class="hidden">자연 회복률 (최대 MP %/초)<input id="manaRecoveryRate" type="number" min="0" max="100" step="any" value="4.44" /></label>
                 <label>음식·서포터 적용 전 회복 1회량<input id="manaRecovery" type="number" min="0" step="any" /></label>
                 <label>첫 회복(초)<input id="manaFirstRecovery" type="number" min="0" step="any" /></label>
                 <label>회복 간격(초)<input id="manaRecoveryInterval" type="number" min="0.1" step="any" /></label>
                 <label>소모 감소 중첩<select id="manaCostReductions"><option value="">미확인</option><option value="sum">합산으로 실측</option><option value="product">개별 곱으로 실측</option></select></label>
                 <label id="manaFoodTickLabel" class="hidden">음식 사용 중 회복 1회량<input id="manaFoodTick" type="number" min="0" step="any" /></label>
               </div>
+              <p id="manaRecoveryRateHint" class="hint hidden">공개 추정치는 시간 분석에 적용합니다. 비워 둔 시작 MP는 최대 MP, 첫 회복과 틱 간격은 1초 간격으로 가정합니다. <a href="https://www.inven.co.kr/board/lostark/4821/100754" target="_blank" rel="noopener noreferrer">공개 자료</a></p>
               <p id="manaFoodSummary" class="hint hidden"></p>
               <div id="manaSupportSettings" class="manaScenarioGrid hidden">
                 <label id="manaArtistVariantLabel" class="hidden">해우물 스킬·트라이포드<select id="manaArtistVariant"><option value="">Lv.14 기본 (25%)</option><option value="level-7">Lv.7 기본 (22%)</option><option value="level-14-tripod">Lv.14 + 마나 회복 (25% + 12%)</option></select></label>
@@ -293,12 +297,13 @@
                   <label>집중 룬 비교 스킬명 (선택)<input id="manaFocusSkill" type="text" /></label>
                   <label>변경 후 진화 적용 전 비용<input id="manaFocusCost" type="number" min="0" step="any" /></label>
                 </div>
-                <button id="simulateManaTimeline" type="button">지속력 분석</button>
+                <button id="simulateManaTimeline" type="button">소모량·지속력 분석</button>
                 <p id="manaTimelineStatus" class="hint" role="status"></p>
                 <div id="manaTimelineResult" class="manaTimelineResult hidden"></div>
               </details>
             </div>
           </details>
+          <div id="manaDemandResult" class="manaTimelineResult hidden"></div>
           <p id="arcanaIdentityNote" class="arcanaIdentityNote hidden"></p>
           <div class="resultLayout recommendLayout468">
             <div class="recommendMain468">
@@ -453,11 +458,11 @@
 
     <footer class="pickFooter">
       <span>XXAPICK.APP · LOST ARK FAN-MADE SERVICE</span>
-      <span class="version">Version 6.1.14</span>
+      <span class="version">Version 6.1.15</span>
     </footer>
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <script type="module" src="/app.js?v=6.1.14"></script>
+  <script type="module" src="/app.js?v=6.1.15"></script>
 </body>
 </html>

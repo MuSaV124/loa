@@ -22,6 +22,7 @@
 | v6.1.12 마나 시간 분석 | `mana-recommendation.js`, `mana-character.js`, `support-mana.js`, `mana-timeline-ui.js` | 수동·쿨 기준 시전, 부족 지연, 딜 중지, 회복·비용 비교. 11월 18일 공식 규칙과 11월 25일 Armory 99개 재검산. [마나 엔진 감사와 실측 절차](mana-engine-audit-2026-11-26.md) |
 | v6.1.13 마나 엔진 2차 검증 | `mana-character.js`, `mana-automatic.js`, `mana-recommendation.js`, `mana-timeline-ui.js` | 공식 Armory 스키마·캡처의 최대 MP 확인, 기존 UNKNOWN 583행 재분류, 공통 회복 추정 제거와 입력·비용 근거 표시. [2차 검증 보고서](mana-verification-2.md) |
 | v6.1.14 마나 엔진 3차 검증 | `skill-effects.js`, `mana-character.js`, `mana-recommendation.js`, `support-mana.js` | 공통 마나 플래그·상태별 계획 분리, 공식 용광로 Lv.1/2 및 순서 가정, 서포터 쿨 이론과 음식 후보. [3차 검증 보고서](mana-verification-3.md) |
+| v6.1.15 마나 엔진 4차 검증 | `mana-recommendation.js`, `mana-timeline-ui.js` | 선택형 공개 회복률·민감도, 회복 입력 누락 시 소모량 부분 결과, 관측 자료 검산. [4차 검증 보고서](mana-verification-4.md) |
 | 상급 재련 | `advanced-honing-math.js` 및 `app.js` 재료표 | 선조 효과·경험치·무료 턴을 상태별로 계산. 전투력 상승과 별도 |
 | 스펙업·A/B 장비 비교 | `combat-power-calibration.js`, `combat-power-model.json`, `armguard-power.js`, `gem-math.js`, `combat-analyzer.js/.json`, `spec-planner.js`, `app.js` | 재련 표본 매칭, 완갑 능력치 역산, 악세·각인 전투력 추정, 보석 지분·쿨감, 비용/효율. 목표·예산 경로는 단계별 탐욕 탐색으로 전역 골드 최적을 보장하지 않음 |
 | 시세·경매·참고 통계 | `api/market-*.js`, `api/refresh-market-cache.js`, `api/crystal-price.js`, `server/market-cache.js`, `cache-policy.js`, `class-benchmark.js/.json` | 거래소·경매장·크리스탈 시세와 2026-07-30 대표 빌드. `scripts/update-*.mjs`와 보정 자료 생성 스크립트가 표본을 갱신 |

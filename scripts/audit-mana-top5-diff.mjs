@@ -4,12 +4,13 @@ import { extname, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 
-const [archivePath, beforeRoot, output] = process.argv.slice(2);
+const [archivePath, beforeRoot, output, scope] = process.argv.slice(2);
 if (!archivePath || !beforeRoot || !output) throw new Error('Pass Armory archive, baseline Git worktree and output JSON.');
 const archive = JSON.parse(await readFile(archivePath, 'utf8'));
+const full = scope === '--all';
 const samples = archive.samples.filter(row => row.raw?.ArmoryProfile && row.classExpected === row.className
-  && row.skills?.some(skill => skill.Name === '마리포사'));
-assert.equal(samples.length, 4);
+  && (full || row.skills?.some(skill => skill.Name === '마리포사')));
+assert.equal(samples.length, full ? 99 : 4);
 const chrome = process.env.PLAYWRIGHT_CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const executablePath = await access(chrome).then(() => chrome).catch(() => undefined);
 const browser = await chromium.launch({ executablePath, headless: true, args: ['--disable-gpu'] });
@@ -42,7 +43,7 @@ async function replay(root) {
     const results = [];
     for (const [ordinal, sample] of samples.entries()) {
       const data = parseCharacterArmory(sample.raw, { arkGrid: { data: sample.arkGrid }, combatSkills: { data: sample.skills } });
-      for (const controlled of ordinal ? [false] : [false, true]) {
+      for (const controlled of full || ordinal ? [false] : [false, true]) {
         const row = await page.evaluate(async ({ data, controlled }) => {
           const audit = globalThis.manaAppAudit;
           document.getElementById('manaRecommendationMode').value = 'theory';
@@ -56,9 +57,10 @@ async function replay(root) {
           } : undefined);
           const pack = row => [row.entries.map(entry => [entry.name, entry.level]), +row.recValue.toFixed(8)];
           const { ranks } = globalThis.manaRankAudit;
-          return { build: data.powerSnapshot.profile.secondClass, controlled, top: ranks.theoretical.slice(0, 5).map(pack),
+          return { class: data.powerSnapshot.profile.className, build: data.powerSnapshot.profile.secondClass, controlled,
+            top: ranks.theoretical.slice(0, 5).map(pack),
             candidates: ranks.counts.theoretical, mariposaWeighted: audit.prepareSkillScoring().units.some(unit => unit.name === '마리포사' && unit.weight > 0),
-            manaFlag: audit.state.skillEffects.items.find(item => item.name === '마리포사').manaUsageKnown };
+            manaFlag: audit.state.skillEffects.items.find(item => item.name === '마리포사')?.manaUsageKnown };
         }, { data, controlled });
         if (controlled) assert.equal(row.mariposaWeighted, true);
         results.push(row);
@@ -73,9 +75,11 @@ async function replay(root) {
 try {
   const [before, after] = await Promise.all([replay(beforeRoot), replay('.')]);
   const cases = before.map((a, i) => ({ case: `S${i + 1}`, before: a, after: after[i], topChanged: JSON.stringify(a.top) !== JSON.stringify(after[i].top) }));
-  assert.ok(cases.every(row => !row.before.manaFlag && row.after.manaFlag));
+  if (full) assert.deepEqual(after, before, 'All 99 theory rankings and candidate counts must stay unchanged');
+  else assert.ok(cases.every(row => !row.before.manaFlag && row.after.manaFlag));
   await writeFile(output, JSON.stringify({ cases }, null, 2) + '\n');
-  console.log(JSON.stringify(cases.map(row => [row.case, row.after.build, row.after.controlled, row.topChanged, row.before.candidates, row.after.candidates])));
+  console.log(full ? `Full theoretical comparison passed (${cases.length} characters)`
+    : JSON.stringify(cases.map(row => [row.case, row.after.build, row.after.controlled, row.topChanged, row.before.candidates, row.after.candidates])));
 } finally {
   await browser.close();
 }

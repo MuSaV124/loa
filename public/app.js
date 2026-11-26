@@ -19,8 +19,8 @@ import { normalHoningAttemptDistribution, normalHoningAttemptRatePercent } from 
 import { calculateHoningMaterialCost, goldEfficiency } from './honing-cost.js';
 import { materialPurchaser, materialQuote } from './material-quotes.js';
 import { marketFreshness, preservesPricedItems } from './market-freshness.js';
-import { MANA_RECOMMENDATION_SECONDS, createManaRanking, evaluateManaCandidate, evaluateManaRotation, forecastManaDamage, manaFurnaceDamage, prepareManaScenario } from './mana-recommendation.js?v=6.1.14';
-import { clearManaTimelineGraph, renderManaTimeline } from './mana-timeline-ui.js?v=6.1.14';
+import { MANA_RECOMMENDATION_SECONDS, PUBLIC_MANA_RECOVERY_RATE, buildManaRecovery, createManaRanking, evaluateManaCandidate, evaluateManaDemand, evaluateManaRotation, forecastManaDamage, manaFurnaceDamage, manaRateInputs, prepareManaScenario } from './mana-recommendation.js?v=6.1.15';
+import { clearManaTimelineGraph, renderManaDemand, renderManaSensitivity, renderManaTimeline } from './mana-timeline-ui.js?v=6.1.15';
 import { buildAutomaticManaAnalysis } from './mana-automatic.js?v=6.1.14';
 import { buildCharacterManaProfile, findVerifiedManaProfile, MANA_PROFILE_PATCH, manaSkillScope, withManaCooldowns } from './mana-character.js?v=6.1.14';
 import { MANA_FOODS, resolveManaEnvironment, SUPPORT_MANA, SUPPORT_MANA_VERIFIED_AT, supportManaCycle, supportManaProfile, supportManaSummary } from './support-mana.js?v=6.1.14';
@@ -37,7 +37,7 @@ import {
   remainingCooldownMs
 } from './cache-policy.js?v=6.1.1';
 
-const VERSION = '6.1.14';
+const VERSION = '6.1.15';
 const PARTY_EVOLUTION_NODES = new Set(['정열의 춤사위', '선각자', '진군', '기원', '입식 타격가', '마나 용광로', '안정된 관리자']);
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function isNoManaMainSkillEnabled() { return Boolean(document.getElementById('noManaMainSkill')?.checked); }
@@ -5088,6 +5088,7 @@ const supportManaInputs = new Map();
 let selectedManaSupport = 'none';
 let previousManaCharacter = '';
 let manaOverviewResult = null;
+let manaOverviewDemand = null;
 
 function manaSupportPlan() {
   if ($('manaSupportTimingMode')?.value !== 'cooldown') return undefined;
@@ -5101,11 +5102,14 @@ function renderManaOverview() {
   const output = $('manaOverview');
   if (!output) return;
   const result = manaOverviewResult;
+  const demand = manaOverviewDemand;
   const max = Number($('manaMax')?.value);
   const rate = value => Number.isFinite(value) ? `${fmt(value)} MP/초` : 'UNKNOWN';
   const rows = [
     ['최대 마나', max > 0 ? formatNumber(max) : 'UNKNOWN', max > 0 ? manaFieldSource('manaMax') : ''],
-    ['계획 소모', rate(result?.demandPerSecond)], ['예정 회복', rate(result?.recoveryPerSecond)], ['마나 수지', rate(result?.netPerSecond)],
+    ['계획 소모', rate(demand ? demand.complete ? demand.knownPerSecond : null : result?.demandPerSecond),
+      demand && !demand.complete ? `확인 범위 ${rate(demand.knownPerSecond)}` : ''],
+    ['예정 회복', rate(result?.recoveryPerSecond ?? demand?.recovery)], ['마나 수지', rate(result?.netPerSecond ?? (demand?.complete && Number.isFinite(demand.recovery) ? demand.recovery - demand.knownPerSecond : null))],
     ['마나 지속력', !result || result.partialInputs ? 'UNKNOWN' : result.firstShortage == null
       ? `${fmt(result.duration)}초 유지` : `${fmt(result.firstShortage)}초 첫 부족`]
   ];
@@ -5162,6 +5166,7 @@ function renderManaInputEvidence() {
     ['첫 회복 시각', 'manaFirstRecovery'], ['틱 간격', 'manaRecoveryInterval'], ['비용 중첩', 'manaCostReductions'],
     ['시전·비용 입력', 'manaRotation'], ['분석 시간', 'manaTimelineDuration'], ['시전 간격 기준', 'manaTimelineBasis'],
     ['동일 시각 처리', 'manaTimelineOrder']];
+  if ($('manaRecoveryBasis')?.value === 'public-rate') fields.push(['자연 회복률', 'manaRecoveryRate']);
   if ($('manaFood')?.value !== 'none') fields.push(['음식 회복', 'manaFoodTick']);
   if ($('manaSupport')?.value && $('manaSupport').value !== 'none') fields.push(['서포터 수신 시각', 'manaSupportTimes'],
     ['서포터 가동률', 'manaSupportUptime'], ['서포터 회복량', 'manaSupportRestore']);
@@ -5176,6 +5181,9 @@ function renderManaInputEvidence() {
 }
 
 function renderManaEnvironment() {
+  const estimateRecovery = $('manaRecoveryBasis')?.value === 'public-rate';
+  $('manaRecoveryRateLabel')?.classList.toggle('hidden', !estimateRecovery);
+  $('manaRecoveryRateHint')?.classList.toggle('hidden', !estimateRecovery);
   renderManaInputEvidence();
   const support = $('manaSupport')?.value || 'none';
   const variant = support === 'artist' ? $('manaArtistVariant')?.value : '';
@@ -5235,7 +5243,7 @@ function renderManaEnvironment() {
   renderManaOverview();
 }
 
-function manaScenarioForRecommendation({ timeline = false } = {}) {
+function manaScenarioForRecommendation({ timeline = false, forceCooldown = false } = {}) {
   const decimal = value => !String(value ?? '').trim() ? NaN : Number(value);
   const field = id => decimal($(id)?.value);
   const lines = id => String($(id)?.value || '').split(/\r?\n/).filter(line => line.trim())
@@ -5244,9 +5252,9 @@ function manaScenarioForRecommendation({ timeline = false } = {}) {
   const recoveryLines = lines('manaExtraRecovery');
   const downtimeLines = timeline ? lines('manaDowntime') : [];
   const windowLines = timeline ? lines('manaSkillWindows') : [];
-  const castLines = timeline ? lines('manaCastStarts') : [];
+  const castLines = timeline && !forceCooldown ? lines('manaCastStarts') : [];
   const buffLines = timeline ? lines('manaBuffWindows') : [];
-  const basis = timeline ? $('manaTimelineBasis').value : 'base';
+  const basis = timeline ? forceCooldown ? 'cooldown' : $('manaTimelineBasis').value : 'base';
   if ((basis !== 'cooldown' && skillLines.some(line => line.length < 4 || line.length > 6))
       || [...recoveryLines, ...downtimeLines, ...castLines].some(line => line.length !== 2)
       || [...windowLines, ...buffLines].some(line => line.length !== 3)) {
@@ -5261,7 +5269,7 @@ function manaScenarioForRecommendation({ timeline = false } = {}) {
   });
   const damageSkills = weightedSkillUnits().filter(unit => unit.weight > 0).map(unit => unit.name);
   const rotationSource = manaFieldSource('manaRotation');
-  const input = {
+  let input = {
     duration: field(timeline ? 'manaTimelineDuration' : 'manaDuration'),
     strict: timeline || field('manaDuration') === MANA_RECOMMENDATION_SECONDS,
     analysisOnly: timeline,
@@ -5289,8 +5297,6 @@ function manaScenarioForRecommendation({ timeline = false } = {}) {
         cost: costProfiles.get(key)?.preEvolutionCost, cooldownItem, castTime: skill.castTime,
         costSource: '공식 툴팁·비용 산출', intervalSource: '쿨타임 기준 가정' };
     });
-    const unknown = input.skills.filter(skill => !Number.isFinite(skill.cost) || !Number.isFinite(skill.interval));
-    if (unknown.length) return { reason: `조회한 비용·쿨타임 미확인 (${unknown.map(skill => skill.name).join(', ')}). 사용자 지정 간격을 사용할 수 있습니다.` };
   }
   if (timeline) {
     const skills = new Map(input.skills.map(skill => [normalizeSkillCycleName(skill.name), skill]));
@@ -5305,6 +5311,17 @@ function manaScenarioForRecommendation({ timeline = false } = {}) {
       skill.castStarts = times.split(',').map(decimal);
     }
   }
+  const demandPlan = timeline ? prepareManaScenario({ ...input, demandOnly: true,
+    skills: input.skills.filter(skill => Number.isFinite(skill.interval) && Number.isFinite(skill.first))
+      .map(skill => ({ ...skill, cost: Number.isFinite(skill.cost) ? skill.cost : null })) }, damageSkills, knownSkills) : null;
+  // Estimated recovery is confined to the standalone timeline. Recommendation inputs keep their existing rules.
+  const useRate = timeline && $('manaRecoveryBasis')?.value === 'public-rate';
+  const recoveryRate = useRate ? field('manaRecoveryRate') : null;
+  const rateInput = useRate ? manaRateInputs(input, recoveryRate) : null;
+  if (rateInput) {
+    const fullStart = !Number.isFinite(input.startMana);
+    input = { ...rateInput, startMana: fullStart ? rateInput.maxMana : rateInput.startMana };
+  }
   const support = $('manaSupport')?.value || 'none';
   const times = $('manaSupportTimes')?.value.trim();
   const envInput = {
@@ -5315,21 +5332,45 @@ function manaScenarioForRecommendation({ timeline = false } = {}) {
     foodTick: field('manaFoodTick'), cooldownPlan: manaSupportPlan(),
     patch: MANA_PROFILE_PATCH, inclusiveEnd: input.strict
   };
+  const measuredWindows = buffLines.map(([start, end, amount]) => ({ start: decimal(start), end: decimal(end), amount: decimal(amount) }));
+  const resolveEnvironment = (scenarioInput, overrides = {}) => {
+    const environment = resolveManaEnvironment({ ...envInput, ...overrides, maxMana: scenarioInput.maxMana, naturalMana: scenarioInput.recoveryMana });
+    if (environment.reason) return environment;
+    if (measuredWindows.some(window => !Number.isFinite(window.start) || window.start < 0 || !Number.isFinite(window.end)
+      || window.end <= window.start || window.end > input.duration || !Number.isFinite(window.amount) || window.amount < scenarioInput.recoveryMana)) {
+      return { reason: '회복 버프 구간과 총 회복 1회량을 확인해 주세요.' };
+    }
+    environment.windows.push(...measuredWindows);
+    if (useRate) {
+      environment.quality = 'estimate';
+      environment.assumption = [environment.assumption, `${recoveryRate === PUBLIC_MANA_RECOVERY_RATE ? '공개 추정' : '사용자 지정 추정'} 회복 ${fmt(recoveryRate)}%/초 · ${fmt(scenarioInput.recoveryInterval)}초 틱`].filter(Boolean).join(' · ');
+    }
+    return environment;
+  };
+  const environment = useRate && !rateInput ? { reason: '비례 회복 추정에는 최대 마나와 유효한 회복률이 필요합니다.' } : resolveEnvironment(input);
+  const foodOff = { food: false, manualRestore: SUPPORT_MANA[support]?.kind === 'window' ? NaN : envInput.manualRestore };
+  const supportOff = { support: 'none', variant: '' };
+  const recoveryComparison = overrides => {
+    if (useRate && !rateInput) return { reason: environment.reason };
+    if (measuredWindows.length) return { reason: '별도 버프의 음식·서포터 포함 여부 미확인' };
+    const env = resolveEnvironment(input, overrides);
+    return env.reason ? env : buildManaRecovery(input, env);
+  };
+  const partial = timeline ? {
+    demandScenario: demandPlan.scenario, demandReason: demandPlan.reason, basis,
+    recovery: environment.reason ? environment : buildManaRecovery(input, environment),
+    recoveryComparisons: [support !== 'none' && { name: '서포터 미적용', ...recoveryComparison(supportOff) },
+      envInput.food && { name: '음식 미적용', ...recoveryComparison(foodOff) }].filter(Boolean)
+  } : {};
   const base = prepareManaScenario(input, damageSkills, knownSkills);
-  if (!base.scenario) return base;
+  if (environment.reason && useRate) return { ...partial, reason: environment.reason };
+  if (!base.scenario) return { ...partial, ...base };
   const verified = findVerifiedManaProfile(state.manaCharacter);
   const resourceKind = state.manaCharacter?.kind;
   if (resourceKind === 'special' && !state.manaCharacter.observedMana && !verified) {
     return { reason: `${state.manaCharacter.resource} 운용 미검증 · 해당 자원을 마나로 계산하지 않습니다.` };
   }
-  const environment = resolveManaEnvironment(envInput);
-  if (environment.reason) return environment;
-  const measuredWindows = buffLines.map(([start, end, amount]) => ({ start: decimal(start), end: decimal(end), amount: decimal(amount) }));
-  if (measuredWindows.some(window => !Number.isFinite(window.start) || window.start < 0 || !Number.isFinite(window.end)
-    || window.end <= window.start || window.end > input.duration || !Number.isFinite(window.amount) || window.amount < input.recoveryMana)) {
-    return { reason: '회복 버프 구간과 총 회복 1회량을 확인해 주세요.' };
-  }
-  environment.windows.push(...measuredWindows);
+  if (environment.reason) return { ...partial, ...environment };
   if (resourceKind === 'state-dependent' && !verified) {
     environment.quality = 'estimate';
     environment.assumption = [environment.assumption, '변신·자원 전환 타이밍 미검증'].filter(Boolean).join(' · ');
@@ -5338,21 +5379,19 @@ function manaScenarioForRecommendation({ timeline = false } = {}) {
     environment.quality = 'estimate';
     environment.assumption = [environment.assumption, 'API 비용은 툴팁 계산값'].filter(Boolean).join(' · ');
   }
-  const prepared = prepareManaScenario({ ...input, environment }, damageSkills, knownSkills);
+  const prepared = { ...partial, ...prepareManaScenario({ ...input, environment }, damageSkills, knownSkills) };
   if (prepared.scenario?.strict) {
     prepared.detail = [environment.assumption, '입력한 시작 MP·회복 틱과 스킬 행 순서의 우선순위 적용',
       input.recoveryOrder === 'after-cast' ? '동시각에는 시전 우선' : '동시각에는 회복 우선',
       input.skills.some(skill => skill.castTime == null || skill.aftercast == null) && '누락된 시전·후딜 시간은 0초로 가정'].filter(Boolean).join(' · ');
   }
   if (prepared.scenario && support !== 'none') {
-    const withoutSupport = resolveManaEnvironment({ ...envInput, support: 'none', variant: '' });
-    if (!measuredWindows.length) prepared.withoutSupport = prepareManaScenario({ ...input, environment: withoutSupport }, damageSkills, knownSkills).scenario;
+    const withoutSupport = resolveEnvironment(input, supportOff);
+    if (!measuredWindows.length && !withoutSupport.reason) prepared.withoutSupport = prepareManaScenario({ ...input, environment: withoutSupport }, damageSkills, knownSkills).scenario;
     else prepared.supportComparisonReason = '별도 회복 버프에 서포터 효과가 포함됐는지 미확인';
   }
   if (timeline && prepared.scenario) {
-    const withoutFood = resolveManaEnvironment({ ...envInput, food: false,
-      // A measured support tick with food cannot safely be substituted for the food-free tick.
-      manualRestore: SUPPORT_MANA[support]?.kind === 'window' ? NaN : envInput.manualRestore });
+    const withoutFood = resolveEnvironment(input, foodOff);
     if (envInput.food) {
       prepared.withoutFood = measuredWindows.length ? { reason: '별도 회복 버프에 음식 효과가 포함됐는지 미확인' }
         : withoutFood.reason ? withoutFood
@@ -5374,19 +5413,42 @@ function manaScenarioForRecommendation({ timeline = false } = {}) {
       ['mixed', 'state-dependent'].includes(resourceKind) && '변신·포격·아이덴티티는 실제 시전 계획과 회복 입력 필요',
       '마나 부족 시 시전 순서 유지 · 딜 중지 중 회복 유지'].filter(Boolean).join(' · ');
     prepared.basis = basis;
+    if (useRate) prepared.sensitivity = [0.9, 1, 1.1].flatMap(capacityFactor => [-0.5, 0, 0.5].map(rateDelta => {
+      const maxMana = Math.max(1, input.maxMana * capacityFactor);
+      const rate = Math.min(100, Math.max(0, recoveryRate + rateDelta));
+      const varied = manaRateInputs({ ...input, maxMana, startMana: input.startMana / input.maxMana * maxMana }, rate);
+      const env = resolveEnvironment(varied);
+      return { maxMana, rate, ...(env.reason ? env : prepareManaScenario({ ...varied, environment: env }, damageSkills, knownSkills)) };
+    }));
   }
   return prepared;
 }
 
-function updateManaTimeline() {
+function updateManaTimeline(forceCooldown = false) {
   const status = $('manaTimelineStatus');
   const output = $('manaTimelineResult');
+  const demandOutput = $('manaDemandResult');
   clearManaTimeline();
-  const prepared = manaScenarioForRecommendation({ timeline: true });
-  if (!prepared.scenario) { status.textContent = prepared.reason; return; }
-  const model = { ...prepareSkillScoring(), cooldownExcluded: true };
+  const prepared = manaScenarioForRecommendation({ timeline: true, forceCooldown });
   const entries = selectedEntries(state.selected).sort((a, b) => a.tier - b.tier);
   const stats = applyEvolutionEntries(entries, getBaseStats(state.selected), false);
+  if (state.manaCharacter && !manaNotUsed(state.manaCharacter)) {
+    const demand = evaluateManaDemand(prepared.demandScenario, stats);
+    const max = Number($('manaMax').value);
+    if (demand) manaOverviewDemand = { ...demand, recovery: prepared.recovery?.perSecond };
+    const skills = state.manaCharacter.skills.filter(skill => skill.automatic || demand?.rows.some(row => row.name === skill.name));
+    renderManaDemand(demandOutput, { skills, demand, max, recovery: prepared.recovery, basis: prepared.basis,
+      reason: prepared.demandReason || prepared.reason, recoveryComparisons: prepared.recoveryComparisons,
+      furnaceSelected: Boolean(stats.manaFurnace), timelinePending: !prepared.scenario });
+    demandOutput.classList.remove('hidden');
+    renderManaOverview();
+  }
+  if (!prepared.scenario) {
+    status.textContent = prepared.reason;
+    if (forceCooldown && !demandOutput.classList.contains('hidden')) demandOutput.querySelector('h3')?.focus();
+    return;
+  }
+  const model = { ...prepareSkillScoring(), cooldownExcluded: true };
   const damage = score(stats, model);
   const result = evaluateManaRotation(prepared.scenario, stats);
   if (!result || result.reason) { status.textContent = result?.reason || '시전 조건 미확인'; return; }
@@ -5411,17 +5473,22 @@ function updateManaTimeline() {
   manaOverviewResult = result;
   renderManaOverview();
   renderManaTimeline(output, result, damageForecast, comparisons, prepared.scenario.unscheduled, Boolean(stats.manaFurnace));
+  if (prepared.sensitivity) renderManaSensitivity(output, prepared.sensitivity.map(row => ({ ...row,
+    result: row.scenario ? evaluateManaRotation(row.scenario, stats) : null })));
   output.classList.remove('hidden');
 }
 
 function clearManaTimeline() {
   manaOverviewResult = null;
+  manaOverviewDemand = null;
   const status = $('manaTimelineStatus');
   const result = $('manaTimelineResult');
   if (status) status.textContent = '';
   if (result) clearManaTimelineGraph(result);
   result?.replaceChildren();
   result?.classList.add('hidden');
+  $('manaDemandResult')?.replaceChildren();
+  $('manaDemandResult')?.classList.add('hidden');
   renderManaOverview();
 }
 
@@ -6316,7 +6383,9 @@ $('applyManaScenario')?.addEventListener('click', () => {
   $('manaShortageClass').checked = true;
   calculateAndRender();
 });
-$('simulateManaTimeline')?.addEventListener('click', updateManaTimeline);
+$('simulateManaTimeline')?.addEventListener('click', () => updateManaTimeline());
+$('estimateManaDemand')?.addEventListener('click', () => updateManaTimeline(true));
+$('manaRecoveryBasis')?.addEventListener('change', renderManaEnvironment);
 $('manaScenarioPanel')?.addEventListener('input', () => {
   clearManaTimeline();
   renderManaInputEvidence();

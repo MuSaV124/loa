@@ -10,6 +10,66 @@ export function clearManaTimelineGraph(output) {
   charts.delete(output);
 }
 
+export function renderManaDemand(output, { skills, demand, max, recovery, basis, reason, recoveryComparisons, furnaceSelected, timelinePending }) {
+  const label = basis === 'cooldown' ? '쿨타임 기준 최대 시전 가정' : '입력 시전 계획';
+  const byName = new Map(demand?.rows.map(skill => [skill.name, skill]));
+  const rated = demand?.rows.some(row => row.casts > 0 && row.final != null);
+  const rate = value => Number.isFinite(value) ? `${format(value)} MP/초` : 'UNKNOWN';
+  const known = rated ? `${rate(demand.knownPerSecond)} · ${format(demand.knownPerSecond * 60)} MP/분` : 'UNKNOWN';
+  const target = demand?.complete ? demand.knownPerSecond : null;
+  const additional = target != null && max > 0 && Number.isFinite(recovery?.perSecond)
+    ? Math.max(0, target - recovery.perSecond) / max * 100 : null;
+  const metrics = [
+    [demand?.complete ? '계획 소모' : '확인 범위 소모', known],
+    ['수지 균형 최소 회복', rate(target)],
+    ['추가 회복 필요율', additional == null ? 'UNKNOWN' : `최대 MP의 ${format(additional)}%/초`],
+    ['예정 회복', rate(recovery?.perSecond)]
+  ];
+  if (furnaceSelected) {
+    metrics.push(['용광로 미적용 소모', rate(demand?.beforeComplete ? demand.beforePerSecond : null)],
+      ['용광로 추가 소모', Number.isFinite(demand?.furnacePercentPerSecond)
+        ? `최대 MP의 ${format(demand.furnacePercentPerSecond)}%/초` : 'UNKNOWN']);
+  }
+  const options = (profile, focus) => {
+    const matches = (profile.modifiers ?? []).filter(modifier => modifier.source.startsWith('집중 룬') === focus);
+    if (!Number.isFinite(profile.baseCost) || matches.length > 1 || matches.some(modifier => modifier.percent == null)) return '—';
+    const names = matches.map(modifier => modifier.source).join(', ');
+    return `${format(profile.baseCost * (1 + (matches[0]?.percent ?? 0) / 100))}${names ? `<small>${escape(names)}</small>` : ''}`;
+  };
+  const rows = skills.map(skill => {
+    const planned = byName.get(skill.name);
+    return `<tr><th scope="row">${escape(skill.name)}${skill.reason ? `<small>${escape(skill.reason)}</small>` : ''}</th>
+      <td>${format(skill.baseCost)}</td><td>${options(skill, true)}</td><td>${options(skill, false)}</td>
+      <td>${format(skill.preEvolutionCost)}</td><td>${format(planned?.before)}</td><td>${format(planned?.extra)}</td>
+      <td>${format(planned?.final)}</td><td>${format(planned?.casts)}</td></tr>`;
+  }).join('');
+  const comparisons = (recoveryComparisons ?? []).map(row => `<li>${escape(row.name)} · ${escape(rate(row.perSecond))}${row.reason ? ` · ${escape(row.reason)}` : ''}</li>`).join('');
+  output.innerHTML = `<h3 tabindex="-1">스킬 소모량과 회복 필요량</h3><p class="hint">${label}. 수지 균형은 평균 소모량을 맞추는 회복량입니다. 순간 마나 부족은 시간 분석에서 확인합니다.</p>
+    <div class="manaTimelineMetrics">${metrics.map(([name, value]) => `<div><span>${name}</span><b>${value}</b></div>`).join('')}</div>
+    ${reason && timelinePending ? `<p class="hint">${escape(reason)}</p>` : ''}
+    ${recovery?.reason ? `<p class="hint">회복 비교 · ${escape(recovery.reason)}</p>` : ''}
+    ${demand?.unscheduled.length ? `<p class="hint">간격 미확인 또는 시전 계획에서 제외 · ${escape(demand.unscheduled.join(', '))}</p>` : ''}
+    ${comparisons ? `<ul class="hint">${comparisons}</ul>` : ''}
+    ${rows ? `<details><summary>스킬별 비용 단계</summary>
+      <p class="hint">집중과 트라이포드 열은 기본 MP에 각 효과를 따로 적용한 값입니다. 두 효과의 중첩은 확인된 값이 필요합니다.${furnaceSelected ? ' 용광로 추가는 감소 뒤 합산하는 A 가정입니다.' : ''} —는 미확인 또는 계획 미포함입니다.</p>
+      <div class="manaTimelineTable" tabindex="0" role="region" aria-label="스킬별 비용 단계"><table><thead><tr>
+      <th scope="col">스킬</th><th scope="col">기본 MP</th><th scope="col">집중만 적용</th><th scope="col">트라이포드만 적용</th>
+      <th scope="col">툴팁 진화 전</th><th scope="col">진화 적용 후</th><th scope="col">용광로 추가</th><th scope="col">최종 MP</th><th scope="col">계획 시전</th>
+      </tr></thead><tbody>${rows}</tbody></table></div></details>` : ''}`;
+}
+
+export function renderManaSensitivity(output, rows) {
+  const details = document.createElement('details');
+  details.innerHTML = `<summary>최대 MP·자연 회복률 민감도</summary>
+    <p class="hint">최대 MP ±10%, 자연 회복률 ±0.5%p/초에서 같은 계획을 재생합니다. 시작 MP 비율을 유지하고 직접 입력한 고정 회복량은 유지합니다.</p>
+    <div class="manaTimelineTable" tabindex="0" role="region" aria-label="마나 지속력 민감도"><table><thead><tr>
+    <th scope="col">최대 MP</th><th scope="col">회복률/초</th><th scope="col">예정 수지/초</th><th scope="col">첫 부족(초)</th><th scope="col">종료 MP</th>
+    </tr></thead><tbody>${rows.map(({ maxMana, rate, result, reason }) => `<tr><th scope="row">${format(maxMana)}</th><td>${format(rate)}%</td>
+      ${result && !result.reason && !result.partialInputs ? `<td>${format(result.netPerSecond)}</td><td>${result.firstShortage == null ? '없음' : format(result.firstShortage)}</td><td>${format(result.endMana)}</td>`
+        : `<td colspan="3">${escape(reason || result?.reason || '시전 조건 일부 미확인')}</td>`}</tr>`).join('')}</tbody></table></div>`;
+  output.append(details);
+}
+
 function drawManaTrace(canvas, result) {
   const context = canvas.getContext('2d');
   if (!context) return;
