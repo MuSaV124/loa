@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import characterHandler from '../api/character.js';
 import invenHandler from '../api/inven-arkpassive.js';
-import { buildCharacterManaProfile, findVerifiedManaProfile, MANA_PROFILE_PATCH, skillManaCostProfile } from '../public/mana-character.js';
+import { buildCharacterManaProfile, findVerifiedManaProfile, MANA_PROFILE_PATCH, readMaximumMana, skillManaCostProfile } from '../public/mana-character.js';
 import { evaluateManaCandidate, prepareManaScenario, rankManaCandidates } from '../public/mana-recommendation.js';
 import { resolveManaEnvironment, SUPPORT_MANA } from '../public/support-mana.js';
 
@@ -26,10 +26,19 @@ assert.equal(skillManaCostProfile({ ...raw, Tripods: [{ ...reduction, Tooltip: '
 assert.equal(skillManaCostProfile({ ...raw, Tripods: [{ ...reduction, Tooltip: '마나 소모량이 <FONT>67.0%</FONT> 확률로 <FONT>100.0%</FONT> 감소한다.' }] }).preEvolutionCost, null);
 assert.equal(skillManaCostProfile({ Tooltip: JSON.stringify({ Element_011: { value: '마나 999 소모' } }) }).baseCost, null);
 assert.equal(skillManaCostProfile({ Tooltip: JSON.stringify({ title: { leftText: '재사용 대기시간 12초' } }) }).preEvolutionCost, null);
+const nonManaOrb = { Tooltip: JSON.stringify({ Element_004: { type: 'MultiTextBox', value: '<FONT>정령의 구슬 1 소모</FONT>|' } }) };
+assert.equal(skillManaCostProfile(nonManaOrb).baseCost, 0);
+assert.equal(skillManaCostProfile(nonManaOrb).alternativeResource, '정령의 구슬');
+assert.equal(skillManaCostProfile({ Tooltip: JSON.stringify({ Element_004: { type: 'SingleTextBox', value: '대상에게 피해를 줍니다.' } }) }).baseCost, null);
 
 const profile = { CharacterName: '마나 API 표본', CharacterClassName: '데모닉', Stats: [{ Type: '최대 마나', Value: '3,500' }] };
 const character = buildCharacterManaProfile(profile, undefined, [raw], [skill]);
 assert.equal(character.maxMana, 3500);
+assert.deepEqual(character.maximumMana, { value: 3500, path: 'ArmoryProfile.Stats[최대 마나]', status: 'api' });
+assert.equal(readMaximumMana({ ...profile, MaxMana: 3400 }).value, null);
+assert.equal(readMaximumMana({ Stats: [{ Type: '마나', Value: '3,400' }] }).value, null);
+assert.equal(readMaximumMana({ Stats: [{ Type: '최대 마나', Value: '3,4,00' }], MaxMana: 3400 }).value, 3400);
+assert.equal(readMaximumMana({ Stats: [{ Type: '최대 마나', Value: '[+400]' }] }).status, 'unknown');
 assert.equal(character.kind, 'state-dependent');
 assert.equal(buildCharacterManaProfile({ ...profile, Stats: [] }).maxMana, null);
 assert.equal(buildCharacterManaProfile({ ...profile, CharacterClassName: '기공사' }).kind, 'special');
@@ -56,6 +65,7 @@ for (const id of ['none', 'bard', 'artist', 'paladin', 'valkyrie']) {
 }
 assert.match(resolveManaEnvironment({ ...env, support: 'bard' }).reason, /적용 시각 또는 가동률/);
 assert.match(resolveManaEnvironment({ ...env, support: 'artist', uptime: 100 }).reason, /적용 시각/);
+assert.match(resolveManaEnvironment({ ...env, support: 'bard', uptime: 0, receivedTimes: [1] }).reason, /동시에 입력/);
 assert.match(resolveManaEnvironment({ ...env, support: 'bard', uptime: 100, patch: '2026-12-01' }).reason, /재확인/);
 assert.match(resolveManaEnvironment({ ...env, support: 'none', naturalMana: NaN }).reason, /회복량 미확인/);
 assert.match(resolveManaEnvironment({ ...env, support: 'none', food: true }).reason, /음식/);
@@ -137,7 +147,7 @@ try {
   const first = mockResponse();
   await characterHandler({ query }, first);
   assert.equal(first.statusCode, 200);
-  assert.equal(first.body.apiVersion, '6.1.12');
+  assert.equal(first.body.apiVersion, '6.1.13');
   assert.equal(first.body.manaProfile.maxMana, 3500);
   assert.equal(first.body.manaProfile.skills[0].preEvolutionCost, 280);
   assert.doesNotMatch(JSON.stringify(first.body), /test-token/);

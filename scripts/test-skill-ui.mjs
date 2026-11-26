@@ -98,7 +98,7 @@ const baselineSkillItem = {
 };
 const characterResponse = {
   ok: true,
-  apiVersion: '6.1.12',
+  apiVersion: '6.1.13',
   profile: {
     CharacterName: '스킬표본', CharacterClassName: '브레이커', ServerName: '아브렐슈드',
     ItemAvgLevel: '1,700.00', CombatPower: '5,000.00', CharacterImage: '',
@@ -146,7 +146,7 @@ async function verifyViewport(viewport) {
   const page = await browser.newPage({ viewport });
   await page.route('**/api/character**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(characterResponse) }));
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' });
-  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.12');
+  assert.equal(await page.locator('.version').textContent(), 'Version 6.1.13');
   await fillCharacterSearch(page, '스킬표본');
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('heading', { name: /스킬표본/ }).waitFor();
@@ -501,7 +501,7 @@ async function verifyHighCritRecommendation(viewport = { width: 1440, height: 10
   };
   const fixture = {
     ok: true,
-    apiVersion: '6.1.12',
+    apiVersion: '6.1.13',
     profile: { ...characterResponse.profile, CharacterName: '다중치명표본', Stats: [] },
     arkPassive: { Points: evolutionPoints(140), Effects: [...fixedTier1, { Name: '입식 타격가', Level: 2 }] },
     accessoryEffects: accessory,
@@ -830,26 +830,22 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
     const mode = page.locator('#manaRecommendationMode');
     assert.equal(await page.locator('#manaDuration').inputValue(), '300');
     assert.equal(await rows.count(), 0);
-    if (analyzerMatched) {
-      assert.match(await page.locator('#recommendList').innerText(), /300초 실측 검증을 통과한 후보가 없습니다/);
-      assert.match(await status.textContent(), /300초 실측 검증 0개/);
-    } else {
-      assert.match(await page.locator('#recommendList').innerText(), /이론상 기대 피해에서 후보를 비교/);
-      assert.match(await status.textContent(), /300초 검증 불가.*전투분석 피해 지분 미확인/);
-      await mode.selectOption('estimate');
-      assert.equal(await rows.count(), 0);
-      assert.match(await status.textContent(), /300초 검증 불가.*전투분석 피해 지분 미확인/);
-    }
+    assert.match(await page.locator('#recommendList').innerText(), /이론상 기대 피해에서 후보를 비교/);
+    assert.match(await status.textContent(), /300초 검증 불가.*자연 회복량·틱 및 실제 시전 조건 미확인/);
+    await mode.selectOption('estimate');
+    assert.equal(await rows.count(), 0);
+    assert.match(await status.textContent(), /300초 검증 불가.*자연 회복량·틱 및 실제 시전 조건 미확인/);
     await mode.selectOption('theory');
     assert.equal(await rows.count(), 5);
     assert.match(await status.textContent(), /이론상 기대 피해 순위/);
     if (analyzerMatched) {
       await mode.selectOption('estimate');
       assert.equal(await rows.count(), 0);
-      assert.match(await status.textContent(), /300초 추정 검증 · 마나 통과 0개/);
+      assert.match(await status.textContent(), /300초 검증 불가/);
       await page.locator('#manaSupport').selectOption('artist');
       await waitForRecommendations(page);
-      assert.match(await status.textContent(), /도화가/);
+      assert.match(await status.textContent(), /자연 회복량·틱 및 실제 시전 조건 미확인/);
+      assert.match(await page.locator('#manaSupportSummary').textContent(), /해우물/);
       await mode.selectOption('auto');
       assert.equal(await rows.count(), 0);
       return;
@@ -920,10 +916,19 @@ async function verifyManaRecommendation(viewport, critBonus, analyzerMatched = f
       const output = page.locator('#manaTimelineResult');
       const canvas = output.getByRole('img');
       const statusLine = page.locator('#manaTimelineStatus');
+      await set('manaRecovery', '');
+      await simulate();
+      assert.match(await statusLine.textContent(), /필수 마나 입력 미확인.*자연 회복 1회량/);
+      assert.equal(await output.isVisible(), false);
+      await set('manaRecovery', 0);
+      assert.match(await page.locator('#manaInputEvidence').textContent(), /자연 회복 1회량 · 사용자 입력/);
       await simulate();
       assert.match(await statusLine.textContent(), /입력·가정 기반 추정.*사용자 지정 간격 고정/);
       assert.match(await canvas.getAttribute('aria-label'), /60초 마나 잔량/);
       assert.match(await output.textContent(), /마나 부족 구간.*서포터 미적용.*음식 미적용.*집중 룬 변경/s);
+      await output.getByText('스킬 비용 산출과 입력 비교').click();
+      assert.ok(await output.getByRole('region', { name: '스킬별 마나 산출 근거' }).isVisible());
+      assert.match(await output.getByRole('region', { name: '스킬별 마나 산출 근거' }).textContent(), /사용자 입력.*용광로 추가 MP|용광로 추가 MP.*사용자 입력/s);
       await output.getByText(/마나 부족 구간 \d+개/).click();
       assert.ok(await output.getByText(/부족 .* MP/).first().isVisible());
       await set('manaTimelineDuration', 61.5);

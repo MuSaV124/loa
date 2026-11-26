@@ -24,6 +24,12 @@ export function prepareManaScenario(input, damageSkills, cycleSkills = []) {
   const downtime = analysisOnly ? input.downtime ?? [] : [];
   const recoveryOrder = input.recoveryOrder ?? 'before-cast';
   if (strict && !analysisOnly && duration !== MANA_RECOMMENDATION_SECONDS) return { reason: '300초 시전 조건이 필요합니다.' };
+  if (analysisOnly) {
+    const missing = [!validNumber(maxMana, 1) && '최대 마나', !validNumber(startMana, 0, validNumber(maxMana, 1) ? maxMana : Infinity) && '시작 마나',
+      !validNumber(recoveryMana, 0) && '자연 회복 1회량', recoveryMana > 0 && !validNumber(recoveryInterval, 0.1) && '회복 틱 간격',
+      recoveryMana > 0 && !validNumber(firstRecovery, 0) && '첫 회복 시각'].filter(Boolean);
+    if (missing.length) return { reason: `필수 마나 입력 미확인 · ${missing.join(' · ')}` };
+  }
   if (!validNumber(duration, 1, 600) || !validNumber(maxMana, 1) || !validNumber(startMana, 0, maxMana)
       || !validNumber(recoveryMana, 0) || (recoveryMana > 0
         && (!validNumber(recoveryInterval, 0.1) || !validNumber(firstRecovery, 0)))) {
@@ -57,6 +63,7 @@ export function prepareManaScenario(input, damageSkills, cycleSkills = []) {
     // Zero recorded cost can also be a mana skill made free by another effect.
     const usesMana = known.manaUsageKnown === true ? known.usesMana : skill.cost > 0 ? true : null;
     byName.set(key, { ...skill, key, usesMana, cooldownEligible: known.cooldownEligible !== false,
+      ...(analysisOnly && { baseManaCost: known.baseManaCost, tooltipPreEvolutionCost: known.tooltipPreEvolutionCost }),
       ...(strict && { castOnCompletion: /^(?:캐스팅|지점|casting|target)(?:\s*스킬)?$/i.test(known.type || '') }) });
   }
   const damageKeys = damageSkills.map(name => normalizeSkillCycleName(name));
@@ -171,6 +178,7 @@ function manaCastSkills(scenario, reductions, { generalCooldown, manaCooldown, f
     const cooldown = Math.min(95, generalCooldown + (skill.usesMana ? manaCooldown : 0));
     return {
       ...skill,
+      costBeforeEvolution: skill.cost,
       interval: scenario.analysisOnly && skill.fixedInterval ? skill.interval
         : skill.cooldownItem ? skillCooldownSeconds(skill.cooldownItem, cooldown)
         : skill.cooldownEligible ? Math.max(0.1, skill.interval * (1 - cooldown / 100)) : skill.interval,
@@ -339,6 +347,9 @@ function forecastManaRotation(scenario, stats) {
   const { planned, counts, unavailable } = plannedRotation(scenario, skills);
   const actors = skills.map((skill, index) => ({ key: skill.key, name: skill.name, interval: skill.interval,
     fixedInterval: Boolean(skill.fixedInterval), cost: skill.cost + maxMana * skill.maxManaCost,
+    baseManaCost: skill.baseManaCost, tooltipPreEvolutionCost: skill.tooltipPreEvolutionCost,
+    costBeforeEvolution: skill.costBeforeEvolution, reduction: skill.costBeforeEvolution - skill.cost,
+    furnaceExtra: maxMana * skill.maxManaCost, costSource: skill.costSource, intervalSource: skill.intervalSource,
     plannedCasts: counts[index], times: [], delayed: 0, ready: scenario.replay ? 0 : skill.first }));
   const tolerance = Number.EPSILON * maxMana * 32;
   const trace = [{ time: 0, mana: startMana, kind: 'start' }];
@@ -411,7 +422,8 @@ function forecastManaRotation(scenario, stats) {
       instantAmount: recovery.filter(event => event.natural == null).reduce((total, event) => total + event.amount, 0),
       windows: scenario.environment?.windows ?? []
     },
-    averageDepletion: netPerSecond < 0 ? startMana / -netPerSecond : null,
+    partialInputs: Boolean(scenario.unscheduled.length || unavailable.length),
+    averageDepletion: netPerSecond < 0 && !scenario.unscheduled.length && !unavailable.length ? startMana / -netPerSecond : null,
     firstShortage: shortages[0]?.start ?? null, shortageTime: shortages.reduce((sum, event) => sum + event.end - event.start, 0),
     lostCasts: actors.reduce((sum, actor) => sum + actor.plannedCasts - actor.times.length, 0),
     skillCasts: actors.map(({ ready, times, ...actor }) => ({ ...actor, casts: times.length,
@@ -446,7 +458,8 @@ export function forecastManaDamage(scenario, rotation, damage) {
     idealAlternate += share * (row.alternateValue ?? row.value);
     actualAlternate += share * (row.alternateValue ?? row.value) * completion;
   }
-  return { ideal, actual, idealAlternate, actualAlternate, lossPercent: ideal > 0 ? 100 * (1 - actual / ideal) : null,
+  if (!(ideal > 0)) return { reason: '기준 계획에서 계산 가능한 피해 없음' };
+  return { ideal, actual, idealAlternate, actualAlternate, lossPercent: 100 * (1 - actual / ideal),
     lossPercentAlternate: idealAlternate > 0 ? 100 * (1 - actualAlternate / idealAlternate) : null };
 }
 

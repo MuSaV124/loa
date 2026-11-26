@@ -10,6 +10,7 @@ const SPECIAL_RESOURCES = {
   인파이터: ['special', '기력·충격'],
   기공사: ['special', '내공·금강선공'],
   브레이커: ['special', '기력·충격·투기'],
+  리퍼: ['unknown', '어둠·혼돈 게이지 · 마나 비용 표기 없음'],
   스카우터: ['state-dependent', '배터리·하이퍼 싱크'],
   데모닉: ['state-dependent', '마나·잠식 게이지·악마화'],
   아르카나: ['mixed', '마나·카드 수급'],
@@ -22,9 +23,37 @@ const SPECIAL_RESOURCES = {
 };
 
 function positiveNumber(value) {
-  const text = String(value ?? '').replace(/,/g, '').trim();
-  const number = /^\d+(?:\.\d+)?$/.test(text) ? Number(text) : NaN;
+  const text = String(value ?? '').trim();
+  const number = /^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$/.test(text) ? Number(text.replaceAll(',', '')) : NaN;
   return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+export function readMaximumMana(profile) {
+  const stats = Array.isArray(profile?.Stats) ? profile.Stats : [];
+  const candidates = stats.filter(row => /^최대\s*마나$/.test(String(row?.Type ?? '').trim()))
+    .map(row => ({ value: positiveNumber(row.Value), path: 'ArmoryProfile.Stats[최대 마나]' }));
+  candidates.push({ value: positiveNumber(profile?.MaxMana), path: 'ArmoryProfile.MaxMana' });
+  const valid = candidates.filter(row => row.value != null);
+  if (!valid.length) return { value: null, status: 'unknown', reason: '명시 최대 마나 없음' };
+  if (valid.some(row => row.value !== valid[0].value)) return { value: null, status: 'unknown', reason: '최대 마나 필드 불일치' };
+  return { ...valid[0], status: 'api' };
+}
+
+function currentManaTooltip(raw, skill) {
+  if (raw?.Tooltip == null) return { usage: skill, reason: '툴팁 누락' };
+  const usage = parseSkillManaUsage(raw.Tooltip);
+  if (usage.manaUsageKnown) return { usage };
+  let tooltip = raw.Tooltip;
+  if (typeof tooltip === 'string') {
+    try { tooltip = JSON.parse(tooltip); } catch { return { usage, reason: '현재 레벨 비용 문구 미확인' }; }
+  }
+  const box = tooltip?.Element_004;
+  // The current Korean Armory gives this skill an Ancient Orb cost in the resource row.
+  if (box?.type === 'MultiTextBox' && typeof box.value === 'string' &&
+      /^정령의 구슬\s+[1-9]\d*\s*소모$/.test(collectSkillTooltipTexts(box.value.split('|')[0])[0] || '')) {
+    return { usage: { manaUsageKnown: true, usesMana: false, manaCost: 0 }, alternativeResource: '정령의 구슬' };
+  }
+  return { usage, reason: box?.type === 'SingleTextBox' ? '설명 시작 · 별도 비용 행 생략' : '현재 레벨 비용 문구 미확인' };
 }
 
 function readCostModifier(texts, source, rune = false) {
@@ -45,9 +74,10 @@ function readCostModifier(texts, source, rune = false) {
 }
 
 export function skillManaCostProfile(raw, skill) {
-  const usage = raw?.Tooltip != null ? parseSkillManaUsage(raw.Tooltip) : skill;
-  if (!usage?.manaUsageKnown) return { baseCost: null, preEvolutionCost: null, source: 'unverified', modifiers: [] };
-  if (!usage.usesMana) return { baseCost: 0, preEvolutionCost: 0, source: raw ? 'official-api' : 'derived', modifiers: [] };
+  const { usage, reason, alternativeResource } = currentManaTooltip(raw, skill);
+  const source = raw?.Tooltip ? 'official-api' : 'derived';
+  if (!usage?.manaUsageKnown) return { baseCost: null, preEvolutionCost: null, source: 'unverified', modifiers: [], reason };
+  if (!usage.usesMana) return { baseCost: 0, preEvolutionCost: 0, source, modifiers: [], alternativeResource };
   const baseCost = positiveNumber(usage.manaCost);
   const modifiers = (Array.isArray(raw?.Tripods) ? raw.Tripods : []).filter(tripod => tripod?.IsSelected === true)
     .map(tripod => readCostModifier(collectSkillTooltipTexts(tripod.Tooltip), tripod.Name || '트라이포드')).filter(Boolean);
@@ -58,7 +88,7 @@ export function skillManaCostProfile(raw, skill) {
   return {
     baseCost,
     preEvolutionCost: valid ? baseCost * (1 + (modifiers[0]?.percent || 0) / 100) : null,
-    source: raw?.Tooltip ? 'official-api' : 'derived',
+    source, reason: valid ? undefined : '선택 비용 효과 또는 중첩 미확인',
     modifiers
   };
 }
@@ -73,15 +103,15 @@ export function buildCharacterManaProfile(profile, snapshot, rawSkills = [], ski
     ...skillManaCostProfile(rawByName.get(normalizeSkillCycleName(skill.name)), skill)
   }));
   const stats = Array.isArray(profile?.Stats) ? profile.Stats : [];
-  const maxManaStat = stats.find(row => /^최대\s*마나$/.test(row?.Type || ''));
-  const maxMana = positiveNumber(maxManaStat?.Value ?? profile?.MaxMana);
+  const maximumMana = readMaximumMana(profile);
+  const maxMana = maximumMana.value;
   const observedMana = skills.some(skill => skill.baseCost > 0);
   const observedNonMana = skills.some(skill => skill.baseCost === 0);
   const special = Object.hasOwn(SPECIAL_RESOURCES, className) ? SPECIAL_RESOURCES[className] : null;
   const kind = special?.[0] || (observedMana ? 'mana-observed' : 'unknown');
   const resource = special?.[1] || (observedMana ? '장착 스킬에서 마나 사용 확인' : '자원 미확인');
   const signature = JSON.stringify([
-    profile?.CharacterName || snapshot?.profile?.name || '', className, build, maxMana,
+    profile?.CharacterName || snapshot?.profile?.name || '', className, build, maxMana, profile?.CharacterLevel ?? null,
     stats,
     (rawSkills || []).filter(skill => skillItems.some(item => item.name === skill.Name)).map(skill => [
       skill.Name, skill.Level, skill.SkillType, parseSkillManaUsage(skill.Tooltip),
@@ -92,7 +122,7 @@ export function buildCharacterManaProfile(profile, snapshot, rawSkills = [], ski
     snapshot?.effects?.engraving?.items || [], snapshot?.effects?.bracelet || {}, snapshot?.arkGrid?.slots || [],
     snapshot?.equipment?.combat || [], snapshot?.equipment?.accessories || []
   ]);
-  return { className, build, kind, resource, maxMana, observedMana, observedNonMana, skills, signature };
+  return { className, build, kind, resource, maxMana, maximumMana, observedMana, observedNonMana, skills, signature };
 }
 
 export function findVerifiedManaProfile(character, profiles = VERIFIED_MANA_PROFILES, today = new Date().toISOString().slice(0, 10)) {

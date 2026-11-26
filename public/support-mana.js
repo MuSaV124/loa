@@ -49,12 +49,13 @@ export function resolveManaEnvironment({
   if (food && (!Number.isFinite(foodTick) || foodTick < naturalMana)) return { reason: '음식 사용 상태의 회복 1회량 미확인' };
   const baseline = food ? foodTick : naturalMana;
   const result = { profile, baseline, quality: 'input', windows: [], instant: [] };
-  if (!profile.skill || uptime === 0) return result;
+  if (!profile.skill) return result;
   if (patch > SUPPORT_MANA_VERIFIED_AT) return { reason: '현재 패치에서 서포터 회복 툴팁 재확인 필요' };
   if (Number.isFinite(uptime) && (uptime < 0 || uptime > 100)) return { reason: '서포터 가동률을 0~100%로 입력해 주세요.' };
   if (receivedTimes.some(time => !Number.isFinite(time) || time < 0 || (inclusiveEnd ? time > duration : time >= duration))) {
     return { reason: '서포터 효과를 받은 시각을 전투 구간 안으로 입력해 주세요.' };
   }
+  if (uptime === 0) return receivedTimes.length ? { reason: '서포터 가동률 0%와 수신 시각이 동시에 입력됐습니다.' } : result;
   if (!receivedTimes.length && (!Number.isFinite(uptime) || profile.kind === 'instant')) {
     return { reason: profile.kind === 'instant'
       ? '도화가 즉시 회복은 실제 적용 시각이 필요합니다.'

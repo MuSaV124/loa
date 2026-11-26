@@ -57,6 +57,14 @@ const effects = { manaFurnace: furnace, manaCostReductions: [20, 10] };
 assert.equal(evaluateManaRotation(prepare({}, costCheck), effects).reason.includes('중첩'), true);
 assert.ok(Math.abs(evaluateManaRotation(prepare({ reductions: 'product' }, costCheck), effects).consumedMana - 13.52) < 1e-9);
 assert.ok(Math.abs(evaluateManaRotation(prepare({ reductions: 'sum' }, costCheck), effects).consumedMana - 13.2) < 1e-9);
+const breakdown = evaluateManaRotation(prepare({ reductions: 'product' }, [{ ...costCheck[0], costSource: '사용자 입력',
+  metadata: { baseManaCost: 20, tooltipPreEvolutionCost: 14 } }]), effects).skillCasts[0];
+assert.deepEqual([breakdown.baseManaCost, breakdown.tooltipPreEvolutionCost, breakdown.costBeforeEvolution, breakdown.furnaceExtra], [20, 14, 16, 2]);
+assert.ok(Math.abs(breakdown.reduction - 4.48) < 1e-9);
+assert.ok(Math.abs(breakdown.cost - 13.52) < 1e-9);
+const partial = { ...scenario, unscheduled: ['누락 유틸'] };
+assert.equal(evaluateManaRotation(partial).averageDepletion, null);
+assert.match(forecastManaDamage(partial, result, {}).reason, /스킬 시전 정보/);
 assert.match(evaluateManaRotation(prepare({}, [{ ...single[0], cost: 0 }]), effects).reason, /마나 무료/);
 assert.deepEqual(manaFurnaceDamage(furnace, { manaUsageKnown: true, usesMana: true, manaCost: 500, freeManaSkill: true }), { damage: 0, known: false });
 assert.deepEqual(manaFurnaceDamage(furnace, { manaUsageKnown: true, usesMana: true, manaCost: 500 }), { damage: 24, known: true });

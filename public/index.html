@@ -220,7 +220,7 @@
             <p id="manaAutoStatus" class="hint">캐릭터 조회 후 공식 스킬 데이터를 표시합니다.</p>
           </div>
           <details id="manaScenarioPanel" class="advancedInputDetails manaScenarioPanel">
-            <summary><span><b>고급 마나 설정</b><small>측정한 스킬 사용과 회복으로 자동 조건을 수정할 수 있습니다.</small></span></summary>
+            <summary><span><b>고급 마나 설정</b><small>전투 시작 MP, 회복 틱과 실제 시전 조건을 입력할 수 있습니다.</small></span></summary>
             <div class="advancedInputBody">
               <label class="manaManualToggle"><input id="manaShortageClass" type="checkbox" /> 수동 마나 환경 사용</label>
               <div class="manaScenarioGrid">
@@ -241,6 +241,16 @@
                 <label><span id="manaSupportRestoreLabel">실측 회복량</span><input id="manaSupportRestore" type="number" min="0" step="any" aria-labelledby="manaSupportRestoreLabel" /></label>
               </div>
               <p id="manaSupportTimingHint" class="hint hidden"></p>
+              <details class="manaAutoSkills">
+                <summary>입력 출처 및 게임 내 측정</summary>
+                <p id="manaInputEvidence" class="hint"></p>
+                <ol>
+                  <li>무한 자원 설정을 끄고 전투 화면에서 최대 MP와 시작 MP를 기록하세요.</li>
+                  <li>마나를 일부 소모한 뒤 아무 스킬도 쓰지 않고 연속 회복의 시각과 1회량을 기록하세요. 음식이나 서포터 효과는 한 가지씩 켜고 다시 측정하세요.</li>
+                  <li>회복 틱 사이에 스킬을 한 번씩 사용해 집중 룬·마나 용광로 적용 전후의 MP 차감을 기록하세요. 스킬 입력에는 진화 적용 전 값을 넣으세요.</li>
+                  <li>전투 영상에서 스킬 시전 시작 시각을 기록하고 사용자 지정 시전 계획에 입력하세요. 출처 확인을 위한 테스트는 같은 장착 상태에서 반복하세요.</li>
+                </ol>
+              </details>
               <details id="manaAutoSkills" class="manaAutoSkills hidden">
                 <summary>조회한 스킬 소모량과 쿨타임</summary>
                 <ul id="manaAutoSkillList"></ul>
@@ -293,7 +303,6 @@
                 <p id="directionRateStatus" class="hint" aria-live="polite"></p>
               </details>
               <details id="manaSensitivityPanel" class="comboDetails hidden"><summary>순위 가정 비교</summary><p id="manaSensitivity" class="hint"></p></details>
-              <a id="manaRecoverySource" class="hint hidden" target="_blank" rel="noopener noreferrer">자연 회복 가정에 사용한 2024년 관찰 자료</a>
               <div id="recommendList" class="recommendList"></div>
             </div>
             <div class="apiBaseline468">
@@ -433,11 +442,11 @@
 
     <footer class="pickFooter">
       <span>XXAPICK.APP · LOST ARK FAN-MADE SERVICE</span>
-      <span class="version">Version 6.1.12</span>
+      <span class="version">Version 6.1.13</span>
     </footer>
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <script type="module" src="/app.js?v=6.1.12"></script>
+  <script type="module" src="/app.js?v=6.1.13"></script>
 </body>
 </html>

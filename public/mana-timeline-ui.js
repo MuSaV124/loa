@@ -56,19 +56,28 @@ function drawManaTrace(canvas, result) {
   context.stroke();
 }
 
-export function renderManaTimeline(output, result, damage, comparisons, unscheduled) {
+export function renderManaTimeline(output, result, damage, comparisons, unscheduled, furnaceSelected) {
   clearManaTimelineGraph(output);
   const time = value => Number.isFinite(value) ? `${format(value)}초` : '없음';
   const metrics = [
     ['최대 마나', format(result.maxMana)], ['계획 소모 / 초', format(result.demandPerSecond)],
     ['예정 회복 / 초', format(result.recoveryPerSecond)], ['예정 순증감 / 초', format(result.netPerSecond)],
-    ['평균 수지의 고갈 예상', time(result.averageDepletion)], ['첫 마나 부족', time(result.firstShortage)],
+    ['평균 수지의 고갈 예상', result.partialInputs ? 'UNKNOWN' : time(result.averageDepletion)],
+    [result.partialInputs ? '입력 범위 첫 부족' : '첫 마나 부족', time(result.firstShortage)],
     ['마나 부족 횟수', format(result.shortages.length)], ['마나 부족 누적 시간', time(result.shortageTime)],
     ['종료 마나', format(result.endMana)], ['미시전 횟수', format(result.lostCasts)]
   ];
   const rows = result.skillCasts.map(skill => `<tr><th scope="row">${escape(skill.name)}</th><td>${format(skill.cost)}</td>
     <td>${format(skill.interval)}</td><td>${format(skill.actualInterval)}</td><td>${format(skill.spentPerSecond)}</td>
     <td>${skill.casts} / ${skill.plannedCasts}</td><td>${skill.delayed}</td></tr>`).join('');
+  const costs = result.skillCasts.map(skill => {
+    const difference = Number.isFinite(skill.tooltipPreEvolutionCost) && skill.costSource === '사용자 입력'
+      ? skill.costBeforeEvolution - skill.tooltipPreEvolutionCost : null;
+    return `<tr><th scope="row">${escape(skill.name)}<small>${escape(skill.intervalSource || 'UNKNOWN')}</small></th>
+      <td>${format(skill.baseManaCost)}</td><td>${format(skill.tooltipPreEvolutionCost)}</td>
+      <td>${format(skill.costBeforeEvolution)}<small>${escape(skill.costSource || 'UNKNOWN')}</small></td>
+      <td>${format(difference)}</td><td>${format(skill.reduction)}</td><td>${format(skill.furnaceExtra)}</td><td>${format(skill.cost)}</td></tr>`;
+  }).join('');
   const comparisonRows = comparisons.filter(comparison => comparison && (comparison.result || comparison.detail)).map(comparison => {
     const compared = comparison.result;
     const detail = [comparison.detail, compared?.reason].filter(Boolean).join(' · ');
@@ -100,6 +109,13 @@ export function renderManaTimeline(output, result, damage, comparisons, unschedu
     <th scope="col">계획 MP/초</th><th scope="col">실행 / 계획</th><th scope="col">지연</th></tr></thead><tbody>${rows}</tbody></table></div>
     ${result.shortages.length ? `<details><summary>마나 부족 구간 ${result.shortages.length}개</summary><ul>
       ${result.shortages.map(row => `<li>${time(row.start)} ~ ${time(row.end)} · ${escape(row.skill)} · 부족 ${format(row.deficit)} MP</li>`).join('')}</ul></details>` : ''}
+    <details><summary>스킬 비용 산출과 입력 비교</summary>
+      ${furnaceSelected ? '<p class="hint">용광로 추가 MP는 소모 감소 뒤에 합산하는 가정값입니다. 게임의 중첩 순서와 반올림은 UNKNOWN입니다.</p>' : ''}
+      <div class="manaTimelineTable" tabindex="0" role="region" aria-label="스킬별 마나 산출 근거"><table><thead><tr>
+      <th scope="col">스킬 / 간격 근거</th><th scope="col">툴팁 기본 MP</th><th scope="col">툴팁 진화 전 산출</th>
+      <th scope="col">사용한 진화 전 MP</th><th scope="col">입력 − 툴팁 산출</th><th scope="col">진화 절감 MP</th>
+      <th scope="col">용광로 추가 MP</th><th scope="col">최종 모델 MP</th></tr></thead><tbody>${costs}</tbody></table></div>
+    </details>
     ${comparisonRows ? `<div class="manaTimelineTable" tabindex="0" role="region" aria-label="마나 효과 비교"><table><thead><tr>
     <th scope="col">시나리오 변경</th><th scope="col">소모/초</th><th scope="col">회복/초</th><th scope="col">첫 부족</th>
     <th scope="col">종료 MP</th><th scope="col">기대 피해 지수</th></tr></thead><tbody>${comparisonRows}</tbody></table></div>` : ''}`;
