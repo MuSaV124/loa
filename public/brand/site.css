@@ -7,6 +7,11 @@
   --pick-blue: #65a9ff;
   --pick-muted: #a9b2cb;
   --pick-text: #fff;
+  --control-height: 40px;
+  --compact-control-height: 34px;
+  --control-inset: .75rem;
+  --label-leading: 1.3;
+  --body-leading: 1.5;
 }
 
 body {
@@ -290,4 +295,205 @@ body[data-site-page="nodes"] #evolutionTiers .nodeName { min-width: 0; overflow-
 
 @media (max-width: 540px) {
   body[data-site-page="nodes"] #evolutionTiers .nodeGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Allow controls to grow with wrapped labels while sharing the same visual center. */
+:is(button, input, select, textarea) { font-family: inherit; }
+
+button:not(.pickTool, .nodeCard, .hidden),
+.pickNav .tabButton,
+.characterNav a,
+.simulatorJumpButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: var(--control-height);
+  padding-block: .375rem;
+  padding-inline: var(--control-inset);
+  line-height: var(--label-leading);
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+:is(.characterNav, .specEfficiencyToolbar, .specPlannerMode, .specScenarioActions, .avatarJobButtonList) > :is(a, button),
+.sourceTitle button {
+  --control-height: var(--compact-control-height);
+  --control-inset: .625rem;
+}
+
+:is(.search, .marketSelectGrid, .crystalMarketToolbar, .avatarControls) > button:not(.hidden) {
+  block-size: auto;
+  min-block-size: var(--control-height);
+  padding-inline: var(--control-inset);
+}
+
+#searchWorkspace .search { --control-height: 44px; }
+#searchWorkspace .search > :is(input, button):not(.hidden) { min-block-size: var(--control-height); }
+
+.pickNav .tabButton {
+  --control-inset: .25rem;
+  min-width: 0;
+  font-size: clamp(.875rem, 2.1vw, .9375rem);
+  white-space: nowrap;
+}
+
+.characterNav { align-items: stretch; }
+.characterNav button { align-self: stretch; }
+:is(.specPlannerMode, .specScenarioActions, .avatarControls) { align-items: stretch; }
+
+.marketSubNav {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  width: min(100%, 38rem);
+  gap: 8px;
+}
+
+:is(.marketSubNav, .specEfficiencyToolbar, .specPlannerMode, .specScenarioActions) > button { min-width: 0; }
+
+.search input,
+.marketSelectGrid :is(input, select),
+.ratioSearch input,
+.manualGrid :is(input:not([type="checkbox"], [type="hidden"]), select),
+.manaScenarioPanel :is(input:not([type="checkbox"]), select, textarea),
+:is(.manaEnvironment, .manaRecommendationMode, .armguardRangeControls) select,
+:is(.specPlannerInputs, .powerPheonGrid) input {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  min-block-size: var(--control-height);
+  padding-block: .375rem;
+  line-height: var(--label-leading);
+}
+
+:is(.manualGrid, .manaScenarioPanel, .directionRatePanel, .specPlannerInputs, .powerPheonGrid, .powerCostMaterial) input[type="number"] {
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.manualGrid > label,
+.manualGrid .adrenalineSetting > label,
+.manualGrid .adrenalineReplacement > label,
+.manualGrid .staticInfo {
+  block-size: auto;
+  line-height: var(--label-leading);
+}
+
+.manualGrid .checkLabel {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  text-align: start;
+}
+
+.manualGrid .checkLabel input { flex: 0 0 auto; }
+.manualGrid .checkLabel span { min-width: 0; overflow-wrap: anywhere; }
+
+/* Titles, icon groups and values share their own alignment rather than a page-wide centering rule. */
+.pickTools .pickTool { justify-content: flex-start; }
+.pickTool svg { display: block; flex: none; }
+.pickTool :is(strong, span) { overflow-wrap: anywhere; }
+
+.sectionHead { align-items: center; }
+:is(.sectionHead, .powerRawHeader, .powerBuildHeader, .specWorkspaceHead, .armguardCostHeader) > * { min-width: 0; }
+:is(.sectionHead, .powerRawHeader, .specWorkspaceHead, .armguardCostHeader) :is(h2, h3, h4) { line-height: var(--label-leading); }
+.sectionHead h2 { margin-block: 0; }
+.sectionHead .hint { margin-block: 4px 0; word-break: keep-all; overflow-wrap: anywhere; }
+
+:is(.simulatorFoldSummary, .specScenarioSummary, .advancedInputDetails > summary, .armguardBreathDetails > summary, .sourceHead) {
+  line-height: var(--label-leading);
+}
+
+:is(.simulatorFoldSummary, .specScenarioSummary, .advancedInputDetails > summary, .armguardBreathDetails > summary) > :is(span, div) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.simulatorFold > .simulatorFoldSummary > strong {
+  margin-inline-start: auto;
+  max-inline-size: 42%;
+  text-align: end;
+  word-break: keep-all;
+}
+
+:is(.pickBeta, .badge, .lostarkNoticeBadge, .confidencePill, .nodeControls, .characterNameLine span, .apiMark) {
+  line-height: var(--label-leading);
+}
+
+.lostarkNoticeLink strong,
+.skillEffectHeading b,
+.skillEffectPreview > b,
+.marketResultItem b,
+.materialPriceCard b,
+.engravingPriceCard b,
+.avatarPart small,
+.gemPriceCell small,
+.specPlannerStep b {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: var(--label-leading);
+}
+
+.skillEffectHeading { align-items: flex-start; }
+.skillEffectHeading b { flex: 0 1 auto; }
+.skillEffectHeading span { flex: 1 1 65%; min-width: 0; line-height: var(--body-leading); }
+
+:is(.specEfficiencyTargetTitle, .combatPowerCoverage, .powerBuildHeader, .characterNameLine) { flex-wrap: wrap; }
+:is(.combatPowerCoverage p, .powerBuildHeader span, .specEfficiencyTargetTitle b, .crystalMarketMeta span) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+:is(.marketResultItem, .materialPriceCard, .engravingPriceCard) > :nth-child(2) { min-width: 0; }
+.marketResultItem { grid-template-columns: 52px minmax(0, 1fr) auto; }
+:is(.marketPrice, .engravingPriceCard strong, .materialPriceCard strong) { text-align: end; }
+.crystalExchangeCard { align-items: stretch; }
+.crystalExchangeArrow { align-self: center; }
+.crystalMarketMeta { align-items: baseline; flex-wrap: wrap; }
+
+.skillCycleRow > :is(span, strong) { text-align: end; }
+.skillCycleRow :is(b, small) { overflow-wrap: anywhere; }
+.specEfficiencyHeader { padding-inline: 14px 12px; }
+.specEfficiencyHeader > span:not(:first-child) { text-align: end; }
+.specEfficiencyTarget > .specEfficiencyRank { display: grid; place-items: center; line-height: 1; }
+.specEfficiencyTarget > div:last-child > span,
+.specEfficiencyDetail,
+.rowMetric span {
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  line-height: var(--label-leading);
+}
+
+.specEfficiencyStep b small { display: inline-block; white-space: nowrap; }
+.specEfficiencyStep span { word-break: keep-all; overflow-wrap: anywhere; }
+
+.ratioColumnHead > span:nth-child(4) { justify-content: flex-end; }
+.ratioBuildMetric { text-align: end; }
+.comboTable :is(th, td) { vertical-align: middle; }
+
+.nodeTooltip { line-height: var(--body-leading); }
+.nodeTooltipHead { flex-wrap: wrap; gap: 4px 12px; }
+.nodeTooltipHead :is(strong, span) { white-space: normal; overflow-wrap: anywhere; }
+
+@media (min-width: 761px) {
+  .specEfficiencyHeader,
+  .specEfficiencyRow {
+    grid-template-columns: minmax(0, 1fr) minmax(0, clamp(126px, 15vw, 140px)) minmax(0, clamp(96px, 13vw, 120px)) minmax(0, clamp(108px, 14vw, 130px));
+  }
+}
+
+@media (max-width: 760px) {
+  :root { --control-height: 44px; --compact-control-height: 38px; }
+  .marketSubNav { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+  .skillEffectHeading { flex-wrap: wrap; gap: 4px 10px; }
+  .skillEffectHeading span { flex-basis: 100%; }
+  .armguardRangeControls select { --control-height: 40px; }
+}
+
+@media (max-width: 560px) {
+  .marketResultItem { grid-template-columns: 42px minmax(0, 1fr); }
+  .marketResultItem img, .marketResultItem .marketIconFallback { inline-size: 42px; block-size: 42px; }
+  .marketResultItem .marketPrice { grid-column: 2; }
+  .characterNav button { margin-inline-start: 0; }
 }
