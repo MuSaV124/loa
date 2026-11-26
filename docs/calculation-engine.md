@@ -4,6 +4,8 @@
 
 ## 계산 경로
 
+2026-11-26의 시뮬레이터·시세·교차 계산은 [XXAPICK 3차 전수 감사](xxapick-full-audit-v3.md)와 [43개 기능 인벤토리](xxapick-feature-inventory.md)에서 관리한다. 11월 25일 장신구 연마 단계 잔존 수정은 게임 UI 변경이며, 11월 26일 알려진 이슈에 현재 계산 엔진의 배율 공식을 바꿀 공지는 확인되지 않았다. [11월 25일 정기 점검](https://lostark.game.onstove.com/News/Notice/Views/13606) · [11월 26일 알려진 이슈](https://lostark.game.onstove.com/News/Notice/Views/13605)
+
 2026-11-25 전 직업의 API 표본, 방향 판정 파서 및 피해 적용 변경은 [공격 판정·피해 적용 감사](combat-attack-audit-v2.md)를 참고한다.
 
 | 기능 | 입력과 계산 파일 | 출력 및 검증 범위 |

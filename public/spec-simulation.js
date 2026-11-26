@@ -18,6 +18,7 @@ export function accessoryDamageInput(base = {}, before = {}, after = {}) {
 }
 
 export function expectedDamageChangePercent(before, after, analyzedGemFactor = 1) {
+  if (![before, after, analyzedGemFactor].every(Number.isFinite)) return null;
   if (!(before > 0) || !(after >= 0) || !(analyzedGemFactor > 0)) return null;
   const change = (after * analyzedGemFactor / before - 1) * 100;
   return Number.isFinite(change) ? change : null;

@@ -60,6 +60,9 @@ assert.equal(accessoryUpgradeHasDamageModel(after.items[0]), true);
 assert.equal(accessoryUpgradeHasDamageModel({ effects: { weaponPowerPercent: 3 } }), false);
 close(expectedDamageChangePercent(2.8, 2.8), 0);
 assert.equal(expectedDamageChangePercent(0, 2.8), null);
+assert.equal(expectedDamageChangePercent(2.8, null), null);
+assert.equal(expectedDamageChangePercent(2.8, NaN), null);
+assert.equal(expectedDamageChangePercent(2.8, 0), -100);
 
 const rows = [
   { item: { name: '반지 상상' }, upgradeGroup: 'ring:0', available: true, powerDelta: 20, expectedCost: { expectedGold: 100 } },

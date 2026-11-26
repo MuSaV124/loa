@@ -7,7 +7,7 @@ import { extractArkGridSkillEffects } from '../public/passive-skill-effects.js';
 import { extractCardEffects } from '../public/card-effects.js';
 import { extractAvatarEffects } from '../public/avatar-effects.js';
 
-const API_VERSION = '6.1.10';
+const API_VERSION = '6.1.11';
 const CDN_PREFIX = 'https://cdn-lostark.game.onstove.com/';
 const OFFICIAL_ARMGUARD_ICON = `${CDN_PREFIX}efui_iconatlas/bracer/bracer_1.png`;
 const CHARACTER_CACHE_TTL_MS = SHARED_PRICE_CACHE_TTL_MS;
@@ -78,6 +78,11 @@ export function parseCharacterArmory(data, { arkGrid = {}, combatSkills = {} } =
     throw error;
   }
   const profile = data.ArmoryProfile || data.Profile || null;
+  if (typeof profile?.CharacterName !== 'string' || !profile.CharacterName.trim()) {
+    const error = new Error('Open API 응답에 캐릭터 프로필이 없습니다.');
+    error.status = 502;
+    throw error;
+  }
   const arkPassive = data.ArkPassive || data.ArmoryArkPassive || null;
   const equipment = data.ArmoryEquipment || data.Equipment || [];
   const gems = data.ArmoryGem || data.ArmoryGems || data.Gems || null;
@@ -86,7 +91,11 @@ export function parseCharacterArmory(data, { arkGrid = {}, combatSkills = {} } =
   const accessoryEffects = extractAccessoryEffects(equipment);
   const braceletEffects = extractBraceletEffects(equipment);
   const abilityStoneEffects = extractAbilityStoneEffects(equipment);
-  const engravingEffects = extractEngravingEffects(data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null);
+  const engravingData = data.ArmoryEngraving || data.Engravings || data.ArmoryEngravings || null;
+  const engravingEffects = extractEngravingEffects(engravingData);
+  const equippedEngravings = (Array.isArray(engravingData?.ArkPassiveEffects) ? engravingData.ArkPassiveEffects : [])
+    .filter(row => typeof row?.Name === 'string')
+    .map(({ Name, Description }) => ({ Name, Description }));
   const cardEffects = extractCardEffects(cards);
   const avatarEffects = extractAvatarEffects(avatars);
   const skills = Array.isArray(combatSkills.data) ? combatSkills.data : [];
@@ -98,7 +107,7 @@ export function parseCharacterArmory(data, { arkGrid = {}, combatSkills = {} } =
   const manaProfile = buildCharacterManaProfile(profile, powerSnapshot, skills, skillExperimentItems(skillEffects));
 
   // cards/avatars 원본은 raw에 그대로 들어있고 파싱 결과에 아이콘까지 포함하므로 최상위로 중복해서 싣지 않는다.
-  return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, gems, skills, skillEffects, manaProfile, skillEffectsError: combatSkills.error, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, cardEffects, avatarEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridSkillEffects, arkGridError: arkGrid.error, powerSnapshot, raw: data };
+  return { ok: true, apiVersion: API_VERSION, profile, arkPassive, equipment, gems, skills, skillEffects, manaProfile, skillEffectsError: combatSkills.error, accessoryEffects, braceletEffects, abilityStoneEffects, engravingEffects, equippedEngravings, cardEffects, avatarEffects, arkGrid: arkGrid.data, arkGridEffects, arkGridSkillEffects, arkGridError: arkGrid.error, powerSnapshot, raw: data };
 }
 
 async function fetchJson(url, apiKey, timeoutMs = 9000) {

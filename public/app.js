@@ -36,7 +36,7 @@ import {
   remainingCooldownMs
 } from './cache-policy.js?v=6.1.1';
 
-const VERSION = '6.1.10';
+const VERSION = '6.1.11';
 const PARTY_EVOLUTION_NODES = new Set(['정열의 춤사위', '선각자', '진군', '기원', '입식 타격가', '마나 용광로', '안정된 관리자']);
 function isCooldownExcluded() { return Boolean(document.getElementById('excludeCooldown')?.checked); }
 function isNoManaMainSkillEnabled() { return Boolean(document.getElementById('noManaMainSkill')?.checked); }
@@ -53,6 +53,10 @@ const EVOLUTION_TIERS = [1, 2, 3, 4, 5];
 const SPEC_OWNED_STORAGE_KEY = 'loa.specOwnedMaterials.v1';
 const SPEC_SCENARIO_STORAGE_KEY = 'loa.specScenario.v1';
 const initialOwnedMaterials = normalizeOwnedMaterials(readStoredObject(SPEC_OWNED_STORAGE_KEY));
+const defaultSimulatorSelection = () => ({
+  specEfficiencyFilter: 'all', specPlannerMode: 'target', specPlannerTarget: 0, specPlannerBudget: 1000000,
+  armguardRange: { from: 0, to: 25 }, armguardBreathMode: 'optimal', specScenarioSelectedKeys: new Set()
+});
 const state = {
   evolution: null,
   index: new Map(),
@@ -77,14 +81,8 @@ const state = {
   combatPowerModel: null,
   combatAnalyzer: null,
   classBenchmarks: null,
-  specEfficiencyFilter: 'all',
   ownedMaterials: initialOwnedMaterials,
-  specPlannerMode: 'target',
-  specPlannerTarget: 0,
-  specPlannerBudget: 1000000,
-  armguardRange: { from: 0, to: 25 },
-  armguardBreathMode: 'optimal',
-  specScenarioSelectedKeys: new Set()
+  ...defaultSimulatorSelection()
 };
 let simulatorRendered = false;
 let calculationDirty = false;
@@ -2158,8 +2156,10 @@ function engravingPowerEstimateFromEffects(effects = {}, snapshot = state.powerS
 function specMarketCost(price, pheonCost = 0) {
   const crystalGoldPer100 = Number($('crystalGoldPer100Input')?.value || 0);
   const pheonCrystalPerOne = Number($('pheonCrystalPerOneInput')?.value || DEFAULT_PHEON_CRYSTAL_PER_ONE);
-  const pheonGold = crystalGoldPer100 > 0 && pheonCrystalPerOne > 0 ? (crystalGoldPer100 / 100) * pheonCrystalPerOne * Number(pheonCost || 0) : 0;
-  return { totalGold: Number(price || 0) + pheonGold, tradeGold: Number(price || 0), fixedGold: pheonGold, silver: 0 };
+  const pheonRateKnown = crystalGoldPer100 > 0 && pheonCrystalPerOne > 0;
+  const pheonGold = pheonRateKnown ? (crystalGoldPer100 / 100) * pheonCrystalPerOne * pheonCost : 0;
+  return { totalGold: price + pheonGold, tradeGold: price, fixedGold: pheonGold, silver: 0,
+    complete: price > 0 && (!pheonCost || pheonRateKnown) };
 }
 async function calculateAccessorySpecEstimates() {
   const equipped = state.powerSnapshot?.effects?.accessory?.items || state.accessory?.items || [];
@@ -2175,15 +2175,15 @@ async function calculateAccessorySpecEstimates() {
       const price = Number(item?.price || 0);
       const powerEstimate = support ? supportAccessoryPowerEstimate(candidate, state.powerSnapshot) : accessoryPowerEstimate(candidate, state.powerSnapshot);
       const powerDelta = round2(powerEstimate.value);
-      const cost = specMarketCost(price, item?.pheonCost || 0);
+      const cost = specMarketCost(price, Number(item?.pheonCost || 0));
       return {
         category: 'accessory',
         item: { type: candidate.instanceLabel, name: candidate.equippedItem?.name || `${candidate.label} ${candidate.comboLabel}`, icon: item?.icon || '', quality: item?.quality },
-        available: price > 0 && Number(powerEstimate.percent || 0) > 0,
+        available: cost.complete && Number(powerEstimate.percent || 0) > 0,
         from: '',
         to: candidate.comboLabel,
         cost,
-        expectedCost: { expectedGold: cost.totalGold, expectedSilver: 0 },
+        expectedCost: { expectedGold: cost.totalGold, expectedSilver: 0, complete: cost.complete },
         powerDelta,
         powerEstimate,
         accessoryCandidate: candidate,
@@ -2191,7 +2191,7 @@ async function calculateAccessorySpecEstimates() {
         supportLabel: `${candidate.label} ${candidate.comboLabel} 최저가`,
         stepLabel: candidate.instanceLabel,
         stepDetail: `${candidate.currentPairLabel} → ${candidate.comboLabel}`,
-        reason: price > 0 ? '악세 최저가 기준' : '악세 시세 없음'
+        reason: price <= 0 ? '악세 시세 없음' : !cost.complete ? '페온 환산 시세 없음 · 총비용 미확정' : '악세 최저가 기준'
       };
     } catch (error) {
       return { category: 'accessory', item: { type: candidate.label, name: `${candidate.label} ${candidate.comboLabel}` }, available: false, reason: error.message || '악세 시세 조회 실패', powerDelta: 0, cost: {}, expectedCost: {} };
@@ -2517,14 +2517,14 @@ function bindSpecPlannerControls() {
     if (targetLabel) targetLabel.textContent = isSupportPowerSnapshot(state.powerSnapshot) ? '목표 복합 기여 지수' : hasModeledRecommendationMetrics() ? '목표 환산 전투력' : '목표 전투력';
     if (!(state.specPlannerTarget > 0)) state.specPlannerTarget = Math.ceil(currentPower + 100);
     targetInput.value = String(Math.round(state.specPlannerTarget));
-    targetInput.onchange = () => {
+    targetInput.oninput = () => {
       state.specPlannerTarget = Math.max(currentPower, Number(targetInput.value || currentPower));
       renderSpecPlannerOutput();
     };
   }
   if (budgetInput) {
     budgetInput.value = String(Math.round(state.specPlannerBudget));
-    budgetInput.onchange = () => {
+    budgetInput.oninput = () => {
       state.specPlannerBudget = Math.max(0, Number(budgetInput.value || 0));
       renderSpecPlannerOutput();
     };
@@ -2582,7 +2582,7 @@ function applySpecScenarioPayload(payload, options = {}) {
   }
   state.specPlannerMode = payload.plannerMode === 'budget' ? 'budget' : 'target';
   state.specPlannerTarget = Math.max(0, Number(payload.plannerTarget || 0));
-  state.specPlannerBudget = Math.max(0, Number(payload.plannerBudget || state.specPlannerBudget));
+  state.specPlannerBudget = Math.max(0, Number(payload.plannerBudget ?? state.specPlannerBudget));
   if (!options.deferRender) {
     renderEvolutionTiers();
     calculateAndRender();
@@ -3196,7 +3196,7 @@ function renderArmguardMaterialRows(cost) {
 let armguardCostRender = null;
 async function renderArmguardExpectedCost(priceMap) {
   const result = $('armguardCostResult');
-  if (!result) return;
+  if (!result?.closest('.powerCostPrep')?.open) return;
   armguardCostRender?.abort();
   const controller = new AbortController();
   armguardCostRender = controller;
@@ -3293,6 +3293,7 @@ function bindArmguardCostControls(priceMap) {
   const toSelect = $('armguardToStage');
   const modeInputs = [...document.querySelectorAll('input[name="armguardBreathMode"]')];
   if (!fromSelect || !toSelect) return;
+  const panel = fromSelect.closest('.powerCostPrep');
   const update = changed => {
     let from = Math.max(0, Math.min(24, Number(fromSelect.value || 0)));
     let to = Math.max(1, Math.min(25, Number(toSelect.value || 25)));
@@ -3312,7 +3313,11 @@ function bindArmguardCostControls(priceMap) {
     state.armguardBreathMode = ['none', 'full'].includes(input.value) ? input.value : 'optimal';
     renderArmguardExpectedCost(t4MaterialPriceCache || priceMap);
   }; });
-  update();
+  panel.ontoggle = () => {
+    if (panel.open) update();
+    else armguardCostRender?.abort();
+  };
+  if (panel.open) update();
 }
 async function loadT4MaterialPriceMap() {
   if (t4MaterialPriceCache) return t4MaterialPriceCache;
@@ -3451,13 +3456,14 @@ async function hydrateCrystalPrice() {
     updatePheonGoldSummary();
     refreshPowerCostEstimatesFromMarketCache();
   };
-  crystalInput.addEventListener('input', onInput);
+  let crystalEdited = false;
+  crystalInput.addEventListener('input', () => { crystalEdited = true; onInput(); });
   pheonInput.addEventListener('input', onInput);
   try {
     const data = await loadCrystalPrice();
     const value = Number(data?.crystalGoldPer100 || 0);
     if (value > 0) {
-      crystalInput.value = String(Math.round(value));
+      if (!crystalEdited) crystalInput.value = String(Math.round(value));
       if (sourceText) {
         const latestTime = data?.latest?.dt ? ` · 기준 ${data.latest.dt}` : '';
         sourceText.textContent = `LOSPI 1시간 OHLC 최신 종가 기준${latestTime}. 실패하거나 맞지 않으면 직접 수정할 수 있습니다.`;
@@ -3596,7 +3602,8 @@ function renderPowerSnapshot(snapshot) {
     .map(gem => {
       const label = gem.kind === 'damage' ? '딜' : gem.kind === 'cooldown' ? '쿨' : '?';
       const icon = gem.icon ? `<img src="${escapeHtml(gem.icon)}" alt="">` : `<i>${escapeHtml(label)}</i>`;
-      return `<span title="${escapeHtml(label)} Lv.${Number(gem.level || 0)} ${escapeHtml(gem.skillName || gem.name || '-')}">${icon}<b>${Number(gem.level || 0)}</b></span>`;
+      const binding = gem.bound ? ' · 귀속' : '';
+      return `<span title="${escapeHtml(label)} Lv.${Number(gem.level || 0)} ${escapeHtml(gem.skillName || gem.name || '-')}${binding}">${icon}<b>${Number(gem.level || 0)}</b></span>`;
     })
     .join('');
   const gearRows = sortCombatEquipmentForDisplay(combat).map(renderPowerEquipmentRow).join('');
@@ -3618,7 +3625,7 @@ function renderPowerSnapshot(snapshot) {
         <span>보석 · 장비 · 악세 · 아크그리드</span>
       </div>
       <details class="powerSnapshotBlock simulatorFold">
-        <summary class="simulatorFoldSummary"><span><h3>장착 보석</h3><small>장착 중인 보석 11개와 귀속 여부</small></span></summary>
+        <summary class="simulatorFoldSummary"><span><h3>장착 보석</h3><small>장착 ${gemItems.length}개${gemItems.length ? ` · 귀속 ${gemItems.filter(gem => gem.bound).length}개` : ''}</small></span></summary>
         <div class="simulatorFoldBody"><div id="gemAnalyzerSummary" class="powerBuildHeader">${gemAnalyzerSummaryHtml(snapshot)}</div><div class="powerGemList">${equippedGems || '<span>보석 정보를 찾지 못했습니다.</span>'}</div></div>
       </details>
       ${renderSkillCyclePanel()}
@@ -3643,6 +3650,7 @@ function renderPowerSnapshot(snapshot) {
     <details class="powerSnapshotNote simulatorMethodNote"><summary>계산 기준 및 주의사항</summary><p>기대 피해는 공통 피해 엔진과 스킬 지분을 사용합니다. 전투력 추정, 보석의 분석 기반 환산, 재련 기대 비용은 각 항목의 계산 기준을 사용합니다. 스킬 주기와 서포터 가동률은 모델 추정치이며, 실제 전투 순서나 전투 시간별 총 피해와 DPS는 계산하지 않습니다.</p></details>
   `;
   bindSpecPlannerControls();
+  renderSpecScenarioComparison();
   hydratePowerCostMaterialPrices();
   hydrateCrystalPrice();
 }
@@ -5584,13 +5592,15 @@ async function fetchCharacterData(name, { force, maxAttempts }) {
       const body = await res.text();
       let data = null;
       try { data = body ? JSON.parse(body) : null; } catch {}
-      if (res.ok && data?.ok) {
-        const savedAt = saveStoredCharacter(data.profile?.CharacterName || name, data);
+      if (res.ok && data?.ok && data.profile?.CharacterName) {
+        const savedAt = saveStoredCharacter(data.profile.CharacterName, data);
         return { data, savedAt, fromCache: false };
       }
 
-      const error = new Error(data?.error || data?.message || `캐릭터 검색 서버 오류 (${res.status})`);
-      error.retryable = !data || res.status === 429 || res.status >= 500;
+      const incomplete = res.ok && data?.ok && !data.profile?.CharacterName;
+      const error = new Error(incomplete ? 'Open API 응답에 캐릭터 프로필이 없습니다.'
+        : data?.error || data?.message || `캐릭터 검색 서버 오류 (${res.status})`);
+      error.retryable = incomplete || !data || res.status === 429 || res.status >= 500;
       throw error;
     } catch (error) {
       lastError = error;
@@ -5627,7 +5637,7 @@ function rememberCharacterWorkspace() {
     supportInputs: new Map(supportManaInputs),
     selection: JSON.stringify(state.selected) !== JSON.stringify(state.apiSelected) ? cloneSelection(state.selected) : null,
     planner: {
-      specPlannerMode: state.specPlannerMode, specPlannerTarget: state.specPlannerTarget,
+      specEfficiencyFilter: state.specEfficiencyFilter, specPlannerMode: state.specPlannerMode, specPlannerTarget: state.specPlannerTarget,
       specPlannerBudget: state.specPlannerBudget, specScenarioSelectedKeys: new Set(state.specScenarioSelectedKeys),
       armguardRange: { ...state.armguardRange }, armguardBreathMode: state.armguardBreathMode
     }
@@ -5678,8 +5688,7 @@ function resetCharacterResultState() {
   state.evolutionPointBudget = null;
   state.powerSnapshot = null;
   state.powerCostEstimates = [];
-  state.specPlannerTarget = 0;
-  state.specScenarioSelectedKeys = new Set();
+  Object.assign(state, defaultSimulatorSelection());
   state.abilityStone = { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
   state.engraving = emptyEngravingState();
   state.rawEngravings = [];
@@ -5702,7 +5711,7 @@ function applyCharacterData(data, restore) {
   state.bracelet = data.braceletEffects || { critRate: 0, critDamage: 0, critHitDamage: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   state.abilityStone = data.abilityStoneEffects || { attackPower: 0, effects: { critRate: 0, critDamage: 0, additionalDamage: 0, enemyDamage: 0, attackPower: 0, conditionalDamage: 0 }, engravings: [], items: [] };
   state.engraving = data.engravingEffects || emptyEngravingState();
-  state.rawEngravings = data.raw?.ArmoryEngraving?.ArkPassiveEffects || [];
+  state.rawEngravings = data.equippedEngravings || data.raw?.ArmoryEngraving?.ArkPassiveEffects || [];
   state.arkGrid = data.arkGridEffects || { critRate: 0, critDamage: 0, attackSpeed: 0, moveSpeed: 0, enemyDamage: 0, additionalDamage: 0, items: [] };
   state.arkGridSkillEffects = data.arkGridSkillEffects || emptyPassiveSkillEffectState();
   state.card = data.cardEffects || emptyCardEffects();
@@ -5754,7 +5763,6 @@ function applyCharacterData(data, restore) {
   renderSkillEffectControl();
   applyProfileDefaults(data.profile, state.apiSelected);
   restore?.();
-  renderPowerSnapshot(state.powerSnapshot);
   renderEvolutionTiers();
   renderSummary(data.profile, data.arkPassive);
   return calculateAndRender();
@@ -5886,6 +5894,9 @@ function renderPage() {
     if (cycle) cycle.open = true;
   }
   $('recommendHeading').textContent = page === 'combat' ? '마나 지속 가능성과 기대 피해' : '2·3·4·5티어 조합 추천';
+  const recalculateArea = $('evolutionRecalculateButton').parentElement;
+  const recalculateSlot = page === 'combat' ? $('combatRecalculateSlot') : $('evolutionPanel').querySelector('.evolutionSectionHead');
+  if (recalculateArea.parentElement !== recalculateSlot) recalculateSlot.append(recalculateArea);
   if (simulator && ready && state.powerSnapshot) {
     if (!simulatorRendered) renderPowerSnapshot(state.powerSnapshot);
     $('powerSnapshotPanel').classList.remove('hidden');
@@ -6298,10 +6309,6 @@ function applyMarketSnapshot(snapshot, { persist = true } = {}) {
   if (!isUsableClientMarketSnapshot(snapshot)) return false;
   marketSnapshotAvailable = true;
   const sections = snapshot.sections;
-  if (persist) {
-    marketSnapshotSectionTimes = Object.fromEntries(Object.keys(MARKET_SECTION_ROUTES).map(section =>
-      [section, snapshot.sectionUpdatedAt?.[section] || sections[section].updatedAt]));
-  }
   applyMarketSnapshotSection('gem', sections.gem);
   applyMarketSnapshotSection('engraving', sections.engraving);
   applyMarketSnapshotSection('material', sections.material);
@@ -6313,6 +6320,9 @@ function applyMarketSnapshot(snapshot, { persist = true } = {}) {
     renderMaterialPriceGrid($('materialMarketResult'), materialQuoteSection);
   }
   applyMarketSnapshotSection('crystal', sections.crystal);
+  marketSnapshotSectionTimes = Object.fromEntries(Object.keys(MARKET_SECTION_ROUTES).map(section =>
+    [section, marketSectionData(section)?.updatedAt]));
+  renderMarketFreshness();
   if (persist) {
     const stored = compactClientMarketSnapshot(snapshot);
     for (const section of Object.keys(MARKET_SECTION_ROUTES)) {
@@ -6477,6 +6487,7 @@ function renderAvatarJobPicker() {
 }
 
 function selectAvatarJob(job) {
+  if (legendAvatarLoading) return;
   selectedAvatarJob = job || null;
   renderAvatarJobPicker();
   if (!selectedAvatarJob) return;
@@ -6553,6 +6564,7 @@ async function loadLegendAvatarSet(job, force = false) {
   if (mainButton) mainButton.disabled = true;
   if (refreshButton) refreshButton.disabled = true;
   legendAvatarLoading = true;
+  $('avatarJobPicker')?.querySelectorAll('button').forEach(button => { button.disabled = true; });
   setAvatarMessage(`${job} 전설 아바타 시세를 부위별로 조회하는 중입니다.`);
 
   const order = ['머리', '상의', '하의', '무기'];
@@ -6601,6 +6613,7 @@ async function loadLegendAvatarSet(job, force = false) {
     setAvatarMessage(error.message, true);
   } finally {
     legendAvatarLoading = false;
+    $('avatarJobPicker')?.querySelectorAll('button').forEach(button => { button.disabled = false; });
     if (mainButton) mainButton.disabled = false;
     if (refreshButton) refreshButton.disabled = false;
   }
@@ -6736,12 +6749,12 @@ async function searchMarketAccessory() {
 async function loadMarketGemList(force = false) {
   if (!canForceMarketRefresh('gem', force)) return;
   if (!force && marketListLoadState.gem === 'loaded') return;
-  if (!force && marketListLoadState.gem === 'loading') return;
+  if (marketListLoadState.gem === 'loading') return;
   marketListLoadState.gem = 'loading';
   const button = $('gemListButton');
   const resultEl = $('gemMarketResult');
   if (button) { button.disabled = true; button.textContent = '조회 중'; }
-  if (resultEl) resultEl.innerHTML = '경매장에서 5~10레벨 겁화/작열 최저가를 조회하는 중입니다.';
+  if (resultEl && !marketSectionData('gem')) resultEl.innerHTML = '경매장에서 5~10레벨 겁화/작열 최저가를 조회하는 중입니다.';
   try {
     const data = await fetchMarketJson(`/api/market-prices?mode=gemList${force ? '&force=1' : ''}`);
     renderGemPriceGrid(resultEl, data);
@@ -6749,8 +6762,7 @@ async function loadMarketGemList(force = false) {
     updateStoredMarketSnapshotSection('gem', data);
     rememberMarketRefresh('gem', force);
   } catch (error) {
-    marketListLoadState.gem = 'idle';
-    renderMarketError(resultEl, error.message);
+    restoreMarketListAfterFailure('gem', resultEl, renderGemPriceGrid, error);
   } finally {
     updateMarketRefreshButtons();
   }
@@ -6759,12 +6771,12 @@ async function loadMarketGemList(force = false) {
 async function loadMarketEngravingList(force = false) {
   if (!canForceMarketRefresh('engraving', force)) return;
   if (!force && marketListLoadState.engraving === 'loaded') return;
-  if (!force && marketListLoadState.engraving === 'loading') return;
+  if (marketListLoadState.engraving === 'loading') return;
   marketListLoadState.engraving = 'loading';
   const button = $('engravingListButton');
   const resultEl = $('engravingMarketResult');
   if (button) { button.disabled = true; button.textContent = '조회 중'; }
-  if (resultEl) resultEl.innerHTML = '거래소에서 전체 유물 각인서 최저가를 조회하는 중입니다.';
+  if (resultEl && !marketSectionData('engraving')) resultEl.innerHTML = '거래소에서 전체 유물 각인서 최저가를 조회하는 중입니다.';
   try {
     const data = await fetchMarketJson(`/api/market-prices?mode=engravingList${force ? '&force=1' : ''}`);
     renderEngravingPriceGrid(resultEl, data);
@@ -6772,11 +6784,23 @@ async function loadMarketEngravingList(force = false) {
     updateStoredMarketSnapshotSection('engraving', data);
     rememberMarketRefresh('engraving', force);
   } catch (error) {
-    marketListLoadState.engraving = 'idle';
-    renderMarketError(resultEl, error.message);
+    restoreMarketListAfterFailure('engraving', resultEl, renderEngravingPriceGrid, error);
   } finally {
     updateMarketRefreshButtons();
   }
+}
+
+function restoreMarketListAfterFailure(section, container, render, error) {
+  const previous = marketSectionData(section);
+  marketListLoadState[section] = previous ? 'loaded' : 'idle';
+  if (!previous) return renderMarketError(container, error.message);
+  render(container, previous);
+  if (!container) return;
+  const status = document.createElement('p');
+  status.className = 'hint';
+  status.setAttribute('role', 'status');
+  status.textContent = '시세 갱신 실패 · 마지막 정상 가격 표시 중';
+  container.prepend(status);
 }
 
 async function loadMarketMaterialList(force = false, { revalidate = false } = {}) {
@@ -7055,12 +7079,12 @@ function renderRatioPanel() {
 async function loadMarketCrystalPrice(force = false) {
   if (!canForceMarketRefresh('crystal', force)) return;
   if (!force && marketListLoadState.crystal === 'loaded') return;
-  if (!force && marketListLoadState.crystal === 'loading') return;
+  if (marketListLoadState.crystal === 'loading') return;
   const button = $('crystalListButton');
   const resultEl = $('crystalMarketResult');
   marketListLoadState.crystal = 'loading';
   if (button) button.disabled = true;
-  if (resultEl) resultEl.innerHTML = '<div class="marketEmptyBox">최신 크리스탈 시세를 불러오는 중입니다.</div>';
+  if (resultEl && !crystalPriceCache) resultEl.innerHTML = '<div class="marketEmptyBox">최신 크리스탈 시세를 불러오는 중입니다.</div>';
   try {
     const data = await loadCrystalPrice(force);
     renderCrystalMarketPrice(resultEl, data);
@@ -7068,9 +7092,7 @@ async function loadMarketCrystalPrice(force = false) {
     updateStoredMarketSnapshotSection('crystal', data);
     rememberMarketRefresh('crystal', force);
   } catch (error) {
-    marketListLoadState.crystal = crystalPriceCache ? 'loaded' : 'idle';
-    if (crystalPriceCache) renderCrystalMarketPrice(resultEl, crystalPriceCache);
-    else renderMarketError(resultEl, error.message || '크리스탈 시세를 불러오지 못했습니다.');
+    restoreMarketListAfterFailure('crystal', resultEl, renderCrystalMarketPrice, error);
   } finally {
     updateMarketRefreshButtons();
   }

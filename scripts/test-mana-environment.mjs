@@ -137,7 +137,7 @@ try {
   const first = mockResponse();
   await characterHandler({ query }, first);
   assert.equal(first.statusCode, 200);
-  assert.equal(first.body.apiVersion, '6.1.10');
+  assert.equal(first.body.apiVersion, '6.1.11');
   assert.equal(first.body.manaProfile.maxMana, 3500);
   assert.equal(first.body.manaProfile.skills[0].preEvolutionCost, 280);
   assert.doesNotMatch(JSON.stringify(first.body), /test-token/);
