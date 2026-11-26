@@ -121,13 +121,24 @@ function isConditionalSkill(item) {
   return Boolean(item?.conditional) || (item?.selectedTripods || []).some(tripod => tripod?.conditional);
 }
 
+const arcanaCardDrawByCycle = new WeakMap();
 function currentArcanaCardExpectation(cooldownReduction = null) {
   const model = findArcanaCardExpectation(state.powerSnapshot?.profile);
   if (!model || model.key !== 'emperor' || cooldownReduction == null || !Number.isFinite(Number(cooldownReduction))) return model;
-  const castFrequency = evaluateSkillCastFrequency(state.skillCycle, Number(cooldownReduction), {
+  const cycle = state.skillCycle;
+  const reduction = Number(cooldownReduction);
+  let byReduction = arcanaCardDrawByCycle.get(cycle);
+  if (cycle && !byReduction) {
+    byReduction = new Map();
+    arcanaCardDrawByCycle.set(cycle, byReduction);
+  }
+  if (byReduction?.has(reduction)) return byReduction.get(reduction);
+  const castFrequency = evaluateSkillCastFrequency(cycle, reduction, {
     referenceReduction: Number(model.referenceCooldownReduction || 0)
   });
-  return scaleArcanaCardDraw(model, castFrequency.multiplier);
+  const expectation = scaleArcanaCardDraw(model, castFrequency.multiplier);
+  byReduction?.set(reduction, expectation);
+  return expectation;
 }
 
 function currentArcanaStreamEffect() {
@@ -2323,13 +2334,18 @@ async function calculateEngravingSpecEstimates(snapshot) {
   const candidates = books.filter(item => item?.grade === '유물' && Number(item.bookLevel || 0) < 4 && item?.deltaEffects && Object.keys(item.deltaEffects).length
     && engravingAllowedForBuild(item.name, style));
   if (!candidates.length) return [{ category: 'engraving', item: { type: '각인서', name: '다음 각인서 후보' }, available: false, reason: '유물 각인서 Lv.0~3 업그레이드 후보 없음', powerDelta: 0, cost: {}, expectedCost: {} }];
+  const sharedQuotes = new Map((marketSectionData('engraving')?.items || [])
+    .filter(item => !item?.missing && !item?.error && Number.isFinite(Number(item?.price)) && Number(item.price) > 0)
+    .map(item => [item.name, item]));
   const rows = await Promise.all(candidates.map(async book => {
     try {
-      const data = await fetchMarketJson(`/api/market-prices?mode=engraving&name=${encodeURIComponent(book.name)}`);
-      const item = data.lowest || data.items?.[0] || null;
+      const shared = sharedQuotes.get(`유물 ${book.name} 각인서`);
+      const data = shared ? null : await fetchMarketJson(`/api/market-prices?mode=engraving&name=${encodeURIComponent(book.name)}`);
+      const item = shared || data?.lowest || data?.items?.[0] || null;
       const unitPrice = Number(item?.price || 0);
       const buyCount = 5;
       const price = unitPrice * buyCount;
+      const priceBasis = shared ? '시세 탭 공유 각인서 가격' : '개별 조회 각인서 가격';
       const powerEstimate = engravingPowerEstimateFromEffects(book.deltaEffects, snapshot, book);
       const powerDelta = round2(powerEstimate.value);
       return {
@@ -2346,7 +2362,7 @@ async function calculateEngravingSpecEstimates(snapshot) {
         supportLabel: `${book.name} 유물 각인서 최저가 × ${buyCount}장`,
         stepLabel: `${book.name} 각인서`,
         stepDetail: `Lv.${book.bookLevel} → Lv.${book.nextBookLevel}`,
-        reason: price > 0 ? '각인서 최저가 기준' : '각인서 시세 없음'
+        reason: price > 0 ? priceBasis : '각인서 시세 없음'
       };
     } catch (error) {
       return { category: 'engraving', item: { type: '각인서', name: `${book.name} 유물 각인서` }, available: false, reason: error.message || '각인서 시세 조회 실패', powerDelta: 0, cost: {}, expectedCost: {} };
@@ -5275,7 +5291,9 @@ async function calculateAndRender() {
   const budgetKnown = state.evolutionPointBudget != null;
   const cost = row => getNode(row.name).costPerLevel * row.level;
   const fixed = selectedEntries(state.selected).filter(row => row.tier === 1);
-  const pointBudget = state.evolutionPointBudget ?? selectedEntries(apiSelection).reduce((sum, row) => sum + cost(row), 0);
+  const equippedPoints = selectedEntries(apiSelection).reduce((sum, row) => sum + cost(row), 0);
+  const pointBudget = state.evolutionPointBudget ?? equippedPoints;
+  const inconsistentPoints = budgetKnown && apiSelection === state.apiSelected && equippedPoints > pointBudget;
   const nodes = (state.evolution?.nodes || []).filter(node => !excludeCooldown || !hasCooldownEffect(node.name));
   const fixedSelection = selectionWithoutTiers(state.selected, [2, 3, 4, 5]);
   const baseStats = getBaseStats(fixedSelection);
@@ -5404,6 +5422,7 @@ async function calculateAndRender() {
     const status = $('manaRecommendationStatus');
     if (status) {
       const detail = [!budgetKnown && '보유 진화 포인트 미조회 · API 장착 포인트 범위에서 비교', unavailableReason || manaInput?.reason,
+        inconsistentPoints && `API 보유 ${pointBudget}P · 장착 ${equippedPoints}P 불일치`,
         defaultRecommendation && !manaVerificationUnavailable && !ranks.counts.measured && '300초 시전·마나 실측과 대조된 후보가 없습니다.',
         mode === 'estimate' && !manaVerificationUnavailable && (manaInput?.detail || manaInput?.scenario?.environment?.assumption),
         mode === 'theory' && manaInput?.threshold && '상세에 가상 운용의 최소 최대 MP 표시'].filter(Boolean).join(' · ');

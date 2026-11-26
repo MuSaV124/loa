@@ -955,7 +955,7 @@ async function verifyBrandLanding() {
     await page.route('**/api/**', route => route.fulfill({ json: { ok: true } }));
     await page.route('**/api/character**', route => route.fulfill({ json: characterResponse }));
     try {
-      await page.goto(routingOrigin);
+      await page.goto(routingOrigin, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { name: 'YOUR BUILD. YOUR POWER.' }).waitFor();
       assert.match(await page.title(), /^XXAPICK/);
       assert.equal(await page.locator('.pickTool').count(), 4);
@@ -1089,6 +1089,10 @@ async function verifyEvolutionWorkspace() {
         await page.locator('#characterOverviewLink').click();
         await page.locator('#characterNav').waitFor();
         assert.equal(await page.locator('.evolutionWorkspace').evaluate(element => getComputedStyle(element).display), 'contents');
+        await page.locator('#sourceSummary .enlightenmentDetails summary').first().click();
+        const overview = await geometry();
+        assert.ok(overview.summary.top >= overview.tabs.bottom, `The overview summary must clear the character menu at ${width}px`);
+        await page.locator('#copyCharacterLink').click();
       }
     } finally {
       await page.close();

@@ -61,7 +61,7 @@ window.__xxapickAudit = () => {
     grid: state.powerSnapshot.arkGrid, mana: state.manaCharacter,
     estimates: state.powerCostEstimates.map(row => ({ category: row.category, available: row.available, metric: specEfficiencyMetric(row),
       percent: specEfficiencyPercent(row), gold: row.expectedCost?.expectedGold ?? null, complete: row.expectedCost?.complete ?? null,
-      expectedAttempts: row.expectedCost?.expectedAttempts ?? null, reason: specEfficiencyReason(row) })),
+      expectedAttempts: row.expectedCost?.expectedAttempts ?? null, engravingName: row.engravingUpgrade?.name, reason: specEfficiencyReason(row) })),
     market: ['gem', 'engraving', 'material', 'crystal'].map(section => marketSectionData(section)?.updatedAt ?? null)
   };
 };
@@ -132,6 +132,10 @@ async function instrument(page, { traces = false } = {}) {
     }
     const section = { gemList: 'gem', engravingList: 'engraving', t4Materials: 'material' }[modeName];
     if (section) return route.fulfill({ json: market.sections[section] });
+    if (modeName === 'engraving') {
+      const item = market.sections.engraving.items.find(item => item.name === `유물 ${name} 각인서` && item.price > 0);
+      return route.fulfill({ json: { ok: true, items: item ? [item] : [], lowest: item ?? null } });
+    }
     if (modeName === 'accessory') {
       if (!url.searchParams.get('role') && url.searchParams.get('combo') === 'reverseHighMid') {
         return route.fulfill({ json: { ok: true, items: [], accessoryDebug: { filterStats: { quality: 1 } } } });
@@ -190,6 +194,13 @@ function auditBuildData(fixture, payload) {
   }
   for (const [, base, effective] of payload.cycles) assert.ok(base > 0 && effective > 0 && Number.isFinite(effective));
   for (const row of payload.estimates.filter(row => row.available)) assert.ok(row.gold > 0 && row.complete !== false && row.percent > 0, JSON.stringify(row));
+  for (const row of payload.estimates.filter(row => row.engravingName)) {
+    const quote = market.sections.engraving.items.find(item => item.name === `유물 ${row.engravingName} 각인서` && item.price > 0 && !item.missing && !item.error);
+    if (quote) {
+      assert.equal(row.gold, quote.price * 5);
+      assert.match(row.reason, /공유 각인서 가격/);
+    }
+  }
 }
 
 async function runBuilds() {
@@ -198,7 +209,10 @@ async function runBuilds() {
   const firstPerBuild = [...new Map(jobs.map(entry => [entry[1].build, entry])).values()];
   const firstNames = new Set(firstPerBuild.map(([name]) => name));
   jobs.splice(0, jobs.length, ...firstPerBuild, ...jobs.filter(([name]) => !firstNames.has(name)));
-  if (process.env.XXAPICK_AUDIT_CHARACTER) jobs.splice(0, jobs.length, ...jobs.filter(([name]) => name === process.env.XXAPICK_AUDIT_CHARACTER));
+  if (process.env.XXAPICK_AUDIT_CHARACTER) {
+    const selected = new Set(process.env.XXAPICK_AUDIT_CHARACTER.split('|'));
+    jobs.splice(0, jobs.length, ...jobs.filter(([name]) => selected.has(name)));
+  }
   assert.ok(jobs.length > 0, 'No armory matched XXAPICK_AUDIT_CHARACTER');
   const checkpointFile = `${output}.ndjson`;
   await writeFile(checkpointFile, '');
@@ -222,6 +236,9 @@ async function runBuilds() {
           await waitRanks(page);
           result.rankRows = await page.locator('#recommendList .comboRow .rowMetric:first-child b').allTextContents();
           assert.ok(result.rankRows.length <= 5);
+          if (!result.rankRows.length && fixture.data.arkPassive?.Points?.find(row => row.Name === '진화')?.Value < 40) {
+            assert.match(await text(page, 'manaRecommendationStatus'), /포인트|보유.*장착.*불일치/);
+          }
           const ranks = result.rankRows.map(value => Number(value.replace('%', '')));
           for (const [index, value] of ranks.entries()) if (index && Number.isFinite(value) && Number.isFinite(ranks[index - 1])) {
             assert.ok(value <= ranks[index - 1], `TOP5 order ${ranks.join(', ')}`);
@@ -237,6 +254,9 @@ async function runBuilds() {
           await page.waitForFunction(() => window.__xxapickAuditReady(), null, { timeout: 60000 });
           const payload = await page.evaluate(() => window.__xxapickAudit());
           assert.deepEqual(payload.skillRows, before.skillRows);
+          assert.deepEqual(payload.scopedEngravings, before.scopedEngravings);
+          assert.deepEqual(payload.grid, before.grid);
+          assert.deepEqual(payload.market, before.market);
           near(payload.theory, before.theory);
           auditBuildData(fixture, payload);
           const scenario = await byId(page, 'specScenarioOutput').textContent();
@@ -335,8 +355,9 @@ async function viewportAudit(width) {
       await open('#inputPanel details');
       await byId(page, 'extraCritRate').fill('15.5');
       const firstCard = page.locator('.nodeCard').first();
+      await firstCard.scrollIntoViewIfNeeded();
       await firstCard.focus();
-      await page.locator('#nodeTooltip.visible').waitFor({ timeout: 4000 });
+      await page.locator('#nodeTooltip.visible').waitFor({ timeout: 15000 });
       const tooltip = await byId(page, 'nodeTooltip').boundingBox();
       assert.ok(tooltip && tooltip.x >= 0 && tooltip.x + tooltip.width <= width + 1);
       await firstCard.click();
@@ -362,7 +383,9 @@ async function viewportAudit(width) {
       await layout('combat');
       await open('#manaScenarioPanel');
       await option('manaSupport', 'bard');
-      await byId(page, 'manaShortageClass').check();
+      const manualMana = byId(page, 'manaShortageClass');
+      if (!(await manualMana.isChecked())) await page.locator('.manaManualToggle').click();
+      assert.equal(await manualMana.isChecked(), true);
       await byId(page, 'manaMax').fill('3400');
       await click('applyManaScenario');
       await waitRanks(page);

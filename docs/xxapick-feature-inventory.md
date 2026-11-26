@@ -9,8 +9,8 @@
 | H03 | 메인·공통 | 공홈 공지 및 실패 시 공식 목록 링크 | `loadLostarkNoticeCard`, `renderLostarkNoticeCard` |
 | H04 | 공통 | 주소 직접 접근, 공유, 뒤로/앞으로, 새로고침, 404·메인 복귀 | `pageRouteFromLocation`, `showPage`, `404.html` |
 | C01 | 캐릭터·진화·전투 | 프로필, 서버·직업·빌드·아이템 레벨과 캐릭터 메뉴, 링크 복사 | `renderCharacter`, `renderCharacterNavigation` |
-| C02 | 캐릭터·진화 | 계산 요약, 치적·치피·다중 치명·진피·추피·적주피·공증·공이속, 출처 펼치기, 초기화 | `renderCombatStats`, `score`, `renderSourceSummary` |
-| C03 | 캐릭터·진화 | 깨달음·도약, 적용 범위, 중복 확인 | `extractEnlightenmentEffects`, `renderEnlightenmentDetail` |
+| C02 | 캐릭터·진화 | 계산 요약, 치적·치피·다중 치명·진피·추피·적주피·공증·공이속, 출처 펼치기, 초기화 | `renderCombatStats`, `score`, `buildSourceSummary` |
+| C03 | 캐릭터·진화 | 깨달음·도약, 적용 범위, 중복 확인 | `extractEnlightenmentEffects`, `enlightenmentAppliedDetailHtml` |
 | C04 | 캐릭터·진화 | 어빌리티 스톤·각인서, 각인·팔찌·악세·그리드·카드 출처 | `renderCombatStats`, `getBaseStats` |
 | C05 | 캐릭터·진화 | 예리한 둔기 전설/유물, 장착·미장착 비교, 스킬별 조건 | `renderKeenEfficiency` |
 | N01 | 진화 | 추가 효과, 7개 수치 입력, 치적 시너지 10/20, 헤드/백 가정, 아드레날린·대체 각인 및 유물 책 레벨, 스킬·트라이포드 요약 | `inputPanel`, `getBaseStats`, `renderSkillEffectControl` |
