@@ -22,7 +22,7 @@
   <link rel="icon" type="image/svg+xml" href="/brand/icon.svg" />
   <link rel="apple-touch-icon" href="/brand/icon-180.png" />
   <link rel="manifest" href="/brand/site.webmanifest" />
-  <link rel="stylesheet" href="/style.css?v=mana-timeline-4" />
+  <link rel="stylesheet" href="/style.css?v=character-setup-1" />
   <link rel="stylesheet" href="/brand/site.css?v=4" />
 </head>
 <body data-site-page="home">
@@ -336,10 +336,13 @@
         </section>
       </div>
 
-      <section id="keenPanel" class="calcTabPanel panel">
-        <div class="sectionHead"><div><h2>예리한 둔기 효율</h2><p class="hint">스킬별 치적·치피와 조건부 효과를 반영해 전설·유물 예둔 효율을 계산합니다.</p></div></div>
-        <div id="keenEfficiency" class="keenGrid"></div>
-      </section>
+      <div class="characterAnalysisMain">
+        <section id="keenPanel" class="calcTabPanel panel">
+          <div class="sectionHead"><div><h2>예리한 둔기 효율</h2><p class="hint">스킬별 치적·치피와 조건부 효과를 반영해 전설·유물 예둔 효율을 계산합니다.</p></div></div>
+          <div id="keenEfficiency" class="keenGrid"></div>
+        </section>
+        <section id="characterSetupPanel" class="calcTabPanel characterSetup hiddenByRoute" aria-label="착용 장비 및 캐릭터 세팅"></section>
+      </div>
     </div>
 
     <section id="ratioPanel" class="panel ratioPanel tabContent hidden">
@@ -463,6 +466,6 @@
   </main>
 
   <div id="nodeTooltip" class="nodeTooltip" role="tooltip" aria-hidden="true"></div>
-  <script type="module" src="/app.js?v=6.1.15"></script>
+  <script type="module" src="/app.js?v=6.1.15-setup"></script>
 </body>
 </html>

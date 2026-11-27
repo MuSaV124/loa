@@ -2343,6 +2343,43 @@ select {
 
 /* v4.3.0 DB panel replaced with Keen Blunt efficiency */
 #keenPanel { grid-column: 1; }
+.characterAnalysisMain { display: contents; }
+body[data-site-page="character"].calculatorReady .characterAnalysisMain { display: grid; grid-column: 1; min-width: 0; gap: 14px; }
+.characterSetup { display: grid; min-width: 0; gap: 14px; grid-column: 1; }
+.setupGearGrid, .setupPassiveGrid { display: grid; gap: 14px; min-width: 0; }
+.setupGearGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+.setupPassiveGrid { grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
+.setupCard { min-width: 0; text-align: start; }
+.setupHeading, .setupBadges, .setupEmpty, .setupStats > div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 9px; }
+.setupHeading { justify-content: space-between; margin-bottom: 12px; }
+.setupHeading h2 { margin: 0; }
+.setupList, .setupGemGrid, .setupStats { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.setupGemGrid { grid-template-columns: repeat(auto-fit, minmax(min(148px, 100%), 1fr)); }
+.setupRow, .setupEmpty, .setupStats > div { min-width: 0; border: 1px solid var(--softLine); border-radius: 7px; background: var(--panel2); padding: 8px; }
+.setupRow { display: grid; align-items: start; grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+.setupRowBody, .setupPassiveGrid > div { min-width: 0; }
+.setupRowBody > strong { display: block; word-break: keep-all; }
+.setupIcon { display: block; width: 38px; height: 38px; object-fit: cover; background: var(--panel); border-radius: 5px; }
+.setupIconEmpty { border: 1px solid var(--softLine); }
+.setupBadge, .setupLabel, .setupCard summary, .setupEmpty, .setupFacts, .setupOptionGroup, .setupStats, .setupCard p { font-size: 12px; line-height: 1.45; }
+.setupLabel, .setupEmpty, .setupStats dt { color: var(--muted); }
+.setupBadge { display: inline-flex; align-items: center; justify-content: center; padding: 2px 5px; border: 1px solid var(--softLine); border-radius: 4px; color: var(--muted); }
+.setupGrade { color: #e3c7a1; }
+.setupBadges { margin-top: 4px; }
+.setupCard details { margin-top: 6px; }
+.setupCard summary { width: fit-content; min-height: 28px; align-content: center; cursor: pointer; font-weight: 650; }
+.setupOptionGroup, .setupCard p { margin: 5px 0; }
+.setupFacts { margin: 3px 0 0; padding-inline-start: 16px; }
+.setupRowBody, .setupOptionGroup, .setupFacts, .setupCard summary { overflow-wrap: anywhere; }
+.setupEmpty, .setupStats > div { justify-content: space-between; }
+.setupStats { grid-template-columns: repeat(auto-fit, minmax(min(110px, 100%), 1fr)); }
+.setupStats dd { margin: 0; text-align: end; font-variant-numeric: tabular-nums; font-weight: 750; }
+.setupGem { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+.setupGem .setupIcon { width: 44px; height: 44px; justify-self: center; }
+@media (max-width: 1180px) {
+  body[data-site-page="character"].calculatorReady .characterAnalysisMain, .characterSetup { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) { .setupGearGrid, .setupPassiveGrid { grid-template-columns: minmax(0, 1fr); } }
 .keenGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .keenNote { grid-column: 1 / -1; color: var(--muted); font-size: 13px; padding: 10px 12px; border: 1px solid var(--softLine); border-radius: 12px; background: #0b1220; }
 .keenCard { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--softLine); border-radius: 14px; background: #0b1220; }

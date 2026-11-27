@@ -21,6 +21,7 @@ import { materialPurchaser, materialQuote } from './material-quotes.js';
 import { marketFreshness, preservesPricedItems } from './market-freshness.js';
 import { MANA_RECOMMENDATION_SECONDS, PUBLIC_MANA_RECOVERY_RATE, buildManaRecovery, createManaRanking, evaluateManaCandidate, evaluateManaDemand, evaluateManaRotation, forecastManaDamage, manaFurnaceDamage, manaRateInputs, prepareManaScenario } from './mana-recommendation.js?v=6.1.15';
 import { clearManaTimelineGraph, renderManaDemand, renderManaSensitivity, renderManaTimeline } from './mana-timeline-ui.js?v=6.1.15';
+import { buildCharacterSetup, renderCharacterSetup } from './character-setup.js?v=1';
 import { buildAutomaticManaAnalysis } from './mana-automatic.js?v=6.1.14';
 import { buildCharacterManaProfile, findVerifiedManaProfile, MANA_PROFILE_PATCH, manaSkillScope, withManaCooldowns } from './mana-character.js?v=6.1.14';
 import { MANA_FOODS, resolveManaEnvironment, SUPPORT_MANA, SUPPORT_MANA_VERIFIED_AT, supportManaCycle, supportManaProfile, supportManaSummary } from './support-mana.js?v=6.1.14';
@@ -5826,6 +5827,8 @@ function saveStoredCharacter(name, data) {
   const key = normalizeCharacterCacheKey(name);
   const entries = readStoredObject(CHARACTER_CACHE_STORAGE_KEY);
   const cacheableData = { ...data };
+  const { hasGear, gear, accessories, gems, engravings } = buildCharacterSetup(data);
+  cacheableData.characterSetup = { version: 1, hasGear, gear, accessories, gems, engravings };
   delete cacheableData.raw;
   delete cacheableData.equipment;
   delete cacheableData.gems;
@@ -5959,6 +5962,7 @@ function resetCharacterResultState() {
   document.body.classList.remove('calculatorReady');
   $('characterCard').classList.add('hidden');
   $('characterCard').innerHTML = '';
+  $('characterSetupPanel')?.replaceChildren();
   $('powerSnapshotPanel')?.classList.add('hidden');
   if ($('powerSnapshotView')) $('powerSnapshotView').innerHTML = '';
   $('summaryPanel').classList.add('hidden');
@@ -6028,6 +6032,7 @@ function applyCharacterData(data, restore) {
   fillManaProfileInputs();
   syncAdrenalineControlsFromEngraving();
   renderCharacter(data.profile, data.arkPassive);
+  renderCharacterSetup($('characterSetupPanel'), data, powerEffectRows);
   state.foundEffects = readEffects(data.arkPassive);
   const points = data.arkPassive?.Points;
   const evolutionPoints = Array.isArray(points) ? points.find(point => point?.Name === '진화')?.Value : null;
@@ -6157,7 +6162,7 @@ function renderPage() {
   document.body.classList.toggle('calculatorReady', ready);
   document.body.classList.toggle('simulatorMode', simulator && ready && Boolean(state.powerSnapshot));
   const panels = {
-    character: ['characterCard', 'summaryPanel', 'keenPanel'],
+    character: ['characterCard', 'summaryPanel', 'keenPanel', 'characterSetupPanel'],
     nodes: ['characterCard', 'summaryPanel', 'inputPanel', 'evolutionPanel', 'recommendPanel', 'keenPanel'],
     combat: ['characterCard', 'combatPanel', 'recommendPanel']
   }[page] || [];
